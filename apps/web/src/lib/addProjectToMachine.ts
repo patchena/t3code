@@ -11,6 +11,8 @@ import type {
   ScopedProjectRef,
 } from "@t3tools/contracts";
 import { create } from "zustand";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { suggestAppAccessForRemote } from "../components/sourceControlAppAccessToast";
@@ -43,7 +45,7 @@ export interface AddProjectToMachineInput {
 
 function failureMessage(result: Parameters<typeof squashAtomCommandFailure>[0]): string {
   const error = squashAtomCommandFailure(result);
-  return error instanceof Error ? error.message : "An error occurred.";
+  return error instanceof Error ? error.message : String(error);
 }
 
 /**
@@ -75,12 +77,25 @@ export type ProjectFileCopy =
   | { readonly phase: "copying" }
   | { readonly phase: "failed"; readonly title: string; readonly failures: ReadonlyArray<string> };
 
+type CopyFailure = { readonly path: string } & (
+  | { readonly reason: "tooLarge" }
+  | { readonly reason: "diagnostic"; readonly message: string }
+);
+
+type FileCopyState =
+  | { readonly phase: "copying" }
+  | {
+      readonly phase: "failed";
+      readonly machine: string;
+      readonly failures: ReadonlyArray<CopyFailure>;
+    };
+
 /** Ignored-file copies still owed to a cloned project, keyed by its scoped project key. */
-const useFileCopies = create<{ copies: Readonly<Record<string, ProjectFileCopy>> }>(() => ({
+const useFileCopies = create<{ copies: Readonly<Record<string, FileCopyState>> }>(() => ({
   copies: {},
 }));
 
-function setFileCopy(key: string, copy: ProjectFileCopy | null) {
+function setFileCopy(key: string, copy: FileCopyState | null) {
   useFileCopies.setState(({ copies }) => {
     const { [key]: _previous, ...rest } = copies;
     return { copies: copy === null ? rest : { ...rest, [key]: copy } };
@@ -89,7 +104,22 @@ function setFileCopy(key: string, copy: ProjectFileCopy | null) {
 
 /** The composer holds sends until the copy lands, and shows a failed copy until dismissed. */
 export function useProjectFileCopy(ref: ScopedProjectRef | null): ProjectFileCopy | null {
-  return useFileCopies((state) => (ref ? (state.copies[scopedProjectKey(ref)] ?? null) : null));
+  const { t } = useTranslation("common");
+  const copy = useFileCopies((state) =>
+    ref ? (state.copies[scopedProjectKey(ref)] ?? null) : null,
+  );
+  if (copy?.phase !== "failed") return copy;
+  return {
+    phase: "failed",
+    title: t(($) => $.misc.machine.copyFailed, {
+      count: copy.failures.length,
+      machine: copy.machine,
+    }),
+    failures: copy.failures.map(
+      (failure) =>
+        `${failure.path}: ${failure.reason === "tooLarge" ? t(($) => $.misc.machine.tooLarge) : failure.message}`,
+    ),
+  };
 }
 
 export function dismissProjectFileCopy(ref: ScopedProjectRef) {
@@ -102,7 +132,11 @@ export function dismissProjectFileCopy(ref: ScopedProjectRef) {
  * talk to each other. Resolves once the clone starts. The caller opens the new
  * project, whose composer shows the clone and copy progress, so nothing toasts.
  */
-export async function addProjectToMachine(input: AddProjectToMachineInput): Promise<void> {
+export async function addProjectToMachine(
+  input: AddProjectToMachineInput,
+  t: TFunction<"common">,
+  tWorkspace: TFunction<"workspace">,
+): Promise<void> {
   // Read first, so the copy reflects the files as they were when the user asked.
   const reads = await Promise.all(
     input.files.map(async (relativePath) => {
@@ -112,10 +146,10 @@ export async function addProjectToMachine(input: AddProjectToMachineInput): Prom
           environmentId: input.source.environmentId,
           input: { cwd: input.source.cwd, relativePath },
         }),
-        { label: "Read file to copy", reportFailure: false, refresh: true },
+        { label: t(($) => $.misc.machine.readFile), reportFailure: false, refresh: true },
       );
       if (result._tag === "Failure") return { relativePath, error: failureMessage(result) };
-      if (result.value.truncated) return { relativePath, error: "Too large to copy." };
+      if (result.value.truncated) return { relativePath, tooLarge: true };
       return { relativePath, contents: result.value.contents };
     }),
   );
@@ -138,13 +172,13 @@ export async function addProjectToMachine(input: AddProjectToMachineInput): Prom
         destinationPath: input.destinationPath,
       },
     },
-    { label: "Add project to machine", reportFailure: false },
+    { label: t(($) => $.misc.machine.addProject), reportFailure: false },
   );
   if (started._tag === "Failure") {
     setFileCopy(copyKey, null);
     throw new Error(failureMessage(started));
   }
-  void suggestAppAccessForRemote(input.target.environmentId, input.remoteUrl);
+  void suggestAppAccessForRemote(input.target.environmentId, input.remoteUrl, tWorkspace);
   if (reads.length === 0) return;
 
   void (async () => {
@@ -153,10 +187,14 @@ export async function addProjectToMachine(input: AddProjectToMachineInput): Prom
       setFileCopy(copyKey, null);
       return;
     }
-    const failed: Array<string> = [];
+    const failed: CopyFailure[] = [];
     for (const read of reads) {
       if (!("contents" in read)) {
-        failed.push(`${read.relativePath}: ${read.error}`);
+        failed.push(
+          "tooLarge" in read
+            ? { path: read.relativePath, reason: "tooLarge" }
+            : { path: read.relativePath, reason: "diagnostic", message: read.error },
+        );
         continue;
       }
       const written = await runAtomCommand(
@@ -172,10 +210,14 @@ export async function addProjectToMachine(input: AddProjectToMachineInput): Prom
             contents: read.contents,
           },
         },
-        { label: "Copy file to machine", reportFailure: false },
+        { label: t(($) => $.misc.machine.copyFile), reportFailure: false },
       );
       if (written._tag === "Failure")
-        failed.push(`${read.relativePath}: ${failureMessage(written)}`);
+        failed.push({
+          path: read.relativePath,
+          reason: "diagnostic",
+          message: failureMessage(written),
+        });
     }
     setFileCopy(
       copyKey,
@@ -183,7 +225,7 @@ export async function addProjectToMachine(input: AddProjectToMachineInput): Prom
         ? null
         : {
             phase: "failed",
-            title: `Could not copy ${failed.length} ${failed.length === 1 ? "file" : "files"} to ${input.target.label}`,
+            machine: input.target.label,
             failures: failed,
           },
     );

@@ -730,7 +730,16 @@ function TaskForm({
     }
     const parsedFilters = parseWebhookFilterDrafts(draft.schedule.filters);
     if (draft.schedule.mode === "webhook" && "error" in parsedFilters) {
-      Dialog.alert("Invalid filter", parsedFilters.error);
+      const error = parsedFilters.error;
+      const description =
+        error.kind === "tooMany"
+          ? `Use at most ${error.maximum} filters.`
+          : error.kind === "path"
+            ? `Filter ${error.number} needs a path under body, headers or query.`
+            : error.kind === "values"
+              ? `Filter ${error.number} needs a path under body, headers or query, and at least one value.`
+              : `Filter ${error.number} needs a path under body, headers or query, and a value.`;
+      Dialog.alert("Invalid filter", description);
       return;
     }
     if (draft.schedule.mode === "webhook" && schedule === null) {

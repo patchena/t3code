@@ -32,7 +32,7 @@ function typeset(tex: string, display: boolean): string {
 }
 
 /** KaTeX lives in this lazily loaded chunk, so it is only fetched once a formula renders. */
-export default function MathTypeset(props: { tex: string; display: boolean; fallback: ReactNode }) {
+export function MathTypeset(props: { tex: string; display: boolean; fallback: ReactNode }) {
   const html = typeset(props.tex, props.display);
   if (!html) return props.fallback;
   // KaTeX escapes the TeX it renders, and `trust: false` keeps it from emitting links or attributes.

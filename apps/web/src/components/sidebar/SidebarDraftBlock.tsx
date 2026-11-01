@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { discardComposerDraft } from "../../lib/discardComposerDraft";
 import { replaceComposerContextReferences } from "@t3tools/shared/composerContextReferences";
 import { SquarePenIcon, XIcon } from "lucide-react";
@@ -33,6 +34,7 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
   onContextMenu: (draftId: DraftId, position: { x: number; y: number }) => void;
 }) {
   const { composer, draftId, onContextMenu, onDiscard, onNavigate } = props;
+  const { t } = useTranslation("workspace");
   const promptPreview =
     replaceComposerContextReferences(composer.prompt, (occurrence) => occurrence.label)
       .trim()
@@ -48,10 +50,10 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
   const preview =
     promptPreview.length > 0
       ? promptPreview
-      : `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`;
+      : t(($) => $.sidebar.attachments, { count: attachmentCount });
   const accessibility = resolveSidebarRowAccessibility({
     title: preview,
-    statusLabel: "Unsent draft",
+    statusLabel: t(($) => $.sidebar.draft),
     projectDisplayName: props.projectDisplayName,
     isActive: props.isActive,
   });
@@ -112,7 +114,7 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
                   render={
                     <button
                       type="button"
-                      aria-label="Discard draft"
+                      aria-label={t(($) => $.sidebar.discardDraft)}
                       onClick={handleDiscard}
                       className="pointer-events-none inline-flex cursor-pointer items-center rounded-md bg-transparent px-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100"
                     >
@@ -120,7 +122,7 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
                     </button>
                   }
                 />
-                <TooltipPopup side="top">Discard draft</TooltipPopup>
+                <TooltipPopup side="top">{t(($) => $.sidebar.discardDraft)}</TooltipPopup>
               </Tooltip>
             </span>
           </div>

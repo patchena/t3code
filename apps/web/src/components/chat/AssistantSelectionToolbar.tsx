@@ -5,6 +5,7 @@ import {
   type ScopedThreadRef,
 } from "@t3tools/contracts";
 import { QuoteIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { use, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -29,6 +30,7 @@ export function AssistantSelectionToolbar({
   threadRef: ScopedThreadRef;
   onCite: (citation: AssistantCitation, sourceAnchor: AssistantCitationSourceAnchor) => boolean;
 }) {
+  const { t } = useTranslation("chat");
   const [selection, setSelection] = useState<{
     citation: AssistantCitation;
     position: SelectionActionPoint;
@@ -195,7 +197,7 @@ export function AssistantSelectionToolbar({
       size="xs"
       variant="glass"
       disabled={tooLong}
-      aria-label={tooLong ? "Selection is too long to cite" : "Cite selection in composer"}
+      aria-label={tooLong ? t(($) => $.citation.tooLong) : t(($) => $.citation.citeSelection)}
       className="fixed z-50 max-w-[calc(100vw-1rem)]"
       style={{ left: selection.position.x, top: selection.position.y }}
       onPointerDown={(event) => event.preventDefault()}
@@ -209,7 +211,7 @@ export function AssistantSelectionToolbar({
       }}
     >
       <QuoteIcon aria-hidden="true" className="size-3.5" />
-      {tooLong ? "Shorten selection" : "Cite"}
+      {tooLong ? t(($) => $.citation.shorten) : t(($) => $.citation.cite)}
     </Button>,
     document.body,
   );

@@ -1,4 +1,10 @@
-import { SourceControlProviderKind, type VcsStatusResult } from "@t3tools/contracts";
+import { createI18n } from "@t3tools/client-runtime/i18n";
+import {
+  SourceControlProviderKind,
+  type GitRunStackedActionResult,
+  type VcsStatusResult,
+} from "@t3tools/contracts";
+import { EMPTY_VCS_ACTION_STATE } from "@t3tools/client-runtime/state/vcs";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { resolveAutoFeatureBranchName } from "@t3tools/shared/git";
 import { assert, describe, it } from "vite-plus/test";
@@ -9,7 +15,55 @@ import {
   resolveDefaultBranchActionDialogCopy,
   resolveLiveThreadBranchUpdate,
   resolveQuickAction,
-} from "./GitActionsControl.logic";
+  resolveGitActionResultPresentation,
+  resolveGitActionProgressPresentation,
+} from "~/components/GitActionsControl.logic";
+
+const t = createI18n("en").getFixedT(null, "workspace");
+
+it("localizes structured Git results and phases without changing diagnostic text", async () => {
+  const instance = createI18n("en");
+  const translate = instance.getFixedT(null, "workspace");
+  const terminology = sourceControlClients.get(
+    SourceControlProviderKind.make("github"),
+  ).changeRequest;
+  const result: GitRunStackedActionResult = {
+    action: "commit_push",
+    branch: { status: "skipped_not_requested" },
+    commit: { status: "created", commitSha: "abcdef012345", subject: "Unchanged subject" },
+    push: { status: "pushed", branch: "feature/ref" },
+    pr: { status: "skipped_not_requested" },
+    toast: {
+      title: "Server presentation text",
+      description: "Unchanged subject",
+      cta: { kind: "none" },
+    },
+  };
+  expectResult("Pushed abcdef0 to feature/ref");
+  await instance.changeLanguage("de");
+  expectResult("abcdef0 nach feature/ref gepusht");
+  assert.deepEqual(
+    resolveGitActionProgressPresentation(
+      {
+        ...EMPTY_VCS_ACTION_STATE,
+        isRunning: true,
+        operation: "run_change_request",
+        currentPhase: "commit",
+        lastOutputLine: "Unchanged diagnostic",
+      },
+      terminology,
+      translate,
+    ),
+    { status: "Commit wird erstellt...", output: "Unchanged diagnostic", startedAtMs: null },
+  );
+
+  function expectResult(title: string) {
+    assert.deepEqual(resolveGitActionResultPresentation(result, terminology, translate), {
+      title,
+      description: "Unchanged subject",
+    });
+  }
+});
 
 function status(overrides: Partial<VcsStatusResult> = {}): VcsStatusResult {
   return {
@@ -46,6 +100,9 @@ describe("when: ref is clean, ahead, and has an open PR", () => {
         },
       }),
       false,
+      false,
+      true,
+      t,
     );
     assert.deepInclude(quick, { kind: "run_action", action: "push", label: "Push" });
   });
@@ -60,7 +117,7 @@ describe("when: ref is clean, up to date, and has no open PR", () => {
       pr: null,
     });
 
-    const quick = resolveQuickAction(syncedFeature, false);
+    const quick = resolveQuickAction(syncedFeature, false, false, true, t);
     assert.deepInclude(quick, {
       label: "Create PR",
       disabled: false,
@@ -68,12 +125,12 @@ describe("when: ref is clean, up to date, and has no open PR", () => {
       action: "create_pr",
     });
 
-    const items = buildMenuItems(syncedFeature, false);
+    const items = buildMenuItems(syncedFeature, false, true, t);
     assert.equal(items.find((item) => item.id === "pr")?.disabled, false);
 
     const dirtyFeature = { ...syncedFeature, hasWorkingTreeChanges: true };
     assert.equal(
-      buildMenuItems(dirtyFeature, false).find((item) => item.id === "pr")?.disabled,
+      buildMenuItems(dirtyFeature, false, true, t).find((item) => item.id === "pr")?.disabled,
       false,
     );
   });
@@ -85,6 +142,8 @@ describe("when: on default ref without open PR", () => {
       status({ refName: "main", hasWorkingTreeChanges: true }),
       false,
       true,
+      true,
+      t,
     );
     assert.deepInclude(quick, {
       kind: "run_action",
@@ -104,7 +163,7 @@ describe("when: local changes are behind upstream", () => {
       kind: "run_action",
       action: "commit",
     } as const;
-    assert.deepEqual(resolveQuickAction(behind, false), commit);
+    assert.deepEqual(resolveQuickAction(behind, false, false, true, t), commit);
     assert.deepEqual(
       resolveQuickAction(
         {
@@ -119,6 +178,9 @@ describe("when: local changes are behind upstream", () => {
           },
         },
         false,
+        false,
+        true,
+        t,
       ),
       commit,
     );
@@ -134,6 +196,9 @@ describe("when: ref has no upstream configured", () => {
         pr: null,
       }),
       false,
+      false,
+      true,
+      t,
     );
     assert.deepInclude(quick, {
       kind: "run_action",
@@ -153,6 +218,7 @@ describe("when: ref has no upstream configured", () => {
       false,
       false,
       false,
+      t,
     );
     assert.deepEqual(quick, {
       kind: "open_publish",
@@ -173,19 +239,26 @@ describe("when: the ref is on GitLab", () => {
 
   it("names merge requests in actions and the default-ref dialog", () => {
     const ahead = status({ ...gitLab, hasUpstream: false, aheadCount: 2 });
-    assert.equal(resolveQuickAction(ahead, false).label, "Push & create MR");
+    assert.equal(resolveQuickAction(ahead, false, false, true, t).label, "Push & create MR");
     assert.equal(
-      resolveQuickAction(status({ ...gitLab, hasWorkingTreeChanges: true }), false).label,
+      resolveQuickAction(status({ ...gitLab, hasWorkingTreeChanges: true }), false, false, true, t)
+        .label,
       "Commit, push & MR",
     );
-    assert.equal(buildMenuItems(ahead, false).find((item) => item.id === "pr")?.label, "Create MR");
+    assert.equal(
+      buildMenuItems(ahead, false, true, t).find((item) => item.id === "pr")?.label,
+      "Create MR",
+    );
 
-    const copy = resolveDefaultBranchActionDialogCopy({
-      action: "create_pr",
-      branchName: "main",
-      includesCommit: false,
-      terminology: sourceControlClients.get("gitlab").changeRequest,
-    });
+    const copy = resolveDefaultBranchActionDialogCopy(
+      {
+        action: "create_pr",
+        branchName: "main",
+        includesCommit: false,
+        terminology: sourceControlClients.get("gitlab").changeRequest,
+      },
+      t,
+    );
     assert.equal(copy.title, "Push & create MR from default ref?");
     assert.include(copy.description, "create a merge request on");
   });

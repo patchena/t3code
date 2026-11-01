@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { applyPullRequestDraftFilterChange } from "@t3tools/client-runtime/pull-request-query";
 import { Spinner } from "~/components/ui/spinner";
@@ -46,52 +47,62 @@ import {
   settlePullRequestOverrides,
   comparePullRequestsByRecency,
   largestPullRequestReadCount,
-} from "./pullRequestList.logic";
+} from "~/components/pullRequest/pullRequestList.logic";
 import {
   pullRequestListPreferences,
   type PullRequestListPreferencePatch,
   writePullRequestListPreferences,
-} from "./pullRequestListPreferences";
-import { environmentMachineIcon } from "../EnvironmentMachineIcon";
-import { PullRequestDetailPanel } from "./PullRequestDetailPanel";
+} from "~/components/pullRequest/pullRequestListPreferences";
+import { environmentMachineIcon } from "~/components/EnvironmentMachineIcon";
+import { PullRequestDetailPanel } from "~/components/pullRequest/PullRequestDetailPanel";
 import {
   PullRequestFiltersMenu,
   PullRequestSearchInput,
   pullRequestHostLabel,
   pullRequestProjectKey,
   type PullRequestFilterOption,
-} from "./PullRequestListFilters";
-import { PullRequestCompactFilterMenu } from "./PullRequestCompactFilterMenu";
-import { INVOLVEMENT_TABS, SORT_OPTIONS, STATE_TABS } from "./pullRequestListOptions";
-import { PullRequestsColumn } from "./PullRequestsColumn";
-import { PullRequestListGroups } from "./PullRequestListGroups";
-import { pullRequestPanelReference } from "./usePullRequestDetail";
-import { usePullRequestIntentPrefetch } from "./usePullRequestIntentPrefetch";
+} from "~/components/pullRequest/PullRequestListFilters";
+import { PullRequestCompactFilterMenu } from "~/components/pullRequest/PullRequestCompactFilterMenu";
+import {
+  INVOLVEMENT_TABS,
+  SORT_OPTIONS,
+  STATE_TABS,
+} from "~/components/pullRequest/pullRequestListOptions";
+import { PullRequestsColumn } from "~/components/pullRequest/PullRequestsColumn";
+import { PullRequestListGroups } from "~/components/pullRequest/PullRequestListGroups";
+import { pullRequestPanelReference } from "~/components/pullRequest/usePullRequestDetail";
+import { usePullRequestIntentPrefetch } from "~/components/pullRequest/usePullRequestIntentPrefetch";
 import {
   usePullRequestDisplayGroups,
   usePullRequestQueryFilters,
   usePullRequestScope,
   type PullRequestsSearch,
-} from "./usePullRequestListView";
-import { pullRequestGroups, pullRequestListEntryId } from "./pullRequestListGroups.logic";
-import { PullRequestListEmptyState } from "./PullRequestListEmptyState";
-import { PullRequestListGhost } from "./PullRequestGhosts";
-import { type PullRequestRowTarget } from "./PullRequestRow";
-import { PullRequestsUnavailableState } from "./PullRequestsUnavailableState";
-import { RightPanelTabs } from "../RightPanelTabs";
+} from "~/components/pullRequest/usePullRequestListView";
+import {
+  pullRequestGroups,
+  pullRequestListEntryId,
+} from "~/components/pullRequest/pullRequestListGroups.logic";
+import { PullRequestListEmptyState } from "~/components/pullRequest/PullRequestListEmptyState";
+import { PullRequestListGhost } from "~/components/pullRequest/PullRequestGhosts";
+import { type PullRequestRowTarget } from "~/components/pullRequest/PullRequestRow";
+import { PullRequestsUnavailableState } from "~/components/pullRequest/PullRequestsUnavailableState";
+import { RightPanelTabs } from "~/components/RightPanelTabs";
 import { isCommandPaletteOpen } from "~/commandPaletteBus";
 import { isElectron } from "~/env";
 import { resolveShortcutCommand, shortcutLabelForCommand } from "~/keybindings";
 import { registerCommands } from "~/shortcuts/dispatcher";
 import { isTerminalFocused } from "~/lib/terminalFocus";
-import { PanelLayoutControls, RightPanelMaximizeControl } from "../chat/PanelLayoutControls";
-import { Button } from "../ui/button";
-import { SidebarInset } from "../ui/sidebar";
+import {
+  PanelLayoutControls,
+  RightPanelMaximizeControl,
+} from "~/components/chat/PanelLayoutControls";
+import { Button } from "~/components/ui/button";
+import { SidebarInset } from "~/components/ui/sidebar";
 import { useLiveRefresh } from "~/hooks/useLiveRefresh";
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { useOpenPanelPullRequestUrl } from "~/hooks/useOpenPanelPullRequestUrl";
-import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
-import { toastManager } from "../ui/toast";
+import { clipboardErrorMessage, writeTextToClipboard } from "~/hooks/useCopyToClipboard";
+import { toastManager } from "~/components/ui/toast";
 import { usePanelAnimationSettings, usePanelPresence } from "~/panelAnimations";
 import {
   PULL_REQUESTS_PANEL_REF,
@@ -143,6 +154,8 @@ const EMPTY_PREVIEW_DESKTOP_STATE = {};
 const EMPTY_TERMINAL_LABELS = new Map<string, string>();
 const EMPTY_PENDING_SURFACES = new Set<string>();
 export function PullRequestsPage() {
+  const { t } = useTranslation("workspace");
+  const { t: tCommon } = useTranslation("common");
   const search = useSearch({ from: "/_chat/pull-requests" });
   const sort = search.sort ?? "ready";
   const statsPolicy: PullRequestStatsPolicy =
@@ -692,24 +705,27 @@ export function PullRequestsPage() {
     groups,
     entriesByStatsKey,
     heldPullRequestsBySurface,
-  } = pullRequestGroups({
-    known: ordered?.key === filterKey ? ordered.entries : (listData?.entries ?? []),
-    providers: baselineQuery.data?.providers ?? listData?.providers ?? [],
-    viewers,
-    involvement: search.involvement,
-    localFilters,
-    hasLocalFilters,
-    text: typedParsed.text,
-    answeredLocally: querySettled && !showingCarried,
-    baselineEmpty,
-    held:
-      loaded !== null && loaded.environmentKey === environmentKey && loaded.scope === scopeKey
-        ? loaded.partitions
-        : undefined,
-    authored: partitionsWanted ? authoredQuery.data?.entries : undefined,
-    reviewing: partitionsWanted ? reviewingQuery.data?.entries : undefined,
-    partitionsWanted,
-  });
+  } = pullRequestGroups(
+    {
+      known: ordered?.key === filterKey ? ordered.entries : (listData?.entries ?? []),
+      providers: baselineQuery.data?.providers ?? listData?.providers ?? [],
+      viewers,
+      involvement: search.involvement,
+      localFilters,
+      hasLocalFilters,
+      text: typedParsed.text,
+      answeredLocally: querySettled && !showingCarried,
+      baselineEmpty,
+      held:
+        loaded !== null && loaded.environmentKey === environmentKey && loaded.scope === scopeKey
+          ? loaded.partitions
+          : undefined,
+      authored: partitionsWanted ? authoredQuery.data?.entries : undefined,
+      reviewing: partitionsWanted ? reviewingQuery.data?.entries : undefined,
+      partitionsWanted,
+    },
+    t,
+  );
 
   const visibleStatsKeys = useRef({ key: filterKey, values: new Set<string>() });
   const [statsByRow, setStatsByRow] = useState<PullRequestDiffStats>(() => new Map());
@@ -1125,7 +1141,7 @@ export function PullRequestsPage() {
       rightPanelAvailable={rightPanelAvailable}
       rightPanelOpen={rightPanelState.isOpen}
       rightPanelShortcutLabel={shortcutLabelForCommand(keybindings, "rightPanel.toggle")}
-      rightPanelUnavailableLabel="Select a pull request first"
+      rightPanelUnavailableLabel={t(($) => $.git.selectRequestFirst)}
       onToggleTerminal={() => undefined}
       onToggleRightPanel={toggleRightPanel}
     />
@@ -1151,14 +1167,14 @@ export function PullRequestsPage() {
   const listBody = (
     <>
       {!capabilityKnown ? (
-        <PullRequestListGhost rows={7} caption="Loading pull requests…" />
+        <PullRequestListGhost rows={7} caption={t(($) => $.git.loadingPullRequestsEllipsis)} />
       ) : !pullRequestsSupported ? (
         <PullRequestsUnavailableState
-          title="Pull requests unavailable"
-          error="Update your T3 Code servers to browse pull requests."
+          title={t(($) => $.git.pullRequestsUnavailable)}
+          error={t(($) => $.git.updateServersForRequests)}
         />
       ) : firstLoad ? (
-        <PullRequestListGhost rows={7} caption="Loading pull requests…" />
+        <PullRequestListGhost rows={7} caption={t(($) => $.git.loadingPullRequestsEllipsis)} />
       ) : listQuery.error && shownCount === 0 ? (
         <PullRequestsUnavailableState
           error={listQuery.error}
@@ -1206,9 +1222,12 @@ export function PullRequestsPage() {
 
       {listQuery.error && shownCount > 0 ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning-surface px-3 py-2 text-xs">
-          <span>{listQuery.error} Showing the last pull requests loaded.</span>
+          <span>
+            {listQuery.error}
+            {t(($) => $.git.showLastLoaded)}
+          </span>
           <Button size="xs" variant="outline" onClick={() => listQuery.refresh()}>
-            Retry
+            {t(($) => $.git.retry)}
           </Button>
         </div>
       ) : null}
@@ -1217,7 +1236,9 @@ export function PullRequestsPage() {
           {loadingMore ? (
             <span className="flex items-center gap-2">
               <Spinner aria-hidden size="sm" />
-              {sentCursors === null ? "Updating pull requests" : "Loading more"}
+              {sentCursors === null
+                ? t(($) => $.git.updatingPullRequests)
+                : t(($) => $.git.loadingMore)}
             </span>
           ) : canContinue || pageSize < MAX_PAGE_SIZE ? (
             <Button
@@ -1226,10 +1247,10 @@ export function PullRequestsPage() {
               onClick={loadMore}
               disabled={listQuery.isPending || showingCarried}
             >
-              Load more pull requests
+              {t(($) => $.git.loadMorePullRequests)}
             </Button>
           ) : (
-            <span>Narrow your search to find more pull requests.</span>
+            <span>{t(($) => $.git.narrowSearch)}</span>
           )}
         </div>
       ) : null}
@@ -1237,7 +1258,7 @@ export function PullRequestsPage() {
   );
   const hostEntries = hosts.length > 0 ? hosts : expectedHosts;
   const hostMenuOptions: ReadonlyArray<PullRequestFilterOption<string>> = [
-    { value: "", label: "All", Icon: Plug2Icon },
+    { value: "", label: t(($) => $.git.all), Icon: Plug2Icon },
     ...hostEntries.map((entry) => {
       const summary = hosts.find((host) => host.host === entry.host);
       return {
@@ -1246,12 +1267,12 @@ export function PullRequestsPage() {
         Icon: getSourceControlPresentationForKind(entry.kind).Icon,
         ...(summary === undefined || summary.configured
           ? {}
-          : { unavailable: summary.detail ?? "This host could not be read." }),
+          : { unavailable: summary.detail ?? t(($) => $.git.hostReadFailed) }),
       };
     }),
   ];
   const serverMenuOptions: ReadonlyArray<PullRequestFilterOption<string>> = [
-    { value: "", label: "All servers", Icon: LayersIcon },
+    { value: "", label: t(($) => $.git.allServers), Icon: LayersIcon },
     ...capableEnvironments.map((environment) => ({
       value: environment.environmentId,
       label: environment.label,
@@ -1260,12 +1281,12 @@ export function PullRequestsPage() {
   ];
   const sortMenu = (
     <PullRequestCompactFilterMenu
-      label="Sort pull requests"
+      label={t(($) => $.git.sortPullRequests)}
       triggerIcon={<ArrowDownUpIcon aria-hidden className="size-4" />}
-      triggerLabel="Sort"
+      triggerLabel={t(($) => $.git.sort)}
       outlined
       value={sort}
-      options={SORT_OPTIONS}
+      options={SORT_OPTIONS(t)}
       onChange={(next) => updateListScope({ sort: next })}
     />
   );
@@ -1273,10 +1294,10 @@ export function PullRequestsPage() {
     <PullRequestFiltersMenuInSidebarOrder
       onOpenChange={setFiltersOpen}
       state={search.state}
-      stateOptions={STATE_TABS}
+      stateOptions={STATE_TABS(t)}
       onState={(state) => updateListScope({ state })}
       involvement={search.involvement}
-      involvementOptions={INVOLVEMENT_TABS}
+      involvementOptions={INVOLVEMENT_TABS(t)}
       onInvolvement={(involvement) => updateListScope({ involvement })}
       filters={
         typedParsed.filters.draft
@@ -1408,20 +1429,23 @@ export function PullRequestsPage() {
     const { shortLabel, singular } = (
       sourceControlClients.findByChangeRequestUrl(url) ?? sourceControlClients.get(undefined)
     ).changeRequest;
-    void writeTextToClipboard(url, `${singular} link`).then(
+    void writeTextToClipboard(
+      url,
+      t(($) => $.git.requestLink, { term: singular }),
+    ).then(
       (didCopy) => {
         if (didCopy)
           toastManager.add({
             type: "success",
-            title: `${shortLabel} link copied`,
+            title: t(($) => $.git.requestLinkCopied, { term: shortLabel }),
             description: url,
           });
       },
       (error) => {
         toastManager.add({
           type: "error",
-          title: `Failed to copy ${shortLabel} link`,
-          description: error instanceof Error ? error.message : "An error occurred.",
+          title: t(($) => $.git.copyRequestLinkFailed, { term: shortLabel }),
+          description: clipboardErrorMessage(error, tCommon),
         });
       },
     );

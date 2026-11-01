@@ -1,4 +1,5 @@
 import { workspaceAreaProps } from "../lib/workspaceFocus";
+import { useTranslation } from "react-i18next";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
@@ -91,6 +92,7 @@ function IndexDraftLanding() {
 }
 
 function DraftStartError({ onRetry }: { readonly onRetry: () => void }) {
+  const { t } = useTranslation("common");
   const contentArea = workspaceAreaProps("home", 1, "Home");
   return (
     <SidebarInset
@@ -101,14 +103,12 @@ function DraftStartError({ onRetry }: { readonly onRetry: () => void }) {
       {isElectron ? <WorkspacePageHeader electron /> : null}
       <Empty className="flex-1">
         <EmptyHeader className="max-w-md">
-          <EmptyTitle>Couldn’t start a new thread</EmptyTitle>
-          <EmptyDescription>
-            The project is still available. Try opening the draft again.
-          </EmptyDescription>
+          <EmptyTitle>{t(($) => $.errors.draftFailed)}</EmptyTitle>
+          <EmptyDescription>{t(($) => $.errors.draftRetry)}</EmptyDescription>
           <div className="mt-5 flex justify-center">
             <Button size="sm" onClick={onRetry}>
               <RefreshIcon size="md" />
-              Try again
+              {t(($) => $.actions.tryAgain)}
             </Button>
           </div>
         </EmptyHeader>

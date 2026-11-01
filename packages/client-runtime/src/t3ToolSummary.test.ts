@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { summarizeT3ToolCalls, type T3ToolSummaryCall } from "./t3ToolSummary.ts";
+import {
+  summarizeT3ToolCalls as summarizeTranslatedT3ToolCalls,
+  type T3ToolSummaryCall,
+} from "./t3ToolSummary.ts";
+
+import { createI18n } from "@t3tools/client-runtime/i18n";
+
+const t = createI18n("en").getFixedT("en", "activity");
+const summarizeT3ToolCalls = (
+  action: Parameters<typeof summarizeTranslatedT3ToolCalls>[0],
+  calls: Parameters<typeof summarizeTranslatedT3ToolCalls>[1],
+) => summarizeTranslatedT3ToolCalls(action, calls, t);
 
 function completed(input: unknown, output?: unknown): T3ToolSummaryCall {
   return { input, output, outcome: "completed" };
@@ -76,6 +87,19 @@ describe("summarizeT3ToolCalls", () => {
 
   it("does not confuse a child's failure or wait timeout with failure of the orchestration call", () => {
     const failedChild = { taskId: "task-1", status: "failed", summary: "command not found" };
+    const germanT = createI18n("de").getFixedT("de", "activity");
+    for (const [count, english, german] of [
+      [0, "Tried to delegate 0 tasks", "Delegieren von 0 Aufgaben versucht"],
+      [1, "Delegated 1 task", "1 Aufgabe delegiert"],
+      [3, "Delegated 3 tasks", "3 Aufgaben delegiert"],
+    ] as const) {
+      const calls = Array.from({ length: count }, (_, index) =>
+        completed({}, { ...failedChild, taskId: `task-${index}` }),
+      );
+      expect(summarizeTranslatedT3ToolCalls("delegate", calls, t).label).toBe(english);
+      expect(summarizeTranslatedT3ToolCalls("delegate", calls, germanT).label).toBe(german);
+    }
+
     expect(
       summarizeT3ToolCalls("delegate", [completed({}, failedChild), completed({}, failedChild)]),
     ).toEqual({

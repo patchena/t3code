@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useAtomCommand } from "~/state/use-atom-command";
 import type { EnvironmentId, PullRequestLabelCandidate, PullRequestRef } from "@t3tools/contracts";
 import { CheckIcon, TagIcon } from "lucide-react";
@@ -7,10 +8,10 @@ import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 
-import { toastManager } from "../ui/toast";
-import { PullRequestCandidatePicker } from "./PullRequestCandidatePicker";
-import { readableFailure } from "./pullRequestDetail.logic";
-import { pullRequestLabelColor } from "./pullRequestList.logic";
+import { toastManager } from "~/components/ui/toast";
+import { PullRequestCandidatePicker } from "~/components/pullRequest/PullRequestCandidatePicker";
+import { readableFailure } from "~/components/pullRequest/pullRequestDetail.logic";
+import { pullRequestLabelColor } from "~/components/pullRequest/pullRequestList.logic";
 
 function matches(candidate: PullRequestLabelCandidate, query: string): boolean {
   if (query.length === 0) return true;
@@ -30,6 +31,7 @@ export function PullRequestLabelPicker({
   reference: PullRequestRef;
   allowed: boolean;
 }) {
+  const { t } = useTranslation("workspace");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<string | null>(null);
@@ -57,11 +59,11 @@ export function PullRequestLabelPicker({
       toastManager.add({
         type: "error",
         title: candidate.isApplied
-          ? `Could not take ${candidate.name} off`
-          : `Could not put ${candidate.name} on`,
+          ? t(($) => $.git.removeLabelFailed, { label: candidate.name })
+          : t(($) => $.git.addLabelFailed, { label: candidate.name }),
         description: readableFailure(
           squashAtomCommandFailure(result),
-          "The host refused it. Check that you have triage access on this repository.",
+          t(($) => $.git.triageAccessRequired),
         ),
       });
       return;
@@ -71,22 +73,22 @@ export function PullRequestLabelPicker({
   return (
     <PullRequestCandidatePicker
       icon={<TagIcon className="size-3.5" />}
-      label="Change labels"
+      label={t(($) => $.git.changeLabels)}
       allowed={allowed}
-      disabledReason="Changing labels needs triage access on this repository"
+      disabledReason={t(($) => $.git.labelTriageRequired)}
       open={open}
       onOpenChange={setOpen}
       query={query}
       onQueryChange={setQuery}
-      searchLabel="Search labels"
+      searchLabel={t(($) => $.git.searchLabels)}
       isPending={candidatesQuery.isPending && candidatesQuery.data === null}
       error={candidatesQuery.data === null ? candidatesQuery.error : null}
       candidates={candidates}
-      emptyLabel="This repository has no labels."
-      noMatchLabel="No label matches that."
-      errorLabel="The labels could not be read."
+      emptyLabel={t(($) => $.git.repositoryNoLabels)}
+      noMatchLabel={t(($) => $.git.noMatchingLabels)}
+      errorLabel={t(($) => $.git.labelsReadFailed)}
       truncated={candidatesQuery.data?.truncated === true}
-      truncatedLabel="This repository has more labels than are listed here. Apply the rest on the host."
+      truncatedLabel={t(($) => $.git.labelsTruncated)}
       candidateKey={(candidate) => candidate.name}
       disabled={pending !== null}
       onSelect={(candidate) => void toggle(candidate)}
@@ -107,7 +109,7 @@ export function PullRequestLabelPicker({
               ) : null}
             </span>
             {candidate.isApplied ? (
-              <CheckIcon aria-label="Applied" className="size-3.5 shrink-0" />
+              <CheckIcon aria-label={t(($) => $.git.applied)} className="size-3.5 shrink-0" />
             ) : null}
           </>
         );

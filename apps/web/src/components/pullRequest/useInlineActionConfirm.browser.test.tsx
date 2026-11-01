@@ -2,7 +2,7 @@ import { render } from "../../../test/render";
 import { expect, it, vi } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 
-import { useInlineActionConfirm } from "./useInlineActionConfirm";
+import { useInlineActionConfirm } from "~/components/pullRequest/useInlineActionConfirm";
 
 function MergeButton({ scopeKey, onConfirm }: { scopeKey: string; onConfirm: () => void }) {
   const confirm = useInlineActionConfirm(scopeKey);

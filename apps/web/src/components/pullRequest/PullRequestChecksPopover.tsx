@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type * as React from "react";
 import type {
   EnvironmentId,
@@ -13,18 +14,18 @@ import { cn } from "~/lib/utils";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
 
-import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
-import { Button } from "../ui/button";
-import { ScrollArea } from "../ui/scroll-area";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { toastManager } from "../ui/toast";
-import { groupPullRequestChecks } from "./pullRequestDetail.logic";
+import { Popover, PopoverPopup, PopoverTrigger } from "~/components/ui/popover";
+import { Button } from "~/components/ui/button";
+import { ScrollArea } from "~/components/ui/scroll-area";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { toastManager } from "~/components/ui/toast";
+import { groupPullRequestChecks } from "~/components/pullRequest/pullRequestDetail.logic";
 import {
   PullRequestCheckStatusIcon,
   pullRequestCheckStatusLabel,
   pullRequestChecksStatePresentation,
   summarizePullRequestChecks,
-} from "./pullRequestPresentation";
+} from "~/components/pullRequest/pullRequestPresentation";
 
 // Fetch only on open to avoid per-row requests.
 function LazyChecksBody({
@@ -36,6 +37,7 @@ function LazyChecksBody({
   reference: PullRequestRef;
   threadRef: ScopedThreadRef | null;
 }) {
+  const { t } = useTranslation("workspace");
   const detailQuery = useEnvironmentQuery(
     pullRequestEnvironment.detail({ environmentId, input: reference }),
   );
@@ -45,7 +47,7 @@ function LazyChecksBody({
   if (detailQuery.data === null) {
     return (
       <p className="text-muted-foreground text-xs">
-        {detailQuery.isPending ? "Loading checks…" : "No checks reported"}
+        {detailQuery.isPending ? t(($) => $.git.loadingChecks) : t(($) => $.git.noChecks)}
       </p>
     );
   }
@@ -59,6 +61,7 @@ function ChecksBody({
   checks: ReadonlyArray<PullRequestCheck>;
   threadRef: ScopedThreadRef | null;
 }) {
+  const { t } = useTranslation("workspace");
   const openLink = useOpenLink(threadRef);
   const [showAll, setShowAll] = useState(false);
   const { attention, running, completed } = groupPullRequestChecks(checks);
@@ -66,7 +69,7 @@ function ChecksBody({
   const visibleChecks = [...attention, ...running, ...(showAll || !canCollapse ? completed : [])];
   const hasDetails = visibleChecks.some((check) => check.url !== null);
   if (checks.length === 0) {
-    return <p className="text-muted-foreground text-xs">No checks reported</p>;
+    return <p className="text-muted-foreground text-xs">{t(($) => $.git.noChecks)}</p>;
   }
   return (
     <>
@@ -91,7 +94,7 @@ function ChecksBody({
                   <TooltipPopup side="top">{check.description ?? check.name}</TooltipPopup>
                 </Tooltip>
                 <span className="justify-self-end whitespace-nowrap text-muted-foreground">
-                  {pullRequestCheckStatusLabel(check)}
+                  {pullRequestCheckStatusLabel(check, t)}
                 </span>
                 {check.url === null ? null : (
                   <button
@@ -101,11 +104,14 @@ function ChecksBody({
                       if (!check.url) return;
                       void openLink(check.url).catch((error: unknown) => {
                         console.error(error);
-                        toastManager.add({ type: "error", title: "Unable to open check details" });
+                        toastManager.add({
+                          type: "error",
+                          title: t(($) => $.git.checkDetailsUnavailable),
+                        });
                       });
                     }}
                   >
-                    Details
+                    {t(($) => $.git.details)}
                   </button>
                 )}
               </li>
@@ -120,7 +126,7 @@ function ChecksBody({
           aria-expanded={showAll}
           onClick={() => setShowAll(!showAll)}
         >
-          {showAll ? "Show less" : "Show all"}
+          {showAll ? t(($) => $.git.showLess) : t(($) => $.git.showAll)}
         </Button>
       ) : null}
     </>
@@ -148,22 +154,23 @@ export function PullRequestChecksPopover({
   className?: string;
   render?: React.ReactElement;
 }) {
-  const presentation = pullRequestChecksStatePresentation(checksState);
+  const { t } = useTranslation("workspace");
+  const presentation = pullRequestChecksStatePresentation(checksState, t);
   const incompleteCount =
     checks?.filter((check) => check.status === "pending" || check.status === "action-required")
       .length ?? 0;
   const failedCount =
     checks?.filter((check) => check.status === "failure" || check.status === "cancelled").length ??
     0;
-  const summary = checks === undefined || stale ? null : summarizePullRequestChecks(checks);
+  const summary = checks === undefined || stale ? null : summarizePullRequestChecks(checks, t);
   return (
     <Popover>
       <PopoverTrigger
         nativeButton={variant === "count"}
         aria-label={
           variant === "count"
-            ? `Open checks: ${summary ?? presentation.label}`
-            : `Checks: ${presentation.label}`
+            ? t(($) => $.git.openChecksSummary, { summary: summary ?? presentation.label })
+            : t(($) => $.git.checksSummary, { summary: presentation.label })
         }
         render={
           variant === "count" ? (
@@ -183,10 +190,15 @@ export function PullRequestChecksPopover({
           <>
             {checks !== undefined && incompleteCount > 0 ? (
               <span className="tabular-nums">
-                {checks.length - incompleteCount}/{checks.length} checks
+                {t(($) => $.git.completedChecks, {
+                  done: checks.length - incompleteCount,
+                  total: checks.length,
+                })}
               </span>
             ) : failedCount > 0 ? (
-              <span className="tabular-nums">{failedCount} failed</span>
+              <span className="tabular-nums">
+                {t(($) => $.git.checksFailed, { count: failedCount })}
+              </span>
             ) : null}
           </>
         ) : null}
@@ -195,9 +207,7 @@ export function PullRequestChecksPopover({
         <p className="mb-2 font-medium text-sm">{presentation.label}</p>
         {summary === null ? null : <p className="mb-2 text-muted-foreground text-xs">{summary}</p>}
         {stale ? (
-          <p className="text-muted-foreground text-xs">
-            Check details are out of date. Refresh the pull request to update them.
-          </p>
+          <p className="text-muted-foreground text-xs">{t(($) => $.git.staleCheckDetails)}</p>
         ) : checks !== undefined ? (
           <ChecksBody checks={checks} threadRef={threadRef} />
         ) : environmentId !== undefined && reference !== undefined ? (

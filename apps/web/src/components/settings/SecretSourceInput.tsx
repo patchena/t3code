@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   SecretReference,
   type EnvironmentId,
@@ -68,10 +69,13 @@ export function SecretSourceSelect(props: {
   readonly disabled?: boolean;
   readonly onValueChange: (provider: SecretProviderId | null) => void;
 }) {
+  const { t } = useTranslation("settings");
   const { value, sources } = props;
   const known = value === null || sources.some((source) => source.id === value);
   const title =
-    value === null ? "Value" : (sources.find((source) => source.id === value)?.label ?? value);
+    value === null
+      ? t(($) => $.providers.value)
+      : (sources.find((source) => source.id === value)?.label ?? value);
   return (
     <Select
       value={value ?? STORED_VALUE}
@@ -85,7 +89,7 @@ export function SecretSourceSelect(props: {
       <SelectTrigger
         size="sm"
         className="w-auto min-w-0 shrink-0"
-        aria-label={`${props.label} source`}
+        aria-label={t(($) => $.providers.secretSource, { label: props.label })}
         title={title}
       >
         <SelectValue>
@@ -94,7 +98,7 @@ export function SecretSourceSelect(props: {
       </SelectTrigger>
       <SelectPopup align="start" alignItemWithTrigger={false}>
         <SelectItem value={STORED_VALUE}>
-          <SourceLabel icon={TypeIcon} label="Value" />
+          <SourceLabel icon={TypeIcon} label={t(($) => $.providers.value)} />
         </SelectItem>
         {sources.map((source) => (
           <SelectItem key={source.id} value={source.id}>
@@ -133,6 +137,7 @@ export function SecretSourceInput({
   children,
   ...rest
 }: SecretSourceInputProps) {
+  const { t } = useTranslation("settings");
   // A provider picked here applies once a reference for it is committed.
   const [pendingProvider, setPendingProvider] = useState<SecretProviderId | null>(null);
   const [rejectedReference, setRejectedReference] = useState<string | null>(null);
@@ -142,7 +147,7 @@ export function SecretSourceInput({
   const reference = secret !== undefined && secret.provider === provider ? secret.reference : "";
   const providerSource = sources.find((source) => source.id === provider);
   const definition = providerSource && builtInSecretProviderDefinitions.find(providerSource.kind);
-  const label = input["aria-label"] ?? "Secret";
+  const label = input["aria-label"] ?? t(($) => $.providers.secret);
   const source =
     sources.length === 0 && provider === null ? null : (
       <SecretSourceSelect
@@ -197,12 +202,14 @@ export function SecretSourceInput({
           autoComplete="off"
           placeholder={definition?.referencePlaceholder}
           spellCheck={false}
-          aria-label={`${label} reference`}
+          aria-label={t(($) => $.providers.secretReference, { label })}
           aria-invalid={rejectedReference !== null}
         />
         {rejectedReference !== null ? (
           <p className="text-2xs text-destructive">
-            {definition?.invalidReferenceMessage ?? "Enter a valid secret reference."}
+            {definition?.kind === "one_password"
+              ? t(($) => $.providers.onePasswordReference)
+              : t(($) => $.providers.invalidSecretReference)}
           </p>
         ) : null}
       </div>

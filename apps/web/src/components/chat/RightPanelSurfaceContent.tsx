@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type {
   EditorId,
   EnvironmentId,
@@ -10,7 +11,7 @@ import type {
 } from "@t3tools/contracts";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { lazy, Suspense } from "react";
-import SideChatPane from "./SideChatPane";
+import { SideChatPane } from "./SideChatPane";
 import type { ComposerImageAttachment, DraftId } from "../../composerDraftStore";
 import type { ShortcutMatchContext } from "../../keybindings";
 import type { SideChatParentPanel } from "../../lib/sideChatPane";
@@ -28,11 +29,17 @@ import { ThreadPullRequestsPanel } from "../pullRequest/ThreadPullRequestsPanel"
 const PreviewPanel = lazy(() =>
   import("../preview/PreviewPanel").then((module) => ({ default: module.PreviewPanel })),
 );
-const DiffPanel = lazy(() => import("../DiffPanel"));
+const DiffPanel = lazy(() =>
+  import("../DiffPanel").then((module) => ({ default: module.DiffPanel })),
+);
 const DevicePanel = lazy(() =>
   import("../device/DevicePanel").then((module) => ({ default: module.DevicePanel })),
 );
-const FilePreviewPanel = lazy(() => import("../files/FilePreviewPanel"));
+const FilePreviewPanel = lazy(() =>
+  import("~/components/files/FilePreviewPanel").then((module) => ({
+    default: module.FilePreviewPanel,
+  })),
+);
 
 type RightPanelTerminalProps = Omit<
   PersistentThreadTerminalPanelProps,
@@ -80,6 +87,7 @@ export function RightPanelSurfaceContent(props: {
   readonly files: RightPanelFileProps;
   readonly sideChatParentPanel: SideChatParentPanel;
 }) {
+  const { t } = useTranslation("chat");
   const { surface, threadRef, visible, onCloseSurface } = props;
   if (surface === null) return null;
   switch (surface.kind) {
@@ -123,8 +131,8 @@ export function RightPanelSurfaceContent(props: {
       if (!pullRequest.supported) {
         return (
           <PullRequestsUnavailableState
-            title="Pull requests unavailable"
-            error="Update this environment's T3 Code server to browse pull requests."
+            title={t(($) => $.details.pullRequestsUnavailable)}
+            error={t(($) => $.details.updateServer)}
           />
         );
       }

@@ -58,6 +58,9 @@ const babelConfig = require("./babel.config.js")({ cache: () => {} });
 const testPlatform = process.env.T3_MOBILE_TEST_PLATFORM === "android" ? "android" : "ios";
 
 export default defineConfig({
+  resolve: {
+    alias: { "~": sourceRoot.slice(0, -1) },
+  },
   test: {
     hookTimeout: 60_000,
     testTimeout: 60_000,

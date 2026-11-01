@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
 import { useAtomValue } from "@effect/atom-react";
 import type { PullRequestAction, PullRequestSummary } from "@t3tools/contracts";
 import { createContext, use, type ReactNode } from "react";
@@ -6,16 +8,19 @@ import type { ChangeRequestTerminology } from "@t3tools/client-runtime/source-co
 import { useShortcutModifierState } from "~/shortcutModifierState";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useUiStateStore } from "~/uiStateStore";
-import { Button } from "../ui/button";
-import { Spinner } from "../ui/spinner";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { resolvePullRequestMergeMethod } from "./pullRequestDetail.logic";
-import { PullRequestGlyph } from "./pullRequestIcons";
-import { pullRequestQuickActions, type EnvironmentPullRequestEntry } from "./pullRequestList.logic";
+import { Button } from "~/components/ui/button";
+import { Spinner } from "~/components/ui/spinner";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { resolvePullRequestMergeMethod } from "~/components/pullRequest/pullRequestDetail.logic";
+import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
+import {
+  pullRequestQuickActions,
+  type EnvironmentPullRequestEntry,
+} from "~/components/pullRequest/pullRequestList.logic";
 import {
   usePullRequestActionRunner,
   usePullRequestDefaultMergeMethodResolver,
-} from "./usePullRequestActions";
+} from "~/components/pullRequest/usePullRequestActions";
 
 type PullRequestSpeedActionEntry = Pick<
   EnvironmentPullRequestEntry,
@@ -45,6 +50,7 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
   sweeping?: boolean;
   onCloseSweepStart?: (entry: Entry, event: PointerEvent) => void;
 }) {
+  const { t } = useTranslation("workspace");
   const canWrite = useAtomValue(
     pullRequestEnvironment.runAction.permissionAtom(entry.environmentId),
   );
@@ -67,8 +73,7 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
       const allowed = detail.capabilities.mergeMethods.filter(
         (method) => detail.mergeCapabilities[method],
       );
-      if (allowed.length === 0)
-        throw new Error("No merge method is available for this repository.");
+      if (allowed.length === 0) throw new Error(t(($) => $.git.noMergeMethod));
       return resolvePullRequestMergeMethod(
         allowed,
         null,
@@ -84,11 +89,14 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
     <SpeedModeGroup
       busy={busy}
       pending={actionPending || closing}
-      label={`Quick actions for ${terminology.singular} #${entry.number}`}
+      label={t(($) => $.git.requestQuickActions, {
+        term: terminology.singular,
+        number: entry.number,
+      })}
     >
       {actions.map((action) => {
-        const label = ACTIONS[action].label;
-        const Icon = ACTIONS[action].Icon;
+        const label = ACTIONS(t)[action].label;
+        const Icon = ACTIONS(t)[action].Icon;
         return (
           <Tooltip key={action}>
             <TooltipTrigger
@@ -112,10 +120,10 @@ export function PullRequestSpeedActions<Entry extends PullRequestSpeedActionEntr
             </TooltipTrigger>
             <TooltipPopup>
               {action === "merge" && entry.stack
-                ? `Open this ${terminology.singular} to merge its stack`
+                ? t(($) => $.git.openStackToMerge, { term: terminology.singular })
                 : action === "close" && onCloseSweepStart
-                  ? "Close immediately, or drag across rows to close several"
-                  : `${label} immediately`}
+                  ? t(($) => $.git.closeDragHint)
+                  : t(($) => $.git.actionImmediately, { action: label })}
             </TooltipPopup>
           </Tooltip>
         );
@@ -163,9 +171,10 @@ function SpeedModeGroup({
   );
 }
 
-const ACTIONS = {
-  close: { label: "Close", Icon: PullRequestGlyph.closed },
-  merge: { label: "Merge", Icon: PullRequestGlyph.merged },
-  ready: { label: "Ready for review", Icon: PullRequestGlyph.pullRequest },
-  reopen: { label: "Reopen", Icon: PullRequestGlyph.reopen },
-} as const;
+const ACTIONS = (t: TFunction<"workspace">) =>
+  ({
+    close: { label: t(($) => $.git.close), Icon: PullRequestGlyph.closed },
+    merge: { label: t(($) => $.git.merge), Icon: PullRequestGlyph.merged },
+    ready: { label: t(($) => $.git.readyForReview), Icon: PullRequestGlyph.pullRequest },
+    reopen: { label: t(($) => $.git.reopen), Icon: PullRequestGlyph.reopen },
+  }) as const;

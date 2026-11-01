@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it } from "vite-plus/test";
 import type { DesktopUpdateState } from "@t3tools/contracts";
 
@@ -8,6 +9,8 @@ import {
   getDesktopUpdateReleaseUrl,
   resolveDesktopUpdateButtonAction,
 } from "./desktopUpdate.logic";
+
+const tWorkspace = createI18n("en").getFixedT(null, "workspace");
 
 const baseState: DesktopUpdateState = {
   enabled: true,
@@ -39,7 +42,7 @@ describe("desktop update button state", () => {
       canRetry: true,
     };
     expect(resolveDesktopUpdateButtonAction(state)).toBe("download");
-    expect(getDesktopUpdateButtonTooltip(state)).toContain("Click to retry");
+    expect(getDesktopUpdateButtonTooltip(state, tWorkspace)).toContain("Click to retry");
   });
 
   it("prefers a newly available release over a stale downloaded version", () => {

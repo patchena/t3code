@@ -1,5 +1,6 @@
 import { RefreshCwIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { threadSyncLabel, type ThreadSyncPhase } from "../../threadSync";
 import { cn } from "~/lib/utils";
@@ -33,6 +34,7 @@ function ThreadNowLine({
   /** Announces the line when it appears; only for something that needs the user. */
   readonly announce?: boolean;
 }) {
+  const { t } = useTranslation("chat");
   return (
     <div
       role={announce ? "alert" : undefined}
@@ -46,7 +48,9 @@ function ThreadNowLine({
           reachable; when it is cut, its details button shows all of it. */}
       <NoticeText
         detailsLabel={
-          typeof item.title === "string" ? `Show details: ${item.title}` : "Show details"
+          typeof item.title === "string"
+            ? t(($) => $.thread.showNamedDetails, { title: item.title })
+            : t(($) => $.thread.showDetails)
         }
         className="min-w-0 truncate"
       >
@@ -68,10 +72,11 @@ function ThreadNowLine({
 }
 
 function ThreadSyncLine({ phase }: { readonly phase: ThreadSyncPhase }) {
+  const { t } = useTranslation("chat");
   return (
     <div className={lineClassName} role="status" data-composer-sync-status={phase}>
       <RefreshCwIcon aria-hidden />
-      <span className="truncate">{threadSyncLabel(phase)}</span>
+      <span className="truncate">{threadSyncLabel(phase, t)}</span>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type {
   PullRequestInvolvement,
   PullRequestListFilters,
@@ -17,41 +18,44 @@ import {
   pullRequestEntryViewer,
   type EnvironmentPullRequestEntry,
   type PullRequestPartitionsSnapshot,
-} from "./pullRequestList.logic";
+} from "~/components/pullRequest/pullRequestList.logic";
 
 export const pullRequestListEntryId = (target: Parameters<typeof pullRequestSurfaceId>[0]) =>
   pullRequestSurfaceId({ ...target, repository: target.repository.toLowerCase() });
 
 /** The held rows narrowed to what the reader asked for, in the groups the list shows. */
-export function pullRequestGroups({
-  known,
-  providers,
-  viewers,
-  involvement,
-  localFilters,
-  hasLocalFilters,
-  text,
-  answeredLocally,
-  baselineEmpty,
-  held,
-  authored,
-  reviewing,
-  partitionsWanted,
-}: {
-  known: ReadonlyArray<EnvironmentPullRequestEntry>;
-  providers: PullRequestListResult["providers"];
-  viewers: PullRequestListResult["viewers"];
-  involvement: PullRequestInvolvement;
-  localFilters: PullRequestListFilters;
-  hasLocalFilters: boolean;
-  text: string;
-  answeredLocally: boolean;
-  baselineEmpty: boolean;
-  held: PullRequestPartitionsSnapshot | undefined;
-  authored: ReadonlyArray<EnvironmentPullRequestEntry> | undefined;
-  reviewing: ReadonlyArray<EnvironmentPullRequestEntry> | undefined;
-  partitionsWanted: boolean;
-}) {
+export function pullRequestGroups(
+  {
+    known,
+    providers,
+    viewers,
+    involvement,
+    localFilters,
+    hasLocalFilters,
+    text,
+    answeredLocally,
+    baselineEmpty,
+    held,
+    authored,
+    reviewing,
+    partitionsWanted,
+  }: {
+    known: ReadonlyArray<EnvironmentPullRequestEntry>;
+    providers: PullRequestListResult["providers"];
+    viewers: PullRequestListResult["viewers"];
+    involvement: PullRequestInvolvement;
+    localFilters: PullRequestListFilters;
+    hasLocalFilters: boolean;
+    text: string;
+    answeredLocally: boolean;
+    baselineEmpty: boolean;
+    held: PullRequestPartitionsSnapshot | undefined;
+    authored: ReadonlyArray<EnvironmentPullRequestEntry> | undefined;
+    reviewing: ReadonlyArray<EnvironmentPullRequestEntry> | undefined;
+    partitionsWanted: boolean;
+  },
+  t: TFunction<"workspace">,
+) {
   const searchingHosts = new Set(
     providers.flatMap((provider) => (provider.searchesOnHost ? [provider.host] : [])),
   );
@@ -87,7 +91,7 @@ export function pullRequestGroups({
   const groups = (() => {
     if (involvement !== "all") return [{ key: "others" as const, label: "", entries }];
     if (baselineEmpty) {
-      return groupPullRequestsByInvolvement(entries, viewers);
+      return groupPullRequestsByInvolvement(entries, viewers, t);
     }
     const narrow = (rows: ReadonlyArray<EnvironmentPullRequestEntry> | undefined) =>
       rows === undefined || !hasLocalFilters
@@ -98,9 +102,9 @@ export function pullRequestGroups({
     const narrowedAuthored = narrow(partitionsWanted ? (authored ?? held?.authored) : undefined);
     const narrowedReviewing = narrow(partitionsWanted ? (reviewing ?? held?.reviewing) : undefined);
     if (narrowedAuthored === undefined || narrowedReviewing === undefined) {
-      return groupPullRequestsByInvolvement(entries, viewers);
+      return groupPullRequestsByInvolvement(entries, viewers, t);
     }
-    return partitionPullRequestsWithPriority(entries, narrowedAuthored, narrowedReviewing);
+    return partitionPullRequestsWithPriority(entries, narrowedAuthored, narrowedReviewing, t);
   })();
 
   const entriesByStatsKey: ReadonlyMap<string, EnvironmentPullRequestEntry> = new Map(

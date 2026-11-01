@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useLoadBalancedEnvironment } from "../../hooks/useLoadBalancedEnvironment";
 import { useLogicalProjectEnvironments } from "../../hooks/useLogicalProjectEnvironments";
 import { useScratchProject } from "../../hooks/useScratchProject";
@@ -48,6 +49,7 @@ interface DraftEnvironmentRoutingInput {
  * project on the target machine.
  */
 export function useDraftEnvironmentRouting(input: DraftEnvironmentRoutingInput) {
+  const { t } = useTranslation("chat");
   const {
     draftId,
     draftThread,
@@ -138,9 +140,8 @@ export function useDraftEnvironmentRouting(input: DraftEnvironmentRoutingInput) 
       toastManager.add({
         type: "warning",
         id: "load-balancing-attachments",
-        title: "Keep attachments on this machine",
-        description:
-          "Remove attachments before choosing automatic routing, then attach them on the selected machine.",
+        title: t(($) => $.composer.keepAttachmentsMachine),
+        description: t(($) => $.composer.removeBeforeRouting),
       });
       return;
     }
@@ -157,12 +158,12 @@ export function useDraftEnvironmentRouting(input: DraftEnvironmentRoutingInput) 
   const onAutoEnvironmentStable = useStableCallback(onAutoEnvironment);
   const autoEnvironmentLabel = automaticEnvironment
     ? draftThread?.loadBalancedEnvironmentId
-      ? "Auto balance"
+      ? t(($) => $.composer.autoBalance)
       : loadBalancing.pending
-        ? "Checking machines…"
+        ? t(($) => $.composer.checkingMachines)
         : loadBalancing.failed
-          ? "Auto balance unavailable"
-          : "Auto balance"
+          ? t(($) => $.composer.autoBalanceUnavailable)
+          : t(($) => $.composer.autoBalance)
     : undefined;
 
   // A change in flight belongs to the draft and project it started on.
@@ -251,7 +252,10 @@ export function useDraftEnvironmentRouting(input: DraftEnvironmentRoutingInput) 
       return;
     }
     setBusyEnvironmentChange(request);
-    void openScratchProject(target.environmentId, "Could not switch machine")
+    void openScratchProject(
+      target.environmentId,
+      t(($) => $.composer.switchMachineFailed),
+    )
       .then((project) => {
         if (project) retarget(project);
       })

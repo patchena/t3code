@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   type DeviceHostSummary,
   type DevicePlatformAvailability,
@@ -19,7 +20,27 @@ export type DeviceHostCheck =
       platforms: ReadonlyArray<DevicePlatformAvailability>;
       tools?: DeviceHostSummary["tools"];
     }
-  | { status: "failed"; error: string };
+  | {
+      status: "failed";
+      error: { kind: "disconnected" | "permission" } | { kind: "diagnostic"; message: string };
+    };
+
+export class DeviceHostAccessError extends Schema.TaggedError<DeviceHostAccessError>()(
+  "DeviceHostAccessError",
+  {},
+) {}
+
+const isDeviceHostAccessError = Schema.is(DeviceHostAccessError);
+
+export function deviceHostCheckError(
+  error: Extract<DeviceHostCheck, { status: "failed" }>["error"],
+  t: TFunction<"settings">,
+): string {
+  if (error.kind === "diagnostic") return error.message;
+  return error.kind === "disconnected"
+    ? t(($) => $.providers.environmentDisconnected)
+    : t(($) => $.providers.cannotTestHosts);
+}
 
 const decodeDeviceHostDraft = Schema.decodeUnknownOption(SshDeviceHostConfig);
 
@@ -45,7 +66,10 @@ export async function checkDeviceHostConnections(
     targets.map(async (target) => {
       report(target.environmentId, { status: "pending" });
       try {
-        if (!target.connected) throw new Error("Environment disconnected");
+        if (!target.connected) {
+          report(target.environmentId, { status: "failed", error: { kind: "disconnected" } });
+          return;
+        }
         const result = await probe(target.environmentId, host);
         report(
           target.environmentId,
@@ -60,7 +84,12 @@ export async function checkDeviceHostConnections(
       } catch (error) {
         report(target.environmentId, {
           status: "failed",
-          error: error instanceof Error ? error.message : String(error),
+          error: isDeviceHostAccessError(error)
+            ? { kind: "permission" }
+            : {
+                kind: "diagnostic",
+                message: error instanceof Error ? error.message : String(error),
+              },
         });
       }
     }),

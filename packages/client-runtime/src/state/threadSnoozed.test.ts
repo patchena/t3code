@@ -5,6 +5,7 @@ import { ThreadId } from "@t3tools/contracts";
 import { TurnId } from "@t3tools/contracts";
 import type { SnoozePresetSetting } from "@t3tools/contracts/settings";
 import { describe, expect, it } from "vite-plus/test";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 
 import {
   canSnooze,
@@ -12,6 +13,7 @@ import {
   hasQueuedTurnStart,
   pickSnoozePreset,
   resolveSnoozePresets,
+  snoozeWakeLabel,
   threadRaisedHandWhileSnoozed,
   threadWokeAt,
   isThreadWokeUnseen,
@@ -391,9 +393,11 @@ describe("resolveSnoozePresets", () => {
   const formatTime = (date: Date) =>
     `${date.getHours()}:${String(date.getMinutes()).padStart(2, "0")}`;
   const menu = (now: Date, presets?: ReadonlyArray<SnoozePresetSetting>) =>
-    resolveSnoozePresets(now, { formatTime, ...(presets ? { presets } : {}) }).map(
-      (preset) => `${preset.label} ${preset.whenLabel}`,
-    );
+    resolveSnoozePresets(now, {
+      t: createI18n("en").getFixedT(null, "common"),
+      formatTime,
+      ...(presets ? { presets } : {}),
+    }).map((preset) => `${preset.label} ${preset.whenLabel}`);
 
   it("lists custom presets soonest first and names the day when the label does not", () => {
     // Wednesday 20:00.
@@ -405,12 +409,36 @@ describe("resolveSnoozePresets", () => {
         { kind: "after", minutes: 180 },
       ]),
     ).toEqual(["In 3 hours 23:00", "In 6 hours Thu 2:00", "Tomorrow 21:00", "Next week Mon 18:00"]);
+    const now = localDate(2026, 4, 8, 20);
+    const german = resolveSnoozePresets(now, {
+      t: createI18n("de").getFixedT(null, "common"),
+      formatTime,
+      presets: [
+        { kind: "at", day: "monday", time: "18:00" },
+        { kind: "at", day: "tomorrow", time: "21:00" },
+        { kind: "after", minutes: 360 },
+        { kind: "after", minutes: 180 },
+      ],
+    });
+    expect(german.map((preset) => `${preset.label} ${preset.whenLabel}`)).toEqual([
+      "In 3 Stunden 23:00",
+      "In 6 Stunden Do. 2:00",
+      "Morgen 21:00",
+      "Nächste Woche Mo. 18:00",
+    ]);
+    expect(
+      snoozeWakeLabel(new Date(now.getTime() + 3_600_000).toISOString(), {
+        now: now.toISOString(),
+        t: createI18n("de").getFixedT(null, "common"),
+      }),
+    ).toBe("1 Std.");
   });
 
   it("drops a today preset once its time passes and moves a weekday on that day to next week", () => {
     // Monday 18:30.
     const now = localDate(2026, 4, 13, 18, 30);
     const presets = resolveSnoozePresets(now, {
+      t: createI18n("en").getFixedT(null, "common"),
       presets: [
         { kind: "at", day: "today", time: "18:00" },
         { kind: "at", day: "monday", time: "09:00" },
@@ -469,8 +497,10 @@ describe("pickSnoozePreset", () => {
       { kind: "after", minutes: 180 },
     ];
     // At 15:00 the two differ; at 15:30 "In 3 hours" lands on 18:30 and the menu shows one row.
-    const shown = resolveSnoozePresets(localDate(2026, 4, 8, 15), { presets });
+    const t = createI18n("en").getFixedT(null, "common");
+    const shown = resolveSnoozePresets(localDate(2026, 4, 8, 15), { presets, t });
     const picked = pickSnoozePreset({
+      t,
       shown,
       id: "after:180",
       now: localDate(2026, 4, 8, 15, 30),
@@ -481,8 +511,10 @@ describe("pickSnoozePreset", () => {
 
   it("keeps a set time's shown wake when the day changes while the menu is open", () => {
     // Sunday 23:59: "Tomorrow" means Monday 9:00, even if the pick lands after midnight.
-    const shown = resolveSnoozePresets(localDate(2026, 8, 30, 23, 59));
+    const t = createI18n("en").getFixedT(null, "common");
+    const shown = resolveSnoozePresets(localDate(2026, 8, 30, 23, 59), { t });
     const picked = pickSnoozePreset({
+      t,
       shown,
       id: "at:tomorrow:09:00",
       now: localDate(2026, 8, 31, 0, 1),

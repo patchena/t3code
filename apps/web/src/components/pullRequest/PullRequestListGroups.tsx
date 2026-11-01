@@ -3,18 +3,18 @@ import { EyeIcon, LayersIcon, PenLineIcon, UsersIcon, type LucideIcon } from "lu
 import { useDeferredValue, type RefCallback } from "react";
 
 import { cn } from "~/lib/utils";
-import { Separator } from "../ui/separator";
+import { Separator } from "~/components/ui/separator";
 import {
   pullRequestEntryKey,
   scorePullRequestMatch,
   type EnvironmentPullRequestEntry,
   type PullRequestGroup,
-} from "./pullRequestList.logic";
-import { PullRequestRow, type PullRequestRowTarget } from "./PullRequestRow";
+} from "~/components/pullRequest/pullRequestList.logic";
+import { PullRequestRow, type PullRequestRowTarget } from "~/components/pullRequest/PullRequestRow";
 import {
   PullRequestSpeedModeProvider,
   type PullRequestSpeedActionResult,
-} from "./PullRequestSpeedActions";
+} from "~/components/pullRequest/PullRequestSpeedActions";
 
 const GROUP_ICONS: Record<string, LucideIcon> = {
   authored: PenLineIcon,

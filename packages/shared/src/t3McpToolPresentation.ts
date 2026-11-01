@@ -95,7 +95,7 @@ const T3_MCP_SERVER_ALIASES = new Set([
   "t3_code_direct",
 ]);
 
-const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
+const T3_MCP_TOOLS = {
   link_pull_request: tool(
     ["Link", "Linking", "Linked", "a pull request"],
     "link-pr",
@@ -372,7 +372,11 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
   t3_thread_send_attachments: tool(["Send", "Sending", "Sent", "attachments"], "attachment-send"),
   html_preview: tool(["Preview", "Previewing", "Previewed", "an HTML page"], "html-preview"),
   html_render: tool(["Render", "Rendering", "Rendered", "an HTML page"], "html-render"),
-};
+} satisfies Readonly<Record<string, T3McpToolDefinition>>;
+
+export type T3McpToolId = keyof typeof T3_MCP_TOOLS;
+
+const isT3McpToolId = (value: string): value is T3McpToolId => Object.hasOwn(T3_MCP_TOOLS, value);
 
 export const T3_MCP_TOOL_NAMES: ReadonlySet<string> = new Set(Object.keys(T3_MCP_TOOLS));
 
@@ -429,9 +433,15 @@ function parseT3McpToolName(value: string): string | null {
   return longest;
 }
 
-export function resolveT3McpToolId(toolName: string | null | undefined): string | null {
+export function resolveT3McpToolId(
+  toolName: string | null | undefined,
+  input?: unknown,
+): T3McpToolId | null {
   const name = toolName == null ? null : resolveT3McpToolName(toolName);
-  return name !== null && Object.hasOwn(T3_MCP_TOOLS, name) ? name : null;
+  if (name === null || !isT3McpToolId(name)) return null;
+  const action = asSummaryInput(input)?.action;
+  const actionTool = typeof action === "string" ? ACTION_TOOLS[name]?.(action) : undefined;
+  return actionTool !== undefined && isT3McpToolId(actionTool) ? actionTool : name;
 }
 
 type SummaryInput = Readonly<Record<string, unknown>>;
@@ -455,13 +465,8 @@ export function resolveT3McpToolDefinition(
   toolName: string | null | undefined,
   input?: unknown,
 ): T3McpToolDefinition | null {
-  const name = toolName == null ? null : resolveT3McpToolName(toolName);
-  if (name === null || !Object.hasOwn(T3_MCP_TOOLS, name)) return null;
-  const action = asSummaryInput(input)?.action;
-  const actionTool = typeof action === "string" ? ACTION_TOOLS[name]?.(action) : undefined;
-  return actionTool !== undefined && Object.hasOwn(T3_MCP_TOOLS, actionTool)
-    ? T3_MCP_TOOLS[actionTool]!
-    : T3_MCP_TOOLS[name]!;
+  const id = resolveT3McpToolId(toolName, input);
+  return id === null ? null : T3_MCP_TOOLS[id];
 }
 
 /** Tools whose summary depends on which fields a call sets. */

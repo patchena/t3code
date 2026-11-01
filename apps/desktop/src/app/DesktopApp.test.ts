@@ -141,6 +141,7 @@ it.effect.each([false, true])(
           } as PreviewPasskeys.PreviewPasskeys["Service"]),
           Effect.provideService(DesktopApplicationMenu.DesktopApplicationMenu, {
             configure: Effect.void,
+            setLanguage: () => Effect.void,
           }),
           Effect.provideService(DesktopUpdates.DesktopUpdates, {
             configure: Effect.void,
@@ -214,7 +215,7 @@ it.effect.each([false, true])(
             Layer.mock(BrowserImport.BrowserImport, {}),
             Layer.mock(DesktopBackendConfiguration.DesktopBackendConfiguration, {}),
             Layer.mock(DesktopCliCommand.DesktopCliCommand, {}),
-            Layer.mock(DesktopClientSettings.DesktopClientSettings, {}),
+            Layer.mock(DesktopClientSettings.DesktopClientSettings, { get: Effect.succeedNone }),
             Layer.mock(DesktopConnectionCatalogStore.DesktopConnectionCatalogStore, {}),
             Layer.mock(DesktopIpc.DesktopIpc, {}),
             Layer.mock(DesktopLocalEnvironmentAuth.DesktopLocalEnvironmentAuth, {}),

@@ -1,10 +1,11 @@
+import { useTranslation } from "react-i18next";
 import { AuthSettingsWriteScope } from "@t3tools/contracts";
-import { useEnvironmentsWithScope } from "../../state/session";
+import { useEnvironmentsWithScope } from "~/state/session";
 import {
   requiredScopesForServerSettingsPatch,
   EnvironmentAuthorizationError,
 } from "@t3tools/contracts";
-import { readEnvironmentScope } from "../../state/session";
+import { readEnvironmentScope } from "~/state/session";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
 import {
@@ -14,11 +15,14 @@ import {
   type UnifiedSettings,
 } from "@t3tools/contracts";
 
-import { persistClientSettingsPatch, useMergedSettings } from "../../hooks/useSettings";
-import { serverEnvironment } from "../../state/server";
-import { useAtomCommand } from "../../state/use-atom-command";
-import { toastManager } from "../ui/toast";
-import { useOptionalSettingsScope, useSettingsScope } from "./SettingsScopeContext";
+import { persistClientSettingsPatch, useMergedSettings } from "~/hooks/useSettings";
+import { serverEnvironment } from "~/state/server";
+import { useAtomCommand } from "~/state/use-atom-command";
+import { toastManager } from "~/components/ui/toast";
+import {
+  useOptionalSettingsScope,
+  useSettingsScope,
+} from "~/components/settings/SettingsScopeContext";
 import {
   persistScopedSettingsPatch,
   planProjectOverridesClear,
@@ -28,7 +32,7 @@ import {
   scopedSettingsSource,
   type ProjectOverrideEntry,
   type ScopedSettingsPatch,
-} from "./scopedSettings";
+} from "~/components/settings/scopedSettings";
 
 export function useScopedSettings<T = UnifiedSettings>(
   selector?: (settings: UnifiedSettings) => T,
@@ -48,12 +52,13 @@ export function useScopedSettingSource(keys: readonly (keyof ServerSettings)[]) 
 }
 
 function useRunScopedPlan() {
+  const { t } = useTranslation("settings");
   const persistServer = useAtomCommand(serverEnvironment.updateSettings, { reportFailure: false });
   return (plan: ReturnType<typeof planScopedSettingsPatch>, onFailed?: () => void) => {
     if (plan.unavailableReason) {
       toastManager.add({
         type: "warning",
-        title: "Setting not saved",
+        title: t(($) => $.writes.notSaved),
         description: plan.unavailableReason,
       });
       onFailed?.();
@@ -70,26 +75,33 @@ function useRunScopedPlan() {
             Cause.fail(
               new EnvironmentAuthorizationError({
                 requiredScope: missing,
-                message: "This connection lacks permission to change these settings.",
+                message: t(($) => $.writes.permissionDenied),
               }),
             ),
           );
         return persistServer(request);
       },
       persistClientSettingsPatch,
+      t,
     ).then(({ failedEnvironments, savedEnvironments, savedEnvironmentCount }) => {
       if (failedEnvironments.length === 0) return;
       onFailed?.();
       toastManager.add({
         type: "error",
         title:
-          savedEnvironmentCount > 0 ? "Setting saved on some environments" : "Setting not saved",
+          savedEnvironmentCount > 0
+            ? t(($) => $.writes.partiallySaved)
+            : t(($) => $.writes.notSaved),
         description: [
-          ...failedEnvironments.map(
-            ({ label, message }) => `Could not save on ${label}: ${message}`,
+          ...failedEnvironments.map(({ label, message }) =>
+            t(($) => $.writes.failedOn, { environment: label, error: message }),
           ),
           ...(savedEnvironmentCount > 0
-            ? [`Saved on ${savedEnvironments.map(({ label }) => label).join(", ")}.`]
+            ? [
+                t(($) => $.writes.savedOn, {
+                  environments: savedEnvironments.map(({ label }) => label).join(", "),
+                }),
+              ]
             : []),
         ].join("\n"),
       });
@@ -98,23 +110,26 @@ function useRunScopedPlan() {
 }
 
 export function useUpdateScopedSettings() {
+  const { t } = useTranslation("settings");
   const { scope, environments } = useSettingsScope();
   const run = useRunScopedPlan();
   /** `onFailed` runs when any target rejects or drops the patch, so a draft can fall back. */
   return (patch: ScopedSettingsPatch, options?: { readonly onFailed?: () => void }) =>
-    run(planScopedSettingsPatch(scope, environments, patch), options?.onFailed);
+    run(planScopedSettingsPatch(scope, environments, patch, t), options?.onFailed);
 }
 
 export function useClearScopedSettings() {
+  const { t } = useTranslation("settings");
   const context = useOptionalSettingsScope();
   const run = useRunScopedPlan();
   return (keys: readonly ProjectScopedServerSettingKey[]) => {
     if (context === null) return;
-    run(planScopedSettingsClear(context.scope, context.environments, keys));
+    run(planScopedSettingsClear(context.scope, context.environments, keys, t));
   };
 }
 
 export function useClearProjectOverrides() {
+  const { t } = useTranslation("settings");
   const context = useOptionalSettingsScope();
   const run = useRunScopedPlan();
   return (
@@ -122,7 +137,7 @@ export function useClearProjectOverrides() {
     keys: readonly ProjectScopedServerSettingKey[],
   ) => {
     if (context === null) return;
-    run(planProjectOverridesClear(context.environments, entries, keys));
+    run(planProjectOverridesClear(context.environments, entries, keys, t));
   };
 }
 

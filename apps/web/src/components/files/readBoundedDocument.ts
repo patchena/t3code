@@ -1,3 +1,4 @@
+import { FilePreviewFailure } from "~/components/files/fileFailure";
 export async function readBoundedDocument(
   src: string,
   signal: AbortSignal,
@@ -6,9 +7,10 @@ export async function readBoundedDocument(
 ) {
   const response = await fetch(src, { signal, cache });
   if (!response.ok || Number(response.headers.get("content-length")) > limit)
-    throw new Error("This file is unavailable or too large to preview.");
+    throw new FilePreviewFailure({ describe: (t) => t(($) => $.document.unavailableOrLarge) });
   const reader = response.body?.getReader();
-  if (!reader) throw new Error("This file is unavailable.");
+  if (!reader)
+    throw new FilePreviewFailure({ describe: (t) => t(($) => $.document.unavailableShort) });
   const chunks: Uint8Array<ArrayBuffer>[] = [];
   let size = 0;
   try {
@@ -16,7 +18,8 @@ export async function readBoundedDocument(
       const { done, value } = await reader.read();
       if (done) break;
       size += value.length;
-      if (size > limit) throw new Error("This file is too large to preview.");
+      if (size > limit)
+        throw new FilePreviewFailure({ describe: (t) => t(($) => $.document.tooLarge) });
       chunks.push(value);
     }
   } finally {

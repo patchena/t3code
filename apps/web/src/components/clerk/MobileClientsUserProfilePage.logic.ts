@@ -1,18 +1,8 @@
 import type { RelayClientDeviceRecord } from "@t3tools/contracts/relay";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { interfaceDateLocale } from "~/timestampFormat";
 
-const mobileClientUpdatedAtFormatter = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
-const NOTIFICATION_PREFERENCES = [
-  ["notifyOnApproval", "approvals"],
-  ["notifyOnInput", "input requests"],
-  ["notifyOnCompletion", "completions"],
-  ["notifyOnFailure", "failures"],
-] as const satisfies ReadonlyArray<
-  readonly [keyof RelayClientDeviceRecord["notifications"], string]
->;
+const updatedAtFormatters = new Map<string, Intl.DateTimeFormat>();
 
 export function mobileClientPlatformLabel(device: RelayClientDeviceRecord): string {
   const platform =
@@ -24,22 +14,40 @@ export function mobileClientPlatformLabel(device: RelayClientDeviceRecord): stri
   return `${platform}${device.appVersion ? ` · T3 Code ${device.appVersion}` : ""}`;
 }
 
-export function mobileClientNotificationDetail(device: RelayClientDeviceRecord): string {
+export function mobileClientNotificationDetail(
+  device: RelayClientDeviceRecord,
+  t: TFunction<"connect">,
+): string {
   if (!device.notifications.enabled) {
-    return "Push notifications are disabled on this device.";
+    return t(($) => $.profile.notificationsDisabled);
   }
 
-  const enabledPreferences = NOTIFICATION_PREFERENCES.flatMap(([preference, label]) =>
+  const preferences = [
+    ["notifyOnApproval", t(($) => $.profile.approvals)],
+    ["notifyOnInput", t(($) => $.profile.inputRequests)],
+    ["notifyOnCompletion", t(($) => $.profile.completions)],
+    ["notifyOnFailure", t(($) => $.profile.failures)],
+  ] as const;
+  const enabledPreferences = preferences.flatMap(([preference, label]) =>
     device.notifications[preference] ? [label] : [],
   );
   return enabledPreferences.length > 0
-    ? `Alerts enabled for ${enabledPreferences.join(", ")}.`
-    : "Push notifications are enabled, but no alert types are selected.";
+    ? t(($) => $.profile.alertsEnabled, { alerts: enabledPreferences.join(", ") })
+    : t(($) => $.profile.noAlertTypes);
 }
 
-export function mobileClientUpdatedAtLabel(updatedAt: string): string {
+export function mobileClientUpdatedAtLabel(
+  updatedAt: string,
+  t: TFunction<"connect">,
+  language: string,
+): string {
   const date = new Date(updatedAt);
-  return Number.isNaN(date.getTime())
-    ? "Update time unavailable"
-    : `Updated ${mobileClientUpdatedAtFormatter.format(date)}`;
+  if (Number.isNaN(date.getTime())) return t(($) => $.profile.updateUnavailable);
+  const locale = interfaceDateLocale(language);
+  let formatter = updatedAtFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+    updatedAtFormatters.set(locale, formatter);
+  }
+  return t(($) => $.profile.updated, { date: formatter.format(date) });
 }

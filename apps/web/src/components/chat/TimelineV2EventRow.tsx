@@ -1,4 +1,5 @@
 import { WorkLogBlock } from "./WorkLog";
+import { useTranslation } from "react-i18next";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { useAtomValue } from "@effect/atom-react";
 import { environmentThreadDetails } from "../../state/threads";
@@ -56,6 +57,7 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
 }: {
   row: Extract<TimelineRow, { kind: "event" }>;
 }) {
+  const { t } = useTranslation("activity");
   const ctx = use(TimelineRowCtx);
   const groupId = `subagent-group:${row.id}`;
   const [expanded, setExpanded] = useState(() =>
@@ -79,9 +81,12 @@ const V2SubagentGroup = memo(function V2SubagentGroup({
       completedAt: live?.completedAt ?? item.completedAt,
     };
   });
-  const summary = subagentGroupSummary(agents);
-  const label = `${members.length} ${members.length === 1 ? "subagent" : "subagents"}`;
-  const statusSummary = summarizeSubagentStatuses(agents.map(({ status }) => status));
+  const summary = subagentGroupSummary(agents, t);
+  const label = t(($) => $.subagent.count, { count: members.length });
+  const statusSummary = summarizeSubagentStatuses(
+    agents.map(({ status }) => status),
+    t,
+  );
   const toggleExpanded = (open: boolean) => {
     ctx.onToggleWorkEntry(row.id, expanded);
     if (open) ctx.workGroupViewState.expandedEntries.add(groupId);

@@ -1,12 +1,14 @@
-import { appAtomRegistry, subscribeAtomChanges } from "../rpc/atomRegistry";
-import { primaryEnvironmentIdAtom } from "../state/primaryEnvironment";
-import { primaryServerConfigAtom, primaryServerConfigEventAtom } from "../state/server";
-import { KeybindingsConfigWarning } from "./KeybindingsConfigWarning";
-import { createKeybindingsUpdateToastController } from "./KeybindingsUpdateToast.logic";
-import { stackedThreadToast, toastManager } from "./ui/toast";
+import { appI18n } from "~/i18n";
+import { appAtomRegistry, subscribeAtomChanges } from "~/rpc/atomRegistry";
+import { primaryEnvironmentIdAtom } from "~/state/primaryEnvironment";
+import { primaryServerConfigAtom, primaryServerConfigEventAtom } from "~/state/server";
+import { KeybindingsConfigWarning } from "~/components/KeybindingsConfigWarning";
+import { createKeybindingsUpdateToastController } from "~/components/KeybindingsUpdateToast.logic";
+import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 
 /** Toasts each keybindings reload the primary server reports. */
 export function startKeybindingsUpdateToasts(): () => void {
+  const t = appI18n.getFixedT(null, "workspace");
   const controller = createKeybindingsUpdateToastController({});
   return subscribeAtomChanges(primaryServerConfigEventAtom, (event) => {
     const decision = controller.handle(event);
@@ -15,8 +17,8 @@ export function startKeybindingsUpdateToasts(): () => void {
     if (decision._tag === "Success") {
       toastManager.add({
         type: "success",
-        title: "Keybindings updated",
-        description: "Keybindings configuration reloaded successfully.",
+        title: t(($) => $.updates.keybindingsUpdated),
+        description: t(($) => $.updates.keybindingsConfigurationReloadedSuccessfully),
       });
       return;
     }
@@ -25,7 +27,7 @@ export function startKeybindingsUpdateToasts(): () => void {
     toastManager.add(
       stackedThreadToast({
         type: "warning",
-        title: "Invalid keybindings configuration",
+        title: t(($) => $.updates.invalidKeybindingsConfiguration),
         description: (
           <KeybindingsConfigWarning
             message={decision.message}

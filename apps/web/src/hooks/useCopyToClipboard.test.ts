@@ -1,10 +1,37 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { COMPOSER_CONTEXT_CLIPBOARD_MIME } from "@t3tools/shared/composerContextClipboard";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 
-import { writeTextToClipboard } from "./useCopyToClipboard";
+import {
+  ClipboardApiUnavailableError,
+  ClipboardWriteError,
+  clipboardErrorMessage,
+  writeTextToClipboard,
+} from "~/hooks/useCopyToClipboard";
 
 describe("writeTextToClipboard", () => {
+  it("localizes structured error presentation while preserving diagnostics and target names", async () => {
+    const instance = createI18n("de");
+    const t = instance.getFixedT(null, "common");
+    const error = new ClipboardWriteError({
+      target: "branch name",
+      cause: new Error("permission denied"),
+    });
+    expect(error.message).toBe("Failed to copy branch name to the clipboard.");
+    expect(clipboardErrorMessage(error, t)).toBe(
+      "Branch-Name konnte nicht in die Zwischenablage kopiert werden.",
+    );
+    const target = "source<model>&{{name}}.ts";
+    expect(clipboardErrorMessage(new ClipboardApiUnavailableError({ target }), t)).toBe(
+      `Die Zwischenablage ist beim Kopieren von ${target} nicht verfügbar.`,
+    );
+    expect(clipboardErrorMessage(new Error("Native browser diagnostic"), t)).toBe(
+      "Native browser diagnostic",
+    );
+    await instance.changeLanguage("en");
+    expect(clipboardErrorMessage(error, t)).toBe(error.message);
+  });
   it("reserves plain text even when an extra flavor attempts to replace it", async () => {
     const write = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("window", {});

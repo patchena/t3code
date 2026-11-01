@@ -1,10 +1,12 @@
+import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { observeIntersection } from "~/lib/observeIntersection";
-import { DiffFileHeaderSkeleton } from "../DiffPanelShell";
+import { DiffFileHeaderSkeleton } from "~/components/DiffPanelShell";
 
 export function DiffFileLoadingBoundary({ load, count }: { load: () => void; count: number }) {
+  const { t } = useTranslation("workspace");
   const [isNear, setIsNear] = useState(false);
   const loadLatest = useStableCallback(load);
   // A fresh observe redelivers the current intersection, so this ref must keep its identity
@@ -23,7 +25,7 @@ export function DiffFileLoadingBoundary({ load, count }: { load: () => void; cou
   }, [isNear, count, loadLatest]);
 
   return (
-    <div ref={observe} role="status" aria-label="Loading diff…">
+    <div ref={observe} role="status" aria-label={t(($) => $.git.loadingDiffEllipsis)}>
       {Array.from({ length: Math.min(count, 4) }, (_, index) => (
         <div key={index} aria-hidden className="border-b border-border/40">
           <DiffFileHeaderSkeleton titleWidth="medium" />

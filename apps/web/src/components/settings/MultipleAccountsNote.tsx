@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useAtomValue } from "@effect/atom-react";
 import type { EnvironmentId, ProviderDriverKind } from "@t3tools/contracts";
 import { InfoIcon } from "lucide-react";
@@ -21,6 +22,7 @@ export function MultipleAccountsNote({
   readonly environmentId: EnvironmentId;
   readonly driver: ProviderDriverKind;
 }) {
+  const { t } = useTranslation("settings");
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
   const providerName = PROVIDER_NAMES.get(driver);
   const hasSignedInAccount =
@@ -28,20 +30,20 @@ export function MultipleAccountsNote({
     providers?.some(
       (provider) => provider.driver === driver && provider.auth.status === "authenticated",
     );
-  if (!hasSignedInAccount) return null;
+  if (!hasSignedInAccount || providerName === undefined) return null;
   return (
     <Alert variant="info" role="note">
       <InfoIcon aria-hidden />
       <AlertDescription>
         <p>
-          We do not recommend managing multiple {providerName} accounts in T3 Code.{" "}
+          {t(($) => $.providers.multipleAccounts, { provider: providerName })}{" "}
           <a
             href={MULTIPLE_ACCOUNTS_FAQ_URL}
             target="_blank"
             rel="noreferrer"
             className="underline underline-offset-2 hover:text-foreground"
           >
-            More info
+            {t(($) => $.providers.moreInfo)}
           </a>
         </p>
       </AlertDescription>

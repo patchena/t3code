@@ -16,6 +16,7 @@ import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { resolveProjectScripts } from "@t3tools/shared/projectScripts";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
+import { useTranslation } from "react-i18next";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import {
   decodeProjectScriptKeybindingRule,
@@ -43,6 +44,7 @@ export function useProjectScriptEditing(input: {
   readonly scripts: ReadonlyArray<ProjectScript>;
   readonly settings: UnifiedSettings;
 }) {
+  const { t } = useTranslation("chat");
   const { environmentId, project, scripts, settings } = input;
   const allProjects = useProjects();
   const updateProjectScriptSettings = useAtomCommand(serverEnvironment.updateSettings, {
@@ -79,7 +81,7 @@ export function useProjectScriptEditing(input: {
         Cause.fail(
           new EnvironmentAuthorizationError({
             requiredScope: AuthSettingsWriteScope,
-            message: "This connection cannot change keyboard shortcuts.",
+            message: t(($) => $.terminal.cannotChangeShortcuts),
           }),
         ),
       );
@@ -124,8 +126,8 @@ export function useProjectScriptEditing(input: {
           new EnvironmentAuthorizationError({
             requiredScope: AuthSettingsWriteScope,
             message: isDeletingScript
-              ? "The script was deleted, but its keyboard shortcut could not be removed because permission changed."
-              : "The script was saved, but this connection can no longer change keyboard shortcuts.",
+              ? t(($) => $.terminal.deletedShortcutDenied)
+              : t(($) => $.terminal.savedShortcutDenied),
           }),
         ),
       );
@@ -213,7 +215,7 @@ export function useProjectScriptEditing(input: {
     }
     const existingScript = scripts.find((script) => script.id === scriptId);
     if (!existingScript) {
-      return AsyncResult.failure(Cause.fail(new Error("Script not found.")));
+      return AsyncResult.failure(Cause.fail(new Error(t(($) => $.terminal.scriptMissing))));
     }
 
     const updatedScript = buildProjectScript(existingScript.id, input);
@@ -251,15 +253,18 @@ export function useProjectScriptEditing(input: {
     if (result._tag === "Success") {
       toastManager.add({
         type: "success",
-        title: `Deleted action "${deletedName ?? "Unknown"}"`,
+        title:
+          deletedName === undefined
+            ? t(($) => $.terminal.deletedUnknownAction)
+            : t(($) => $.terminal.deletedAction, { name: deletedName }),
       });
     } else if (!isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not delete action",
-          description: error instanceof Error ? error.message : "An unexpected error occurred.",
+          title: t(($) => $.terminal.deleteActionFailed),
+          description: error instanceof Error ? error.message : t(($) => $.ui.unexpectedError),
         }),
       );
     }

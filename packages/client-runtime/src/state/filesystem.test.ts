@@ -11,7 +11,7 @@ import {
 const SPLIT_SCOPES_SERVER = { serverUpdateScope: "environment:maintain" } as const;
 
 describe("filesystem read access", () => {
-  it("waits for the initial catalog before declaring a missing environment disconnected", () => {
+  it("distinguishes a pending catalog and a disconnected environment from session errors", () => {
     expect(
       resolveFilesystemReadAccess({
         isCatalogReady: false,
@@ -19,7 +19,20 @@ describe("filesystem read access", () => {
         session: null,
         sessionError: null,
       }),
-    ).toEqual({ canReadFiles: false, isPending: true, error: null });
+    ).toEqual({ canReadFiles: false, isPending: true, error: null, failure: null });
+    const input = { isCatalogReady: true, connection: null, session: null, sessionError: null };
+    expect(resolveFilesystemReadAccess(input)).toEqual({
+      canReadFiles: false,
+      isPending: false,
+      error: "This environment is not connected.",
+      failure: "disconnected",
+    });
+    expect(resolveFilesystemReadAccess({ ...input, sessionError: "Session diagnostic" })).toEqual({
+      canReadFiles: false,
+      isPending: false,
+      error: "Session diagnostic",
+      failure: null,
+    });
   });
 
   it.each([false, true])(
@@ -35,10 +48,16 @@ describe("filesystem read access", () => {
         canReadFiles: true,
         isPending: false,
         error: null,
+        failure: null,
       });
       expect(
         resolveFilesystemReadAccess({ ...input, sessionError: "The session has expired." }),
-      ).toEqual({ canReadFiles: false, isPending: false, error: "The session has expired." });
+      ).toEqual({
+        canReadFiles: false,
+        isPending: false,
+        error: "The session has expired.",
+        failure: null,
+      });
     },
   );
 
@@ -53,7 +72,7 @@ describe("filesystem read access", () => {
         session,
         sessionError: null,
       }),
-    ).toEqual({ canReadFiles: false, isPending: false, error: null });
+    ).toEqual({ canReadFiles: false, isPending: false, error: null, failure: null });
   });
 
   it("falls back to the orchestration grant on a server that predates filesystem:read", () => {
@@ -64,7 +83,7 @@ describe("filesystem read access", () => {
         session: { authenticated: true, scopes: [AuthOrchestrationReadScope], auth: {} },
         sessionError: null,
       }),
-    ).toEqual({ canReadFiles: true, isPending: false, error: null });
+    ).toEqual({ canReadFiles: true, isPending: false, error: null, failure: null });
   });
 });
 

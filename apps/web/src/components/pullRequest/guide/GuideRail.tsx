@@ -1,9 +1,10 @@
+import { useTranslation } from "react-i18next";
 import type { PullRequestReviewGuideStop } from "@t3tools/contracts";
 import { CheckIcon } from "lucide-react";
 
 import { cn } from "~/lib/utils";
 
-import { Badge } from "../../ui/badge";
+import { Badge } from "~/components/ui/badge";
 import { stopSubline } from "@t3tools/client-runtime/review-guide-tour";
 
 export function GuideRail({
@@ -17,6 +18,7 @@ export function GuideRail({
   seen: ReadonlySet<number>;
   onSelect: (position: number) => void;
 }) {
+  const { t } = useTranslation("workspace");
   const reviewed = seen.size;
   const renderStop = (stop: PullRequestReviewGuideStop, index: number) => (
     <li key={index}>
@@ -29,10 +31,10 @@ export function GuideRail({
           <>
             {stop.attention !== null ? (
               <Badge size="sm" variant="warning">
-                Look closely
+                {t(($) => $.git.lookClosely)}
               </Badge>
             ) : null}
-            <span>{stopSubline(stop)}</span>
+            <span>{stopSubline(stop, t)}</span>
           </>
         }
       />
@@ -40,9 +42,9 @@ export function GuideRail({
   );
 
   return (
-    <nav aria-label="Review tour" className="flex min-h-0 flex-col gap-4">
+    <nav aria-label={t(($) => $.git.reviewTour)} className="flex min-h-0 flex-col gap-4">
       <p className="text-xs text-muted-foreground tabular-nums @max-[56rem]/guide:hidden">
-        {reviewed} of {stops.length} read
+        {t(($) => $.git.stopsRead, { count: reviewed, total: stops.length })}
       </p>
       <div className="flex flex-col gap-4">
         <ol className="flex flex-col gap-0.5">{stops.map(renderStop)}</ol>
@@ -88,6 +90,7 @@ function RailRow({
 }
 
 function StopBullet({ number, seen }: { number: number; seen: boolean }) {
+  const { t } = useTranslation("workspace");
   return (
     <span
       className={cn(
@@ -95,7 +98,14 @@ function StopBullet({ number, seen }: { number: number; seen: boolean }) {
         seen ? "border-success/40 text-success-foreground" : "border-border text-muted-foreground",
       )}
     >
-      {seen ? <CheckIcon aria-label={`Stop ${number}, read`} className="size-3" /> : number}
+      {seen ? (
+        <CheckIcon
+          aria-label={t(($) => $.git.stopReadLabel, { number: number })}
+          className="size-3"
+        />
+      ) : (
+        number
+      )}
     </span>
   );
 }

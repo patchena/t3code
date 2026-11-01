@@ -2,6 +2,8 @@ import type { ScopedThreadRef } from "@t3tools/contracts";
 import { parseThreadLinkPrompt, withoutPromptLinkParams } from "@t3tools/shared/promptLinks";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { formatPromptLinkError } from "@t3tools/client-runtime/prompt-links";
 
 import { isThreadRoutePathname } from "../../threadRoutes";
 import { stackedThreadToast, toastManager } from "../ui/toast";
@@ -10,6 +12,7 @@ import { placeLinkedPrompt } from "./linkedPrompt";
 const handledLinkKeys = new Set<string>();
 
 export function ThreadLinkPrompt({ threadRef }: { readonly threadRef: ScopedThreadRef }) {
+  const { t } = useTranslation("chat");
   const navigate = useNavigate();
   const location = useLocation({
     select: (current) => ({
@@ -32,19 +35,19 @@ export function ThreadLinkPrompt({ threadRef }: { readonly threadRef: ScopedThre
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not open the linked prompt",
-            description: parsed.error,
+            title: t(($) => $.links.prompt.linkedFailed),
+            description: formatPromptLinkError(parsed.error, t),
           }),
         );
       } else if (parsed.value !== null) {
-        placeLinkedPrompt(threadRef, parsed.value);
+        placeLinkedPrompt(threadRef, parsed.value, t);
       }
     }
     void navigate({
       href: `${location.pathname}${withoutPromptLinkParams(location.search)}`,
       replace: true,
     });
-  }, [location, navigate, threadRef]);
+  }, [location, navigate, threadRef, t]);
 
   return null;
 }

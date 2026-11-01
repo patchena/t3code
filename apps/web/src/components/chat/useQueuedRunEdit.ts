@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
 import { useAtomValue } from "@effect/atom-react";
 import {
   makeQueuedRunEditStore,
@@ -87,26 +89,32 @@ function queuedEditDraftTarget(routeThreadRef: ScopedThreadRef, runId: RunId) {
   return DraftId.make(`queued-edit:${scopedThreadKey(routeThreadRef)}:${runId}`);
 }
 
-async function submitQueuedRunEdit(input: {
-  readonly environmentId: EnvironmentId;
-  readonly draftTarget: ComposerThreadTarget;
-  readonly editing: EditingQueuedRun;
-  readonly content: QueuedRunEditContent;
-  readonly editQueuedRun: ReturnType<typeof useEditQueuedRunCommand>;
-}): Promise<string | null> {
+async function submitQueuedRunEdit(
+  input: {
+    readonly environmentId: EnvironmentId;
+    readonly draftTarget: ComposerThreadTarget;
+    readonly editing: EditingQueuedRun;
+    readonly content: QueuedRunEditContent;
+    readonly editQueuedRun: ReturnType<typeof useEditQueuedRunCommand>;
+  },
+  t: TFunction<"chat">,
+): Promise<string | null> {
   const { environmentId, draftTarget, editing, content } = input;
   const editText = content.prompt.trim();
   const newAttachments = [...content.images, ...content.files];
   const uploadFiles = async (files: ReadonlyArray<ComposerFileAttachment>) => {
     const validateFiles = () => {
       const config = appAtomRegistry.get(environmentServerConfigsAtom).get(environmentId) ?? null;
-      const reason = fileAttachmentCapabilityBlockReason({
-        files,
-        attachmentUploadsCapabilityKnown: config !== null,
-        supportsAttachmentUploads: config !== null,
-        maxFileAttachmentBytes:
-          config?.environment.capabilities.fileAttachments?.maxUploadBytes ?? null,
-      });
+      const reason = fileAttachmentCapabilityBlockReason(
+        {
+          files,
+          attachmentUploadsCapabilityKnown: config !== null,
+          supportsAttachmentUploads: config !== null,
+          maxFileAttachmentBytes:
+            config?.environment.capabilities.fileAttachments?.maxUploadBytes ?? null,
+        },
+        t,
+      );
       if (reason !== null) throw new Error(reason);
     };
     validateFiles();
@@ -114,17 +122,20 @@ async function submitQueuedRunEdit(input: {
     await awaitAttachmentUploads(files.map((file) => file.id));
     validateFiles();
     const uploaded = getUploadedAttachments({ environmentId, images: files });
-    if (uploaded === null) throw new Error("Retry or remove failed uploads before saving.");
+    if (uploaded === null) throw new Error(t(($) => $.composer.retryUploadsBeforeSave));
     return uploaded;
   };
   try {
-    const uploads = await prepareQueuedEditAttachments({
-      existingAttachments: editing.existingAttachments,
-      images: content.images,
-      files: content.files,
-      readImage: readFileAsDataUrl,
-      uploadFiles,
-    });
+    const uploads = await prepareQueuedEditAttachments(
+      {
+        existingAttachments: editing.existingAttachments,
+        images: content.images,
+        files: content.files,
+        readImage: readFileAsDataUrl,
+        uploadFiles,
+      },
+      t,
+    );
     const keptRecords = (editing.context?.records ?? []).filter(
       (record) =>
         !("attachmentId" in record) ||
@@ -166,9 +177,9 @@ async function submitQueuedRunEdit(input: {
         },
       },
     });
-    return result._tag === "Failure" ? "Could not save the edited queued message." : null;
+    return result._tag === "Failure" ? t(($) => $.composer.saveQueuedEditFailed) : null;
   } catch (error) {
-    return error instanceof Error ? error.message : "Could not save the edited queued message.";
+    return error instanceof Error ? error.message : t(($) => $.composer.saveQueuedEditFailed);
   }
 }
 
@@ -186,6 +197,7 @@ export function useQueuedRunEdit(input: {
   readonly promptRef: { current: string };
   readonly composerRef: RefObject<ChatComposerHandle | null>;
 }) {
+  const { t } = useTranslation("chat");
   const {
     environmentId,
     routeThreadRef,
@@ -270,15 +282,18 @@ export function useQueuedRunEdit(input: {
           const title = appAtomRegistry.get(
             environmentThreadShells.threadShellAtom(threadRef),
           )?.title;
-          const where = title === undefined ? "" : ` in “${title}”`;
           toastManager.add(
             stackedThreadToast({
               type: recovery === "kept" ? "info" : "warning",
-              title: "Queued message is no longer queued",
+              title: t(($) => $.composer.messageNoLongerQueued),
               description:
                 recovery === "kept"
-                  ? `Your unsaved edit${where} was kept in the composer.`
-                  : `Your unsaved edit${where} was discarded.`,
+                  ? title === undefined
+                    ? t(($) => $.composer.unsavedEditKept)
+                    : t(($) => $.composer.unsavedThreadEditKept, { thread: title })
+                  : title === undefined
+                    ? t(($) => $.composer.unsavedEditDiscarded)
+                    : t(($) => $.composer.unsavedThreadEditDiscarded, { thread: title }),
             }),
           );
         },
@@ -313,7 +328,7 @@ export function useQueuedRunEdit(input: {
     ) {
       setThreadError(
         editing.threadId,
-        `A message can have at most ${PROVIDER_SEND_TURN_MAX_ATTACHMENTS} attachments.`,
+        t(($) => $.composer.maxAttachments, { count: PROVIDER_SEND_TURN_MAX_ATTACHMENTS }),
       );
       return;
     }
@@ -327,13 +342,16 @@ export function useQueuedRunEdit(input: {
     // The save's result decides the edit's fate, even if the run starts meanwhile.
     const finishSave = queuedRunEdits.startSave(editKey);
     if (finishSave === null) return;
-    const error = await submitQueuedRunEdit({
-      environmentId,
-      draftTarget,
-      editing,
-      content,
-      editQueuedRun: editQueuedRunCommand,
-    });
+    const error = await submitQueuedRunEdit(
+      {
+        environmentId,
+        draftTarget,
+        editing,
+        content,
+        editQueuedRun: editQueuedRunCommand,
+      },
+      t,
+    );
     setThreadError(editing.threadId, error);
     const current = finishSave(error === null);
     if (error !== null) return;

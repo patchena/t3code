@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vite-plus/test";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { converter } from "culori/fn";
 import { BUILT_IN_THEMES } from "@t3tools/shared/themePalettes";
 
 import { CONTEXT_CHIP_ACCENTS, contextChipColorVariable } from "./lib/contextChipAccents";
+import { themeErrorMessage } from "~/components/settings/themeErrorMessage";
+import { isThemeError, ThemeError } from "~/themeErrors";
 
 import {
   applyThemePalette,
@@ -126,6 +129,25 @@ describe("theme files", () => {
     const restored = parseThemeFile(JSON.parse(serializeThemeFile(theme)));
     expect(restored.colors).toEqual(theme.colors);
     expect(restored.variants).toEqual(theme.variants);
+  });
+
+  it("localizes structured validation errors after a language change while preserving diagnostics", async () => {
+    let cause: unknown;
+    try {
+      parseThemeFile({ version: THEME_FILE_VERSION + 1 });
+    } catch (error) {
+      cause = error;
+    }
+    if (!isThemeError(cause)) throw new Error("Expected a structured theme error.");
+    const i18n = createI18n("en");
+    const t = i18n.getFixedT(null, "settings");
+    expect(themeErrorMessage(cause, t)).toBe(cause.message);
+    const opaque = new ThemeError({ message: "opaque diagnostic", detail: cause.detail });
+    await i18n.changeLanguage("de");
+    expect(themeErrorMessage(opaque, t)).toBe(
+      `Diese Designdatei verwendet eine nicht unterstützte Version. Erwartet wird ${THEME_FILE_VERSION}.`,
+    );
+    expect(opaque.message).toBe("opaque diagnostic");
   });
 
   it.each(["searchMatchBackground", "searchMatchActiveBackground"] as const)(

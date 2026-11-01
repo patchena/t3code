@@ -1,3 +1,4 @@
+import { appI18n } from "~/i18n";
 import {
   type AtomCommandResult,
   isAtomCommandInterrupted,
@@ -13,14 +14,14 @@ import { AsyncResult } from "effect/reactivity";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 
-import { toastManager } from "../ui/toast";
+import { toastManager } from "~/components/ui/toast";
 import {
   revertFileViewedOverlay,
   settleFileViewedOverlay,
   toFileViewedBatch,
   toFileViewedStates,
   type FileViewedOverlay,
-} from "./pullRequestFilesViewed.logic";
+} from "~/components/pullRequest/pullRequestFilesViewed.logic";
 
 export interface FilesViewedTarget {
   readonly environmentId: EnvironmentId;
@@ -248,7 +249,11 @@ const filesViewedStore = createFilesViewedStore({
       { reportFailure: false },
     ),
   refresh: (target) => appAtomRegistry.refresh(filesViewedAtom(target)),
-  reportFailure: () => toastManager.add({ type: "error", title: "Could not update viewed files" }),
+  reportFailure: () =>
+    toastManager.add({
+      type: "error",
+      title: appI18n.getFixedT(null, "workspace")(($) => $.git.updateViewedFailed),
+    }),
 });
 
 export function filesViewedScope(target: FilesViewedTarget): FilesViewedScopeHandle {

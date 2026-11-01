@@ -5,7 +5,7 @@ import { useStableCallback } from "~/hooks/useStableCallback";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
 
-import { pullRequestPanelReference } from "./usePullRequestDetail";
+import { pullRequestPanelReference } from "~/components/pullRequest/usePullRequestDetail";
 
 const INTENT_DELAY_MS = 150;
 

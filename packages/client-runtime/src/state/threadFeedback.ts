@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { MessageId, type ProviderUploadFeedbackResult } from "@t3tools/contracts";
 
 import {
@@ -28,19 +29,22 @@ export function parseCodexFeedbackCommand(text: string): { readonly reason?: str
   return reason ? { reason } : {};
 }
 
-export function codexFeedbackNotice(submission: CodexFeedbackSubmission) {
+export function codexFeedbackNotice(submission: CodexFeedbackSubmission, t: TFunction<"chat">) {
   switch (submission.status) {
     case "interrupted":
       return null;
     case "uploading":
-      return { title: "Sending feedback to OpenAI...", description: undefined };
+      return { title: t(($) => $.composer.sendingFeedback), description: undefined };
     case "sent":
       return {
-        title: "Feedback sent to OpenAI",
-        description: `Thread ID: ${submission.feedbackId}`,
+        title: t(($) => $.composer.feedbackSent),
+        description: t(($) => $.composer.threadId, { id: submission.feedbackId }),
       };
     case "failed":
-      return { title: "Could not send feedback to OpenAI", description: submission.errorMessage };
+      return {
+        title: t(($) => $.composer.feedbackSendFailed),
+        description: submission.errorMessage,
+      };
   }
 }
 

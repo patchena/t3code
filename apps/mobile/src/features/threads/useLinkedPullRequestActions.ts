@@ -1,6 +1,8 @@
+import { mobileI18n } from "~/i18n";
 import {
   pullRequestLinkProject,
   resolveLinkPullRequestInput,
+  formatPullRequestLinkInputError,
 } from "@t3tools/client-runtime/pull-request-link-input";
 import type {
   EnvironmentProject,
@@ -106,7 +108,13 @@ export function useLinkedPullRequestActions(input: {
           return;
         }
         if ("error" in resolved) {
-          Dialog.alert(`Couldn't link this ${singular}`, resolved.error);
+          Dialog.alert(
+            `Couldn't link this ${singular}`,
+            formatPullRequestLinkInputError(
+              resolved.error,
+              mobileI18n.getFixedT(null, "workspace"),
+            ),
+          );
           return;
         }
         setLinked(resolved.link, true);

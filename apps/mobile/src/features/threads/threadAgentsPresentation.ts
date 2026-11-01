@@ -1,3 +1,4 @@
+import { mobileI18n } from "~/i18n";
 import {
   formatSubagentDisplayTitle,
   resolveSubagentMetadata,
@@ -176,7 +177,10 @@ export function workflowMemberMetadata(
   provider: Pick<ServerProvider, "driver" | "models"> | undefined,
 ) {
   const model = member.model?.trim()
-    ? resolveSubagentMetadata({ model: member.model, provider }).modelLabel
+    ? resolveSubagentMetadata(
+        { model: member.model, provider },
+        mobileI18n.getFixedT("en", "activity"),
+      ).modelLabel
     : null;
   const slug = provider
     ? resolveSelectableModel(provider.driver, member.model, provider.models)

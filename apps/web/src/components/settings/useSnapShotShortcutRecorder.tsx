@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   isModifierPairShortcut,
   type SnapShotModifier,
@@ -47,6 +48,7 @@ export function useSnapShotShortcutRecorder({
   onStart?: () => void;
   onError: (message: string) => void;
 }) {
+  const { t } = useTranslation("settings");
   const bridge = getDesktopSnapShotBridge();
   const displayShortcut = shortcutLabel ? parseDesktopSnapShotShortcut(shortcutLabel) : shortcut;
   const [recording, setRecording] = useState(false);
@@ -70,7 +72,7 @@ export function useSnapShotShortcutRecorder({
     } catch (error) {
       if (!requests.owns(request)) return;
       requests.clear();
-      onError(error instanceof Error ? error.message : "Could not start shortcut recording.");
+      onError(error instanceof Error ? error.message : t(($) => $.extra.capture.recordFailed));
     }
   };
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- releases the desktop bridge's SnapShot shortcut suppression on unmount
@@ -96,7 +98,7 @@ export function useSnapShotShortcutRecorder({
       const [left, right] = MODIFIER_CODES[modifier];
       if (held.has(left) && held.has(right)) {
         if (!allowModifierPairs) {
-          onError("Add a letter, number, or function key to your shortcut.");
+          onError(t(($) => $.extra.capture.addKey));
           return;
         }
         stopRecording();
@@ -127,8 +129,10 @@ export function useSnapShotShortcutRecorder({
         disabled={disabled}
         aria-label={
           displayShortcut
-            ? `Record snapshot shortcut, currently ${formatSnapShotShortcutLabel(displayShortcut)}`
-            : "Change snapshot shortcut"
+            ? t(($) => $.extra.capture.recordLabel, {
+                shortcut: formatSnapShotShortcutLabel(displayShortcut),
+              })
+            : t(($) => $.extra.capture.changeLabel)
         }
         aria-pressed={recording}
         data-keybinding-capture=""
@@ -138,11 +142,11 @@ export function useSnapShotShortcutRecorder({
         onBlur={stopRecording}
       >
         {recording ? (
-          "Press shortcut…"
+          t(($) => $.extra.capture.pressShortcut)
         ) : !displayShortcut ? (
-          "Change shortcut"
+          t(($) => $.extra.capture.changeShortcut)
         ) : !allowModifierPairs && isModifierPairShortcut(displayShortcut) ? (
-          "Choose shortcut"
+          t(($) => $.extra.capture.chooseShortcutShort)
         ) : (
           <SnapShotShortcutKeys shortcut={displayShortcut} />
         )}

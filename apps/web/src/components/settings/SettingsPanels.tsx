@@ -1,6 +1,13 @@
+import { useTranslation } from "react-i18next";
+import type { SettingsTranslation } from "~/components/settings/settingsSearch";
+import {
+  persistClientSettingsUpdate,
+  useClientSettings,
+  useClientSettingsHydrated,
+} from "~/hooks/useSettings";
 import { useAtomValue } from "@effect/atom-react";
-import { NotificationSettings } from "./NotificationSettings";
-import { PRIVACY_POLICY_URL } from "../../legalLinks";
+import { NotificationSettings } from "~/components/settings/NotificationSettings";
+import { PRIVACY_POLICY_URL } from "~/legalLinks";
 import { CheckIcon } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
@@ -16,6 +23,7 @@ import {
 } from "@t3tools/contracts";
 import {
   DEFAULT_UNIFIED_SETTINGS,
+  InterfaceLanguage,
   type DiffLayout,
   MAX_SIDEBAR_AUTO_SETTLE_AFTER_DAYS,
   MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS,
@@ -28,10 +36,10 @@ import { createModelSelection } from "@t3tools/shared/model";
 import { resolvePastedPath } from "@t3tools/shared/path";
 import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
-import { APP_VERSION, HOSTED_APP_CHANNEL, HOSTED_APP_CHANNEL_LABEL } from "../../branding";
-import { AboutVersionTitle } from "./AboutVersionTitle";
-import { CliCommandSettingsRow } from "./CliCommandSettingsRow";
-import { MobileAppSettingsRow } from "./MobileAppSettingsRow";
+import { APP_VERSION, HOSTED_APP_CHANNEL, HOSTED_APP_CHANNEL_LABEL } from "~/branding";
+import { AboutVersionTitle } from "~/components/settings/AboutVersionTitle";
+import { CliCommandSettingsRow } from "~/components/settings/CliCommandSettingsRow";
+import { MobileAppSettingsRow } from "~/components/settings/MobileAppSettingsRow";
 import {
   canCheckForUpdate,
   getDesktopUpdateButtonTooltip,
@@ -39,48 +47,57 @@ import {
   getDesktopUpdateInstallConfirmationMessage,
   isDesktopUpdateButtonDisabled,
   resolveDesktopUpdateButtonAction,
-} from "../../components/desktopUpdate.logic";
-import { ProviderModelPicker } from "../chat/ProviderModelPicker";
-import { TraitsPicker } from "../chat/TraitsPicker";
-import { isElectron } from "../../env";
-import { buildHostedChannelSelectionUrl, type HostedAppChannel } from "../../hostedPairing";
+} from "~/components/desktopUpdate.logic";
+import { ProviderModelPicker } from "~/components/chat/ProviderModelPicker";
+import { TraitsPicker } from "~/components/chat/TraitsPicker";
+import { isElectron } from "~/env";
+import { buildHostedChannelSelectionUrl, type HostedAppChannel } from "~/hostedPairing";
 import {
   readAppearanceModePreference,
   readThemeHalves,
   readThemePreference,
   useTheme,
-} from "../../hooks/useTheme";
+} from "~/hooks/useTheme";
 import {
   useScopedSettings,
   useScopedSettingsMixed,
   useUpdateScopedSettings,
-} from "./useScopedSettings";
-import { useScopedModelDisabledReason } from "./useScopedModelAvailability";
-import { useOptionalSettingsScope, useSettingsScope } from "./SettingsScopeContext";
-import { scopedIdleCompaction } from "./scopedSettings";
-import { ProjectDefaultsSettings } from "./ProjectDefaultsSettings";
-import { ThreadTitleInstructionsSettings } from "./ThreadTitleInstructionsSettings";
-import { SnoozePresetsRow } from "./SnoozePresetsSettings";
-import { useDesktopUpdateState } from "../../state/desktopUpdate";
-import { managedTelemetryOffMessage, usePrimaryManagedPolicy } from "../../state/managedPolicy";
+} from "~/components/settings/useScopedSettings";
+import { useScopedModelDisabledReason } from "~/components/settings/useScopedModelAvailability";
+import {
+  useOptionalSettingsScope,
+  useSettingsScope,
+} from "~/components/settings/SettingsScopeContext";
+import { scopedIdleCompaction } from "~/components/settings/scopedSettings";
+import { ProjectDefaultsSettings } from "~/components/settings/ProjectDefaultsSettings";
+import { ThreadTitleInstructionsSettings } from "~/components/settings/ThreadTitleInstructionsSettings";
+import { SnoozePresetsRow } from "~/components/settings/SnoozePresetsSettings";
+import { useDesktopUpdateState } from "~/state/desktopUpdate";
+import { managedTelemetryOffMessage, usePrimaryManagedPolicy } from "~/state/managedPolicy";
 import {
   getCustomModelOptionsByInstance,
   resolveAppModelSelectionState,
   selectsPlanAgent,
-} from "../../modelSelection";
-import { providerInstanceEntriesFor } from "../../providerInstances";
-import { ensureLocalApi, readLocalApi } from "../../localApi";
-import { isMacPlatform } from "../../lib/utils";
-import { useEnvironmentProviders, useEnvironments } from "../../state/environments";
-import { EMPTY_SERVER_PROVIDERS } from "../../state/server";
-import { Button } from "../ui/button";
-import { DraftInput } from "../ui/draft-input";
-import { Input } from "../ui/input";
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
-import { Switch } from "../ui/switch";
-import { ScopedSwitch } from "./ScopedSwitch";
-import { stackedThreadToast, toastManager } from "../ui/toast";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+} from "~/modelSelection";
+import { providerInstanceEntriesFor } from "~/providerInstances";
+import { ensureLocalApi, readLocalApi } from "~/localApi";
+import { isMacPlatform } from "~/lib/utils";
+import { useEnvironmentProviders, useEnvironments } from "~/state/environments";
+import { EMPTY_SERVER_PROVIDERS } from "~/state/server";
+import { Button } from "~/components/ui/button";
+import { DraftInput } from "~/components/ui/draft-input";
+import { Input } from "~/components/ui/input";
+import {
+  Select,
+  SelectItem,
+  SelectPopup,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { Switch } from "~/components/ui/switch";
+import { ScopedSwitch } from "~/components/settings/ScopedSwitch";
+import { stackedThreadToast, toastManager } from "~/components/ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import {
   getChangedBrowserSettingLabels,
   getChangedTypographySettingLabels,
@@ -89,63 +106,83 @@ import {
   projectGroupingModeFromToggle,
   readLastEnabledProjectGroupingMode,
   rememberEnabledProjectGroupingMode,
-} from "./SettingsPanels.logic";
+} from "~/components/settings/SettingsPanels.logic";
 import {
   SETTINGS_PICKER_TRIGGER_CLASSNAME,
   SettingResetButton,
   SettingsPageContainer,
   SettingsRow,
   SettingsSection,
-} from "./settingsLayout";
-import { searchableSetting } from "./settingsSearch";
-import { BackgroundActivitySettingsRow } from "./BackgroundActivitySettings";
-import { AdvancedSettings } from "./AdvancedSettings";
-import { PullRequestLinksOpenInAppSetting } from "./IntegrationsSettings";
-import { StorageCleanupSections } from "./StorageSettings";
-import { UpdateTrackSwitchDialog } from "./UpdateTrackSwitchDialog";
+} from "~/components/settings/settingsLayout";
+import { searchableSetting } from "~/components/settings/settingsSearch";
+import { BackgroundActivitySettingsRow } from "~/components/settings/BackgroundActivitySettings";
+import { AdvancedSettings } from "~/components/settings/AdvancedSettings";
+import { PullRequestLinksOpenInAppSetting } from "~/components/settings/IntegrationsSettings";
+import { StorageCleanupSections } from "~/components/settings/StorageSettings";
+import { UpdateTrackSwitchDialog } from "~/components/settings/UpdateTrackSwitchDialog";
 import { environmentIdsKey } from "~/state/environmentAtomList";
 import { environmentSessionStatesAtom } from "~/state/session";
-import { canUpdateServer } from "../ServerUpdateAction";
-import { useUpdateEverythingRun } from "../sidebar/updateEverythingRun";
-import { awaitsTrackSwitch, channelSwitchLabel } from "../sidebar/updateEverything.logic";
-import { isHostedByThisApp } from "../sidebar/useUpdateEverything";
+import { canUpdateServer } from "~/components/ServerUpdateAction";
+import { useUpdateEverythingRun } from "~/components/sidebar/updateEverythingRun";
+import { awaitsTrackSwitch, channelSwitchLabel } from "~/components/sidebar/updateEverything.logic";
+import { isHostedByThisApp } from "~/components/sidebar/useUpdateEverything";
 
-const RESPONSE_STREAMING_MODE_LABELS: Record<ResponseStreamingMode, string> = {
-  turn: "Wait for the full response",
-  paragraph: "Show finished paragraphs",
-};
+function responseStreamingModeLabels(
+  t: SettingsTranslation,
+): Record<ResponseStreamingMode, string> {
+  return {
+    turn: t(($) => $.panels.waitForTheFullResponse),
+    paragraph: t(($) => $.panels.showFinishedParagraphs),
+  };
+}
 
-const RESPONSE_STREAMING_MODE_DESCRIPTIONS: Record<ResponseStreamingMode, string> = {
-  turn: "Text appears once the agent finishes its turn.",
-  paragraph: "Each paragraph or code block appears as soon as it is complete.",
-};
+function responseStreamingModeDescriptions(
+  t: SettingsTranslation,
+): Record<ResponseStreamingMode, string> {
+  return {
+    turn: t(($) => $.panels.textAppearsOnceTheAgentFinishesItsTurn),
+    paragraph: t(($) => $.panels.eachParagraphOrCodeBlockAppearsAsSoon),
+  };
+}
 
-const SIDEBAR_PROJECT_SORT_ORDER_LABELS: Record<SidebarProjectSortOrder, string> = {
-  updated_at: "Last user message",
-  created_at: "Created at",
-  manual: "Manual",
-};
+function sidebarProjectSortOrderLabels(
+  t: SettingsTranslation,
+): Record<SidebarProjectSortOrder, string> {
+  return {
+    updated_at: t(($) => $.panels.lastUserMessage),
+    created_at: t(($) => $.panels.createdAt),
+    manual: t(($) => $.panels.manual),
+  };
+}
 const isSidebarProjectSortOrder = Schema.is(SidebarProjectSortOrder);
 
-const TIMESTAMP_FORMAT_LABELS = {
-  locale: "System default",
-  "12-hour": "12-hour",
-  "24-hour": "24-hour",
-} as const;
+function timestampFormatLabels(t: SettingsTranslation) {
+  return {
+    locale: t(($) => $.panels.systemDefault),
+    "12-hour": t(($) => $.panels.twelveHour),
+    "24-hour": t(($) => $.panels.twentyFourHour),
+  } as const;
+}
 
-const DIFF_LAYOUT_LABELS: Record<DiffLayout, string> = {
-  stacked: "Stacked",
-  split: "Split",
-};
+function diffLayoutLabels(t: SettingsTranslation): Record<DiffLayout, string> {
+  return {
+    stacked: t(($) => $.panels.stacked),
+    split: t(($) => $.panels.split),
+  };
+}
 
-const QUIT_CONFIRMATION_MODE_LABELS: Record<QuitConfirmationMode, string> = {
-  direct: "Direct",
-  hold: "Hold",
-  "double-click": "Double press",
-};
+function quitConfirmationModeLabels(t: SettingsTranslation): Record<QuitConfirmationMode, string> {
+  return {
+    direct: t(($) => $.panels.direct),
+    hold: t(($) => $.panels.hold),
+    "double-click": t(($) => $.panels.doublePress),
+  };
+}
 
 const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
 function AboutVersionSection() {
+  const { t } = useTranslation("settings");
+  const { t: tWorkspace } = useTranslation("workspace");
   const updateState = useDesktopUpdateState();
   const [switchChannel, setSwitchChannel] = useState<DesktopUpdateChannel | null>(null);
   const [isUpdateActionPending, setIsUpdateActionPending] = useState(false);
@@ -198,8 +235,8 @@ function AboutVersionSection() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not download update",
-            description: error instanceof Error ? error.message : "Download failed.",
+            title: t(($) => $.panels.couldNotDownloadUpdate),
+            description: error instanceof Error ? error.message : t(($) => $.panels.downloadFailed),
           }),
         );
       });
@@ -214,6 +251,7 @@ function AboutVersionSection() {
         confirmed = await ensureLocalApi().dialogs.confirm(
           getDesktopUpdateInstallConfirmationMessage(
             updateState ?? { availableVersion: null, downloadedVersion: null },
+            tWorkspace,
           ),
         );
       } catch (error) {
@@ -221,8 +259,9 @@ function AboutVersionSection() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not confirm update",
-            description: error instanceof Error ? error.message : "Update confirmation failed.",
+            title: t(($) => $.panels.couldNotConfirmUpdate),
+            description:
+              error instanceof Error ? error.message : t(($) => $.panels.updateConfirmationFailed),
           }),
         );
         return;
@@ -237,8 +276,9 @@ function AboutVersionSection() {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Could not install update",
-              description: error instanceof Error ? error.message : "Install failed.",
+              title: t(($) => $.panels.couldNotInstallUpdate),
+              description:
+                error instanceof Error ? error.message : t(($) => $.panels.installFailed),
             }),
           );
         })
@@ -254,11 +294,11 @@ function AboutVersionSection() {
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: "Could not check for updates",
+              title: t(($) => $.panels.couldNotCheckForUpdates),
               description:
                 updatesDenial ??
                 result.state.message ??
-                "Automatic updates are not available in this build.",
+                t(($) => $.panels.automaticUpdatesAreNotAvailableInThisBuild),
             }),
           );
         }
@@ -267,39 +307,45 @@ function AboutVersionSection() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not check for updates",
-            description: error instanceof Error ? error.message : "Update check failed.",
+            title: t(($) => $.panels.couldNotCheckForUpdates),
+            description:
+              error instanceof Error ? error.message : t(($) => $.panels.updateCheckFailed),
           }),
         );
       });
   };
 
   const action = updateState ? resolveDesktopUpdateButtonAction(updateState) : "none";
-  const buttonTooltip = updateState ? getDesktopUpdateButtonTooltip(updateState) : null;
+  const buttonTooltip = updateState ? getDesktopUpdateButtonTooltip(updateState, tWorkspace) : null;
   const buttonDisabled =
     action === "none"
       ? !canCheckForUpdate(updateState)
       : isDesktopUpdateButtonDisabled(updateState);
 
-  const actionLabel: Record<string, string> = { download: "Download", install: "Install" };
+  const actionLabel: Record<string, string> = {
+    download: t(($) => $.panels.download),
+    install: t(($) => $.panels.install),
+  };
   const statusLabel: Record<string, string> = {
-    checking: "Checking…",
-    downloading: "Downloading…",
+    checking: t(($) => $.panels.checking),
+    downloading: t(($) => $.panels.downloading),
     // Off its track, "up to date" only means no switch is pending; Review moves it.
-    ...(appOffTrack ? {} : { "up-to-date": "Up to Date" }),
+    ...(appOffTrack ? {} : { "up-to-date": t(($) => $.panels.upToDateLabel) }),
   };
   const buttonLabel =
-    actionLabel[action] ?? statusLabel[updateState?.status ?? ""] ?? "Check for Updates";
+    actionLabel[action] ??
+    statusLabel[updateState?.status ?? ""] ??
+    t(($) => $.panels.checkForUpdates);
   const description =
     action === "download" || action === "install"
-      ? "Update available."
-      : (getDesktopUpdateDisabledReason(updateState, updatesDenial) ??
-        "Current version of the application.");
+      ? t(($) => $.panels.updateAvailable)
+      : (getDesktopUpdateDisabledReason(updateState, tWorkspace, updatesDenial) ??
+        t(($) => $.panels.currentVersionOfTheApplication));
 
   return (
     <>
       <SettingsRow
-        id={searchableSetting("app-version").id}
+        id={searchableSetting("app-version", t).id}
         title={<AboutVersionTitle />}
         description={description}
         managed={updatesDenial}
@@ -323,20 +369,27 @@ function AboutVersionSection() {
       />
       {hasDesktopBridge ? (
         <SettingsRow
-          {...searchableSetting("update-track")}
+          {...searchableSetting("update-track", t)}
           description={
             nightlyDeniedBy !== undefined ? (
-              `${managedUpdatesMessage(nightlyDeniedBy)} Nightly builds are not available${
-                selectedUpdateChannel === "nightly"
-                  ? "; switch to Stable to keep getting updates."
-                  : "."
-              }`
+              selectedUpdateChannel === "nightly" ? (
+                t(($) => $.panels.nightlyDeniedSwitchToStable, {
+                  message: managedUpdatesMessage(nightlyDeniedBy),
+                })
+              ) : (
+                t(($) => $.panels.nightlyDenied, {
+                  message: managedUpdatesMessage(nightlyDeniedBy),
+                })
+              )
             ) : unswitchedMachines > 0 ? (
               <>
-                {unswitchedMachines === 1
-                  ? "1 machine still runs"
-                  : `${unswitchedMachines} machines still run`}{" "}
-                {channelSwitchLabel(selectedUpdateChannel === "nightly" ? "latest" : "nightly")}.{" "}
+                {t(($) => $.panels.pendingMachines, {
+                  count: unswitchedMachines,
+                  channel: channelSwitchLabel(
+                    selectedUpdateChannel === "nightly" ? "latest" : "nightly",
+                    tWorkspace,
+                  ),
+                })}{" "}
                 {/* The dialog moves what it can and says why it skips the rest. */}
                 <Button
                   size="xs"
@@ -344,11 +397,11 @@ function AboutVersionSection() {
                   disabled={updateRun !== null}
                   onClick={() => setSwitchChannel(selectedUpdateChannel)}
                 >
-                  Review
+                  {t(($) => $.panels.review)}
                 </Button>
               </>
             ) : (
-              "Switches this app and every connected machine whose database the target release supports."
+              t(($) => $.panels.switchesThisAppAndEveryConnectedMachineWhose)
             )
           }
           managed={updatesDenial}
@@ -364,21 +417,21 @@ function AboutVersionSection() {
               <SelectTrigger
                 size="sm"
                 className="w-full sm:w-40"
-                aria-label="Update track"
+                aria-label={t(($) => $.panels.updateTrack)}
                 disabled={switchChannel !== null || updateRun !== null}
               >
-                <SelectValue>{channelSwitchLabel(selectedUpdateChannel)}</SelectValue>
+                <SelectValue>{channelSwitchLabel(selectedUpdateChannel, tWorkspace)}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="latest">
-                  Stable
+                  {t(($) => $.panels.stable)}
                 </SelectItem>
                 <SelectItem
                   hideIndicator
                   value="nightly"
                   disabled={nightlyDeniedBy !== undefined && selectedUpdateChannel !== "nightly"}
                 >
-                  Nightly
+                  {t(($) => $.panels.nightly)}
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -386,8 +439,8 @@ function AboutVersionSection() {
         />
       ) : selectedHostedAppChannel ? (
         <SettingsRow
-          {...searchableSetting("update-track")}
-          description="Switches the hosted app release channel."
+          {...searchableSetting("update-track", t)}
+          description={t(($) => $.panels.switchesTheHostedAppReleaseChannel)}
           control={
             <Select
               value={selectedHostedAppChannel}
@@ -398,15 +451,19 @@ function AboutVersionSection() {
                 );
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Update track">
+              <SelectTrigger
+                size="sm"
+                className="w-full sm:w-40"
+                aria-label={t(($) => $.panels.updateTrack)}
+              >
                 <SelectValue>{HOSTED_APP_CHANNEL_LABEL}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="latest">
-                  Latest
+                  {t(($) => $.panels.latest)}
                 </SelectItem>
                 <SelectItem hideIndicator value="nightly">
-                  Nightly
+                  {t(($) => $.panels.nightly)}
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -422,6 +479,7 @@ function AboutVersionSection() {
 }
 
 export function useSettingsRestore(onRestored?: () => void) {
+  const { t } = useTranslation("settings");
   const {
     theme,
     setTheme,
@@ -441,137 +499,152 @@ export function useSettingsRestore(onRestored?: () => void) {
   const isBackgroundActivityDirty = hasChangedBackgroundActivitySettings(settings);
 
   const changedSettingLabels = [
-    ...(theme !== "system" ? ["Theme"] : []),
-    ...(!followSystem ? ["Follow system"] : []),
-    ...(themeHalves !== null ? ["Theme mix"] : []),
+    ...(settings.interfaceLanguage !== DEFAULT_UNIFIED_SETTINGS.interfaceLanguage
+      ? [t(($) => $.search.interfaceLanguage)]
+      : []),
+    ...(theme !== "system" ? [t(($) => $.panels.theme)] : []),
+    ...(!followSystem ? [t(($) => $.panels.followSystem)] : []),
+    ...(themeHalves !== null ? [t(($) => $.panels.themeMix)] : []),
     ...(settings.appearanceContrast !== DEFAULT_UNIFIED_SETTINGS.appearanceContrast
-      ? ["Contrast"]
+      ? [t(($) => $.panels.contrast)]
       : []),
-    ...(settings.glassOpacity !== DEFAULT_UNIFIED_SETTINGS.glassOpacity ? ["Glass opacity"] : []),
+    ...(settings.glassOpacity !== DEFAULT_UNIFIED_SETTINGS.glassOpacity
+      ? [t(($) => $.panels.glassOpacity)]
+      : []),
     ...(settings.diffColorScheme !== DEFAULT_UNIFIED_SETTINGS.diffColorScheme
-      ? ["Diff colors"]
+      ? [t(($) => $.panels.diffColors)]
       : []),
-    ...(settings.chatWidth !== DEFAULT_UNIFIED_SETTINGS.chatWidth ? ["Chat width"] : []),
+    ...(settings.chatWidth !== DEFAULT_UNIFIED_SETTINGS.chatWidth
+      ? [t(($) => $.panels.chatWidth)]
+      : []),
     ...(settings.effortDisplay !== DEFAULT_UNIFIED_SETTINGS.effortDisplay
-      ? ["Effort display"]
+      ? [t(($) => $.panels.effortDisplay)]
       : []),
     ...(settings.mathRenderingEnabled !== DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled
-      ? ["Render math"]
+      ? [t(($) => $.panels.renderMath)]
       : []),
     ...(settings.panelAnimationDurationMs !== DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs
-      ? ["Panel animations"]
+      ? [t(($) => $.panels.panelAnimations)]
       : []),
     ...(settings.environmentIdentificationMode !==
     DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode
-      ? ["Environment identification"]
+      ? [t(($) => $.panels.environmentIdentification)]
       : []),
     ...(settings.timestampFormat !== DEFAULT_UNIFIED_SETTINGS.timestampFormat
-      ? ["Time format"]
+      ? [t(($) => $.panels.timeFormat)]
       : []),
     ...(settings.notificationMode !== DEFAULT_UNIFIED_SETTINGS.notificationMode
-      ? ["Thread notifications"]
+      ? [t(($) => $.panels.threadNotifications)]
       : []),
     ...(settings.inAppNotificationsEnabled !== DEFAULT_UNIFIED_SETTINGS.inAppNotificationsEnabled
-      ? ["In-app notifications"]
+      ? [t(($) => $.panels.inAppNotifications)]
       : []),
     ...(settings.sidebarProjectGroupingMode !== DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode
-      ? ["Project Grouping"]
+      ? [t(($) => $.panels.projectGrouping)]
       : []),
     ...(settings.sidebarProjectSortOrder !== DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder
-      ? ["Project order"]
+      ? [t(($) => $.panels.projectOrder)]
       : []),
     ...(settings.sidebarWorkingShelfEnabled !== DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled
-      ? ["Working section"]
+      ? [t(($) => $.panels.workingSection)]
       : []),
     ...(settings.sidebarAutoSettleAfterDays !== DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays
-      ? ["Auto-settle inactive threads"]
+      ? [t(($) => $.panels.autoSettleInactiveThreads)]
       : []),
     ...(settings.sidebarAutoSettleKeepPullRequests !==
     DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleKeepPullRequests
-      ? ["Keep threads with a PR"]
+      ? [t(($) => $.panels.keepThreadsWithAPR)]
       : []),
     ...(settings.sidebarAutoSettleOnMerge !== DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge
-      ? ["Auto-settle merged threads"]
+      ? [t(($) => $.panels.autoSettleMergedThreads)]
       : []),
     ...(settings.autoResumeLimitedThreads !== DEFAULT_UNIFIED_SETTINGS.autoResumeLimitedThreads
-      ? ["Resume after usage limits"]
+      ? [t(($) => $.panels.resumeAfterUsageLimits)]
       : []),
     ...(settings.snoozeLimitedThreads !== DEFAULT_UNIFIED_SETTINGS.snoozeLimitedThreads
-      ? ["Snooze until limits reset"]
+      ? [t(($) => $.panels.snoozeUntilLimitsReset)]
       : []),
     ...(!Equal.equals(settings.snoozePresets, DEFAULT_UNIFIED_SETTINGS.snoozePresets)
-      ? ["Snooze options"]
+      ? [t(($) => $.panels.snoozeOptions)]
       : []),
-    ...(settings.wordWrap !== DEFAULT_UNIFIED_SETTINGS.wordWrap ? ["Word wrap"] : []),
+    ...(settings.wordWrap !== DEFAULT_UNIFIED_SETTINGS.wordWrap
+      ? [t(($) => $.panels.wordWrap)]
+      : []),
     ...(settings.persistComposerContextStrip !==
     DEFAULT_UNIFIED_SETTINGS.persistComposerContextStrip
-      ? ["Composer context"]
+      ? [t(($) => $.panels.composerContext)]
       : []),
-    ...getChangedTypographySettingLabels(settings),
+    ...getChangedTypographySettingLabels(settings, t),
     ...(settings.diffFilesCollapsed !== DEFAULT_UNIFIED_SETTINGS.diffFilesCollapsed
-      ? ["Default diff file state"]
+      ? [t(($) => $.panels.defaultDiffFileState)]
       : []),
     ...(settings.diffIgnoreWhitespace !== DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace
-      ? ["Diff whitespace changes"]
+      ? [t(($) => $.panels.diffWhitespaceChanges)]
       : []),
-    ...(settings.diffLayout !== DEFAULT_UNIFIED_SETTINGS.diffLayout ? ["Diff layout"] : []),
+    ...(settings.diffLayout !== DEFAULT_UNIFIED_SETTINGS.diffLayout
+      ? [t(($) => $.panels.diffLayout)]
+      : []),
     ...(settings.proactivePanelsEnabled !== DEFAULT_UNIFIED_SETTINGS.proactivePanelsEnabled
-      ? ["Open pull requests and changes panels proactively"]
+      ? [t(($) => $.panels.proactivePanels)]
       : []),
     ...(settings.showSkillsInSlashMenu !== DEFAULT_UNIFIED_SETTINGS.showSkillsInSlashMenu
-      ? ["Show skills in slash menu"]
+      ? [t(($) => $.panels.showSkillsInSlashMenu)]
       : []),
     ...(settings.composerRichTextEnabled !== DEFAULT_UNIFIED_SETTINGS.composerRichTextEnabled
-      ? ["Rich text composer"]
+      ? [t(($) => $.panels.richTextComposer)]
       : []),
-    ...(settings.sendShortcut !== DEFAULT_UNIFIED_SETTINGS.sendShortcut ? ["Send shortcut"] : []),
+    ...(settings.sendShortcut !== DEFAULT_UNIFIED_SETTINGS.sendShortcut
+      ? [t(($) => $.panels.sendShortcut)]
+      : []),
     ...(settings.followUpBehavior !== DEFAULT_UNIFIED_SETTINGS.followUpBehavior
-      ? ["Follow-up behavior"]
+      ? [t(($) => $.panels.followUpBehavior)]
       : []),
     ...(settings.contextWindowMeterEnabled !== DEFAULT_UNIFIED_SETTINGS.contextWindowMeterEnabled
-      ? ["Context window indicator"]
+      ? [t(($) => $.panels.contextWindowIndicator)]
       : []),
     ...(settings.responseStreamingMode !== DEFAULT_UNIFIED_SETTINGS.responseStreamingMode
-      ? ["Response streaming"]
+      ? [t(($) => $.panels.responseStreaming)]
       : []),
     ...(settings.enableProviderUpdateChecks !== DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks
-      ? ["Provider update checks"]
+      ? [t(($) => $.panels.providerUpdateChecks)]
       : []),
     ...(settings.continueThreadsAfterServerUpdate !==
     DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate
-      ? ["Continue threads after restarts"]
+      ? [t(($) => $.panels.continueThreadsAfterRestarts)]
       : []),
-    ...(isBackgroundActivityDirty ? ["Background activity"] : []),
+    ...(isBackgroundActivityDirty ? [t(($) => $.panels.backgroundActivity)] : []),
     ...(settings.defaultThreadEnvMode !== DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode
-      ? ["New thread mode"]
+      ? [t(($) => $.panels.newThreadMode)]
       : []),
     ...(settings.newWorktreesStartFromOrigin !==
     DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin
-      ? ["New worktrees start from remote"]
+      ? [t(($) => $.panels.newWorktreesStartFromRemote)]
       : []),
     ...(settings.addProjectBaseDirectory !== DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory
-      ? ["Add project base directory"]
+      ? [t(($) => $.panels.addProjectBaseDirectory)]
       : []),
     ...(settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout
-      ? ["Clone into host folders"]
+      ? [t(($) => $.panels.cloneIntoHostFolders)]
       : []),
     ...(settings.confirmThreadUnpin !== DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin
-      ? ["Unpin confirmation"]
+      ? [t(($) => $.panels.unpinConfirmation)]
       : []),
     ...(settings.confirmThreadArchive !== DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive
-      ? ["Archive confirmation"]
+      ? [t(($) => $.panels.archiveConfirmation)]
       : []),
     ...(settings.confirmThreadDelete !== DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete
-      ? ["Delete confirmation"]
+      ? [t(($) => $.panels.deleteConfirmation)]
       : []),
-    ...(settings.confirmQuit !== DEFAULT_UNIFIED_SETTINGS.confirmQuit ? ["Quit shortcut"] : []),
-    ...(isTextGenerationModelDirty ? ["Text generation model"] : []),
+    ...(settings.confirmQuit !== DEFAULT_UNIFIED_SETTINGS.confirmQuit
+      ? [t(($) => $.panels.quitShortcut)]
+      : []),
+    ...(isTextGenerationModelDirty ? [t(($) => $.panels.textGenerationModel)] : []),
     ...(settings.threadTitleInstructions !== DEFAULT_UNIFIED_SETTINGS.threadTitleInstructions
-      ? ["Thread title instructions"]
+      ? [t(($) => $.panels.threadTitleInstructions)]
       : []),
-    ...getChangedBrowserSettingLabels(settings),
+    ...getChangedBrowserSettingLabels(settings, t),
     ...(settings.enableAgentBrowserAccess !== DEFAULT_UNIFIED_SETTINGS.enableAgentBrowserAccess
-      ? ["Agent browser access"]
+      ? [t(($) => $.panels.agentBrowserAccess)]
       : []),
   ];
 
@@ -579,12 +652,28 @@ export function useSettingsRestore(onRestored?: () => void) {
     if (changedSettingLabels.length === 0) return;
     const api = readLocalApi();
     const confirmed = await (api ?? ensureLocalApi()).dialogs.confirm(
-      ["Restore default settings?", `This will reset: ${changedSettingLabels.join(", ")}.`].join(
-        "\n",
-      ),
+      [
+        t(($) => $.panels.restoreDefaultSettings),
+        t(($) => $.panels.resetNotice, { settings: changedSettingLabels.join(", ") }),
+      ].join("\n"),
       { variant: "destructive" },
     );
     if (!confirmed) return;
+    if (settings.interfaceLanguage !== DEFAULT_UNIFIED_SETTINGS.interfaceLanguage) {
+      try {
+        await persistClientSettingsUpdate((current) => ({
+          ...current,
+          interfaceLanguage: DEFAULT_UNIFIED_SETTINGS.interfaceLanguage,
+        }));
+      } catch (error) {
+        toastManager.add({
+          type: "error",
+          title: t(($) => $.panels.languageNotSaved),
+          description: error instanceof Error ? error.message : String(error),
+        });
+        return;
+      }
+    }
 
     // Reset only dirty theme keys so storage failures cannot block other settings; re-read after confirmation
     // for safe rollback.
@@ -600,8 +689,8 @@ export function useSettingsRestore(onRestored?: () => void) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Couldn’t restore theme settings",
-          description: "Try again.",
+          title: t(($) => $.panels.couldnTRestoreThemeSettings),
+          description: t(($) => $.panels.tryAgain),
         }),
       );
     };
@@ -714,6 +803,7 @@ function AutoSettleDaysInput({
   value: number;
   onCommit: (days: number) => void;
 }) {
+  const { t } = useTranslation("settings");
   const [draft, setDraft] = useState(String(value));
   const [draftSource, setDraftSource] = useState(value);
   if (draftSource !== value) {
@@ -741,40 +831,41 @@ function AutoSettleDaysInput({
         }
       }}
       onBlur={() => setDraft(String(value))}
-      aria-label="Days of inactivity before auto-settle"
+      aria-label={t(($) => $.panels.daysOfInactivityBeforeAutoSettle)}
     />
   );
 }
 
 export function LegacyFeaturesSection() {
+  const { t } = useTranslation("settings");
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
 
   return (
-    <SettingsSection id="legacy-features" title="Legacy">
+    <SettingsSection id="legacy-features" title={t(($) => $.panels.legacy)}>
       <SettingsRow
-        {...searchableSetting("legacy-plan-mode")}
-        description="Restore Build/Plan, /plan, /default, and Shift+Tab. Off uses build mode."
+        {...searchableSetting("legacy-plan-mode", t)}
+        description={t(($) => $.panels.restoreBuildPlanPlanDefaultAndShiftTab)}
         control={
           <Switch
             checked={settings.planModeEnabled}
             onCheckedChange={(checked) => {
               updateSettings({ planModeEnabled: Boolean(checked) });
             }}
-            aria-label="Plan mode (legacy)"
+            aria-label={t(($) => $.panels.planModeLegacy)}
           />
         }
       />
       <SettingsRow
-        {...searchableSetting("legacy-context-window-indicator")}
-        description="Shows context window usage as a circular indicator in the composer."
+        {...searchableSetting("legacy-context-window-indicator", t)}
+        description={t(($) => $.panels.showsContextWindowUsageAsACircularIndicator)}
         control={
           <Switch
             checked={settings.contextWindowMeterEnabled}
             onCheckedChange={(checked) =>
               updateSettings({ contextWindowMeterEnabled: Boolean(checked) })
             }
-            aria-label="Context window indicator (legacy)"
+            aria-label={t(($) => $.panels.contextWindowIndicatorLegacy)}
           />
         }
       />
@@ -782,7 +873,72 @@ export function LegacyFeaturesSection() {
   );
 }
 
+const languageNames: Record<InterfaceLanguage, string> = { en: "English", de: "Deutsch" };
+
+function InterfaceLanguageRow() {
+  const { t } = useTranslation("settings");
+  const language = useClientSettings((settings) => settings.interfaceLanguage);
+  const hydrated = useClientSettingsHydrated();
+  const [saving, setSaving] = useState(false);
+  const save = async (next: InterfaceLanguage) => {
+    if (saving || next === language) return;
+    setSaving(true);
+    try {
+      await persistClientSettingsUpdate((current) => ({ ...current, interfaceLanguage: next }));
+    } catch (error) {
+      setSaving(false);
+      toastManager.add({
+        type: "error",
+        title: t(($) => $.panels.languageNotSaved),
+        description: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+    setSaving(false);
+  };
+  return (
+    <SettingsRow
+      {...searchableSetting("interface-language", t)}
+      resetAction={
+        language !== DEFAULT_UNIFIED_SETTINGS.interfaceLanguage ? (
+          <SettingResetButton
+            label={t(($) => $.search.interfaceLanguage)}
+            disabled={!hydrated || saving}
+            onClick={() => void save(DEFAULT_UNIFIED_SETTINGS.interfaceLanguage)}
+          />
+        ) : null
+      }
+      control={
+        <Select
+          value={language}
+          disabled={!hydrated || saving}
+          onValueChange={(value) => {
+            const next = InterfaceLanguage.literals.find((candidate) => candidate === value);
+            if (next) void save(next);
+          }}
+        >
+          <SelectTrigger
+            size="sm"
+            className="w-full sm:w-40"
+            aria-label={t(($) => $.search.interfaceLanguage)}
+          >
+            <SelectValue>{languageNames[language]}</SelectValue>
+          </SelectTrigger>
+          <SelectPopup align="end" alignItemWithTrigger={false}>
+            {InterfaceLanguage.literals.map((option) => (
+              <SelectItem key={option} value={option}>
+                {languageNames[option]}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
+      }
+    />
+  );
+}
+
 export function GeneralSettingsPanel() {
+  const { t } = useTranslation("settings");
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const lastEnabledProjectGroupingMode = useRef<SidebarProjectGroupingMode>(
@@ -791,30 +947,33 @@ export function GeneralSettingsPanel() {
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="notifications" title="Notifications">
+      <SettingsSection id="interface" title={t(($) => $.search.interfaceLanguage)}>
+        <InterfaceLanguageRow />
+      </SettingsSection>
+      <SettingsSection id="notifications" title={t(($) => $.panels.notifications)}>
         <NotificationSettings />
         <SettingsRow
-          {...searchableSetting("in-app-notifications")}
-          description="Show a toast when another thread finishes, fails, or needs input or approval while this app has focus."
+          {...searchableSetting("in-app-notifications", t)}
+          description={t(($) => $.panels.showAToastWhenAnotherThreadFinishesFails)}
           control={
             <Switch
               checked={settings.inAppNotificationsEnabled}
               onCheckedChange={(checked) => updateSettings({ inAppNotificationsEnabled: checked })}
-              aria-label="In-app notifications"
+              aria-label={t(($) => $.panels.inAppNotifications)}
             />
           }
         />
       </SettingsSection>
 
-      <SettingsSection id="sidebar" title="Sidebar">
+      <SettingsSection id="sidebar" title={t(($) => $.panels.sidebar)}>
         <SettingsRow
-          {...searchableSetting("project-grouping")}
-          description="Combine matching repositories across environments."
+          {...searchableSetting("project-grouping", t)}
+          description={t(($) => $.panels.combineMatchingRepositoriesAcrossEnvironments)}
           resetAction={
             settings.sidebarProjectGroupingMode !==
             DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode ? (
               <SettingResetButton
-                label="project grouping"
+                label={t(($) => $.panels.projectGroupingLabel)}
                 onClick={() =>
                   updateSettings({
                     sidebarProjectGroupingMode: DEFAULT_UNIFIED_SETTINGS.sidebarProjectGroupingMode,
@@ -838,18 +997,18 @@ export function GeneralSettingsPanel() {
                   ),
                 });
               }}
-              aria-label="Project grouping"
+              aria-label={t(($) => $.panels.projectGroupingLabelLabel)}
             />
           }
         />
         <SettingsRow
-          {...searchableSetting("project-order")}
-          description="Order of projects in the sidebar project picker and command palette."
+          {...searchableSetting("project-order", t)}
+          description={t(($) => $.panels.orderOfProjectsInTheSidebarProjectPicker)}
           resetAction={
             settings.sidebarProjectSortOrder !==
             DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder ? (
               <SettingResetButton
-                label="project order"
+                label={t(($) => $.panels.projectOrderLabel)}
                 onClick={() =>
                   updateSettings({
                     sidebarProjectSortOrder: DEFAULT_UNIFIED_SETTINGS.sidebarProjectSortOrder,
@@ -867,15 +1026,19 @@ export function GeneralSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-44" aria-label="Project order">
+              <SelectTrigger
+                size="sm"
+                className="w-full sm:w-44"
+                aria-label={t(($) => $.panels.projectOrder)}
+              >
                 <SelectValue>
-                  {SIDEBAR_PROJECT_SORT_ORDER_LABELS[settings.sidebarProjectSortOrder]}
+                  {sidebarProjectSortOrderLabels(t)[settings.sidebarProjectSortOrder]}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 {SidebarProjectSortOrder.literals.map((sortOrder) => (
                   <SelectItem hideIndicator key={sortOrder} value={sortOrder}>
-                    {SIDEBAR_PROJECT_SORT_ORDER_LABELS[sortOrder]}
+                    {sidebarProjectSortOrderLabels(t)[sortOrder]}
                   </SelectItem>
                 ))}
               </SelectPopup>
@@ -883,13 +1046,13 @@ export function GeneralSettingsPanel() {
           }
         />
         <SettingsRow
-          {...searchableSetting("working-shelf")}
-          description="Fold working and monitoring threads into a Working section. They return to the top of the inbox when they need you. The boring sidebar in Labs has no Working section."
+          {...searchableSetting("working-shelf", t)}
+          description={t(($) => $.panels.foldWorkingAndMonitoringThreadsIntoAWorking)}
           resetAction={
             settings.sidebarWorkingShelfEnabled !==
             DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled ? (
               <SettingResetButton
-                label="working section"
+                label={t(($) => $.panels.workingSectionLabel)}
                 onClick={() =>
                   updateSettings({
                     sidebarWorkingShelfEnabled: DEFAULT_UNIFIED_SETTINGS.sidebarWorkingShelfEnabled,
@@ -904,20 +1067,20 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ sidebarWorkingShelfEnabled: Boolean(checked) })
               }
-              aria-label="Working section"
+              aria-label={t(($) => $.panels.workingSection)}
             />
           }
         />
       </SettingsSection>
 
-      <SettingsSection id="confirmations" title="Confirmations">
+      <SettingsSection id="confirmations" title={t(($) => $.panels.confirmations)}>
         <SettingsRow
-          {...searchableSetting("unpin-confirmation")}
-          description="Ask before unpinning a thread from the pinned section."
+          {...searchableSetting("unpin-confirmation", t)}
+          description={t(($) => $.panels.askBeforeUnpinningAThreadFromThePinned)}
           resetAction={
             settings.confirmThreadUnpin !== DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin ? (
               <SettingResetButton
-                label="unpin confirmation"
+                label={t(($) => $.panels.unpinConfirmationLabel)}
                 onClick={() =>
                   updateSettings({
                     confirmThreadUnpin: DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin,
@@ -932,17 +1095,17 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ confirmThreadUnpin: Boolean(checked) })
               }
-              aria-label="Confirm thread unpinning"
+              aria-label={t(($) => $.panels.confirmThreadUnpinning)}
             />
           }
         />
         <SettingsRow
-          {...searchableSetting("archive-confirmation")}
-          description="Require a second click on the inline archive action before a thread is archived."
+          {...searchableSetting("archive-confirmation", t)}
+          description={t(($) => $.panels.requireASecondClickOnTheInlineArchive)}
           resetAction={
             settings.confirmThreadArchive !== DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive ? (
               <SettingResetButton
-                label="archive confirmation"
+                label={t(($) => $.panels.archiveConfirmationLabel)}
                 onClick={() =>
                   updateSettings({
                     confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
@@ -957,17 +1120,17 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ confirmThreadArchive: Boolean(checked) })
               }
-              aria-label="Confirm thread archiving"
+              aria-label={t(($) => $.panels.confirmThreadArchiving)}
             />
           }
         />
         <SettingsRow
-          {...searchableSetting("delete-confirmation")}
-          description="Ask before deleting a thread and its chat history."
+          {...searchableSetting("delete-confirmation", t)}
+          description={t(($) => $.panels.askBeforeDeletingAThreadAndItsChat)}
           resetAction={
             settings.confirmThreadDelete !== DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete ? (
               <SettingResetButton
-                label="delete confirmation"
+                label={t(($) => $.panels.deleteConfirmationLabel)}
                 onClick={() =>
                   updateSettings({
                     confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
@@ -982,18 +1145,18 @@ export function GeneralSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ confirmThreadDelete: Boolean(checked) })
               }
-              aria-label="Confirm thread deletion"
+              aria-label={t(($) => $.panels.confirmThreadDeletion)}
             />
           }
         />
         {isElectron ? (
           <SettingsRow
-            {...searchableSetting("quit-confirmation")}
-            description="Hold mode also quits on two quick presses."
+            {...searchableSetting("quit-confirmation", t)}
+            description={t(($) => $.panels.holdModeAlsoQuitsOnTwoQuickPresses)}
             resetAction={
               settings.confirmQuit !== DEFAULT_UNIFIED_SETTINGS.confirmQuit ? (
                 <SettingResetButton
-                  label="quit shortcut behavior"
+                  label={t(($) => $.panels.quitShortcutBehavior)}
                   onClick={() =>
                     updateSettings({ confirmQuit: DEFAULT_UNIFIED_SETTINGS.confirmQuit })
                   }
@@ -1012,12 +1175,12 @@ export function GeneralSettingsPanel() {
                 <SelectTrigger
                   size="sm"
                   className="w-full sm:w-40"
-                  aria-label="Quit shortcut behavior"
+                  aria-label={t(($) => $.panels.quitShortcutBehaviorLabel)}
                 >
-                  <SelectValue>{QUIT_CONFIRMATION_MODE_LABELS[settings.confirmQuit]}</SelectValue>
+                  <SelectValue>{quitConfirmationModeLabels(t)[settings.confirmQuit]}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
-                  {Object.entries(QUIT_CONFIRMATION_MODE_LABELS).map(([value, label]) => (
+                  {Object.entries(quitConfirmationModeLabels(t)).map(([value, label]) => (
                     <SelectItem hideIndicator key={value} value={value}>
                       {label}
                     </SelectItem>
@@ -1029,14 +1192,14 @@ export function GeneralSettingsPanel() {
         ) : null}
       </SettingsSection>
 
-      <SettingsSection id="display" title="Display">
+      <SettingsSection id="display" title={t(($) => $.panels.display)}>
         <SettingsRow
-          {...searchableSetting("time-format")}
-          description="System default follows your browser or OS clock preference."
+          {...searchableSetting("time-format", t)}
+          description={t(($) => $.panels.systemDefaultFollowsYourBrowserOrOSClock)}
           resetAction={
             settings.timestampFormat !== DEFAULT_UNIFIED_SETTINGS.timestampFormat ? (
               <SettingResetButton
-                label="time format"
+                label={t(($) => $.panels.timeFormatLabel)}
                 onClick={() =>
                   updateSettings({
                     timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
@@ -1054,18 +1217,22 @@ export function GeneralSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Timestamp format">
-                <SelectValue>{TIMESTAMP_FORMAT_LABELS[settings.timestampFormat]}</SelectValue>
+              <SelectTrigger
+                size="sm"
+                className="w-full sm:w-40"
+                aria-label={t(($) => $.panels.timestampFormat)}
+              >
+                <SelectValue>{timestampFormatLabels(t)[settings.timestampFormat]}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="locale">
-                  {TIMESTAMP_FORMAT_LABELS.locale}
+                  {timestampFormatLabels(t).locale}
                 </SelectItem>
                 <SelectItem hideIndicator value="12-hour">
-                  {TIMESTAMP_FORMAT_LABELS["12-hour"]}
+                  {timestampFormatLabels(t)["12-hour"]}
                 </SelectItem>
                 <SelectItem hideIndicator value="24-hour">
-                  {TIMESTAMP_FORMAT_LABELS["24-hour"]}
+                  {timestampFormatLabels(t)["24-hour"]}
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -1077,26 +1244,30 @@ export function GeneralSettingsPanel() {
 }
 
 export function ChatSettingsPanel() {
+  const { t } = useTranslation("settings");
   const modifierLabel = isMacPlatform(navigator.platform) ? "⌘" : "Ctrl";
   const sendShortcutOptions = [
     { value: "enter", label: "Enter" },
-    { value: "mod-enter-multiline", label: `${modifierLabel} + Enter for multiline prompts` },
-    { value: "mod-enter", label: `${modifierLabel} + Enter always` },
+    {
+      value: "mod-enter-multiline",
+      label: t(($) => $.panels.multilineShortcut, { modifier: modifierLabel }),
+    },
+    { value: "mod-enter", label: t(($) => $.panels.alwaysShortcut, { modifier: modifierLabel }) },
   ] as const;
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="composer" title="Composer">
+      <SettingsSection id="composer" title={t(($) => $.panels.composer)}>
         <SettingsRow
-          {...searchableSetting("composer-rich-text")}
-          description="Show formatted Markdown as you type."
+          {...searchableSetting("composer-rich-text", t)}
+          description={t(($) => $.panels.showFormattedMarkdownAsYouType)}
           resetAction={
             settings.composerRichTextEnabled !==
             DEFAULT_UNIFIED_SETTINGS.composerRichTextEnabled ? (
               <SettingResetButton
-                label="rich text composer"
+                label={t(($) => $.panels.richTextComposerLabel)}
                 onClick={() =>
                   updateSettings({
                     composerRichTextEnabled: DEFAULT_UNIFIED_SETTINGS.composerRichTextEnabled,
@@ -1111,17 +1282,17 @@ export function ChatSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ composerRichTextEnabled: Boolean(checked) })
               }
-              aria-label="Rich text composer"
+              aria-label={t(($) => $.panels.richTextComposer)}
             />
           }
         />
         <SettingsRow
-          {...searchableSetting("send-shortcut")}
-          description="Choose when Enter sends a prompt or inserts a new line"
+          {...searchableSetting("send-shortcut", t)}
+          description={t(($) => $.panels.chooseWhenEnterSendsAPromptOrInserts)}
           resetAction={
             settings.sendShortcut !== DEFAULT_UNIFIED_SETTINGS.sendShortcut ? (
               <SettingResetButton
-                label="send shortcut"
+                label={t(($) => $.panels.sendShortcutLabel)}
                 onClick={() =>
                   updateSettings({ sendShortcut: DEFAULT_UNIFIED_SETTINGS.sendShortcut })
                 }
@@ -1139,7 +1310,7 @@ export function ChatSettingsPanel() {
               <SelectTrigger
                 size="sm"
                 className="w-auto min-w-0 max-w-full"
-                aria-label="Send shortcut"
+                aria-label={t(($) => $.panels.sendShortcut)}
               >
                 <SelectValue>
                   {
@@ -1161,14 +1332,14 @@ export function ChatSettingsPanel() {
             </Select>
           }
         />
-        <AdvancedSettings targetIds={[searchableSetting("skills-in-slash-menu").id]}>
+        <AdvancedSettings targetIds={[searchableSetting("skills-in-slash-menu", t).id]}>
           <SettingsRow
-            {...searchableSetting("skills-in-slash-menu")}
-            description="Also include skills in the / command menu. Skills always appear when you type $."
+            {...searchableSetting("skills-in-slash-menu", t)}
+            description={t(($) => $.panels.alsoIncludeSkillsInTheCommandMenuSkills)}
             resetAction={
               settings.showSkillsInSlashMenu !== DEFAULT_UNIFIED_SETTINGS.showSkillsInSlashMenu ? (
                 <SettingResetButton
-                  label="skills in slash menu"
+                  label={t(($) => $.panels.skillsInSlashMenu)}
                   onClick={() =>
                     updateSettings({
                       showSkillsInSlashMenu: DEFAULT_UNIFIED_SETTINGS.showSkillsInSlashMenu,
@@ -1183,26 +1354,30 @@ export function ChatSettingsPanel() {
                 onCheckedChange={(checked) =>
                   updateSettings({ showSkillsInSlashMenu: Boolean(checked) })
                 }
-                aria-label="Show skills in slash menu"
+                aria-label={t(($) => $.panels.showSkillsInSlashMenu)}
               />
             }
           />
         </AdvancedSettings>
       </SettingsSection>
 
-      <SettingsSection id="follow-ups" title="Follow-ups">
+      <SettingsSection id="follow-ups" title={t(($) => $.panels.followUps)}>
         <SettingsRow
-          {...searchableSetting("follow-up-behavior")}
+          {...searchableSetting("follow-up-behavior", t)}
           description={
-            "Queue follow-ups while the agent runs or steer the current run. " +
-            (settings.sendShortcut === "mod-enter-multiline"
-              ? `Press ${modifierLabel} + Enter for single-line prompts or ${modifierLabel} + Shift + Enter for multiline prompts to do the opposite for one message.`
-              : `Press ${modifierLabel}${settings.sendShortcut === "mod-enter" ? " + Shift" : ""} + Enter to do the opposite for one message.`)
+            settings.sendShortcut === "mod-enter-multiline"
+              ? t(($) => $.panels.queueMultiline, { modifier: modifierLabel })
+              : t(($) => $.panels.queueModifier, {
+                  shortcut:
+                    settings.sendShortcut === "mod-enter"
+                      ? `${modifierLabel} + Shift`
+                      : modifierLabel,
+                })
           }
           resetAction={
             settings.followUpBehavior !== DEFAULT_UNIFIED_SETTINGS.followUpBehavior ? (
               <SettingResetButton
-                label="follow-up behavior"
+                label={t(($) => $.panels.followUpBehaviorLabel)}
                 onClick={() =>
                   updateSettings({
                     followUpBehavior: DEFAULT_UNIFIED_SETTINGS.followUpBehavior,
@@ -1220,14 +1395,20 @@ export function ChatSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-auto min-w-0" aria-label="Follow-up behavior">
+              <SelectTrigger
+                size="sm"
+                className="w-auto min-w-0"
+                aria-label={t(($) => $.panels.followUpBehavior)}
+              >
                 <SelectValue>
-                  {settings.followUpBehavior === "queue" ? "Queue" : "Steer"}
+                  {settings.followUpBehavior === "queue"
+                    ? t(($) => $.panels.queue)
+                    : t(($) => $.panels.steer)}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem value="queue">Queue</SelectItem>
-                <SelectItem value="steer">Steer</SelectItem>
+                <SelectItem value="queue">{t(($) => $.panels.queue)}</SelectItem>
+                <SelectItem value="steer">{t(($) => $.panels.steer)}</SelectItem>
               </SelectPopup>
             </Select>
           }
@@ -1238,16 +1419,17 @@ export function ChatSettingsPanel() {
 }
 
 function DiffColorsSettingsRow() {
+  const { t } = useTranslation("settings");
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   return (
     <SettingsRow
-      {...searchableSetting("diff-color-scheme")}
-      description="Choose colors for additions and deletions, including change counts."
+      {...searchableSetting("diff-color-scheme", t)}
+      description={t(($) => $.panels.chooseColorsForAdditionsAndDeletionsIncludingChange)}
       resetAction={
         settings.diffColorScheme !== DEFAULT_UNIFIED_SETTINGS.diffColorScheme ? (
           <SettingResetButton
-            label="diff colors"
+            label={t(($) => $.panels.diffColorsLabel)}
             onClick={() =>
               updateSettings({ diffColorScheme: DEFAULT_UNIFIED_SETTINGS.diffColorScheme })
             }
@@ -1263,7 +1445,11 @@ function DiffColorsSettingsRow() {
                 updateSettings({ diffColorScheme: value });
             }}
           >
-            <SelectTrigger size="sm" className="w-full min-w-0" aria-label="Diff colors">
+            <SelectTrigger
+              size="sm"
+              className="w-full min-w-0"
+              aria-label={t(($) => $.panels.diffColors)}
+            >
               <span
                 aria-hidden="true"
                 className={
@@ -1276,12 +1462,14 @@ function DiffColorsSettingsRow() {
                 <span className="size-2 rounded-full bg-diff-addition" />
               </span>
               <SelectValue>
-                {settings.diffColorScheme === "blue-orange" ? "Blue & orange" : "Red & green"}
+                {settings.diffColorScheme === "blue-orange"
+                  ? t(($) => $.panels.blueOrange)
+                  : t(($) => $.panels.redGreen)}
               </SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
-              <SelectItem value="red-green">Red & green (default)</SelectItem>
-              <SelectItem value="blue-orange">Blue & orange</SelectItem>
+              <SelectItem value="red-green">{t(($) => $.panels.redGreenDefault)}</SelectItem>
+              <SelectItem value="blue-orange">{t(($) => $.panels.blueOrange)}</SelectItem>
             </SelectPopup>
           </Select>
         </div>
@@ -1291,19 +1479,20 @@ function DiffColorsSettingsRow() {
 }
 
 export function DiffsSettingsPanel() {
+  const { t } = useTranslation("settings");
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="diffs" title="Diffs">
+      <SettingsSection id="diffs" title={t(($) => $.panels.diffs)}>
         <SettingsRow
-          {...searchableSetting("diff-layout")}
-          description="Show diffs stacked or side by side. The toggle in the diff toolbar changes this too."
+          {...searchableSetting("diff-layout", t)}
+          description={t(($) => $.panels.showDiffsStackedOrSideBySideThe)}
           resetAction={
             settings.diffLayout !== DEFAULT_UNIFIED_SETTINGS.diffLayout ? (
               <SettingResetButton
-                label="diff layout"
+                label={t(($) => $.panels.diffLayoutLabel)}
                 onClick={() => updateSettings({ diffLayout: DEFAULT_UNIFIED_SETTINGS.diffLayout })}
               />
             ) : null
@@ -1317,27 +1506,31 @@ export function DiffsSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Diff layout">
-                <SelectValue>{DIFF_LAYOUT_LABELS[settings.diffLayout]}</SelectValue>
+              <SelectTrigger
+                size="sm"
+                className="w-full sm:w-40"
+                aria-label={t(($) => $.panels.diffLayout)}
+              >
+                <SelectValue>{diffLayoutLabels(t)[settings.diffLayout]}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="stacked">
-                  {DIFF_LAYOUT_LABELS.stacked}
+                  {diffLayoutLabels(t).stacked}
                 </SelectItem>
                 <SelectItem hideIndicator value="split">
-                  {DIFF_LAYOUT_LABELS.split}
+                  {diffLayoutLabels(t).split}
                 </SelectItem>
               </SelectPopup>
             </Select>
           }
         />
         <SettingsRow
-          {...searchableSetting("hide-whitespace-changes")}
-          description="Set whether the diff panel ignores whitespace-only edits by default."
+          {...searchableSetting("hide-whitespace-changes", t)}
+          description={t(($) => $.panels.setWhetherTheDiffPanelIgnoresWhitespaceOnly)}
           resetAction={
             settings.diffIgnoreWhitespace !== DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace ? (
               <SettingResetButton
-                label="diff whitespace changes"
+                label={t(($) => $.panels.diffWhitespaceChangesLabel)}
                 onClick={() =>
                   updateSettings({
                     diffIgnoreWhitespace: DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace,
@@ -1352,17 +1545,17 @@ export function DiffsSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ diffIgnoreWhitespace: Boolean(checked) })
               }
-              aria-label="Hide whitespace changes by default"
+              aria-label={t(($) => $.panels.hideWhitespaceChangesByDefault)}
             />
           }
         />
         <SettingsRow
-          {...searchableSetting("default-diff-file-state")}
-          description="Start with files expanded or collapsed when opening diffs or a pull request's Code tab."
+          {...searchableSetting("default-diff-file-state", t)}
+          description={t(($) => $.panels.startWithFilesExpandedOrCollapsedWhenOpening)}
           resetAction={
             settings.diffFilesCollapsed !== DEFAULT_UNIFIED_SETTINGS.diffFilesCollapsed ? (
               <SettingResetButton
-                label="default diff file state"
+                label={t(($) => $.panels.defaultDiffFileStateLabel)}
                 onClick={() =>
                   updateSettings({
                     diffFilesCollapsed: DEFAULT_UNIFIED_SETTINGS.diffFilesCollapsed,
@@ -1383,16 +1576,20 @@ export function DiffsSettingsPanel() {
               <SelectTrigger
                 size="sm"
                 className="w-full sm:w-40"
-                aria-label="Default diff file state"
+                aria-label={t(($) => $.panels.defaultDiffFileState)}
               >
-                <SelectValue>{settings.diffFilesCollapsed ? "Collapsed" : "Expanded"}</SelectValue>
+                <SelectValue>
+                  {settings.diffFilesCollapsed
+                    ? t(($) => $.panels.collapsed)
+                    : t(($) => $.panels.expanded)}
+                </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="expanded">
-                  Expanded
+                  {t(($) => $.panels.expanded)}
                 </SelectItem>
                 <SelectItem hideIndicator value="collapsed">
-                  Collapsed
+                  {t(($) => $.panels.collapsed)}
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -1401,14 +1598,14 @@ export function DiffsSettingsPanel() {
         <DiffColorsSettingsRow />
       </SettingsSection>
 
-      <SettingsSection id="pull-requests" title="Pull requests">
+      <SettingsSection id="pull-requests" title={t(($) => $.panels.pullRequests)}>
         <SettingsRow
-          {...searchableSetting("proactive-panels")}
-          description="Open linked pull requests first. Otherwise, open Changes for edits to at least 3 files or 50 lines."
+          {...searchableSetting("proactive-panels", t)}
+          description={t(($) => $.panels.openLinkedPullRequestsFirstOtherwiseOpenChanges)}
           resetAction={
             settings.proactivePanelsEnabled !== DEFAULT_UNIFIED_SETTINGS.proactivePanelsEnabled ? (
               <SettingResetButton
-                label="proactive panels"
+                label={t(($) => $.panels.proactivePanelsLabel)}
                 onClick={() =>
                   updateSettings({
                     proactivePanelsEnabled: DEFAULT_UNIFIED_SETTINGS.proactivePanelsEnabled,
@@ -1423,7 +1620,7 @@ export function DiffsSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ proactivePanelsEnabled: Boolean(checked) })
               }
-              aria-label="Open pull requests and changes panels proactively"
+              aria-label={t(($) => $.panels.proactivePanels)}
             />
           }
         />
@@ -1439,6 +1636,16 @@ export function CompactIdleThreadsRow() {
 }
 
 function ScopedCompactIdleThreadsRow() {
+  const { t } = useTranslation("settings");
+  const compactionModes = IDLE_COMPACTION_MODES.map((mode) => ({
+    value: mode.value,
+    label:
+      mode.value === "onReturn"
+        ? t(($) => $.panels.onReturn)
+        : mode.value === "beforeCacheExpires"
+          ? t(($) => $.panels.beforeCacheExpires)
+          : t(($) => $.panels.never),
+  }));
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const { targets } = useSettingsScope();
@@ -1449,12 +1656,12 @@ function ScopedCompactIdleThreadsRow() {
       serverScoped
       settingKeys={["idleCompaction", "compactIdleThreads"]}
       mixed={idleCompaction.mixed}
-      {...searchableSetting("compact-idle-threads")}
-      description="When to compact an idle Claude thread over 200,000 tokens: after you return, just before its prompt cache expires, or never. Each Claude provider can override this."
+      {...searchableSetting("compact-idle-threads", t)}
+      description={t(($) => $.panels.whenToCompactAnIdleClaudeThreadOver)}
       resetAction={
         globalIdleCompaction(settings) !== globalIdleCompaction(DEFAULT_UNIFIED_SETTINGS) ? (
           <SettingResetButton
-            label="compact idle threads"
+            label={t(($) => $.panels.compactIdleThreads)}
             onClick={() =>
               updateSettings({ idleCompaction: globalIdleCompaction(DEFAULT_UNIFIED_SETTINGS) })
             }
@@ -1465,21 +1672,25 @@ function ScopedCompactIdleThreadsRow() {
         <Select
           value={idleCompaction.mixed ? null : globalIdleCompaction(settings)}
           onValueChange={(value) => {
-            const mode = IDLE_COMPACTION_MODES.find((candidate) => candidate.value === value);
+            const mode = compactionModes.find((candidate) => candidate.value === value);
             if (mode) updateSettings({ idleCompaction: mode.value });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Compact idle threads">
+          <SelectTrigger
+            size="sm"
+            className="w-full sm:w-56"
+            aria-label={t(($) => $.panels.compactIdleThreadsLabel)}
+          >
             <SelectValue>
               {(value: string | null) =>
                 value === null
-                  ? "Mixed"
-                  : IDLE_COMPACTION_MODES.find((mode) => mode.value === value)?.label
+                  ? t(($) => $.panels.mixed)
+                  : compactionModes.find((mode) => mode.value === value)?.label
               }
             </SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
-            {IDLE_COMPACTION_MODES.map((mode) => (
+            {compactionModes.map((mode) => (
               <SelectItem
                 hideIndicator
                 key={mode.value}
@@ -1498,6 +1709,7 @@ function ScopedCompactIdleThreadsRow() {
 }
 
 export function ThreadsSettingsPanel() {
+  const { t } = useTranslation("settings");
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const navigate = useNavigate();
@@ -1557,17 +1769,17 @@ export function ThreadsSettingsPanel() {
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="new-projects" title="New projects">
+      <SettingsSection id="new-projects" title={t(($) => $.panels.newProjects)}>
         <SettingsRow
           serverScoped
           settingKeys={["addProjectBaseDirectory"]}
-          {...searchableSetting("add-project-starts-in")}
-          description='Leave empty to use "~/" when the Add Project browser opens.'
+          {...searchableSetting("add-project-starts-in", t)}
+          description={t(($) => $.panels.projectBaseEmpty)}
           resetAction={
             settings.addProjectBaseDirectory !==
             DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory ? (
               <SettingResetButton
-                label="add project base directory"
+                label={t(($) => $.panels.addProjectBaseDirectoryLabel)}
                 onClick={() =>
                   updateSettings({
                     addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
@@ -1583,21 +1795,21 @@ export function ThreadsSettingsPanel() {
               value={mixedAddProjectBaseDirectory ? "" : settings.addProjectBaseDirectory}
               onCommit={(next) => updateSettings({ addProjectBaseDirectory: next })}
               normalizeDraft={resolvePastedPath}
-              placeholder={mixedAddProjectBaseDirectory ? "Mixed" : "~/"}
+              placeholder={mixedAddProjectBaseDirectory ? t(($) => $.panels.mixed) : "~/"}
               spellCheck={false}
-              aria-label="Add project base directory"
+              aria-label={t(($) => $.panels.addProjectBaseDirectory)}
             />
           }
         />
         <SettingsRow
           serverScoped
           settingKeys={["ghqCloneLayout"]}
-          {...searchableSetting("ghq-clone-layout")}
-          description="Clones go to github.com/owner/repo under the folder above, like ghq."
+          {...searchableSetting("ghq-clone-layout", t)}
+          description={t(($) => $.panels.clonesGoToHostFolders)}
           resetAction={
             settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout ? (
               <SettingResetButton
-                label="clone into host folders"
+                label={t(($) => $.panels.cloneIntoHostFoldersLabel)}
                 onClick={() =>
                   updateSettings({ ghqCloneLayout: DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout })
                 }
@@ -1609,7 +1821,7 @@ export function ThreadsSettingsPanel() {
               settingKeys={["ghqCloneLayout"]}
               checked={settings.ghqCloneLayout}
               onCheckedChange={(checked) => updateSettings({ ghqCloneLayout: Boolean(checked) })}
-              aria-label="Clone into host folders"
+              aria-label={t(($) => $.panels.cloneIntoHostFolders)}
             />
           }
         />
@@ -1618,16 +1830,16 @@ export function ThreadsSettingsPanel() {
       <ProjectDefaultsSettings category="general" />
 
       {!isProjectScope ? (
-        <SettingsSection id="snooze" title="Snooze">
+        <SettingsSection id="snooze" title={t(($) => $.panels.snooze)}>
           <SnoozePresetsRow />
         </SettingsSection>
       ) : null}
 
-      <SettingsSection id="usage-limits" title="Usage limits">
+      <SettingsSection id="usage-limits" title={t(($) => $.panels.usageLimits)}>
         <SettingsRow
           serverScoped
-          {...searchableSetting("auto-resume-limited-threads")}
-          description="Automatically resume threads when their usage limits reset. You can cancel auto-resume in each thread."
+          {...searchableSetting("auto-resume-limited-threads", t)}
+          description={t(($) => $.panels.automaticallyResumeThreadsWhenTheirUsageLimitsReset)}
           settingKeys={["autoResumeLimitedThreads"]}
           control={
             <ScopedSwitch
@@ -1636,14 +1848,14 @@ export function ThreadsSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ autoResumeLimitedThreads: Boolean(checked) })
               }
-              aria-label="Resume after usage limits"
+              aria-label={t(($) => $.panels.resumeAfterUsageLimits)}
             />
           }
         />
         <SettingsRow
           serverScoped
-          {...searchableSetting("snooze-limited-threads")}
-          description="Snooze threads until their usage limits reset. Enable auto-resume to continue the agent after the reset."
+          {...searchableSetting("snooze-limited-threads", t)}
+          description={t(($) => $.panels.snoozeThreadsUntilTheirUsageLimitsReset)}
           settingKeys={["snoozeLimitedThreads"]}
           control={
             <ScopedSwitch
@@ -1652,24 +1864,24 @@ export function ThreadsSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ snoozeLimitedThreads: Boolean(checked) })
               }
-              aria-label="Snooze until limits reset"
+              aria-label={t(($) => $.panels.snoozeUntilLimitsReset)}
             />
           }
         />
       </SettingsSection>
 
       {hasServerTargets ? (
-        <SettingsSection id="auto-settle" title="Auto-settle">
+        <SettingsSection id="auto-settle" title={t(($) => $.panels.autoSettle)}>
           <SettingsRow
             serverScoped
             settingKeys={["sidebarAutoSettleOnMerge"]}
-            {...searchableSetting("auto-settle-merged-threads")}
-            description="Settle a thread when its pull request merges. Closed pull requests still settle automatically."
+            {...searchableSetting("auto-settle-merged-threads", t)}
+            description={t(($) => $.panels.settleAThreadWhenItsPullRequestMerges)}
             resetAction={
               settings.sidebarAutoSettleOnMerge !==
               DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge ? (
                 <SettingResetButton
-                  label="auto-settle on merge"
+                  label={t(($) => $.panels.autoSettleOnMerge)}
                   onClick={() =>
                     updateSettings({
                       sidebarAutoSettleOnMerge: DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleOnMerge,
@@ -1685,7 +1897,7 @@ export function ThreadsSettingsPanel() {
                 onCheckedChange={(checked) =>
                   updateSettings({ sidebarAutoSettleOnMerge: Boolean(checked) })
                 }
-                aria-label="Auto-settle merged threads"
+                aria-label={t(($) => $.panels.autoSettleMergedThreads)}
               />
             }
           />
@@ -1693,13 +1905,13 @@ export function ThreadsSettingsPanel() {
           <SettingsRow
             serverScoped
             settingKeys={["sidebarAutoSettleAfterDays"]}
-            {...searchableSetting("auto-settle-inactive-threads")}
-            description="Sidebar threads with no activity for this long settle automatically."
+            {...searchableSetting("auto-settle-inactive-threads", t)}
+            description={t(($) => $.panels.sidebarThreadsWithNoActivityForThisLong)}
             resetAction={
               settings.sidebarAutoSettleAfterDays !==
               DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays ? (
                 <SettingResetButton
-                  label="auto-settle"
+                  label={t(($) => $.panels.autoSettle)}
                   onClick={() =>
                     updateSettings({
                       sidebarAutoSettleAfterDays:
@@ -1718,7 +1930,7 @@ export function ThreadsSettingsPanel() {
                     sidebarAutoSettleAfterDays: checked ? AUTO_SETTLE_DEFAULT_DAYS : null,
                   })
                 }
-                aria-label="Auto-settle inactive threads"
+                aria-label={t(($) => $.panels.autoSettleInactiveThreads)}
               />
             }
           />
@@ -1726,8 +1938,8 @@ export function ThreadsSettingsPanel() {
             <SettingsRow
               serverScoped
               settingKeys={["sidebarAutoSettleAfterDays"]}
-              title={searchableSetting("days-before-auto-settle").title}
-              description="Any new activity un-settles a thread automatically."
+              title={searchableSetting("days-before-auto-settle", t).title}
+              description={t(($) => $.panels.anyNewActivityUnSettlesAThreadAutomatically)}
               control={
                 <AutoSettleDaysInput
                   value={settings.sidebarAutoSettleAfterDays}
@@ -1740,8 +1952,8 @@ export function ThreadsSettingsPanel() {
             <SettingsRow
               serverScoped
               settingKeys={["sidebarAutoSettleKeepPullRequests"]}
-              title="Keep threads with a PR"
-              description="Inactivity does not settle threads with a pull request. Merge and close still do."
+              title={t(($) => $.panels.keepThreadsWithAPR)}
+              description={t(($) => $.panels.inactivityDoesNotSettleThreadsWithAPull)}
               control={
                 <ScopedSwitch
                   settingKeys={["sidebarAutoSettleKeepPullRequests"]}
@@ -1749,7 +1961,7 @@ export function ThreadsSettingsPanel() {
                   onCheckedChange={(checked) =>
                     updateSettings({ sidebarAutoSettleKeepPullRequests: checked })
                   }
-                  aria-label="Keep threads with a PR"
+                  aria-label={t(($) => $.panels.keepThreadsWithAPR)}
                 />
               }
             />
@@ -1757,16 +1969,16 @@ export function ThreadsSettingsPanel() {
         </SettingsSection>
       ) : null}
 
-      <SettingsSection id="text-generation" title="Text generation">
+      <SettingsSection id="text-generation" title={t(($) => $.panels.textGeneration)}>
         <SettingsRow
           serverScoped
           settingKeys={["textGenerationModelSelection"]}
-          {...searchableSetting("text-generation-model")}
-          description="Used for thread titles and other generated text on connected devices with this provider. Source control can override it."
+          {...searchableSetting("text-generation-model", t)}
+          description={t(($) => $.panels.usedForThreadTitlesAndOtherGeneratedText)}
           resetAction={
             hasServerTargets && isTextGenerationModelDirty ? (
               <SettingResetButton
-                label="text generation model"
+                label={t(($) => $.panels.textGenerationModelLabel)}
                 onClick={() =>
                   updateSettings({
                     textGenerationModelSelection:
@@ -1779,11 +1991,11 @@ export function ThreadsSettingsPanel() {
           control={
             !hasServerTargets ? (
               <span className="text-sm text-muted-foreground">
-                Connect an environment to choose its text generation model.
+                {t(($) => $.panels.connectAnEnvironmentToChooseItsTextGeneration)}
               </span>
             ) : !hasTextGenerationProvider ? (
               <span className="text-sm text-muted-foreground">
-                No text generation providers available.
+                {t(($) => $.panels.noTextGenerationProvidersAvailable)}
               </span>
             ) : (
               <div className="flex flex-wrap items-center justify-end gap-1.5">
@@ -1795,7 +2007,7 @@ export function ThreadsSettingsPanel() {
                   instanceEntries={textGenerationModelInstanceEntries}
                   modelOptionsByInstance={textGenerationModelOptionsByInstance}
                   triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-                  {...(mixedTextGenerationModel ? { triggerLabel: "Mixed" } : {})}
+                  {...(mixedTextGenerationModel ? { triggerLabel: t(($) => $.panels.mixed) } : {})}
                   getModelDisabledReason={textGenerationModelDisabledReason}
                   {...(environmentId
                     ? {
@@ -1812,7 +2024,7 @@ export function ThreadsSettingsPanel() {
                     if (reason) {
                       toastManager.add({
                         type: "error",
-                        title: "Text generation model not saved",
+                        title: t(($) => $.panels.textGenerationModelNotSaved),
                         description: reason,
                       });
                       return;
@@ -1862,24 +2074,24 @@ export function ThreadsSettingsPanel() {
         />
         <AdvancedSettings
           targetIds={[
-            searchableSetting("thread-title-instructions").id,
-            searchableSetting("response-streaming").id,
+            searchableSetting("thread-title-instructions", t).id,
+            searchableSetting("response-streaming", t).id,
           ]}
         >
           <ThreadTitleInstructionsSettings />
           <SettingsRow
             serverScoped
             settingKeys={["responseStreamingMode"]}
-            {...searchableSetting("response-streaming")}
+            {...searchableSetting("response-streaming", t)}
             description={
               mixedResponseStreamingMode
-                ? "The selected targets use different streaming modes."
-                : RESPONSE_STREAMING_MODE_DESCRIPTIONS[settings.responseStreamingMode]
+                ? t(($) => $.panels.theSelectedTargetsUseDifferentStreamingModes)
+                : responseStreamingModeDescriptions(t)[settings.responseStreamingMode]
             }
             resetAction={
               settings.responseStreamingMode !== DEFAULT_UNIFIED_SETTINGS.responseStreamingMode ? (
                 <SettingResetButton
-                  label="response streaming"
+                  label={t(($) => $.panels.responseStreamingLabel)}
                   onClick={() =>
                     updateSettings({
                       responseStreamingMode: DEFAULT_UNIFIED_SETTINGS.responseStreamingMode,
@@ -1897,19 +2109,25 @@ export function ThreadsSettingsPanel() {
                   }
                 }}
               >
-                <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Response streaming">
+                <SelectTrigger
+                  size="sm"
+                  className="w-full sm:w-56"
+                  aria-label={t(($) => $.panels.responseStreaming)}
+                >
                   <SelectValue>
                     {(value: ResponseStreamingMode | null) =>
-                      value === null ? "Mixed" : RESPONSE_STREAMING_MODE_LABELS[value]
+                      value === null
+                        ? t(($) => $.panels.mixed)
+                        : responseStreamingModeLabels(t)[value]
                     }
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
                   <SelectItem hideIndicator value="turn">
-                    {RESPONSE_STREAMING_MODE_LABELS.turn}
+                    {responseStreamingModeLabels(t).turn}
                   </SelectItem>
                   <SelectItem hideIndicator value="paragraph">
-                    {RESPONSE_STREAMING_MODE_LABELS.paragraph}
+                    {responseStreamingModeLabels(t).paragraph}
                   </SelectItem>
                 </SelectPopup>
               </Select>
@@ -1922,6 +2140,7 @@ export function ThreadsSettingsPanel() {
 }
 
 export function MaintenanceSettingsPanel() {
+  const { t } = useTranslation("settings");
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const { scope, environment, connectedEnvironments } = useSettingsScope();
@@ -1931,17 +2150,17 @@ export function MaintenanceSettingsPanel() {
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="updates" title="Updates">
+      <SettingsSection id="updates" title={t(($) => $.panels.updates)}>
         <SettingsRow
           serverScoped
           settingKeys={["enableProviderUpdateChecks"]}
-          {...searchableSetting("provider-update-checks")}
-          description="Check installed provider CLIs for newer available versions and fetch model catalog updates. When off, new models may not appear."
+          {...searchableSetting("provider-update-checks", t)}
+          description={t(($) => $.panels.checkInstalledProviderCLIsForNewerAvailableVersions)}
           resetAction={
             settings.enableProviderUpdateChecks !==
             DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks ? (
               <SettingResetButton
-                label="provider update checks"
+                label={t(($) => $.panels.providerUpdateChecksLabel)}
                 onClick={() =>
                   updateSettings({
                     enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
@@ -1957,18 +2176,18 @@ export function MaintenanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ enableProviderUpdateChecks: Boolean(checked) })
               }
-              aria-label="Check provider versions"
+              aria-label={t(($) => $.panels.checkProviderVersions)}
             />
           }
         />
         <SettingsRow
-          {...searchableSetting("continue-threads-after-server-update")}
+          {...searchableSetting("continue-threads-after-server-update", t)}
           serverScoped
           settingKeys={["continueThreadsAfterServerUpdate"]}
-          description="Automatically resume interrupted threads after an update, crash, or machine restart on the selected environments."
+          description={t(($) => $.panels.automaticallyResumeInterruptedThreadsAfterAnUpdateCrash)}
           status={
             !hasServerTargets
-              ? "All selected connected environments must support restart continuation."
+              ? t(($) => $.panels.allSelectedConnectedEnvironmentsMustSupportRestartContinuation)
               : undefined
           }
           resetAction={
@@ -1976,7 +2195,7 @@ export function MaintenanceSettingsPanel() {
             settings.continueThreadsAfterServerUpdate !==
               DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate ? (
               <SettingResetButton
-                label="continue threads after restarts"
+                label={t(($) => $.panels.continueThreadsAfterRestartsLabel)}
                 onClick={() =>
                   updateSettings({
                     continueThreadsAfterServerUpdate:
@@ -1994,25 +2213,25 @@ export function MaintenanceSettingsPanel() {
               onCheckedChange={(checked) =>
                 updateSettings({ continueThreadsAfterServerUpdate: Boolean(checked) })
               }
-              aria-label="Continue threads after restarts"
+              aria-label={t(($) => $.panels.continueThreadsAfterRestarts)}
             />
           }
         />
       </SettingsSection>
 
-      <SettingsSection id="background" title="Background activity">
+      <SettingsSection id="background" title={t(($) => $.panels.backgroundActivity)}>
         <BackgroundActivitySettingsRow />
       </SettingsSection>
 
       <StorageCleanupSections />
 
-      <SettingsSection id="diagnostics-section" title="Diagnostics">
+      <SettingsSection id="diagnostics-section" title={t(($) => $.panels.diagnostics)}>
         <SettingsRow
-          {...searchableSetting("diagnostics")}
+          {...searchableSetting("diagnostics", t)}
           description={
             isEnvironmentScope
-              ? "Inspect processes, resource use, and logs on this environment."
-              : "Inspect processes, resource use, and logs on one environment at a time."
+              ? t(($) => $.panels.inspectProcessesResourceUseAndLogsOnThis)
+              : t(($) => $.panels.inspectProcessesResourceUseAndLogsOnOne)
           }
           control={
             <Button
@@ -2022,7 +2241,7 @@ export function MaintenanceSettingsPanel() {
               size="sm"
               variant="outline"
             >
-              View diagnostics
+              {t(($) => $.panels.viewDiagnostics)}
             </Button>
           }
         />
@@ -2032,15 +2251,18 @@ export function MaintenanceSettingsPanel() {
 }
 
 export function AboutSettingsPanel() {
+  const { t } = useTranslation("settings");
   const primaryPolicy = usePrimaryManagedPolicy();
   const telemetryOff = managedTelemetryOffMessage(primaryPolicy);
   return (
     <SettingsPageContainer>
-      <SettingsSection id="about" title="App">
+      <SettingsSection id="about" title={t(($) => $.panels.app)}>
         {primaryPolicy ? (
           <SettingsRow
-            title="Organization"
-            description={`This environment is managed by ${primaryPolicy.organization}. Some settings and features follow its policy.`}
+            title={t(($) => $.panels.organization)}
+            description={t(($) => $.panels.managedByOrganization, {
+              organization: primaryPolicy.organization,
+            })}
             control={
               primaryPolicy.supportUrl ? (
                 <Button
@@ -2050,7 +2272,7 @@ export function AboutSettingsPanel() {
                   size="sm"
                   variant="outline"
                 >
-                  Get help
+                  {t(($) => $.panels.getHelp)}
                 </Button>
               ) : null
             }
@@ -2061,22 +2283,22 @@ export function AboutSettingsPanel() {
         ) : (
           <>
             <SettingsRow
-              id={searchableSetting("app-version").id}
+              id={searchableSetting("app-version", t).id}
               title={<AboutVersionTitle />}
-              description="Current version of the application."
+              description={t(($) => $.panels.currentVersionOfTheApplication)}
             />
           </>
         )}
         <MobileAppSettingsRow />
       </SettingsSection>
 
-      <SettingsSection id="legal" title="Legal">
+      <SettingsSection id="legal" title={t(($) => $.panels.legal)}>
         <SettingsRow
-          {...searchableSetting("privacy-policy")}
+          {...searchableSetting("privacy-policy", t)}
           description={
             telemetryOff === undefined
-              ? "How we handle your data, including the anonymous usage data T3 Code collects."
-              : `How we handle your data. ${telemetryOff}`
+              ? t(($) => $.panels.howWeHandleYourDataIncludingTheAnonymous)
+              : t(($) => $.panels.howWeHandleYourDataTelemetryOff, { message: telemetryOff })
           }
           control={
             <Button
@@ -2084,20 +2306,20 @@ export function AboutSettingsPanel() {
               size="sm"
               variant="outline"
             >
-              View policy
+              {t(($) => $.panels.viewPolicy)}
             </Button>
           }
         />
         <SettingsRow
-          {...searchableSetting("open-source-licenses")}
-          description="Notices for dependencies, assets, and optional tools used by T3 Code."
+          {...searchableSetting("open-source-licenses", t)}
+          description={t(($) => $.panels.noticesForDependenciesAssetsAndOptionalToolsUsed)}
           control={
             <Button
               render={<Link to="/settings/open-source-licenses" />}
               size="sm"
               variant="outline"
             >
-              View licenses
+              {t(($) => $.panels.viewLicenses)}
             </Button>
           }
         />

@@ -1,4 +1,5 @@
-import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
+import { useTranslation } from "react-i18next";
+import { Tooltip, TooltipTrigger, TooltipPopup } from "~/components/ui/tooltip";
 import { useAtomValue } from "@effect/atom-react";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { visibleLinkedThreads } from "@t3tools/client-runtime/state/threads";
@@ -25,12 +26,12 @@ import { useEnvironmentQuery } from "~/state/query";
 import { useThreadSearch } from "~/state/queries";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { openCommandPalette } from "~/commandPaletteBus";
-import { Button } from "../ui/button";
-import { Command, CommandInput, CommandItem, CommandList } from "../ui/command";
-import { Dialog, DialogPopup, DialogTitle } from "../ui/dialog";
-import { MenuItem } from "../ui/menu";
-import { toastManager } from "../ui/toast";
-import { PullRequestGlyph } from "./pullRequestIcons";
+import { Button } from "~/components/ui/button";
+import { Command, CommandInput, CommandItem, CommandList } from "~/components/ui/command";
+import { Dialog, DialogPopup, DialogTitle } from "~/components/ui/dialog";
+import { MenuItem } from "~/components/ui/menu";
+import { toastManager } from "~/components/ui/toast";
+import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 
 interface PullRequestThreadLinksProps {
   environmentId: EnvironmentId;
@@ -60,6 +61,7 @@ function EnabledPullRequestThreadLinks({
   display,
   onPickerOpenChange,
 }: PullRequestThreadLinksProps) {
+  const { t } = useTranslation("workspace");
   const parsedUrl = sourceControlClients.parseChangeRequestUrl(url);
   const parsed = parsedUrl?.link ?? null;
   const term = (parsedUrl?.definition ?? sourceControlClients.get(undefined)).changeRequest
@@ -100,7 +102,9 @@ function EnabledPullRequestThreadLinks({
       const error = squashAtomCommandFailure(result);
       toastManager.add({
         type: "error",
-        title: remove ? `Could not unlink the ${term}` : `Could not link the ${term}`,
+        title: remove
+          ? t(($) => $.git.unlinkRequestFailed, { term: term })
+          : t(($) => $.git.linkRequestFailed, { term: term }),
         description: error instanceof Error ? error.message : String(error),
       });
       return;
@@ -126,8 +130,8 @@ function EnabledPullRequestThreadLinks({
   );
   const linkedThreadsLabel =
     linkedThreads.length > 0
-      ? `Linked from ${linkedThreads.length} ${linkedThreads.length === 1 ? "thread" : "threads"}`
-      : "Linked threads";
+      ? t(($) => $.git.linkedThreadCount, { count: linkedThreads.length })
+      : t(($) => $.git.linkedThreads);
   return (
     <>
       {display === "count" && (linkedThreads.length > 0 || relations.error !== null) ? (
@@ -152,7 +156,9 @@ function EnabledPullRequestThreadLinks({
               </Button>
             }
           />
-          <TooltipPopup>{linkedThreadsLabel}. Search in the command palette.</TooltipPopup>
+          <TooltipPopup>
+            {t(($) => $.git.searchLinkedThreads, { label: linkedThreadsLabel })}
+          </TooltipPopup>
         </Tooltip>
       ) : null}
       {display === "menu-item" ? (
@@ -172,16 +178,18 @@ function EnabledPullRequestThreadLinks({
             <PullRequestGlyph.link aria-hidden className="size-3.5" />
           )}
           {linkedHere
-            ? "Unlink from this thread"
+            ? t(($) => $.git.unlinkThisThread)
             : currentThreadRef
-              ? "Link to this thread"
-              : "Link to thread"}
+              ? t(($) => $.git.linkThisThread)
+              : t(($) => $.git.linkToThread)}
         </MenuItem>
       ) : null}
       {display === "picker" ? (
         <Dialog open onOpenChange={onPickerOpenChange}>
           <DialogPopup className="max-w-md" showCloseButton={false}>
-            <DialogTitle className="sr-only">Link {term} to a thread</DialogTitle>
+            <DialogTitle className="sr-only">
+              {t(($) => $.git.linkRequestToThread, { term })}
+            </DialogTitle>
             <ThreadPicker
               environmentId={environmentId}
               url={url}
@@ -206,6 +214,7 @@ function ThreadPicker({
   pending: boolean;
   onSelect: (threadId: ThreadId) => void;
 }) {
+  const { t } = useTranslation("workspace");
   const threads = useVisibleThreadShells();
   const linking = usePullRequestLinking(environmentId);
   const projects = useProjects();
@@ -229,12 +238,17 @@ function ThreadPicker({
     )
     .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return (
-    <Command mode="none" value={query} onValueChange={setQuery} aria-label="Choose a thread">
-      <CommandInput placeholder="Search threads or projects..." disabled={pending} />
+    <Command
+      mode={t(($) => $.git.noFiles)}
+      value={query}
+      onValueChange={setQuery}
+      aria-label={t(($) => $.git.chooseThread)}
+    >
+      <CommandInput placeholder={t(($) => $.git.searchThreadsProjects)} disabled={pending} />
       <CommandList className="max-h-80 overflow-y-auto">
         {candidates.length === 0 ? (
           <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No active threads found.
+            {t(($) => $.git.noActiveThreads)}
           </div>
         ) : (
           candidates.map((thread) => {
@@ -248,7 +262,7 @@ function ThreadPicker({
               >
                 <MessageSquareIcon aria-hidden className="size-4 shrink-0" />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate">{thread.title || "Untitled thread"}</span>
+                  <span className="truncate">{thread.title || t(($) => $.git.untitledThread)}</span>
                   <span className="truncate text-xs text-muted-foreground">
                     {projectNames.get(thread.projectId)}
                   </span>
@@ -256,7 +270,7 @@ function ThreadPicker({
                 {linked ? (
                   <>
                     <CheckIcon aria-hidden className="size-3.5" />
-                    <span className="text-xs text-muted-foreground">Linked</span>
+                    <span className="text-xs text-muted-foreground">{t(($) => $.git.linked)}</span>
                   </>
                 ) : null}
               </CommandItem>

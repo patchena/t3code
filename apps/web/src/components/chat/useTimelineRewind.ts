@@ -13,6 +13,7 @@ import {
 } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { useNavigate } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -58,6 +59,7 @@ interface TimelineRewindInput {
  * the composer) and forking a new thread from a run.
  */
 export function useTimelineRewind(input: TimelineRewindInput) {
+  const { t } = useTranslation("chat");
   const {
     environmentId,
     routeThreadRef,
@@ -109,19 +111,22 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     if (!supportsConversationRollback) {
       setThreadError(
         activeThread.id,
-        "This provider does not support reverting conversation history. Start a new thread instead.",
+        t(($) => $.thread.revertUnsupported),
       );
       return;
     }
     if (activeEnvironmentUnavailable && activeEnvironmentUnavailableLabel) {
       setThreadError(
         activeThread.id,
-        `Reconnect ${activeEnvironmentUnavailableLabel} before reverting checkpoints.`,
+        t(($) => $.thread.reconnectRevert, { environment: activeEnvironmentUnavailableLabel }),
       );
       return;
     }
     if (phase === "running" || isSendBusy) {
-      setThreadError(activeThread.id, "Interrupt the current turn before reverting checkpoints.");
+      setThreadError(
+        activeThread.id,
+        t(($) => $.thread.interruptRevert),
+      );
       return;
     }
     if (restoreFiles === undefined) {
@@ -133,20 +138,23 @@ export function useTimelineRewind(input: TimelineRewindInput) {
       rewindingThreadKeys: new Set(store.rewindingThreadKeys).add(routeThreadKey),
     }));
     setThreadError(activeThread.id, null);
-    const rewind = await rewindToMessage({
-      message,
-      environmentId,
-      routeThreadRef,
-      threadId: activeThread.id,
-      turnCount,
-      restoreFiles,
-      // Keep the live checkpoint identity when command context refetches a bounded window.
-      checkpoint: findRevertCheckpoint(serverProjection?.checkpoints ?? [], turnCount),
-      draftTarget: composerDraftTarget,
-      composerHasPendingAttachments: composerRef.current?.hasPendingAttachments() === true,
-      createAssetUrl: createAttachmentAssetUrl,
-      revertThreadCheckpoint,
-    });
+    const rewind = await rewindToMessage(
+      {
+        message,
+        environmentId,
+        routeThreadRef,
+        threadId: activeThread.id,
+        turnCount,
+        restoreFiles,
+        // Keep the live checkpoint identity when command context refetches a bounded window.
+        checkpoint: findRevertCheckpoint(serverProjection?.checkpoints ?? [], turnCount),
+        draftTarget: composerDraftTarget,
+        composerHasPendingAttachments: composerRef.current?.hasPendingAttachments() === true,
+        createAssetUrl: createAttachmentAssetUrl,
+        revertThreadCheckpoint,
+      },
+      t,
+    );
     useComposerDraftStore.setState((store) => {
       const remaining = new Set(store.rewindingThreadKeys);
       remaining.delete(routeThreadKey);
@@ -192,7 +200,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           activeThread.id,
-          error instanceof Error ? error.message : "Failed to fork this response.",
+          error instanceof Error ? error.message : t(($) => $.thread.forkFailed),
         );
       }
       return;
@@ -201,7 +209,7 @@ export function useTimelineRewind(input: TimelineRewindInput) {
     if (!targetThreadReady) {
       setThreadError(
         activeThread.id,
-        "The fork was created, but its thread data did not reach this client. Reconnect and try opening it from the sidebar.",
+        t(($) => $.thread.forkDataUnavailable),
       );
       return;
     }

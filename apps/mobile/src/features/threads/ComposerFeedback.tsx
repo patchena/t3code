@@ -1,3 +1,4 @@
+import { mobileI18n } from "~/i18n";
 import { Button } from "../../components/ui/Button";
 import {
   codexFeedbackNotice,
@@ -16,7 +17,7 @@ export function ComposerFeedback({
   readonly submission: CodexFeedbackSubmission;
   readonly onDismiss: () => void;
 }) {
-  const notice = codexFeedbackNotice(submission);
+  const notice = codexFeedbackNotice(submission, mobileI18n.getFixedT(null, "chat"));
   if (!notice) return null;
   return (
     <View className="px-4 pb-3">

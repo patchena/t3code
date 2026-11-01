@@ -1,6 +1,7 @@
 import { Discovery } from "@t3tools/client-runtime/relay";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 
 import { useRelayEnvironmentDiscovery } from "../../state/environments";
 import {
@@ -26,6 +27,7 @@ export function RemoveT3ConnectEnvironmentDialog({
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
 }) {
+  const { t } = useTranslation("connect");
   const accountPage = useT3ConnectAccountPage();
   const discovery = useRelayEnvironmentDiscovery();
   const registration = environmentId
@@ -46,10 +48,10 @@ export function RemoveT3ConnectEnvironmentDialog({
         openAccountPage();
       }}
     >
-      T3 Connect settings
+      {t(($) => $.profile.settings)}
     </InlineButton>
   ) : (
-    "T3 Connect settings"
+    <span>{t(($) => $.profile.settings)}</span>
   );
 
   return (
@@ -62,30 +64,34 @@ export function RemoveT3ConnectEnvironmentDialog({
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {shown.label} from this device?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This forgets its pairing, credentials, and cached threads here.
-            </AlertDialogDescription>
+            <AlertDialogTitle>
+              {t(($) => $.profile.removeTitle, { environment: shown.label ?? "" })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>{t(($) => $.profile.removeDescription)}</AlertDialogDescription>
             <AlertDialogDescription>
               {shown.registration === "registered" ? (
-                <>
-                  It stays on your T3 Connect account and keeps its host space. Deregister it in{" "}
-                  {accountPageLink} to free it.
-                </>
+                <Trans
+                  t={t}
+                  i18nKey={($) => $.profile.removeRegistered}
+                  components={{ settings: accountPageLink }}
+                />
               ) : shown.registration === "unregistered" ? (
-                "It's no longer on your T3 Connect account."
+                t(($) => $.profile.removeUnregistered)
               ) : (
-                <>
-                  This doesn't change your T3 Connect account. To deregister it there, use{" "}
-                  {accountPageLink}.
-                </>
+                <Trans
+                  t={t}
+                  i18nKey={($) => $.profile.removeUnknown}
+                  components={{ settings: accountPageLink }}
+                />
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+            <AlertDialogClose render={<Button variant="outline" />}>
+              {t(($) => $.actions.cancel)}
+            </AlertDialogClose>
             <Button variant="destructive" onClick={onConfirm}>
-              Remove from this device
+              {t(($) => $.profile.removeDevice)}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

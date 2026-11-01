@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { ProviderDriverKind, ProviderInstanceId, type ServerProvider } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -24,11 +25,14 @@ const provider: ServerProvider = {
 describe("getProviderSummary", () => {
   it("does not hide a provider error behind a previous authenticated state", () => {
     expect(
-      getProviderSummary({
-        ...provider,
-        status: "error",
-        message: "The provider process failed to start.",
-      }),
+      getProviderSummary(
+        {
+          ...provider,
+          status: "error",
+          message: "The provider process failed to start.",
+        },
+        createI18n("en").getFixedT("en", "settings"),
+      ),
     ).toEqual({
       headline: "Unavailable",
       detail: "The provider process failed to start.",
@@ -37,12 +41,15 @@ describe("getProviderSummary", () => {
 
   it("keeps authentication failures actionable when their provider status is error", () => {
     expect(
-      getProviderSummary({
-        ...provider,
-        status: "error",
-        auth: { status: "unauthenticated" },
-        message: "Run codex login.",
-      }),
+      getProviderSummary(
+        {
+          ...provider,
+          status: "error",
+          auth: { status: "unauthenticated" },
+          message: "Run codex login.",
+        },
+        createI18n("en").getFixedT("en", "settings"),
+      ),
     ).toEqual({
       headline: "Not authenticated",
       detail: "Run codex login.",
@@ -63,10 +70,12 @@ describe("Antigravity with unchecked sign-in", () => {
   it("presents an unchecked Google sign-in neutrally without claiming authentication is required", () => {
     for (const auth of [unchecked.auth, { status: "unknown", type: "oauth-personal" }] as const) {
       const candidate = { ...unchecked, auth };
-      expect.soft(getProviderSummary(candidate)).toEqual({
-        headline: "Installed · Sign-in not checked",
-        detail: unchecked.message,
-      });
+      expect
+        .soft(getProviderSummary(candidate, createI18n("en").getFixedT("en", "settings")))
+        .toEqual({
+          headline: "Installed · Sign-in not checked",
+          detail: unchecked.message,
+        });
       expect(getProviderStatusKey(candidate)).toBe("neutral");
     }
   });
@@ -125,7 +134,12 @@ describe("Antigravity with unchecked sign-in", () => {
     ] as const;
     for (const { name, change, headline, status } of cases) {
       const candidate = { ...unchecked, ...change };
-      expect.soft(getProviderSummary(candidate).headline, name).toBe(headline);
+      expect
+        .soft(
+          getProviderSummary(candidate, createI18n("en").getFixedT("en", "settings")).headline,
+          name,
+        )
+        .toBe(headline);
       expect.soft(getProviderStatusKey(candidate), name).toBe(status);
     }
   });
@@ -148,12 +162,23 @@ it("does not suggest copying a command that installs an incompatible latest vers
     recommendedRange: null,
     recommendedVersion: null,
   };
-  expect(getProviderVersionAdvisoryPresentation(advisory, compatibility)).toBeNull();
   expect(
-    getProviderVersionAdvisoryPresentation(advisory, { ...compatibility, status: "broken" }, false),
+    getProviderVersionAdvisoryPresentation(
+      advisory,
+      createI18n("en").getFixedT("en", "settings"),
+      compatibility,
+    ),
   ).toBeNull();
   expect(
-    getProviderVersionAdvisoryPresentation(advisory, {
+    getProviderVersionAdvisoryPresentation(
+      advisory,
+      createI18n("en").getFixedT("en", "settings"),
+      { ...compatibility, status: "broken" },
+      false,
+    ),
+  ).toBeNull();
+  expect(
+    getProviderVersionAdvisoryPresentation(advisory, createI18n("en").getFixedT("en", "settings"), {
       ...compatibility,
       latestVersionStatus: "supported",
     }),
@@ -178,7 +203,13 @@ it("does not offer an update that cannot change a limited-support version", () =
     recommendedRange: ">=2.0.18",
     recommendedVersion: null,
   };
-  expect(getProviderVersionAdvisoryPresentation(advisory, compatibility)).toEqual({
+  expect(
+    getProviderVersionAdvisoryPresentation(
+      advisory,
+      createI18n("en").getFixedT("en", "settings"),
+      compatibility,
+    ),
+  ).toEqual({
     title: "Limited support",
     detail: "Use >=2.0.18 for full support.",
     updateCommand: null,
@@ -188,6 +219,7 @@ it("does not offer an update that cannot change a limited-support version", () =
   expect(
     getProviderVersionAdvisoryPresentation(
       { ...advisory, status: "behind_latest", currentVersion: "1.18.34" },
+      createI18n("en").getFixedT("en", "settings"),
       compatibility,
     )?.updateCommand,
   ).toBe(advisory.updateCommand);
@@ -210,7 +242,13 @@ it("shows compatibility in the version popover even when the installed version i
     recommendedRange: null,
     recommendedVersion: "1.9.0",
   };
-  expect(getProviderVersionAdvisoryPresentation(advisory, compatibility)).toEqual({
+  expect(
+    getProviderVersionAdvisoryPresentation(
+      advisory,
+      createI18n("en").getFixedT("en", "settings"),
+      compatibility,
+    ),
+  ).toEqual({
     title: "Known broken version",
     detail: compatibility.message,
     updateCommand: null,
@@ -218,13 +256,17 @@ it("shows compatibility in the version popover even when the installed version i
     targetVersion: "1.9.0",
   });
   expect(
-    getProviderVersionAdvisoryPresentation(undefined, {
-      ...compatibility,
-      status: "graceful",
-      recommendedVersion: null,
-      recommendedRange: ">=2.1.0",
-      message: null,
-    }),
+    getProviderVersionAdvisoryPresentation(
+      undefined,
+      createI18n("en").getFixedT("en", "settings"),
+      {
+        ...compatibility,
+        status: "graceful",
+        recommendedVersion: null,
+        recommendedRange: ">=2.1.0",
+        message: null,
+      },
+    ),
   ).toEqual({
     title: "Limited support",
     detail: "Use >=2.1.0 for full support.",

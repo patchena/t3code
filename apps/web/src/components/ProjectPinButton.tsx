@@ -1,6 +1,7 @@
 import type { ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import { PinIcon, PinOffIcon } from "lucide-react";
 import type { KeyboardEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 import { resolveShortcutCommand } from "../keybindings";
 
@@ -31,7 +32,10 @@ export function ProjectPinButton(props: {
   readonly onToggle: () => void;
   readonly shortcutLabel?: string | null;
 }) {
-  const action = `${props.pinned ? "Unpin" : "Pin"} ${props.name}`;
+  const { t } = useTranslation("workspace");
+  const action = props.pinned
+    ? t(($) => $.sidebar.unpinNamedProject, { name: props.name })
+    : t(($) => $.sidebar.pinNamedProject, { name: props.name });
   return (
     <span
       className={cn(
@@ -44,7 +48,11 @@ export function ProjectPinButton(props: {
         variant="ghost-muted"
         tabIndex={-1}
         aria-hidden="true"
-        title={props.shortcutLabel ? `${action} (${props.shortcutLabel})` : action}
+        title={
+          props.shortcutLabel
+            ? t(($) => $.sidebar.projectPinShortcut, { action, shortcut: props.shortcutLabel })
+            : action
+        }
         onPointerDown={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.preventDefault()}
         onClick={(event) => {

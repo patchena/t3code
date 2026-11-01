@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import {
   ASSISTANT_CITATION_MAX_TEXT_LENGTH,
   EnvironmentId,
@@ -12,6 +13,8 @@ import {
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import { submitComposerDraft } from "./composerSubmission";
+
+const chatT = createI18n("en").getFixedT(null, "chat");
 
 const assistantCitation = {
   version: 1 as const,
@@ -33,14 +36,17 @@ describe("submitComposerDraft", () => {
     const preventDefault = vi.fn();
 
     const submit = () => {
-      const result = submitComposerDraft({
-        prompt: draft,
-        submissionTarget: "provider-turn",
-        event: { preventDefault },
-        onSend: () => {
-          dispatchedDrafts.push(draft);
+      const result = submitComposerDraft(
+        {
+          prompt: draft,
+          submissionTarget: "provider-turn",
+          event: { preventDefault },
+          onSend: () => {
+            dispatchedDrafts.push(draft);
+          },
         },
-      });
+        chatT,
+      );
       validationMessage = result.validationMessage;
     };
 
@@ -64,13 +70,16 @@ describe("submitComposerDraft", () => {
     const draft = "x".repeat(PROVIDER_SEND_TURN_MAX_INPUT_CHARS);
     const onSend = vi.fn();
 
-    const result = submitComposerDraft({
-      prompt: draft,
-      providerInput: `${draft}\n\nTerminal context`,
-      submissionTarget: "provider-turn",
-      event: undefined,
-      onSend,
-    });
+    const result = submitComposerDraft(
+      {
+        prompt: draft,
+        providerInput: `${draft}\n\nTerminal context`,
+        submissionTarget: "provider-turn",
+        event: undefined,
+        onSend,
+      },
+      chatT,
+    );
 
     expect(result).toEqual({
       validationMessage:
@@ -80,13 +89,16 @@ describe("submitComposerDraft", () => {
     expect(draft).toHaveLength(PROVIDER_SEND_TURN_MAX_INPUT_CHARS);
     expect(onSend).not.toHaveBeenCalled();
 
-    const correctedResult = submitComposerDraft({
-      prompt: "Corrected prompt",
-      providerInput: "Corrected prompt\n\nShort terminal context",
-      submissionTarget: "provider-turn",
-      event: undefined,
-      onSend,
-    });
+    const correctedResult = submitComposerDraft(
+      {
+        prompt: "Corrected prompt",
+        providerInput: "Corrected prompt\n\nShort terminal context",
+        submissionTarget: "provider-turn",
+        event: undefined,
+        onSend,
+      },
+      chatT,
+    );
 
     expect(correctedResult).toEqual({ validationMessage: null, didDispatch: true });
     expect(onSend).toHaveBeenCalledOnce();
@@ -95,12 +107,15 @@ describe("submitComposerDraft", () => {
   it("does not finish submission when the send boundary rejects composed provider input", () => {
     const preventDefault = vi.fn();
 
-    const result = submitComposerDraft({
-      prompt: "Sendable raw draft",
-      submissionTarget: "provider-turn",
-      event: { preventDefault },
-      onSend: () => false,
-    });
+    const result = submitComposerDraft(
+      {
+        prompt: "Sendable raw draft",
+        submissionTarget: "provider-turn",
+        event: { preventDefault },
+        onSend: () => false,
+      },
+      chatT,
+    );
 
     expect(result).toEqual({ validationMessage: null, didDispatch: false });
     expect(preventDefault).toHaveBeenCalledOnce();
@@ -120,13 +135,16 @@ describe("submitComposerDraft", () => {
       const preventDefault = vi.fn();
 
       expect(providerInput.length).toBeLessThan(PROVIDER_SEND_TURN_MAX_INPUT_CHARS);
-      const result = submitComposerDraft({
-        prompt: source === "draft" ? providerInput : "Explain the quote",
-        ...(source === "composed provider input" ? { providerInput } : {}),
-        submissionTarget: "provider-turn",
-        event: { preventDefault },
-        onSend,
-      });
+      const result = submitComposerDraft(
+        {
+          prompt: source === "draft" ? providerInput : "Explain the quote",
+          ...(source === "composed provider input" ? { providerInput } : {}),
+          submissionTarget: "provider-turn",
+          event: { preventDefault },
+          onSend,
+        },
+        chatT,
+      );
 
       expect(result).toEqual({
         validationMessage:
@@ -152,12 +170,15 @@ describe("submitComposerDraft", () => {
     expect(expandAssistantCitationsForProvider(draft).length).toBeLessThan(
       PROVIDER_SEND_TURN_MAX_INPUT_CHARS,
     );
-    const result = submitComposerDraft({
-      prompt: draft,
-      submissionTarget: "provider-turn",
-      event: undefined,
-      onSend,
-    });
+    const result = submitComposerDraft(
+      {
+        prompt: draft,
+        submissionTarget: "provider-turn",
+        event: undefined,
+        onSend,
+      },
+      chatT,
+    );
 
     expect(result).toEqual({
       validationMessage:
@@ -174,14 +195,17 @@ describe("submitComposerDraft", () => {
     )}${citation} \n`;
     const dispatchedDrafts: string[] = [];
 
-    const result = submitComposerDraft({
-      prompt: draft,
-      submissionTarget: "provider-turn",
-      event: undefined,
-      onSend: () => {
-        dispatchedDrafts.push(draft);
+    const result = submitComposerDraft(
+      {
+        prompt: draft,
+        submissionTarget: "provider-turn",
+        event: undefined,
+        onSend: () => {
+          dispatchedDrafts.push(draft);
+        },
       },
-    });
+      chatT,
+    );
 
     expect(result).toEqual({ validationMessage: null, didDispatch: true });
     expect(dispatchedDrafts).toEqual([draft]);
@@ -197,12 +221,15 @@ describe("submitComposerDraft", () => {
     expect(expandAssistantCitationsForProvider(answer).length).toBeGreaterThan(
       PROVIDER_SEND_TURN_MAX_INPUT_CHARS,
     );
-    const result = submitComposerDraft({
-      prompt: answer,
-      submissionTarget: "pending-user-input",
-      event: undefined,
-      onSend,
-    });
+    const result = submitComposerDraft(
+      {
+        prompt: answer,
+        submissionTarget: "pending-user-input",
+        event: undefined,
+        onSend,
+      },
+      chatT,
+    );
 
     expect(result).toEqual({ validationMessage: null, didDispatch: true });
     expect(onSend).toHaveBeenCalledOnce();

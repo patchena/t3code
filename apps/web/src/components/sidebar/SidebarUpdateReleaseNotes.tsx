@@ -1,12 +1,14 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
 import type { DesktopBridge, DesktopUpdateState } from "@t3tools/contracts";
 import { ExternalLinkIcon } from "lucide-react";
 
 import {
   getDesktopUpdateReleaseHistoryUrl,
   getDesktopUpdateReleaseUrl,
-} from "../desktopUpdate.logic";
-import { formatRelativeTimeLabel } from "../../timestampFormat";
-import { openDesktopUpdateReleaseNotes } from "../desktopUpdate.toast";
+} from "~/components/desktopUpdate.logic";
+import { formatRelativeTimeLabel } from "~/timestampFormat";
+import { openDesktopUpdateReleaseNotes } from "~/components/desktopUpdate.toast";
 
 type DesktopUpdateShell = Pick<DesktopBridge, "openExternal">;
 
@@ -20,15 +22,21 @@ function keyReleaseNoteItems(items: ReadonlyArray<string>) {
 }
 
 /** Feed times read "3h ago"; build days from a prerelease version read "today" or "2d ago". */
-function formatReleaseAge(releasedAt: string): string {
+function formatReleaseAge(
+  releasedAt: string,
+  t: TFunction<"workspace">,
+  tCommon: TFunction<"common">,
+): string {
   const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(releasedAt);
-  if (!day) return formatRelativeTimeLabel(releasedAt);
+  if (!day) return formatRelativeTimeLabel(releasedAt, tCommon);
   const now = new Date();
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const days = Math.round(
     (today - Date.UTC(Number(day[1]), Number(day[2]) - 1, Number(day[3]))) / 86_400_000,
   );
-  return days <= 0 ? "today" : `${days}d ago`;
+  return days <= 0
+    ? t(($) => $.updates.releaseToday)
+    : t(($) => $.updates.releaseDaysAgo, { days });
 }
 
 function ReleaseLink({
@@ -40,13 +48,14 @@ function ReleaseLink({
   readonly releaseUrl: string;
   readonly shell: DesktopUpdateShell | undefined;
 }) {
+  const { t } = useTranslation("workspace");
   return (
     <a
       className="mt-1 inline-flex items-center gap-1 rounded-sm text-xs leading-5 text-muted-foreground underline-offset-2 outline-none transition-colors hover:text-foreground hover:underline focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       href={releaseUrl}
       onClick={(event) => {
         event.preventDefault();
-        void openDesktopUpdateReleaseNotes(shell, releaseUrl);
+        void openDesktopUpdateReleaseNotes(shell, releaseUrl, t);
       }}
     >
       {children}
@@ -64,6 +73,8 @@ export function SidebarUpdateReleaseNotes({
   readonly state: DesktopUpdateState;
   readonly tooltip: string;
 }) {
+  const { t } = useTranslation("workspace");
+  const { t: tCommon } = useTranslation("common");
   if (state.releaseNotes.length === 0) {
     return <>{tooltip}</>;
   }
@@ -77,12 +88,12 @@ export function SidebarUpdateReleaseNotes({
         {state.status === "available" ? (
           <div>
             <div className="whitespace-nowrap text-sm leading-5 font-medium">
-              Update ready to download
+              {t(($) => $.updates.updateReadyToDownload)}
             </div>
             {state.availableVersion ? (
               <div className="mt-0.5 text-xs leading-4 text-muted-foreground">
                 {releasedAt
-                  ? `${state.availableVersion} · ${formatReleaseAge(releasedAt)}`
+                  ? `${state.availableVersion} · ${formatReleaseAge(releasedAt, t, tCommon)}`
                   : state.availableVersion}
               </div>
             ) : null}
@@ -98,8 +109,8 @@ export function SidebarUpdateReleaseNotes({
           const linkLabel =
             releaseNote.stats ??
             (omittedItemCount === 0
-              ? "View release on GitHub"
-              : `${omittedItemCount} more ${omittedItemCount === 1 ? "change" : "changes"} on GitHub`);
+              ? t(($) => $.updates.viewReleaseOnGitHub)
+              : t(($) => $.updates.moreChanges, { count: omittedItemCount }));
 
           const generated = releaseNote.stats !== undefined || releaseNote.intro !== undefined;
           return (
@@ -108,13 +119,15 @@ export function SidebarUpdateReleaseNotes({
                 releaseNote.version !== state.availableVersion && (
                   <h3 className="mb-1 text-xs leading-4 font-medium text-muted-foreground">
                     {releaseNote.releasedAt
-                      ? `${releaseNote.version} · ${formatReleaseAge(releaseNote.releasedAt)}`
+                      ? `${releaseNote.version} · ${formatReleaseAge(releaseNote.releasedAt, t, tCommon)}`
                       : releaseNote.version}
                   </h3>
                 )
               ) : (
                 <h3 className="mb-2 text-foreground text-xs leading-4 font-semibold">
-                  {index === 0 ? "What's changed" : `Changes in ${releaseNote.version}`}
+                  {index === 0
+                    ? t(($) => $.updates.whatSChanged)
+                    : t(($) => $.updates.versionChanges, { version: releaseNote.version })}
                 </h3>
               )}
               {releaseNote.intro ? (
@@ -153,7 +166,7 @@ export function SidebarUpdateReleaseNotes({
         {state.omittedReleaseCount > 0 ? (
           <div className="mt-3">
             <ReleaseLink releaseUrl={getDesktopUpdateReleaseHistoryUrl()} shell={shell}>
-              {`${state.omittedReleaseCount} older ${state.omittedReleaseCount === 1 ? "release" : "releases"} on GitHub`}
+              {t(($) => $.updates.olderReleases, { count: state.omittedReleaseCount })}
             </ReleaseLink>
           </div>
         ) : null}

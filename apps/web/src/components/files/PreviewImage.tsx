@@ -2,7 +2,11 @@ import { lazy, Suspense } from "react";
 
 import { FileSurfaceLoading } from "./fileSurfaceChrome";
 
-const PreviewImageContent = lazy(() => import("./PreviewImageContent"));
+const PreviewImageContent = lazy(() =>
+  import("~/components/files/PreviewImageContent").then((module) => ({
+    default: module.PreviewImageContent,
+  })),
+);
 
 export function PreviewImage(props: {
   readonly src: string;

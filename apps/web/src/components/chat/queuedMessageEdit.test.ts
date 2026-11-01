@@ -1,5 +1,6 @@
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import {
   DraftId,
@@ -7,7 +8,14 @@ import {
   type ComposerFileAttachment,
   type ComposerImageAttachment,
 } from "../../composerDraftStore";
-import { prepareQueuedEditAttachments, recoverQueuedMessageEdit } from "./queuedMessageEdit";
+import {
+  prepareQueuedEditAttachments as localizedQueuedEditAttachments,
+  recoverQueuedMessageEdit,
+} from "./queuedMessageEdit";
+
+const prepareQueuedEditAttachments = (
+  input: Parameters<typeof localizedQueuedEditAttachments>[0],
+) => localizedQueuedEditAttachments(input, createI18n("en").getFixedT("en", "chat"));
 
 const environmentId = EnvironmentId.make("remote-environment");
 const threadTarget = scopeThreadRef(environmentId, ThreadId.make("thread:edit"));

@@ -1,3 +1,12 @@
+import { systemLocale } from "~/timestampFormat";
+import {
+  FilePreviewFailure,
+  fileFailure,
+  fileFailureText,
+  type FileFailure,
+} from "~/components/files/fileFailure";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
 import { filePreviewDelimiter } from "@t3tools/shared/delimitedPreview";
 import type { AssetResource, EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
 import { formatAttachmentSize } from "@t3tools/client-runtime/state/attachments";
@@ -15,7 +24,7 @@ import { Check, Code2, Copy, Eye, Table2 } from "lucide";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
 import { useAssetUrlRefresh } from "~/assets/assetUrls";
-import ChatMarkdown from "~/components/ChatMarkdown";
+import { ChatMarkdown } from "~/components/ChatMarkdown";
 import { maskMarkdownFrontmatter } from "@t3tools/shared/markdownFrontmatter";
 import { MorphIcon } from "~/components/MorphIcon";
 import { ScrollArea } from "~/components/ui/scroll-area";
@@ -37,7 +46,11 @@ import {
   FileSurfaceNotice,
 } from "./fileSurfaceChrome";
 
-const LargeTextViewer = lazy(() => import("./LargeTextViewer"));
+const LargeTextViewer = lazy(() =>
+  import("~/components/files/LargeTextViewer").then((module) => ({
+    default: module.LargeTextViewer,
+  })),
+);
 
 const OfficeFilePreview = lazy(() =>
   import("./OfficeFilePreview").then((module) => ({ default: module.OfficeFilePreview })),
@@ -51,7 +64,11 @@ const MermaidFilePreview = lazy(() =>
   import("./MermaidFilePreview").then((module) => ({ default: module.MermaidFilePreview })),
 );
 
-const SourcePreview = lazy(() => import("./ReadOnlySourcePreview"));
+const SourcePreview = lazy(() =>
+  import("~/components/files/ReadOnlySourcePreview").then((module) => ({
+    default: module.ReadOnlySourcePreview,
+  })),
+);
 
 const STALE_URL_MS = 5 * 60_000;
 
@@ -75,11 +92,15 @@ export function ReadOnlySourcePreview(props: { name: string; text: string; wordW
 function renderedToggleLabel(
   mode: "markdown" | "mermaid" | "html" | "table",
   rendered: boolean,
+  t: TFunction<"files">,
 ): string {
-  if (mode === "mermaid") return rendered ? "Show Mermaid source" : "Show rendered diagram";
-  if (mode === "markdown") return rendered ? "Show markdown source" : "Show rendered markdown";
-  if (mode === "table") return rendered ? "Show source" : "Show table";
-  return rendered ? "Show HTML source" : "Show rendered page";
+  if (mode === "mermaid")
+    return rendered ? t(($) => $.preview.showMermaidSource) : t(($) => $.preview.showDiagram);
+  if (mode === "markdown")
+    return rendered ? t(($) => $.preview.showMarkdownSource) : t(($) => $.preview.showMarkdown);
+  if (mode === "table")
+    return rendered ? t(($) => $.preview.showSource) : t(($) => $.preview.showTable);
+  return rendered ? t(($) => $.preview.showHtmlSource) : t(($) => $.preview.showPage);
 }
 
 export function AttachmentFilePreview(props: {
@@ -99,6 +120,7 @@ export function AttachmentFilePreview(props: {
   onRemove?: () => void;
   onClose?: () => void;
 }) {
+  const { t } = useTranslation("files");
   const kind = filePreviewKind(props);
   const officeKind = officePreviewKind(props);
   const delimiter = filePreviewDelimiter(props);
@@ -144,8 +166,8 @@ export function AttachmentFilePreview(props: {
   const [rendered, setRendered] = useState(true);
   const [revision, setRevision] = useState(0);
   const [content, setContent] = useState<{ text: string; truncated: boolean } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [contentError, setContentError] = useState<string | null>(null);
+  const [error, setError] = useState<FileFailure | null>(null);
+  const [contentError, setContentError] = useState<FileFailure | null>(null);
   const copyContents = useRef<(() => Promise<string>) | null>(null);
   const authorizedAt = useRef(0);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- creates an object URL for the local file and revokes it on cleanup
@@ -166,13 +188,13 @@ export function AttachmentFilePreview(props: {
     void refresh()
       .then((url) => {
         if (cancelled) return;
-        if (!url) throw new Error("Reconnect to the environment and try again.");
+        if (!url) throw new FilePreviewFailure({ describe: (t) => t(($) => $.preview.reconnect) });
         authorizedAt.current = Date.now();
         setRemoteUrl(url);
       })
       .catch((cause: unknown) => {
         if (!cancelled)
-          setError(cause instanceof Error ? cause.message : "The attachment is unavailable.");
+          setError(fileFailure(cause, (t) => t(($) => $.preview.attachmentUnavailable)));
       });
     return () => {
       cancelled = true;
@@ -198,7 +220,8 @@ export function AttachmentFilePreview(props: {
       if (!file && Date.now() - authorizedAt.current > STALE_URL_MS) {
         const target = await refresh();
         if (controller.signal.aborted) return;
-        if (!target) throw new Error("Reconnect to the environment and try again.");
+        if (!target)
+          throw new FilePreviewFailure({ describe: (t) => t(($) => $.preview.reconnect) });
         authorizedAt.current = Date.now();
         if (target !== url) {
           setRemoteUrl(target);
@@ -218,7 +241,7 @@ export function AttachmentFilePreview(props: {
       if (!controller.signal.aborted) setContent(result);
     })().catch((cause: unknown) => {
       if (!controller.signal.aborted)
-        setContentError(cause instanceof Error ? cause.message : "Could not load this file.");
+        setContentError(fileFailure(cause, (t) => t(($) => $.preview.loadThisFailed)));
     });
     return () => controller.abort();
   }, [url, needsText, streamsText, revision, props.sizeBytes, props.file, refresh]);
@@ -239,9 +262,11 @@ export function AttachmentFilePreview(props: {
       let file = props.file;
       if (!file) {
         const target = await prepareDownload();
-        if (!target) throw new Error("Reconnect to the environment and try again.");
+        if (!target)
+          throw new FilePreviewFailure({ describe: (t) => t(($) => $.preview.reconnect) });
         const response = await fetch(target);
-        if (!response.ok) throw new Error("The file could not be loaded. Try again.");
+        if (!response.ok)
+          throw new FilePreviewFailure({ describe: (t) => t(($) => $.preview.fileLoadFailed) });
         file = await response.blob();
       }
       // Blob downloads keep desktop's custom app scheme from navigating to an external browser.
@@ -257,8 +282,11 @@ export function AttachmentFilePreview(props: {
         const cause = Cause.squash(result.cause);
         toastManager.add({
           type: "error",
-          title: "Could not save file",
-          description: cause instanceof Error ? cause.message : "Please try again.",
+          title: t(($) => $.preview.saveFailed),
+          description: fileFailureText(
+            fileFailure(cause, (t) => t(($) => $.pleaseTryAgain)),
+            t,
+          ),
         });
       }
       setSaving(false);
@@ -267,7 +295,7 @@ export function AttachmentFilePreview(props: {
 
   const body = failure ? (
     <FileSurfaceFailure
-      message={failure}
+      message={fileFailureText(failure, t)}
       onRetry={() => {
         setError(null);
         setRevision((value) => value + 1);
@@ -347,7 +375,13 @@ export function AttachmentFilePreview(props: {
       }
     />
   ) : kind === "audio" ? (
-    <AudioPreview src={url} name={props.name} onError={() => setError("Unable to load audio.")} />
+    <AudioPreview
+      src={url}
+      name={props.name}
+      onError={() =>
+        setError(new FilePreviewFailure({ describe: (t) => t(($) => $.preview.audioFailed) }))
+      }
+    />
   ) : kind === "video" ? (
     <div className="flex min-h-0 flex-1 items-center justify-center bg-black">
       <video
@@ -356,7 +390,9 @@ export function AttachmentFilePreview(props: {
         src={url}
         aria-label={props.name}
         className="max-h-full max-w-full"
-        onError={() => setError("Unable to load video.")}
+        onError={() =>
+          setError(new FilePreviewFailure({ describe: (t) => t(($) => $.preview.videoFailed) }))
+        }
       />
     </div>
   ) : kind === "image" ? (
@@ -365,14 +401,17 @@ export function AttachmentFilePreview(props: {
       src={url}
       name={props.name}
       mimeType={props.mimeType}
-      onError={() => setError("Unable to load image.")}
+      onError={() =>
+        setError(new FilePreviewFailure({ describe: (t) => t(($) => $.image.loadFailed) }))
+      }
     />
   ) : (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-6 text-center">
-      <p className="text-sm font-medium">No preview for this file</p>
+      <p className="text-sm font-medium">{t(($) => $.noPreview)}</p>
       <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
-        Save it to open in an app that supports {props.name.split(".").at(-1) || "this format"}{" "}
-        files.
+        {t(($) => $.preview.saveForFormat, {
+          format: props.name.split(".").at(-1) || t(($) => $.preview.thisFormat),
+        })}
       </p>
     </div>
   );
@@ -382,7 +421,7 @@ export function AttachmentFilePreview(props: {
       <div className={cn(FILE_SURFACE_SUBHEADER_CLASS)} data-surface-subheader>
         <div className="flex min-w-0 flex-1 items-center text-xs">
           <span className="shrink-0 px-0.5 text-muted-foreground">
-            {props.origin ?? "Attachment"}
+            {props.origin ?? t(($) => $.preview.attachment)}
           </span>
           <ChevronRightIcon className="mx-1 size-3.5 shrink-0 text-muted-foreground/60" />
           <span aria-current="page" className="min-w-0 truncate px-0.5 font-medium text-foreground">
@@ -396,7 +435,7 @@ export function AttachmentFilePreview(props: {
         </div>
         {renderedMode ? (
           <FileSurfaceAction
-            label={renderedToggleLabel(renderedMode, rendered)}
+            label={renderedToggleLabel(renderedMode, rendered, t)}
             pressed={rendered}
             onPress={() => setRendered((value) => !value)}
           >
@@ -408,7 +447,7 @@ export function AttachmentFilePreview(props: {
         ) : null}
         {showsRawText ? (
           <FileSurfaceAction
-            label={wordWrap ? "Disable word wrap" : "Enable word wrap"}
+            label={wordWrap ? t(($) => $.preview.disableWrap) : t(($) => $.preview.enableWrap)}
             pressed={wordWrap}
             onPress={() => setWordWrapOverride(!wordWrap)}
           >
@@ -417,7 +456,13 @@ export function AttachmentFilePreview(props: {
         ) : null}
         {content || streamsText ? (
           <FileSurfaceAction
-            label={isCopied ? "Copied" : content?.truncated ? "Copy preview" : "Copy contents"}
+            label={
+              isCopied
+                ? t(($) => $.preview.copied)
+                : content?.truncated
+                  ? t(($) => $.preview.copyPreview)
+                  : t(($) => $.preview.copyContents)
+            }
             onPress={() => {
               if (content) {
                 void copyToClipboard(content.text, undefined);
@@ -427,8 +472,8 @@ export function AttachmentFilePreview(props: {
               if (!copy) {
                 toastManager.add({
                   type: "error",
-                  title: "Could not copy file",
-                  description: "Wait for the file to finish loading before copying.",
+                  title: t(($) => $.preview.copyFailed),
+                  description: t(($) => $.preview.waitBeforeCopy),
                 });
                 return;
               }
@@ -437,8 +482,11 @@ export function AttachmentFilePreview(props: {
                 .catch((cause: unknown) =>
                   toastManager.add({
                     type: "error",
-                    title: "Could not copy file",
-                    description: cause instanceof Error ? cause.message : "Try again.",
+                    title: t(($) => $.preview.copyFailed),
+                    description: fileFailureText(
+                      fileFailure(cause, (t) => t(($) => $.tryAgainSentence)),
+                      t,
+                    ),
                   }),
                 );
             }}
@@ -448,7 +496,7 @@ export function AttachmentFilePreview(props: {
         ) : null}
         {url ? (
           <FileSurfaceAction
-            label={saving ? "Preparing file…" : "Save file"}
+            label={saving ? t(($) => $.preparingFile) : t(($) => $.saveFile)}
             disabled={saving}
             onPress={save}
           >
@@ -456,21 +504,23 @@ export function AttachmentFilePreview(props: {
           </FileSurfaceAction>
         ) : null}
         {props.onRemove ? (
-          <FileSurfaceAction label="Remove from draft" onPress={props.onRemove}>
+          <FileSurfaceAction label={t(($) => $.preview.removeDraft)} onPress={props.onRemove}>
             <Trash2Icon className="size-3.5" />
           </FileSurfaceAction>
         ) : null}
         {props.onClose ? (
-          <FileSurfaceAction label="Close" onPress={props.onClose}>
+          <FileSurfaceAction label={t(($) => $.ui.close)} onPress={props.onClose}>
             <XIcon className="size-3.5" />
           </FileSurfaceAction>
         ) : null}
       </div>
       {content?.truncated ? (
         <FileSurfaceNotice>
-          Preview limited to the first 1 MB
-          {props.sizeBytes > 0 ? ` of a ${props.sizeBytes.toLocaleString()} byte file` : ""}. Save
-          the file to read it in full.
+          {props.sizeBytes > 0
+            ? t(($) => $.preview.truncatedSaveSize, {
+                size: props.sizeBytes.toLocaleString(systemLocale),
+              })
+            : t(($) => $.preview.truncatedSave)}
         </FileSurfaceNotice>
       ) : null}
       {body}

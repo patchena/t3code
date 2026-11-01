@@ -15,6 +15,11 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("react", () => ({ useCallback: (callback: unknown) => callback }));
+vi.mock("react-i18next", async () => {
+  const { createI18n } = await import("@t3tools/client-runtime/i18n");
+  const t = createI18n("en").getFixedT(null, "workspace");
+  return { useTranslation: () => ({ t }) };
+});
 vi.mock("@effect/atom-react", () => ({
   useAtomValue: () => ({ operation: null, error: null, isRunning: false }),
 }));

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
   isAtomCommandInterrupted,
@@ -79,6 +80,7 @@ function threadShowingBrowser(
 }
 
 export function DesktopWebLinkCoordinator() {
+  const { t } = useTranslation("desktop");
   const router = useRouter();
   const primaryEnvironment = usePrimaryEnvironment();
   const openPullRequestsInApp = useClientSettings((settings) => settings.pullRequestLinksOpenInApp);
@@ -107,15 +109,15 @@ export function DesktopWebLinkCoordinator() {
 
   const reportFailure = (url: string, description = url) =>
     toastManager.add(
-      stackedThreadToast({ type: "error", title: "Could not open the link", description }),
+      stackedThreadToast({ type: "error", title: t(($) => $.webLinks.cannotOpen), description }),
     );
 
   const reportPairingFailure = (error: unknown) =>
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Could not add backend",
-        description: error instanceof Error ? error.message : "Failed to add backend.",
+        title: t(($) => $.webLinks.cannotAdd),
+        description: error instanceof Error ? error.message : t(($) => $.webLinks.addFailed),
       }),
     );
 
@@ -131,7 +133,8 @@ export function DesktopWebLinkCoordinator() {
       reportPairingFailure(error);
       return;
     }
-    const confirmed = (await requestConfirmDialog(`Add the backend at ${origin}?`)) ?? false;
+    const confirmed =
+      (await requestConfirmDialog(t(($) => $.webLinks.confirmAdd, { origin }))) ?? false;
     if (!confirmed) return;
     const result = await connectPairingEnvironment({ pairingUrl });
     if (result._tag === "Failure") {
@@ -141,8 +144,8 @@ export function DesktopWebLinkCoordinator() {
     pairedUrlsRef.current.add(pairingUrl);
     toastManager.add({
       type: "success",
-      title: "Backend added",
-      description: "The environment is saved and will reconnect on app startup.",
+      title: t(($) => $.webLinks.added),
+      description: t(($) => $.webLinks.saved),
     });
   };
 
@@ -152,7 +155,10 @@ export function DesktopWebLinkCoordinator() {
       reportFailure(url);
       return null;
     }
-    const project = await openScratchProject(environmentId, "Could not open the link");
+    const project = await openScratchProject(
+      environmentId,
+      t(($) => $.webLinks.cannotOpen),
+    );
     if (!project) return null;
     const opened = await openThread(scopeProjectRef(project.environmentId, project.id));
     if (!opened) {

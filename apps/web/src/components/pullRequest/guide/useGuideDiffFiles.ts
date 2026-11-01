@@ -6,7 +6,7 @@ import { getRenderablePatch, resolveFileDiffPath } from "~/lib/diffRendering";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
 
-import { pullRequestReviewKey } from "../pullRequestReviewStore";
+import { pullRequestReviewKey } from "~/components/pullRequest/pullRequestReviewStore";
 
 interface LoadedDiff {
   readonly key: string;

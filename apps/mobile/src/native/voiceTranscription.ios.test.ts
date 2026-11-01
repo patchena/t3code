@@ -1,6 +1,7 @@
 import type { TranscriptionResult } from "@react-native-ai/apple/src/NativeAppleTranscription";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { VoiceInputController, VoiceTranscriptionError } from "@t3tools/client-runtime/voice-input";
 import { resetVoiceInputGlobalsForTests } from "../../../../packages/client-runtime/src/voice-input/controller";
 
@@ -78,6 +79,7 @@ function createDictation() {
   const deleted: string[] = [];
   const ended = Promise.withResolvers<void>();
   const controller = new VoiceInputController({
+    t: createI18n("en").getFixedT("en", "voice"),
     recorder,
     getTranscriber: () => ({
       prepare: async (options) => (await getLocalVoiceTranscriber())!.prepare(options),

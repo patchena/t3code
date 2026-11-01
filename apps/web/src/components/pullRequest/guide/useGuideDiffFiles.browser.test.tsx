@@ -14,7 +14,7 @@ vi.mock("~/state/pullRequests", () => ({
   },
 }));
 
-import { useGuideDiffFiles } from "./useGuideDiffFiles";
+import { useGuideDiffFiles } from "~/components/pullRequest/guide/useGuideDiffFiles";
 
 function Probe({ wantedPaths }: { wantedPaths: string[] }) {
   const diff = useGuideDiffFiles({

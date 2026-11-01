@@ -42,6 +42,19 @@ const state = vi.hoisted(() => ({
   sessionLookupFails: false,
 }));
 
+vi.mock("~/i18n", async () => {
+  const { createI18n } = await import("@t3tools/client-runtime/i18n");
+  return { appI18n: createI18n("en") };
+});
+vi.mock("react-i18next", async () => {
+  const { appI18n } = await import("~/i18n");
+  return {
+    useTranslation: (namespace: "workspace" | "common") => ({
+      t: appI18n.getFixedT(null, namespace),
+    }),
+  };
+});
+
 vi.mock("react", () => ({
   useCallback: (callback: unknown) => callback,
   useMemo: (factory: () => unknown) => factory(),

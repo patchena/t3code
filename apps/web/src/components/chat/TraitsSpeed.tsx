@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
 import type { ProviderDriverKind, ProviderOptionDescriptor } from "@t3tools/contracts";
 import { getProviderOptionCurrentValue } from "@t3tools/shared/model";
 import { ZapIcon } from "lucide-react";
@@ -8,10 +10,12 @@ import { ComposerControlIcon, type ComposerControlSize } from "./ComposerControl
 export function getTraitsSpeedDisplay(
   provider: ProviderDriverKind,
   descriptor: ProviderOptionDescriptor,
+  t: TFunction<"chat">,
 ): { label: string; speedIcon: "fast" | "ultrafast" | null } | null {
   if (descriptor.id === "fastMode" && descriptor.type === "boolean") {
     return {
-      label: descriptor.currentValue === true ? "Fast" : "Normal",
+      label:
+        descriptor.currentValue === true ? t(($) => $.composer.fast) : t(($) => $.composer.normal),
       speedIcon: descriptor.currentValue === true ? "fast" : null,
     };
   }
@@ -27,7 +31,13 @@ export function getTraitsSpeedDisplay(
     (ultrafastTier && currentValue === ultrafastTier.id)
   ) {
     return {
-      label: descriptor.options.find(({ id }) => id === currentValue)?.label ?? "Normal",
+      label:
+        ultrafastTier && currentValue === ultrafastTier.id
+          ? t(($) => $.composer.ultrafast)
+          : fastTier && currentValue === fastTier.id
+            ? t(($) => $.composer.fast)
+            : (descriptor.options.find(({ id }) => id === currentValue)?.label ??
+              t(($) => $.composer.normal)),
       speedIcon:
         ultrafastTier && currentValue === ultrafastTier.id
           ? "ultrafast"
@@ -48,6 +58,7 @@ export function TraitsSpeedIcon({
   speedIcon: "fast" | "ultrafast";
   size?: ComposerControlSize;
 }) {
+  const { t } = useTranslation("chat");
   return (
     <>
       <ComposerControlIcon
@@ -63,7 +74,9 @@ export function TraitsSpeedIcon({
         )}
       />
       <span className="sr-only">
-        {speedIcon === "ultrafast" ? "Ultrafast mode on" : "Fast mode on"}
+        {speedIcon === "ultrafast"
+          ? t(($) => $.composer.ultrafastModeOn)
+          : t(($) => $.composer.fastModeOn)}
       </span>
     </>
   );

@@ -1,24 +1,30 @@
 import { RunId } from "@t3tools/contracts";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 
 import { usageLimitRecoveryBannerItem } from "./UsageLimitRecoveryBanner";
 
 const stoppedAt = new Date(2026, 9, 20, 12, 0);
 
 function bannerDescription(resetAt: Date, timestampFormat: TimestampFormat) {
-  return usageLimitRecoveryBannerItem({
-    runId: RunId.make("run-1"),
-    errorCode: null,
-    resetAt: resetAt.toISOString(),
-    stoppedAt: stoppedAt.toISOString(),
-    settled: false,
-    requestPending: false,
-    snoozedUntil: null,
-    recovery: null,
-    timestampFormat,
-    onChange: async () => {},
-  }).description;
+  const instance = createI18n("en");
+  return usageLimitRecoveryBannerItem(
+    {
+      runId: RunId.make("run-1"),
+      errorCode: null,
+      resetAt: resetAt.toISOString(),
+      stoppedAt: stoppedAt.toISOString(),
+      settled: false,
+      requestPending: false,
+      snoozedUntil: null,
+      recovery: null,
+      timestampFormat,
+      onChange: async () => {},
+    },
+    instance.getFixedT("en", "chat"),
+    instance.getFixedT("en", "common"),
+  ).description;
 }
 
 describe("usageLimitRecoveryBannerItem", () => {

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { EnvironmentId, RuntimeMode } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 
@@ -8,10 +9,10 @@ import { ComposerControl } from "./chat/ComposerControl";
 import { ComposerPermissionsSection } from "./chat/ComposerFooterControls";
 import { useComposerMenuProps } from "./chat/composerEventScope";
 import {
+  getRuntimeModeConfig,
   resolveCompatibleRuntimeMode,
   resolveRuntimeModeOptions,
-  runtimeModeConfig,
-} from "./chat/runtimeModeConfig";
+} from "~/components/chat/runtimeModeConfig";
 import { ComposerContextLabel } from "./ComposerContextLabel";
 import { Menu, MenuPopup, MenuTrigger } from "./ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
@@ -22,6 +23,7 @@ export function ComposerContextPermissions(props: {
   supportedRuntimeModes: ReadonlyArray<RuntimeMode> | undefined;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
 }) {
+  const { t } = useTranslation("chat");
   const shortcutLabel = shortcutLabelForCommand(
     useAtomValue(primaryServerKeybindingsAtom),
     "composer.mode",
@@ -30,9 +32,9 @@ export function ComposerContextPermissions(props: {
     props.runtimeMode,
     props.supportedRuntimeModes,
   );
-  const options = resolveRuntimeModeOptions(modes, useManagedPolicy(props.environmentId));
+  const options = resolveRuntimeModeOptions(modes, useManagedPolicy(props.environmentId), t);
   const composerMenuProps = useComposerMenuProps();
-  const { icon: Icon, label } = runtimeModeConfig[mode];
+  const { icon: Icon, label } = getRuntimeModeConfig(t)[mode];
   return (
     <Menu>
       <Tooltip>
@@ -43,7 +45,7 @@ export function ComposerContextPermissions(props: {
                 <ComposerControl
                   size="xs"
                   className="ms-auto min-w-0 shrink-0"
-                  aria-label={`Permissions: ${label}`}
+                  aria-label={t(($) => $.composer.permissionsLabel, { label })}
                   data-composer-context-control
                 />
               }
@@ -53,7 +55,10 @@ export function ComposerContextPermissions(props: {
           <Icon aria-hidden="true" className="size-3" />
           <ComposerContextLabel>{label}</ComposerContextLabel>
         </TooltipTrigger>
-        <TooltipPopup>Permissions{shortcutLabel ? ` · ${shortcutLabel}` : null}</TooltipPopup>
+        <TooltipPopup>
+          {t(($) => $.composer.permissions)}
+          {shortcutLabel ? ` · ${shortcutLabel}` : null}
+        </TooltipPopup>
       </Tooltip>
       <MenuPopup side="top" align="end" {...composerMenuProps}>
         <ComposerPermissionsSection

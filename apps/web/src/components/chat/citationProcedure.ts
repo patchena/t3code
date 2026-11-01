@@ -6,6 +6,7 @@ import { environmentThreadDetails, threadEnvironment } from "../../state/threads
 import { toastManager } from "../ui/toast";
 import type { AssistantCitationRequest } from "./AssistantCitationSource";
 import type { MessagesTimelineRow } from "./MessagesTimeline.logic";
+import { appI18n } from "~/i18n";
 
 /** Whether the cited response is in the loaded history, after paging toward it. */
 export type CitedHistory =
@@ -27,7 +28,7 @@ export interface CitedThreadSnapshot {
 
 export type CitedHistoryOutcome =
   | { readonly _tag: "found" }
-  | { readonly _tag: "failed"; readonly title: string; readonly description: string }
+  | { readonly _tag: "failed"; readonly reason: "load" | "unavailable" | "notAssistant" }
   | { readonly _tag: "aborted" };
 
 type HistoryPageResult = AtomCommandSuccess<
@@ -38,15 +39,12 @@ const MAX_CITATION_PAGES = 20;
 
 const COULD_NOT_LOAD = {
   _tag: "failed",
-  title: "Could not load the cited response",
-  description:
-    "Load earlier turns, then click the citation to try again. Your saved quote is unchanged.",
+  reason: "load",
 } as const;
 
 const UNAVAILABLE = {
   _tag: "failed",
-  title: "The cited response is unavailable",
-  description: "It may have been removed. The selected text is still saved in your citation.",
+  reason: "unavailable",
 } as const;
 
 /**
@@ -68,8 +66,7 @@ export async function loadCitedHistory(input: {
     if (thread.message === "other") {
       return {
         _tag: "failed",
-        title: "The citation does not refer to an assistant response",
-        description: "The selected text is still saved in your citation.",
+        reason: "notAssistant",
       };
     }
     if (!thread.hasMoreHistory) return UNAVAILABLE;
@@ -206,15 +203,32 @@ const citedHistoryAtom = Atom.family(
           );
           return result._tag === "Success"
             ? result.value
-            : { _tag: "error", message: "Could not load history." };
+            : {
+                _tag: "error",
+                message: appI18n.getFixedT(null, "chat")(($) => $.citation.historyFailed),
+              };
         },
       }).then((outcome) => {
         if (outcome._tag === "aborted") return;
         if (outcome._tag === "failed") {
+          const t = appI18n.getFixedT(null, "chat");
+          const messages = {
+            load: {
+              title: t(($) => $.citation.couldNotLoad),
+              description: t(($) => $.citation.loadEarlier),
+            },
+            unavailable: {
+              title: t(($) => $.citation.unavailable),
+              description: t(($) => $.citation.removed),
+            },
+            notAssistant: {
+              title: t(($) => $.citation.notAssistant),
+              description: t(($) => $.citation.saved),
+            },
+          };
           toastManager.add({
             type: "warning",
-            title: outcome.title,
-            description: outcome.description,
+            ...messages[outcome.reason],
           });
         }
         get.setSelf({ _tag: outcome._tag });

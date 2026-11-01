@@ -9,7 +9,7 @@ import { useRenderedAppearance } from "~/hooks/useTheme";
 import { resolveDiffThemeName } from "~/lib/diffRendering";
 import { PREFERRED_HIGHLIGHTER } from "~/lib/syntaxHighlighting";
 
-import { DIFF_VIEW_UNSAFE_CSS } from "../../diffs/StyledDiffCodeView";
+import { DIFF_VIEW_UNSAFE_CSS } from "~/components/diffs/StyledDiffCodeView";
 
 export function GuideFileDiff({
   file,

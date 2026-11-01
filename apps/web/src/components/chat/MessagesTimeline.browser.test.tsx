@@ -38,7 +38,7 @@ import { MessagesTimeline } from "./MessagesTimeline";
 import { makeStreamingTimelineFixture } from "../../test-fixtures";
 import {
   type PendingApproval,
-  deriveTimelineEntriesFromVisibleTurnItems,
+  deriveTimelineEntriesFromVisibleTurnItems as deriveTranslatedEntries,
 } from "../../session-logic";
 import { remarkThoughtPreview } from "./TimelineWorkEntryRow.logic";
 import { parseMarkdownWithMath } from "@t3tools/shared/markdownMath";
@@ -52,6 +52,13 @@ import {
   decodeComposerContextFragment,
 } from "@t3tools/shared/composerContextClipboard";
 import { collectComposerContextReferences } from "@t3tools/shared/composerContextReferences";
+
+import { createI18n } from "@t3tools/client-runtime/i18n";
+
+const projectionT = createI18n("en").getFixedT("en", "activity");
+const deriveTimelineEntriesFromVisibleTurnItems = (
+  input: Parameters<typeof deriveTranslatedEntries>[0],
+) => deriveTranslatedEntries(input, projectionT);
 
 const environmentQuery = vi.hoisted(() => ({
   error: "Pull request not found",

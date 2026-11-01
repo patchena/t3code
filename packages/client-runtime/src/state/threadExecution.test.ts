@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import {
   TurnItemId,
   NodeId,
@@ -611,10 +612,12 @@ describe("isBackgroundWorkStopPending", () => {
 
 describe("presentProviderGoal", () => {
   it("rolls token counts that round to 1000k over to 1m", () => {
+    const t = createI18n("en").getFixedT("en", "activity");
     const usage = (tokensUsed: number) =>
       presentProviderGoal(
         { objective: "Ship the feature", status: "active", tokensUsed, tokenBudget: 2_000_000 },
         true,
+        t,
       ).usage;
     expect(usage(999_499)).toBe("999k / 2m tokens");
     expect(usage(999_500)).toBe("1m / 2m tokens");
@@ -629,6 +632,7 @@ describe("presentProviderGoal", () => {
           tokenBudget: 999_500,
         },
         false,
+        t,
       ).usage,
     ).toBe("1m / 1m tokens");
   });
@@ -636,13 +640,17 @@ describe("presentProviderGoal", () => {
 
 describe("presentPendingBackgroundWork", () => {
   it("names a command by its script, not the shell that wraps it", () => {
-    const presentation = presentPendingBackgroundWork([
-      {
-        taskId: "call_1",
-        kind: "command",
-        description: `/bin/zsh -lc "mv a.ts b.ts\ncat > b.ts <<'EOF'\nexport {};\nEOF"`,
-      },
-    ]);
+    const presentation = presentPendingBackgroundWork(
+      [
+        {
+          taskId: "call_1",
+          kind: "command",
+          description: `/bin/zsh -lc "mv a.ts b.ts\ncat > b.ts <<'EOF'\nexport {};\nEOF"`,
+        },
+      ],
+      createI18n("en").getFixedT("en", "activity"),
+      "en",
+    );
     expect(presentation?.items[0]?.label).toBe("mv a.ts b.ts\ncat > b.ts <<'EOF'\nexport {};\nEOF");
   });
 });

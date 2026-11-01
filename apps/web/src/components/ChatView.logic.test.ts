@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import {
   boundAttachmentIds,
   buildExpiredTerminalContextToastCopy,
@@ -130,15 +131,15 @@ describe("deriveComposerSendState", () => {
 
 describe("buildExpiredTerminalContextToastCopy", () => {
   it("refers to several expired contexts as them", () => {
-    expect(buildExpiredTerminalContextToastCopy(2, "empty")).toEqual({
+    expect(buildExpiredTerminalContextToastCopy(2, "empty", chatT)).toEqual({
       title: "Expired terminal contexts won't be sent",
       description: "Remove them or re-add them to include terminal output.",
     });
-    expect(buildExpiredTerminalContextToastCopy(2, "omitted")).toEqual({
+    expect(buildExpiredTerminalContextToastCopy(2, "omitted", chatT)).toEqual({
       title: "Expired terminal contexts omitted from message",
       description: "Re-add them if you want that terminal output included.",
     });
-    expect(buildExpiredTerminalContextToastCopy(1, "omitted").description).toBe(
+    expect(buildExpiredTerminalContextToastCopy(1, "omitted", chatT).description).toBe(
       "Re-add it if you want that terminal output included.",
     );
   });
@@ -611,7 +612,7 @@ describe("resolveComposerProviderSelection", () => {
 
     expect(selection.selectedProviderEntry?.instanceId).toBe(signedOutEntry.instanceId);
     expect(
-      getAntigravitySendBlockReason(selection.selectedProviderEntry?.snapshot, "gemini-pro"),
+      getAntigravitySendBlockReason(selection.selectedProviderEntry?.snapshot, "gemini-pro", chatT),
     ).toBe("Sign in to Antigravity in provider settings before sending.");
   });
 
@@ -621,10 +622,10 @@ describe("resolveComposerProviderSelection", () => {
       models: catalogModels,
     }).snapshot;
 
-    expect(getAntigravitySendBlockReason(provider, "saved-model-not-in-current-catalog")).toBe(
-      "That Antigravity model is no longer available. Choose another model.",
-    );
-    expect(getAntigravitySendBlockReason(provider, "gemini-pro")).toBeNull();
+    expect(
+      getAntigravitySendBlockReason(provider, "saved-model-not-in-current-catalog", chatT),
+    ).toBe("That Antigravity model is no longer available. Choose another model.");
+    expect(getAntigravitySendBlockReason(provider, "gemini-pro", chatT)).toBeNull();
   });
 
   it("allows a saved native model to retry after a provider error without changing it", () => {
@@ -634,7 +635,7 @@ describe("resolveComposerProviderSelection", () => {
     }).snapshot;
 
     expect(
-      getAntigravitySendBlockReason(provider, "saved-model-not-in-current-catalog"),
+      getAntigravitySendBlockReason(provider, "saved-model-not-in-current-catalog", chatT),
     ).toBeNull();
   });
 
@@ -798,7 +799,7 @@ describe("waitForRevertedMessage", () => {
 
   it("rejects with the projected reason when the rollback fails for good", async () => {
     const { state, projection } = projectionAtom();
-    const waiting = waitForRevertedMessage(threadRef, 1, requestId, async () => {});
+    const waiting = waitForRevertedMessage(threadRef, 1, requestId, async () => {}, chatT);
     await Promise.resolve();
     appAtomRegistry.set(state, {
       data: Option.some({
@@ -858,7 +859,7 @@ describe("waitForRevertedMessage", () => {
       };
       appAtomRegistry.set(state, { data: Option.some(bounded) });
       let outcome = "pending";
-      const waiting = waitForRevertedMessage(threadRef, 0, requestId, async () => {}).then(
+      const waiting = waitForRevertedMessage(threadRef, 0, requestId, async () => {}, chatT).then(
         () => {
           outcome = "reverted";
         },
@@ -904,7 +905,7 @@ describe("waitForRevertedMessage", () => {
     vi.useFakeTimers();
     const { state, projection } = projectionAtom();
     let outcome = "pending";
-    const waiting = waitForRevertedMessage(threadRef, 1, requestId, async () => {}).then(
+    const waiting = waitForRevertedMessage(threadRef, 1, requestId, async () => {}, chatT).then(
       () => {
         outcome = "reverted";
       },
@@ -973,7 +974,7 @@ describe("waitForRevertedMessage", () => {
     });
     const revert = vi.fn(async () => {});
     let outcome = "pending";
-    const waiting = waitForRevertedMessage(threadRef, 1, requestId, revert).then(
+    const waiting = waitForRevertedMessage(threadRef, 1, requestId, revert, chatT).then(
       () => {
         outcome = "reverted";
       },
@@ -1272,3 +1273,5 @@ describe("deriveAvailableRevertTurnCounts", () => {
     expect(deriveAvailableRevertTurnCounts(null).size).toBe(0);
   });
 });
+
+const chatT = createI18n("en").getFixedT(null, "chat");

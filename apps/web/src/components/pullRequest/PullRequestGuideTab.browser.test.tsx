@@ -2,11 +2,13 @@ import { EnvironmentId, ProjectId, type PullRequestRef } from "@t3tools/contract
 import { expect, it, vi } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 
-vi.mock(import("./guide/useReviewGuideWriter"), () => ({ useReviewGuideWriter: vi.fn() }));
+vi.mock(import("~/components/pullRequest/guide/useReviewGuideWriter"), () => ({
+  useReviewGuideWriter: vi.fn(),
+}));
 
 import { render } from "../../../test/render";
-import { useReviewGuideWriter } from "./guide/useReviewGuideWriter";
-import { PullRequestGuideTab } from "./PullRequestGuideTab";
+import { useReviewGuideWriter } from "~/components/pullRequest/guide/useReviewGuideWriter";
+import { PullRequestGuideTab } from "~/components/pullRequest/PullRequestGuideTab";
 
 const reference: PullRequestRef = {
   projectId: ProjectId.make("project"),

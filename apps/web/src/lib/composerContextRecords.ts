@@ -1,7 +1,5 @@
-import {
-  capitalizeTerm,
-  sourceControlClients,
-} from "@t3tools/client-runtime/source-control-clients";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import {
   COMPOSER_CONTEXT_REVIEW_DIFF_MAX_CHARS,
   COMPOSER_CONTEXT_REVIEW_TEXT_MAX_CHARS,
@@ -105,13 +103,39 @@ export function pullRequestContextDisplayState(
   return pullRequest.state === "open" && pullRequest.isDraft ? "draft" : pullRequest.state;
 }
 
-export function pullRequestContextKindLabel(comment: ReviewCommentPresentation): string {
+export function pullRequestContextKindLabel(
+  comment: ReviewCommentPresentation,
+  t: TFunction<"chat">,
+): string {
   const url = comment.pullRequest?.url;
   const host = url === undefined ? null : sourceControlClients.findByChangeRequestUrl(url);
-  const term = (host ?? sourceControlClients.get(undefined)).changeRequest.singular;
+  const definition = host ?? sourceControlClients.get(undefined);
   const state = pullRequestContextDisplayState(comment);
-  if (state === null) return capitalizeTerm(term);
-  return `${capitalizeTerm(state)} ${term}`;
+  const labels =
+    definition.kind === "gitlab"
+      ? {
+          name: t(($) => $.composer.mrName),
+          open: t(($) => $.composer.mrOpen),
+          draft: t(($) => $.composer.mrDraft),
+          merged: t(($) => $.composer.mrMerged),
+          closed: t(($) => $.composer.mrClosed),
+        }
+      : definition.kind === "unknown"
+        ? {
+            name: t(($) => $.composer.changeName),
+            open: t(($) => $.composer.changeOpen),
+            draft: t(($) => $.composer.changeDraft),
+            merged: t(($) => $.composer.changeMerged),
+            closed: t(($) => $.composer.changeClosed),
+          }
+        : {
+            name: t(($) => $.composer.prName),
+            open: t(($) => $.composer.prOpen),
+            draft: t(($) => $.composer.prDraft),
+            merged: t(($) => $.composer.prMerged),
+            closed: t(($) => $.composer.prClosed),
+          };
+  return state === null ? labels.name : labels[state];
 }
 
 export function previewAnnotationContextLabel(annotation: PreviewAnnotationPayload): string {

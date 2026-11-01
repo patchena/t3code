@@ -49,7 +49,7 @@ vi.mock(import("~/state/pullRequests"), async (original) => ({
   }),
 }));
 
-import { PullRequestMarkdownEditor } from "./PullRequestMarkdownEditor";
+import { PullRequestMarkdownEditor } from "~/components/pullRequest/PullRequestMarkdownEditor";
 
 const secondary = EnvironmentId.make("secondary");
 const onSave = vi.fn<(next: string) => void>();

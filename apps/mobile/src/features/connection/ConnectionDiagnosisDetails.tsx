@@ -18,6 +18,9 @@ import { Button } from "../../components/ui/Button";
 import { environmentCatalog } from "../../connection/catalog";
 import { cn } from "../../lib/cn";
 import { copyTextWithHaptic } from "../../lib/copyTextWithHaptic";
+import { mobileI18n } from "~/i18n";
+
+const tConnect = mobileI18n.getFixedT(null, "connect");
 
 const HOP_MARK = { ok: "✓", failed: "✕", unchecked: "–" } as const;
 const HOP_NOTE = { ok: "", failed: " · Failed", unchecked: " · Not checked" } as const;
@@ -36,13 +39,16 @@ export function useConnectionDiagnosis(
   if (phase === "connected" || phase === "unsupported") return { diagnosis: null, state };
   const relayOnly =
     connectionRoutes(presentation.entry).length === 1 && hasRelayRoute(presentation.entry);
-  const diagnosis = presentConnectionDiagnosis({
-    hostLabel: presentation.entry.target.label,
-    state,
-    via: relayOnly ? "relay" : "direct",
-    clientVersion: Constants.expoConfig?.version,
-    serverVersion: presentation.serverConfig?.environment.serverVersion,
-  });
+  const diagnosis = presentConnectionDiagnosis(
+    {
+      hostLabel: presentation.entry.target.label,
+      state,
+      via: relayOnly ? "relay" : "direct",
+      clientVersion: Constants.expoConfig?.version,
+      serverVersion: presentation.serverConfig?.environment.serverVersion,
+    },
+    tConnect,
+  );
   return { diagnosis, state };
 }
 
@@ -82,7 +88,7 @@ export function ConnectionDiagnosisDetails(props: {
         label="Copy diagnostics"
         icon="doc.on.doc"
         onPress={() => {
-          copyTextWithHaptic(connectionDiagnosisText(props.hostLabel, diagnosis), {
+          copyTextWithHaptic(connectionDiagnosisText(props.hostLabel, diagnosis, tConnect), {
             target: "connection-diagnostics",
           });
         }}

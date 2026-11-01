@@ -36,6 +36,7 @@ afterEach(() => {
 describe("client settings hydration", () => {
   const savedSettings = {
     ...DEFAULT_CLIENT_SETTINGS,
+    interfaceLanguage: "de" as const,
     timestampFormat: "12-hour" as const,
     favorites: [{ provider: ProviderInstanceId.make("codex_work"), model: "gpt-5.6" }],
   };
@@ -198,7 +199,7 @@ describe("persistClientSettingsPatch", () => {
 });
 
 describe("persistClientSettingsUpdate", () => {
-  it("publishes the update only after persistence succeeds", async () => {
+  it("publishes language changes and resets only after persistence succeeds", async () => {
     let finishPersistence!: () => void;
     const persistence = new Promise<void>((resolve) => {
       finishPersistence = resolve;
@@ -209,15 +210,27 @@ describe("persistClientSettingsUpdate", () => {
     const pending = persistClientSettingsUpdate(
       (current) => ({
         ...current,
-        timestampFormat: "12-hour",
+        interfaceLanguage: "de",
       }),
       setClientSettings,
     );
 
-    expect(getClientSettings().timestampFormat).toBe(DEFAULT_CLIENT_SETTINGS.timestampFormat);
+    expect(getClientSettings().interfaceLanguage).toBe("en");
     finishPersistence();
-    await expect(pending).resolves.toMatchObject({ timestampFormat: "12-hour" });
-    expect(getClientSettings().timestampFormat).toBe("12-hour");
+    await expect(pending).resolves.toMatchObject({ interfaceLanguage: "de" });
+    expect(getClientSettings().interfaceLanguage).toBe("de");
+    const failure = new Error("storage unavailable");
+    setClientSettings.mockRejectedValueOnce(failure);
+    const reset = (current: ClientSettings): ClientSettings => ({
+      ...current,
+      interfaceLanguage: "en",
+    });
+    await expect(persistClientSettingsUpdate(reset, setClientSettings)).rejects.toBe(failure);
+    expect(getClientSettings().interfaceLanguage).toBe("de");
+    await expect(persistClientSettingsUpdate(reset, setClientSettings)).resolves.toMatchObject({
+      interfaceLanguage: "en",
+    });
+    expect(getClientSettings().interfaceLanguage).toBe("en");
   });
 
   it("preserves an optimistic write made while an awaited update persists", async () => {

@@ -8,6 +8,8 @@ import {
 import { act as reactAct, createContext, use, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { vi } from "vite-plus/test";
+import { createI18n, type i18n } from "@t3tools/client-runtime/i18n";
+import { I18nextProvider } from "react-i18next";
 import { page, utils, type Locator, type LocatorSelectors } from "vite-plus/test/browser";
 
 declare global {
@@ -28,6 +30,7 @@ export async function act<T>(callback: () => T | Promise<T>): Promise<T> {
 }
 
 export interface RenderOptions {
+  readonly i18n?: i18n;
   /**
    * Element to render into, for tests that size or style it before the first render.
    * The screen owns it from then on and removes it on dispose.
@@ -69,15 +72,22 @@ function createTestRouter(path: string): AnyRouter {
  */
 export async function render(
   ui: ReactNode,
-  { container = document.createElement("div"), router: path = "/" }: RenderOptions = {},
+  {
+    container = document.createElement("div"),
+    router: path = "/",
+    i18n = createI18n("en"),
+  }: RenderOptions = {},
 ): Promise<Screen> {
   if (!container.isConnected) document.body.append(container);
   const root = createRoot(container);
   const router = path === false ? undefined : createTestRouter(path);
   // The router element is created once so a rerender updates the tree instead of remounting it.
   const routerElement = router && <RouterProvider router={router} />;
-  const wrap = (node: ReactNode) =>
-    routerElement ? <RoutedUi value={node}>{routerElement}</RoutedUi> : node;
+  const wrap = (node: ReactNode) => (
+    <I18nextProvider i18n={i18n}>
+      {routerElement ? <RoutedUi value={node}>{routerElement}</RoutedUi> : node}
+    </I18nextProvider>
+  );
 
   let mounted = true;
   const unmount = async () => {

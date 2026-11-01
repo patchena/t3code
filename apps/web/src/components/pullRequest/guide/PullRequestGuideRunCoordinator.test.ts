@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import type { AnyRouter } from "@tanstack/react-router";
 import {
   EnvironmentId,
@@ -8,8 +9,10 @@ import {
 import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity";
 import { expect, it, vi } from "vite-plus/test";
 
-import { guideRunKey, useGuideRunStore } from "./guideRunStore";
-import { startGuideRunNotifications } from "./PullRequestGuideRunCoordinator";
+import { guideRunKey, useGuideRunStore } from "~/components/pullRequest/guide/guideRunStore";
+import { startGuideRunNotifications } from "~/components/pullRequest/guide/PullRequestGuideRunCoordinator";
+
+const t = createI18n("en").getFixedT(null, "workspace");
 
 const guides = vi.hoisted(() => ({
   family: null as unknown as (key: string) => unknown,
@@ -49,7 +52,11 @@ function setup() {
     refresh.mock.calls.flatMap(([atom]) =>
       [1, 2].filter((number) => atom === guideAtom(`${environmentId}:${number}`)).map(String),
     );
-  const stop = startGuideRunNotifications(registry, { navigate: vi.fn() } as unknown as AnyRouter);
+  const stop = startGuideRunNotifications(
+    registry,
+    { navigate: vi.fn() } as unknown as AnyRouter,
+    t,
+  );
   const watch = (number: number, since = 0) =>
     useGuideRunStore.getState().watch({
       environmentId,

@@ -1,7 +1,7 @@
 // Menu typeahead consumes search keystrokes; use a combobox.
 import type { ReactNode } from "react";
 
-import { Button } from "../ui/button";
+import { Button } from "~/components/ui/button";
 import {
   Combobox,
   ComboboxSearchInput,
@@ -9,9 +9,9 @@ import {
   ComboboxList,
   ComboboxPopup,
   ComboboxTrigger,
-} from "../ui/combobox";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { PullRequestPeopleGhost } from "./PullRequestGhosts";
+} from "~/components/ui/combobox";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { PullRequestPeopleGhost } from "~/components/pullRequest/PullRequestGhosts";
 
 export function PullRequestCandidatePicker<T>({
   icon,

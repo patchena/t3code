@@ -1,3 +1,4 @@
+import { desktopT } from "#desktop/i18n";
 import * as Effect from "effect/Effect";
 import type * as Fiber from "effect/Fiber";
 
@@ -114,7 +115,7 @@ function createWindow(
     resizable: false,
     show: false,
     skipTaskbar: true,
-    title: "T3 Code Snapshot Animation",
+    title: desktopT(($) => $.snapshot.animationTitle),
     transparent: true,
     webPreferences: {
       backgroundThrottling: false,

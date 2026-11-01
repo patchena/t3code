@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useAtomValue } from "@effect/atom-react";
 import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { DesktopUpdateChannel } from "@t3tools/contracts";
@@ -39,27 +40,33 @@ export function UpdateTrackSwitchDialog({
   readonly channel: DesktopUpdateChannel;
   readonly onClose: () => void;
 }) {
+  const { t } = useTranslation("settings");
+  const { t: tWorkspace } = useTranslation("workspace");
   // npm dist-tags match the desktop channel names.
   const release = useAtomValue(npmReleaseAtom(channel));
   if (AsyncResult.isSuccess(release) && release.value !== null) {
     return <SwitchPlan release={{ channel, ...release.value }} onClose={onClose} />;
   }
-  const label = channelSwitchLabel(channel);
+  const label = channelSwitchLabel(channel, tWorkspace);
   return (
     <AlertDialog open onOpenChange={(open) => !open && onClose()}>
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>Switch to {label}</AlertDialogTitle>
+          <AlertDialogTitle>
+            {t(($) => $.extra.updates.switch, { channel: label })}
+          </AlertDialogTitle>
           <AlertDialogDescription>
             {AsyncResult.isFailure(release)
-              ? npmReleaseFailureMessage(release.cause)
+              ? npmReleaseFailureMessage(release.cause, t)
               : AsyncResult.isSuccess(release)
-                ? `Could not find the latest ${label} release in this environment's npm registry.`
-                : "Checking releases…"}
+                ? t(($) => $.extra.updates.releaseMissing, { channel: label })
+                : t(($) => $.extra.updates.checkingReleases)}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>
+            {t(($) => $.extra.updates.cancel)}
+          </AlertDialogClose>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>
@@ -73,6 +80,8 @@ function SwitchPlan({
   readonly release: ChannelSwitchRelease;
   readonly onClose: () => void;
 }) {
+  const { t } = useTranslation("settings");
+  const { t: tWorkspace } = useTranslation("workspace");
   const updateState = useDesktopUpdateState();
   const { environments } = useEnvironments();
   const crossesLocal = desktopUpdateChannelOf(APP_VERSION) !== release.channel;
@@ -81,7 +90,7 @@ function SwitchPlan({
   const switchesLocal = crossesLocal && !updatesOff;
   const [checking, setChecking] = useState(false);
   const everything = useUpdateEverything(switchesLocal ? release.version : null, release);
-  const label = channelSwitchLabel(release.channel);
+  const label = channelSwitchLabel(release.channel, tWorkspace);
   // This app's reinstall restarts every server it hosts, so each of their databases must allow it.
   const localBlocked = localSwitchBlockReason(
     APP_VERSION,
@@ -91,6 +100,7 @@ function SwitchPlan({
       databaseMigration: environment.serverConfig?.environment.databaseMigration,
     })),
     window.desktopBridge?.getLocalEnvironmentBootstraps().length ?? 0,
+    tWorkspace,
   );
 
   const run = async () => {
@@ -100,13 +110,21 @@ function SwitchPlan({
     setChecking(true);
     const fail = (description: string) =>
       toastManager.add(
-        stackedThreadToast({ type: "error", title: `Could not switch to ${label}`, description }),
+        stackedThreadToast({
+          type: "error",
+          title: t(($) => $.extra.updates.switchFailed, { channel: label }),
+          description,
+        }),
       );
-    const prepared = await prepareLocalTrackSwitch(bridge, {
-      channel: release.channel,
-      version: release.version,
-      reinstall: switchesLocal,
-    });
+    const prepared = await prepareLocalTrackSwitch(
+      bridge,
+      {
+        channel: release.channel,
+        version: release.version,
+        reinstall: switchesLocal,
+      },
+      t,
+    );
     onClose();
     if (!prepared.ok) {
       fail(prepared.message);
@@ -121,7 +139,11 @@ function SwitchPlan({
               ...(local.status === "available"
                 ? {
                     downloadLocal: (reportError) =>
-                      downloadLocalUpdate(bridge, { notifyDownloaded: false, reportError }),
+                      downloadLocalUpdate(
+                        bridge,
+                        { notifyDownloaded: false, reportError },
+                        tWorkspace,
+                      ),
                   }
                 : {}),
               // Install only a build the database check covers, pinned so nothing replaces it.
@@ -132,19 +154,22 @@ function SwitchPlan({
                   !acceptsTrackSwitchRelease(downloadedVersion, release.channel, release.version)
                 ) {
                   reportError(
-                    "Could not install update",
-                    `This app downloaded ${downloadedVersion ?? "nothing"}, not ${release.version} or newer.`,
+                    t(($) => $.extra.updates.installFailed),
+                    t(($) => $.extra.updates.wrongDownload, {
+                      downloaded: downloadedVersion ?? t(($) => $.extra.updates.nothing),
+                      version: release.version,
+                    }),
                   );
                   return false;
                 }
-                return installLocalUpdate(bridge, reportError, downloadedVersion);
+                return installLocalUpdate(bridge, tWorkspace, reportError, downloadedVersion);
               },
             },
       ),
     );
     if (result._tag === "Failure") {
       const error = squashAtomCommandFailure(result);
-      fail(error instanceof Error ? error.message : "An unexpected error occurred.");
+      fail(error instanceof Error ? error.message : t(($) => $.extra.updates.error));
     }
   };
 
@@ -152,26 +177,30 @@ function SwitchPlan({
     <UpdateEverythingDialog
       open
       onOpenChange={(open) => !open && !checking && onClose()}
-      title={`Switch to ${label}?`}
+      title={t(($) => $.extra.updates.switchConfirm, { channel: label })}
       version={release.version}
       providerCount={0}
       rows={everything.rows}
       notes={[
         ...(everything.rows.length === 0 && !crossesLocal
-          ? [`Every connected machine is already on ${label}. This only saves the track.`]
+          ? [t(($) => $.extra.updates.alreadyOn, { channel: label })]
           : []),
-        ...(crossesLocal && updatesOff
-          ? ["This app's updates are off here, so reinstall it yourself to switch."]
-          : []),
+        ...(crossesLocal && updatesOff ? [t(($) => $.extra.updates.updatesOff)] : []),
         ...(switchesLocal && isMacPlatform(navigator.platform)
-          ? ["If T3 Code does not reopen after it restarts, open it again."]
+          ? [t(($) => $.extra.updates.reopen)]
           : []),
       ]}
       restarts={everything.restarts}
-      confirmLabel={checking ? "Checking…" : `Switch to ${label}`}
+      confirmLabel={
+        checking
+          ? t(($) => $.extra.updates.checking)
+          : t(($) => $.extra.updates.switch, { channel: label })
+      }
       busy={checking}
       disabledReason={
-        !switchesLocal || localBlocked === null ? null : `This app cannot switch: ${localBlocked}.`
+        !switchesLocal || localBlocked === null
+          ? null
+          : t(($) => $.extra.updates.blocked, { reason: localBlocked })
       }
       onConfirm={() => void run()}
     />

@@ -1,3 +1,4 @@
+import { mobileI18n } from "~/i18n";
 import { Button } from "../../components/ui/Button";
 import { ThreadSubagentGroup } from "./thread-subagent-group";
 import { ProposedPlanCard } from "./ProposedPlanCard";
@@ -1062,7 +1063,10 @@ const ThreadWorkLogRow = function ThreadWorkLogRow(
         exit {failedExitCode}
       </Text>
     );
-  const toolPresentation = resolveWorkEntryToolPresentation(row.workEntry);
+  const toolPresentation = resolveWorkEntryToolPresentation(
+    row.workEntry,
+    mobileI18n.getFixedT("en", "activity"),
+  );
   const previewText = row.groupStandIn?.label ?? workEntryRowLabel(row.workEntry);
   const answerPreview = row.workEntry.questionAnswer
     ? getQuestionAnswerPreview(row.workEntry.questionAnswer)

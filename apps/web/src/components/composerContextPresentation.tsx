@@ -1,4 +1,6 @@
-import ChatMarkdown from "./ChatMarkdown";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
+import { ChatMarkdown } from "./ChatMarkdown";
 import { isSvgAttachment } from "@t3tools/shared/image";
 import { ReadOnlySourcePreview } from "./files/AttachmentFilePreview";
 import type {
@@ -142,13 +144,17 @@ function ContextChip(props: {
   detailsMode: ContextPresentationCapability["details"];
   kind: ContextChipKind;
 }) {
+  const { t } = useTranslation("chat");
   if (props.detailsMode === "popover") {
     return (
       <ContextChipPopover
         kind={props.kind}
         icon={props.icon}
         label={props.label}
-        accessibleLabel={props.kindLabel + ", " + props.label}
+        accessibleLabel={t(($) => $.composer.contextLabel, {
+          kind: props.kindLabel,
+          label: props.label,
+        })}
       >
         {props.details}
       </ContextChipPopover>
@@ -160,16 +166,21 @@ function ContextChip(props: {
       icon={props.icon}
       label={props.label}
       aria-label={
-        props.detailsMode === "tooltip" ? `${props.kindLabel}, ${props.label}` : undefined
+        props.detailsMode === "tooltip"
+          ? t(($) => $.composer.contextLabel, { kind: props.kindLabel, label: props.label })
+          : undefined
       }
       tooltip={props.detailsMode === "tooltip" ? props.details : undefined}
     />
   );
 }
 
-function uploadStatusSuffix(upload: AttachmentUploadState | undefined): string | null {
+function uploadStatusSuffix(
+  upload: AttachmentUploadState | undefined,
+  t: TFunction<"chat">,
+): string | null {
   if (upload?.status === "uploading") return formatAttachmentUploadProgress(upload.progress);
-  if (upload?.status === "failed") return "upload failed";
+  if (upload?.status === "failed") return t(($) => $.composer.uploadFailed);
   return null;
 }
 
@@ -186,6 +197,7 @@ function ImageContextChip(props: {
   record: ComposerImageAttachment;
   upload: AttachmentUploadState | undefined;
 }) {
+  const { t } = useTranslation("chat");
   const actions = use(ComposerContextActionsContext);
   return (
     <Tooltip>
@@ -195,7 +207,7 @@ function ImageContextChip(props: {
             name={props.record.name}
             previewUrl={props.record.previewUrl}
             size={formatAttachmentSize(props.record.sizeBytes)}
-            suffix={uploadStatusSuffix(props.upload)}
+            suffix={uploadStatusSuffix(props.upload, t)}
             onClick={() => actions.expandImage(props.record.id)}
           />
         }
@@ -211,10 +223,13 @@ function FileContextChip(props: {
   record: ComposerFileAttachment;
   upload: AttachmentUploadState | undefined;
 }) {
+  const { t } = useTranslation("chat");
   const actions = use(ComposerContextActionsContext);
   const { resolvedTheme } = useTheme();
   const needsReattach = composerFileNeedsReattach(props.record);
-  const suffix = needsReattach ? "attach again" : uploadStatusSuffix(props.upload);
+  const suffix = needsReattach
+    ? t(($) => $.composer.attachAgainLower)
+    : uploadStatusSuffix(props.upload, t);
   const size = formatAttachmentSize(props.record.sizeBytes);
   const isVideo = videoMimeType(props.record) !== null;
   return (
@@ -235,7 +250,11 @@ function FileContextChip(props: {
       error={props.upload?.status === "failed"}
       unresolved={needsReattach}
       suffix={suffix}
-      accessibleLabel={`${isVideo && !needsReattach ? "Preview video" : "File"} attachment, ${props.record.name}, ${size}`}
+      accessibleLabel={
+        isVideo && !needsReattach
+          ? t(($) => $.composer.videoAttachment, { name: props.record.name, size })
+          : t(($) => $.composer.fileAttachment, { name: props.record.name, size })
+      }
       onOpen={
         !needsReattach
           ? () =>
@@ -244,7 +263,7 @@ function FileContextChip(props: {
       }
       tooltip={
         needsReattach
-          ? `${props.record.name} was not saved with this draft. Attach it again to send it.`
+          ? t(($) => $.composer.fileNotSavedDraft, { name: props.record.name })
           : attachmentTooltip(props.record, props.upload)
       }
     />
@@ -252,6 +271,7 @@ function FileContextChip(props: {
 }
 
 function PullRequestContextChip(props: { record: ReviewCommentContext; kind: ContextChipKind }) {
+  const { t } = useTranslation("chat");
   const actions = use(ComposerContextActionsContext);
   const metadata = props.record.pullRequest;
   if (metadata === undefined) return null;
@@ -260,23 +280,28 @@ function PullRequestContextChip(props: { record: ReviewCommentContext; kind: Con
       metadata={metadata}
       environmentId={actions.environmentId}
       label={reviewCommentContextLabel(props.record)}
-      kindLabel={pullRequestContextKindLabel(props.record)}
+      kindLabel={pullRequestContextKindLabel(props.record, t)}
       kind={props.kind}
       onOpen={actions.openPullRequest}
     />
   );
 }
 
-function previewAnnotationTooltip(annotation: PreviewAnnotationPayload): string {
+function previewAnnotationTooltip(
+  annotation: PreviewAnnotationPayload,
+  t: TFunction<"chat">,
+): string {
   const lines = [annotation.pageTitle?.trim() || annotation.pageUrl];
   if (annotation.comment.trim()) lines.push("", annotation.comment.trim());
   const targets: string[] = [];
-  const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
-  if (annotation.elements.length > 0) targets.push(plural(annotation.elements.length, "element"));
-  if (annotation.regions.length > 0) targets.push(plural(annotation.regions.length, "region"));
-  if (annotation.strokes.length > 0) targets.push(plural(annotation.strokes.length, "drawing"));
+  if (annotation.elements.length > 0)
+    targets.push(t(($) => $.composer.annotationElements, { count: annotation.elements.length }));
+  if (annotation.regions.length > 0)
+    targets.push(t(($) => $.composer.annotationRegions, { count: annotation.regions.length }));
+  if (annotation.strokes.length > 0)
+    targets.push(t(($) => $.composer.annotationDrawings, { count: annotation.strokes.length }));
   if (annotation.styleChanges.length > 0) {
-    targets.push(plural(annotation.styleChanges.length, "style change"));
+    targets.push(t(($) => $.composer.annotationStyles, { count: annotation.styleChanges.length }));
   }
   if (targets.length > 0) lines.push("", targets.join(", "));
   return lines.join("\n");
@@ -308,19 +333,20 @@ function ComposerPreviewAnnotationDetails({
   annotation: PreviewAnnotationPayload;
   screenshot: ComposerImageAttachment | undefined;
 }) {
-  const summary = previewAnnotationTooltip(annotation);
+  const { t } = useTranslation("chat");
+  const summary = previewAnnotationTooltip(annotation, t);
   const screenshotUrl = annotation.screenshot?.dataUrl || screenshot?.previewUrl;
   return (
     <div className="overflow-hidden rounded-lg border border-border/70 bg-background/70">
       {screenshotUrl ? (
         <img
           src={screenshotUrl}
-          alt="Annotated preview crop"
+          alt={t(($) => $.composer.annotatedPreviewCrop)}
           className="max-h-64 w-full border-border/70 border-b bg-muted object-contain"
         />
       ) : (
         <div className="border-border/70 border-b bg-muted/40 px-3 py-2 text-secondary-label text-xs">
-          Screenshot unavailable
+          {t(($) => $.composer.screenshotUnavailable)}
         </div>
       )}
       <div className="whitespace-pre-wrap wrap-break-word px-3 py-2.5 text-sm text-foreground">
@@ -346,16 +372,13 @@ function ComposerThreadContextChip(props: { record: ThreadContextRecord }) {
 }
 
 function UnresolvedContextChip(props: { label: string }) {
-  return (
-    <UnresolvedChip
-      label={props.label}
-      tooltip="This context is no longer available. Remove it or attach it again."
-    />
-  );
+  const { t } = useTranslation("chat");
+  return <UnresolvedChip label={props.label} tooltip={t(($) => $.composer.contextUnavailable)} />;
 }
 
 interface ComposerContextRenderContext {
   label: string;
+  t: TFunction<"chat">;
 }
 
 const composerContextPresentationRegistry = createContextPresentationRegistry<
@@ -427,7 +450,11 @@ const composerContextPresentationRegistry = createContextPresentationRegistry<
           <ContextChip
             icon={isPullRequest ? <PullRequestGlyph.pullRequest /> : <MessageCircleIcon />}
             label={reviewCommentContextLabel(entry.record)}
-            kindLabel={isPullRequest ? pullRequestContextKindLabel(entry.record) : "Review comment"}
+            kindLabel={
+              isPullRequest
+                ? pullRequestContextKindLabel(entry.record, context.t)
+                : context.t(($) => $.composer.reviewComment)
+            }
             details={<ComposerReviewCommentDetails comment={entry.record} />}
             detailsMode={definition.capabilities.details}
             kind={isPullRequest ? PULL_REQUEST_CHIP_KINDS[pullRequestState] : "review-comment"}
@@ -443,7 +470,7 @@ const composerContextPresentationRegistry = createContextPresentationRegistry<
           <ContextChip
             icon={<MousePointerClickIcon />}
             label={previewAnnotationContextLabel(entry.record)}
-            kindLabel="Preview annotation"
+            kindLabel={context.t(($) => $.composer.previewAnnotation)}
             details={
               <ComposerPreviewAnnotationDetails
                 annotation={entry.record}
@@ -486,8 +513,10 @@ export function ComposerContextReferenceChip(props: {
   contextId: string;
   label: string;
 }): ReactElement {
+  const { t } = useTranslation("chat");
   const records = use(ComposerContextRecordsContext);
   return composerContextPresentationRegistry.render(props.kind, records.get(props.contextId), {
     label: props.label,
+    t,
   });
 }

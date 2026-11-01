@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type {
   EnvironmentId,
   EnvironmentMachineKind,
@@ -33,12 +34,15 @@ function normalizeDisplayLabel(value: string | null | undefined): string | null 
   return trimmed && trimmed.length > 0 ? trimmed : null;
 }
 
-export function resolveEnvironmentOptionLabel(input: {
-  isPrimary: boolean;
-  environmentId: EnvironmentId;
-  runtimeLabel?: string | null;
-  savedLabel?: string | null;
-}): string {
+export function resolveEnvironmentOptionLabel(
+  input: {
+    isPrimary: boolean;
+    environmentId: EnvironmentId;
+    runtimeLabel?: string | null;
+    savedLabel?: string | null;
+  },
+  t: TFunction<"workspace">,
+): string {
   const runtimeLabel = normalizeDisplayLabel(input.runtimeLabel);
   const savedLabel = normalizeDisplayLabel(input.savedLabel);
 
@@ -47,7 +51,7 @@ export function resolveEnvironmentOptionLabel(input: {
       if (!label) return false;
       return !GENERIC_LOCAL_ENVIRONMENT_LABELS.has(label.toLowerCase());
     });
-    return preferredLocalLabel ?? "This device";
+    return preferredLocalLabel ?? t(($) => $.git.thisDevice);
   }
 
   return runtimeLabel ?? savedLabel ?? input.environmentId;
@@ -89,26 +93,34 @@ export function resolveContextStripLabelsCompact(input: {
     : input.neededWidth > input.availableWidth;
 }
 
-export function resolveEnvModeLabel(mode: EnvMode): string {
-  return mode === "worktree" ? "New worktree" : "Current checkout";
+export function resolveEnvModeLabel(mode: EnvMode, t: TFunction<"workspace">): string {
+  return mode === "worktree" ? t(($) => $.git.newWorktree) : t(($) => $.git.currentCheckout);
 }
 
-export const WORKTREE_SUBMODULES_LABELS: Record<WorktreeSubmodules, string> = {
-  recursive: "Recursive",
-  "top-level": "Top level only",
-  none: "Skip",
-};
+export const worktreeSubmodulesLabels = (
+  t: TFunction<"workspace">,
+): Record<WorktreeSubmodules, string> => ({
+  recursive: t(($) => $.git.recursive),
+  "top-level": t(($) => $.git.topLevelOnly),
+  none: t(($) => $.git.skip),
+});
 
-export function resolveCurrentWorkspaceLabel(activeWorktreePath: string | null): string {
-  return activeWorktreePath ? "Current worktree" : resolveEnvModeLabel("local");
+export function resolveCurrentWorkspaceLabel(
+  activeWorktreePath: string | null,
+  t: TFunction<"workspace">,
+): string {
+  return activeWorktreePath ? t(($) => $.git.currentWorktree) : resolveEnvModeLabel("local", t);
 }
 
 export function resolveLockedWorkspaceLabel(
   activeWorktreePath: string | null,
   effectiveEnvMode: EnvMode,
+  t: TFunction<"workspace">,
 ): string {
-  if (activeWorktreePath) return "Worktree";
-  return effectiveEnvMode === "worktree" ? resolveEnvModeLabel("worktree") : "Local checkout";
+  if (activeWorktreePath) return t(($) => $.git.worktree);
+  return effectiveEnvMode === "worktree"
+    ? resolveEnvModeLabel("worktree", t)
+    : t(($) => $.git.localCheckout);
 }
 
 export interface PreviousWorktreeSeed {
@@ -149,8 +161,13 @@ export function resolvePreviousWorktreeSeed(input: {
   return latest === null ? null : { branch: latest.branch, worktreePath: latest.worktreePath };
 }
 
-export function resolvePreviousWorktreeLabel(seed: PreviousWorktreeSeed): string {
-  return seed.branch ? `Previous worktree (${seed.branch})` : "Previous worktree";
+export function resolvePreviousWorktreeLabel(
+  seed: PreviousWorktreeSeed,
+  t: TFunction<"workspace">,
+): string {
+  return seed.branch
+    ? t(($) => $.git.previousWorktreeBranch, { branch: seed.branch })
+    : t(($) => $.git.previousWorktree);
 }
 
 export function resolveEffectiveEnvMode(input: {
@@ -197,13 +214,16 @@ export function resolveBranchToolbarValue(input: {
   return currentGitBranch ?? activeThreadBranch;
 }
 
-export function resolveBranchTriggerLabel(input: {
-  activeWorktreePath: string | null;
-  effectiveEnvMode: EnvMode;
-  resolvedActiveBranch: string | null;
-  resolvedActiveBranchIsRemote: boolean | null;
-  startFromOrigin: boolean;
-}): string {
+export function resolveBranchTriggerLabel(
+  input: {
+    activeWorktreePath: string | null;
+    effectiveEnvMode: EnvMode;
+    resolvedActiveBranch: string | null;
+    resolvedActiveBranchIsRemote: boolean | null;
+    startFromOrigin: boolean;
+  },
+  t: TFunction<"workspace">,
+): string {
   const {
     activeWorktreePath,
     effectiveEnvMode,
@@ -212,13 +232,13 @@ export function resolveBranchTriggerLabel(input: {
     startFromOrigin,
   } = input;
   if (!resolvedActiveBranch) {
-    return "Select ref";
+    return t(($) => $.git.selectRef);
   }
   if (effectiveEnvMode === "worktree" && !activeWorktreePath) {
     // Only the server can determine a local branch's configured remote.
     return startFromOrigin && resolvedActiveBranchIsRemote === false
-      ? `From ${resolvedActiveBranch} (remote)`
-      : `From ${resolvedActiveBranch}`;
+      ? t(($) => $.git.fromRemoteBranch, { branch: resolvedActiveBranch })
+      : t(($) => $.git.fromBranch, { branch: resolvedActiveBranch });
   }
   return resolvedActiveBranch;
 }

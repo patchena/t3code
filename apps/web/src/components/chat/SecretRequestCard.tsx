@@ -1,9 +1,7 @@
-import { pipe } from "effect/Function";
 import {
-  SECRET_REQUEST_DEFAULT_PLACEHOLDER,
   secretRequestAnswerInput,
   secretRequestDisplay,
-  secretRequestFailureMessage,
+  secretRequestFailureDetail,
   secretRequestPrivacyNote,
   secretRequestReference,
   secretRequestSources,
@@ -23,6 +21,7 @@ import type {
 import { useAtomValue } from "@effect/atom-react";
 import { CheckIcon, LockIcon, MinusIcon, ShieldCheckIcon } from "lucide-react";
 import { useId, useRef, useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 import { isSecretsFeatureEnabled } from "../../env";
 import { serverEnvironment } from "../../state/server";
@@ -37,8 +36,9 @@ export function SecretRequestCard(props: {
   readonly item: SecretRequestItem;
   readonly visibility: OrchestrationV2ProjectedTurnItem["visibility"];
 }) {
+  const { t } = useTranslation("chat");
   const { item } = props;
-  const display = secretRequestDisplay(item, props.visibility);
+  const display = secretRequestDisplay(item, props.visibility, t);
   if (display.kind === "answered" || display.kind === "pending-elsewhere") {
     const Icon =
       display.kind === "pending-elsewhere"
@@ -74,6 +74,7 @@ function PendingSecretRequestForm(props: {
   readonly environmentId: EnvironmentId;
   readonly item: SecretRequestItem;
 }) {
+  const { t } = useTranslation("chat");
   const { item } = props;
   const inputId = useId();
   const errorId = useId();
@@ -90,7 +91,8 @@ function PendingSecretRequestForm(props: {
   const [secret, setSecret] = useState("");
   const [reference, setReference] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ readonly message: string | null } | null>(null);
+  const error = failure === null ? null : (failure.message ?? t(($) => $.secret.answerFailed));
   // Enter and click can both submit before a render.
   const inFlight = useRef(false);
 
@@ -99,7 +101,7 @@ function PendingSecretRequestForm(props: {
     if (input === null || inFlight.current) return;
     inFlight.current = true;
     setSubmitting(true);
-    setError(null);
+    setFailure(null);
     const result = await answer({ environmentId: props.environmentId, input }).finally(() => {
       inFlight.current = false;
       setSubmitting(false);
@@ -110,7 +112,7 @@ function PendingSecretRequestForm(props: {
       return;
     }
     if (!isAtomCommandInterrupted(result)) {
-      pipe(squashAtomCommandFailure(result), secretRequestFailureMessage, setError);
+      setFailure({ message: secretRequestFailureDetail(squashAtomCommandFailure(result)) });
     }
   };
 
@@ -119,7 +121,7 @@ function PendingSecretRequestForm(props: {
     if (source === null) {
       void send({ type: "save", secret });
     } else if (secretRequestReference(source, reference) === undefined) {
-      setError(source.invalidReferenceMessage);
+      setFailure({ message: source.invalidReferenceMessage });
     } else {
       void send({ type: "reference", source, reference });
     }
@@ -160,7 +162,7 @@ function PendingSecretRequestForm(props: {
             disabled={submitting}
             onValueChange={(next) => {
               setSourceId(next);
-              setError(null);
+              setFailure(null);
             }}
           />
         ) : null}
@@ -177,7 +179,7 @@ function PendingSecretRequestForm(props: {
               data-1p-ignore
               data-lpignore="true"
               data-bwignore
-              placeholder={item.placeholder ?? SECRET_REQUEST_DEFAULT_PLACEHOLDER}
+              placeholder={item.placeholder ?? t(($) => $.secret.placeholder)}
               value={secret}
               disabled={submitting}
               aria-invalid={error !== null || undefined}
@@ -199,13 +201,13 @@ function PendingSecretRequestForm(props: {
               aria-describedby={describedBy}
               onChange={(event) => {
                 setReference(event.currentTarget.value);
-                setError(null);
+                setFailure(null);
               }}
             />
           )}
         </div>
         <Button type="submit" disabled={submitting || draft.trim().length === 0}>
-          Save securely
+          {t(($) => $.secret.save)}
         </Button>
       </div>
       {error !== null ? (
@@ -219,7 +221,7 @@ function PendingSecretRequestForm(props: {
           className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
         >
           <ShieldCheckIcon className="size-3.5 shrink-0" aria-hidden />
-          {secretRequestPrivacyNote(item)}
+          {secretRequestPrivacyNote(item, t)}
         </p>
         <Button
           type="button"
@@ -228,7 +230,7 @@ function PendingSecretRequestForm(props: {
           disabled={submitting}
           onClick={() => void send({ type: "decline" })}
         >
-          Decline
+          {t(($) => $.secret.decline)}
         </Button>
       </div>
     </form>

@@ -3,6 +3,7 @@ import {
   type RelayProtectedError,
 } from "@t3tools/contracts/relay";
 import { describe, expect, it } from "@effect/vitest";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 
 import { presentConnectionDiagnosis } from "./diagnosis.ts";
 import { mapManagedRelayError, mapRemoteEnvironmentError } from "./errors.ts";
@@ -47,7 +48,10 @@ const unavailable = (endpointFailure: "tunnel_down" | "origin_unreachable") =>
   );
 
 const diagnose = (state: SupervisorConnectionState, via: "relay" | "direct" = "relay") =>
-  presentConnectionDiagnosis({ hostLabel: "Mac mini", state, via });
+  presentConnectionDiagnosis(
+    { hostLabel: "Mac mini", state, via },
+    createI18n("en").getFixedT(null, "connect"),
+  );
 
 const results = (state: SupervisorConnectionState, via?: "relay" | "direct") =>
   diagnose(state, via)?.hops.map((hop) => `${hop.hop}:${hop.result}`);
@@ -56,6 +60,16 @@ describe("presentConnectionDiagnosis", () => {
   it("tells a working tunnel apart from T3 Code not answering", () => {
     expect(diagnose(backoff(unavailable("origin_unreachable")))?.headline).toBe(
       "Tunnel works, but T3 Code on Mac mini did not answer",
+    );
+    const german = presentConnectionDiagnosis(
+      { hostLabel: "Mac mini", state: backoff(unavailable("origin_unreachable")), via: "relay" },
+      createI18n("de").getFixedT(null, "connect"),
+    );
+    expect(german?.headline).toBe(
+      "Der Tunnel funktioniert, aber T3 Code auf Mac mini hat nicht geantwortet",
+    );
+    expect(german?.hops.map((hop) => `${hop.hop}:${hop.result}`)).toEqual(
+      results(backoff(unavailable("origin_unreachable"))),
     );
     expect(results(backoff(unavailable("origin_unreachable")), "direct")).toEqual([
       "device:ok",
@@ -114,19 +128,25 @@ describe("presentConnectionDiagnosis", () => {
   });
 
   it("uses the relay health check before any connect attempt fails", () => {
-    const diagnosis = presentConnectionDiagnosis({
-      hostLabel: "Mac mini",
-      state: AVAILABLE_CONNECTION_STATE,
-      via: "relay",
-      relayStatus: { status: "offline", endpointFailure: "tunnel_down", endpointStatus: 530 },
-    });
+    const diagnosis = presentConnectionDiagnosis(
+      {
+        hostLabel: "Mac mini",
+        state: AVAILABLE_CONNECTION_STATE,
+        via: "relay",
+        relayStatus: { status: "offline", endpointFailure: "tunnel_down", endpointStatus: 530 },
+      },
+      createI18n("en").getFixedT(null, "connect"),
+    );
     expect(diagnosis?.headline).toBe("Mac mini's tunnel is offline");
-    const origin = presentConnectionDiagnosis({
-      hostLabel: "Mac mini",
-      state: AVAILABLE_CONNECTION_STATE,
-      via: "direct",
-      relayStatus: { status: "offline", endpointFailure: "origin_unreachable" },
-    });
+    const origin = presentConnectionDiagnosis(
+      {
+        hostLabel: "Mac mini",
+        state: AVAILABLE_CONNECTION_STATE,
+        via: "direct",
+        relayStatus: { status: "offline", endpointFailure: "origin_unreachable" },
+      },
+      createI18n("en").getFixedT(null, "connect"),
+    );
     expect(origin?.hops.map((hop) => hop.hop)).toEqual(["device", "relay", "tunnel", "server"]);
   });
 
@@ -158,12 +178,15 @@ describe("presentConnectionDiagnosis", () => {
     const failure = mapRemoteEnvironmentError(
       new RemoteEnvironmentAuthFetchError({ message: "Failed to fetch", cause: new TypeError() }),
     );
-    const diagnosis = presentConnectionDiagnosis({
-      hostLabel: "Mac mini",
-      state: backoff(failure),
-      via: "direct",
-      relayStatus: { status: "offline", endpointFailure: "tunnel_down", endpointStatus: 530 },
-    });
+    const diagnosis = presentConnectionDiagnosis(
+      {
+        hostLabel: "Mac mini",
+        state: backoff(failure),
+        via: "direct",
+        relayStatus: { status: "offline", endpointFailure: "tunnel_down", endpointStatus: 530 },
+      },
+      createI18n("en").getFixedT(null, "connect"),
+    );
     expect(diagnosis?.facts.map(([label]) => label)).not.toContain("HTTP status");
   });
 });

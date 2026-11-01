@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it } from "vite-plus/test";
 import { MessageId } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
@@ -8,6 +9,8 @@ import {
   submitCodexFeedback,
   type CodexFeedbackSubmission,
 } from "./threadFeedback.ts";
+
+const chatT = createI18n("en").getFixedT(null, "chat");
 
 describe("submitCodexFeedback", () => {
   const submission = {
@@ -42,7 +45,7 @@ describe("submitCodexFeedback", () => {
 
     expect(draft).toBe("");
     expect(states).toEqual([{ ...submission, status: "uploading" }]);
-    expect(codexFeedbackNotice(states[0]!)).toEqual({
+    expect(codexFeedbackNotice(states[0]!, chatT)).toEqual({
       title: "Sending feedback to OpenAI...",
       description: undefined,
     });
@@ -57,7 +60,7 @@ describe("submitCodexFeedback", () => {
       status: "sent",
       feedbackId: "codex-thread-1",
     });
-    expect(codexFeedbackNotice(states.at(-1)!)?.description).toContain("codex-thread-1");
+    expect(codexFeedbackNotice(states.at(-1)!, chatT)?.description).toContain("codex-thread-1");
   });
 
   it("records a failed upload without losing its user-facing error", async () => {
@@ -77,7 +80,7 @@ describe("submitCodexFeedback", () => {
       status: "failed",
       errorMessage: "Upload rejected.",
     });
-    expect(codexFeedbackNotice(states.at(-1)!)?.description).toBe("Upload rejected.");
+    expect(codexFeedbackNotice(states.at(-1)!, chatT)?.description).toBe("Upload rejected.");
   });
 
   it("marks interruptions without reporting them as upload failures", async () => {
@@ -92,7 +95,7 @@ describe("submitCodexFeedback", () => {
     });
 
     expect(states.at(-1)).toEqual({ ...submission, status: "interrupted" });
-    expect(codexFeedbackNotice(states.at(-1)!)).toBeNull();
+    expect(codexFeedbackNotice(states.at(-1)!, chatT)).toBeNull();
   });
 
   it("lets another feedback submission finish while the first remains in flight", async () => {

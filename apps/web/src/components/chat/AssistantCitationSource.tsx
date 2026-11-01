@@ -1,12 +1,15 @@
 import type { LegendListRef } from "@legendapp/list/react";
 import type { AssistantCitation, MessageId, ScopedThreadRef } from "@t3tools/contracts";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useTranslation } from "react-i18next";
 import {
   resolveAssistantCitationRange,
   type AssistantCitationSourceAnchor,
 } from "~/lib/assistantTextSelection";
 import { toastManager } from "../ui/toast";
 import { observeResize } from "~/lib/observeResize";
+import { useStableCallback } from "~/hooks/useStableCallback";
 
 const CITATION_PULSE_DURATION_MS = 650;
 const CITATION_HIGHLIGHT_HOLD_MS = 1575;
@@ -104,11 +107,13 @@ function observeAssistantCitationSource({
   itemKey,
   request,
   list,
+  getT,
 }: {
   root: HTMLElement;
   itemKey: string;
   request: AssistantCitationTarget;
   list: LegendListRef;
+  getT: () => TFunction<"chat">;
 }) {
   const activation = request.activationRef.current;
   if (activation.dismissed) return;
@@ -192,10 +197,11 @@ function observeAssistantCitationSource({
             activation.dismissed = true;
             clear();
             request.onComplete();
+            const t = getT();
             toastManager.add({
               type: "warning",
-              title: "Could not open the cited response",
-              description: "Click the citation to try again.",
+              title: t(($) => $.citation.couldNotOpen),
+              description: t(($) => $.citation.retry),
             });
           },
         );
@@ -205,10 +211,11 @@ function observeAssistantCitationSource({
       activation.scrolled = true;
       request.onComplete();
       if (!range) {
+        const t = getT();
         toastManager.add({
           type: "warning",
-          title: "The quoted text has changed",
-          description: "Showing the source response. The saved quote is unchanged.",
+          title: t(($) => $.citation.changed),
+          description: t(($) => $.citation.unchanged),
         });
       }
     }
@@ -347,14 +354,16 @@ export function AssistantCitationSource({
   listRef: RefObject<LegendListRef | null>;
   children: ReactNode;
 }) {
+  const { t } = useTranslation("chat");
+  const getT = useStableCallback(() => t);
   const rootRef = useRef<HTMLDivElement>(null);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- observes this message's DOM for a citation reveal request and scrolls the LegendList to it
   useEffect(() => {
     const root = rootRef.current;
     const list = listRef.current;
     if (!root || !list || !request || request.citation.messageId !== messageId) return;
-    return observeAssistantCitationSource({ root, itemKey, request, list });
-  }, [itemKey, listRef, messageId, request]);
+    return observeAssistantCitationSource({ root, itemKey, request, list, getT });
+  }, [getT, itemKey, listRef, messageId, request]);
 
   return (
     <div

@@ -1,6 +1,13 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { buildExpandedImagePreview, resolveMarkdownMediaPreview } from "./ExpandedImagePreview";
+import {
+  buildExpandedImagePreview,
+  resolveMarkdownMediaPreview as localizedMarkdownMediaPreview,
+} from "./ExpandedImagePreview";
+
+const resolveMarkdownMediaPreview = (input: Parameters<typeof localizedMarkdownMediaPreview>[0]) =>
+  localizedMarkdownMediaPreview(input, createI18n("en").getFixedT("en", "chat"));
 
 describe("resolveMarkdownMediaPreview", () => {
   afterEach(() => {

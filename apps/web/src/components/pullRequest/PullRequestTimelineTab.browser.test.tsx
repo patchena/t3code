@@ -8,7 +8,7 @@ import { expect, it } from "vite-plus/test";
 
 import { render } from "../../../test/render";
 import "../../index.css";
-import { PullRequestTimelineTab } from "./PullRequestTimelineTab";
+import { PullRequestTimelineTab } from "~/components/pullRequest/PullRequestTimelineTab";
 
 const COMMITS = 2000;
 

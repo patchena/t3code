@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { Trans, useTranslation } from "react-i18next";
 import type { ProjectId, ScopedThreadRef, ThreadPullRequestLink } from "@t3tools/contracts";
 import {
   sourceControlClients,
@@ -24,22 +26,23 @@ import {
   COMPOSER_PULL_REQUEST_DRAG_TYPE,
   encodePullRequestDragPayload,
 } from "~/components/chat/composerMentionDrag";
-import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
+import { clipboardErrorMessage, writeTextToClipboard } from "~/hooks/useCopyToClipboard";
 import { findProjectForChangeRequest } from "@t3tools/client-runtime/change-request-links";
 import { useOpenPrLink } from "~/lib/openPullRequestLink";
 import { cn } from "~/lib/utils";
 import { useShortcutModifierState } from "~/shortcutModifierState";
 import { useProjects, useServerConfigs, useThreadShell } from "~/state/entities";
-import { PullRequestChangeBreakdownStat } from "./PullRequestChangeBreakdownStat";
-import { PullRequestsUnavailableState } from "./PullRequestsUnavailableState";
+import { PullRequestChangeBreakdownStat } from "~/components/pullRequest/PullRequestChangeBreakdownStat";
+import { PullRequestsUnavailableState } from "~/components/pullRequest/PullRequestsUnavailableState";
 import { threadEnvironment } from "~/state/threads";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { RelativeTime } from "~/components/RelativeTime";
-import { Button } from "../ui/button";
-import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
-import { MiddleTruncate } from "../ui/middle-truncate";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { openLinkPullRequestDialog } from "./LinkPullRequestDialog";
+import { Button } from "~/components/ui/button";
+import { Menu, MenuItem, MenuPopup, MenuTrigger } from "~/components/ui/menu";
+import { MiddleTruncate } from "~/components/ui/middle-truncate";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { toastManager } from "~/components/ui/toast";
+import { openLinkPullRequestDialog } from "~/components/pullRequest/LinkPullRequestDialog";
 import {
   PULL_REQUEST_ROW_CLASS,
   PULL_REQUEST_ROW_NUMBER_CLASS,
@@ -47,30 +50,36 @@ import {
   PullRequestRowBranches,
   PullRequestRowGlyph,
   PullRequestRowLines,
-} from "./PullRequestListRow";
+} from "~/components/pullRequest/PullRequestListRow";
 import {
   PullRequestDiffStat,
   PullRequestReviewDecisionGlyph,
   pullRequestChecksStatePresentation,
-} from "./pullRequestPresentation";
-import { PullRequestGlyph } from "./pullRequestIcons";
-import { pullRequestQuickActions } from "./pullRequestList.logic";
-import { PullRequestSpeedActions, PullRequestSpeedModeContext } from "./PullRequestSpeedActions";
+} from "~/components/pullRequest/pullRequestPresentation";
+import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
+import { pullRequestQuickActions } from "~/components/pullRequest/pullRequestList.logic";
+import {
+  PullRequestSpeedActions,
+  PullRequestSpeedModeContext,
+} from "~/components/pullRequest/PullRequestSpeedActions";
 
-const SOURCE_LABELS: Record<ThreadPullRequestLink["source"], string> = {
-  manual: "Linked by you",
-  created: "Created from this thread",
-  agent: "Linked by the agent",
-  stack: "Found in the stack",
-  "stack-dismissed": "Dismissed",
-};
+const SOURCE_LABELS = (
+  t: TFunction<"workspace">,
+): Record<ThreadPullRequestLink["source"], string> => ({
+  manual: t(($) => $.git.linkedByYou),
+  created: t(($) => $.git.createdFromThread),
+  agent: t(($) => $.git.linkedByAgent),
+  stack: t(($) => $.git.foundInStack),
+  "stack-dismissed": t(($) => $.git.dismissed),
+});
 
 function ChecksGlyph({
   state,
 }: {
   state: NonNullable<ThreadPullRequestLink["snapshot"]>["checksState"] & string;
 }) {
-  const presentation = pullRequestChecksStatePresentation(state);
+  const { t } = useTranslation("workspace");
+  const presentation = pullRequestChecksStatePresentation(state, t);
   return (
     <Tooltip>
       <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
@@ -100,6 +109,8 @@ function LinkRowImpl({
   onUnlink: (link: ThreadPullRequestLink) => void;
   onSetWatching: ((link: ThreadPullRequestLink, watching: boolean) => void) | null;
 }) {
+  const { t } = useTranslation("workspace");
+  const { t: tCommon } = useTranslation("common");
   const openPrLink = useOpenPrLink(threadRef);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
@@ -142,7 +153,7 @@ function LinkRowImpl({
       {depth > 0 ? <span aria-hidden className="-ml-2 h-6 w-px shrink-0 bg-border/70" /> : null}
       {snapshot === null ? (
         <PullRequestGlyph.pullRequest
-          aria-label="Waiting for host state"
+          aria-label={t(($) => $.git.waitingForHost)}
           className="size-4 shrink-0 text-muted-foreground"
         />
       ) : (
@@ -183,7 +194,7 @@ function LinkRowImpl({
                 #{link.number}
               </TooltipTrigger>
               <TooltipPopup>
-                {SOURCE_LABELS[link.source]} · <RelativeTime timestamp={link.linkedAt} />
+                {SOURCE_LABELS(t)[link.source]} · <RelativeTime timestamp={link.linkedAt} />
               </TooltipPopup>
             </Tooltip>
           }
@@ -194,12 +205,13 @@ function LinkRowImpl({
                 {watching ? (
                   <Tooltip>
                     <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
-                      <EyeIcon role="img" aria-label="Watching" className="size-3.5" />
+                      <EyeIcon
+                        role="img"
+                        aria-label={t(($) => $.git.watching)}
+                        className="size-3.5"
+                      />
                     </TooltipTrigger>
-                    <TooltipPopup>
-                      Watching: the agent wakes when checks finish, someone comments, or the branch
-                      conflicts
-                    </TooltipPopup>
+                    <TooltipPopup>{t(($) => $.git.watchingDescription)}</TooltipPopup>
                   </Tooltip>
                 ) : null}
                 {snapshot?.checksState ? <ChecksGlyph state={snapshot.checksState} /> : null}
@@ -245,8 +257,14 @@ function LinkRowImpl({
                   </TooltipTrigger>
                   <TooltipPopup>
                     {stack.kind === "native"
-                      ? `${sourceControlClients.hostLabelForChangeRequestUrl(link.url)} stack of ${stack.size}: merging a layer lands the ones below it.`
-                      : `${stack.size} ${linkHost.changeRequest.plural} chained by base branch.`}
+                      ? t(($) => $.git.stackHostDescription, {
+                          host: sourceControlClients.hostLabelForChangeRequestUrl(link.url),
+                          count: stack.size,
+                        })
+                      : t(($) => $.git.stackBranchDescription, {
+                          count: stack.size,
+                          term: linkHost.changeRequest.plural,
+                        })}
                   </TooltipPopup>
                 </Tooltip>
               ) : null}
@@ -309,7 +327,7 @@ function LinkRowImpl({
               <Button
                 variant="ghost"
                 size="icon-micro"
-                aria-label={`Actions for #${link.number}`}
+                aria-label={t(($) => $.git.actionsForNumber, { number: link.number })}
                 className="relative"
               >
                 <MoreHorizontalIcon className="size-3.5" />
@@ -322,23 +340,35 @@ function LinkRowImpl({
             side="bottom"
             sideOffset={menuPosition ? 0 : 4}
           >
-            <MenuItem onClick={() => void writeTextToClipboard(link.url, "link")}>
+            <MenuItem
+              onClick={() => {
+                void writeTextToClipboard(link.url, "link").catch((error: unknown) => {
+                  toastManager.add({
+                    type: "error",
+                    title: t(($) => $.git.copyLinkFailed),
+                    description: clipboardErrorMessage(error, tCommon),
+                  });
+                });
+              }}
+            >
               <LinkIcon className="size-3.5" />
-              Copy link
+              {t(($) => $.git.copyLink)}
             </MenuItem>
             <MenuItem onClick={(event) => openPrLink(event, link.url, threadRef)}>
               <ArrowUpRightIcon className="size-3.5" />
-              Open
+              {t(($) => $.git.open)}
             </MenuItem>
             {onSetWatching !== null && open ? (
               <MenuItem onClick={() => onSetWatching(link, !watching)}>
                 {watching ? <EyeOffIcon className="size-3.5" /> : <EyeIcon className="size-3.5" />}
-                {watching ? "Stop watching" : "Watch for changes"}
+                {watching ? t(($) => $.git.stopWatching) : t(($) => $.git.watchChanges)}
               </MenuItem>
             ) : null}
             <MenuItem onClick={() => onUnlink(link)}>
               <PullRequestGlyph.unlink className="size-3.5" />
-              {link.source === "stack" ? "Dismiss from thread" : "Unlink from thread"}
+              {link.source === "stack"
+                ? t(($) => $.git.dismissFromThread)
+                : t(($) => $.git.unlinkFromThread)}
             </MenuItem>
           </MenuPopup>
         </Menu>
@@ -362,12 +392,13 @@ const lineKey = (line: PullRequestListLine) =>
   `${line.link.host}/${line.link.repository}#${line.link.number}`;
 
 export function ThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
+  const { t } = useTranslation("workspace");
   const configs = useServerConfigs();
   if (configs.get(threadRef.environmentId) === undefined) {
     return (
       <PullRequestsUnavailableState
-        title="Linked pull requests unavailable"
-        error="This environment does not support multiple linked pull requests."
+        title={t(($) => $.git.linkedPullRequestsUnavailable)}
+        error={t(($) => $.git.multiplePullRequestsUnsupported)}
       />
     );
   }
@@ -375,6 +406,7 @@ export function ThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
 }
 
 function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
+  const { t } = useTranslation("workspace");
   const thread = useThreadShell(threadRef);
   const projects = useProjects();
   const environmentProjects = projects
@@ -429,14 +461,13 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
         <PullRequestGlyph.link aria-hidden className="size-6 text-muted-foreground/60" />
-        <p className="text-sm font-medium">No linked pull requests</p>
+        <p className="text-sm font-medium">{t(($) => $.git.noLinkedPullRequests)}</p>
         <p className="max-w-60 text-xs text-muted-foreground">
-          Pull requests the agent opens from this thread land here. Link one yourself from a URL or
-          a number.
+          {t(($) => $.git.linkedPullRequestsDescription)}
         </p>
         <Button size="sm" variant="outline" onClick={openLinkDialog}>
           <PlusIcon className="size-3.5" />
-          Link pull request
+          {t(($) => $.git.linkPullRequest)}
         </Button>
       </div>
     );
@@ -473,17 +504,20 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
         />
         <footer className="flex items-center justify-between border-t border-border/60 px-2 py-1.5 text-2xs text-muted-foreground">
           <span>
-            {openCount} open · {linkCount} linked
             {lastSynced ? (
-              <>
-                {" · synced "}
-                <RelativeTime timestamp={lastSynced} />
-              </>
-            ) : null}
+              <Trans
+                t={t}
+                i18nKey={($) => $.git.linkCountsSynced}
+                values={{ open: openCount, count: linkCount }}
+                components={{ time: <RelativeTime timestamp={lastSynced} /> }}
+              />
+            ) : (
+              t(($) => $.git.requestLinkCounts, { open: openCount, count: linkCount })
+            )}
           </span>
           <Button size="xs" variant="ghost" onClick={openLinkDialog}>
             <PlusIcon className="size-3.5" />
-            Link
+            {t(($) => $.git.link)}
           </Button>
         </footer>
       </div>

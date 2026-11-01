@@ -1,11 +1,11 @@
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { useTranslation } from "react-i18next";
 import type { EnvironmentId } from "@t3tools/contracts";
 import {
   formatHostedThreadLink,
   guessThreadLinkRef,
   percentDecodedThreadLinkId,
   type ThreadLink,
-  unknownThreadLinkLabel,
 } from "@t3tools/shared/threadLinks";
 
 import { configuredHostedAppUrl } from "../../hostedPairing";
@@ -19,6 +19,7 @@ export function MarkdownThreadLink(props: {
   readonly link: ThreadLink;
   readonly label: string | null;
 }) {
+  const { t } = useTranslation("chat");
   const environmentId = props.link.environmentId ?? props.environmentId;
   const decodedId = percentDecodedThreadLinkId(props.link.threadId);
   const written = useThreadShell(scopeThreadRef(environmentId, props.link.threadId));
@@ -31,11 +32,14 @@ export function MarkdownThreadLink(props: {
   const remote = useThreadShell(guess ? guessThreadLinkRef(props.link, refs) : null);
   const thread = local ?? remote;
   if (thread === null) {
-    const unknown = unknownThreadLinkLabel(props.link, props.environmentId);
+    const unknown =
+      props.link.environmentId === null || props.link.environmentId === props.environmentId
+        ? t(($) => $.context.threadUnavailable)
+        : t(($) => $.context.remoteThread);
     return <UnresolvedChip label={props.label ?? unknown} tooltip={unknown} />;
   }
   const ref = { environmentId: thread.environmentId, threadId: thread.id };
-  const title = thread.title.trim() || props.label || "Untitled thread";
+  const title = thread.title.trim() || props.label || t(($) => $.thread.untitled);
   return (
     <ThreadContextChip
       record={{ ...ref, title }}

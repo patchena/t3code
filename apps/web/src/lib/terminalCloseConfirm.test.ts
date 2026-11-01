@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 const { confirmMock, readLocalApiMock } = vi.hoisted(() => {
@@ -34,7 +35,10 @@ describe("terminal close confirmation", () => {
         }),
     );
 
-    const confirmation = confirmTerminalClose(["Terminal 1"]);
+    const confirmation = confirmTerminalClose(
+      ["Terminal 1"],
+      createI18n("en").getFixedT("en", "tools"),
+    );
     expect(isTerminalCloseConfirmPending()).toBe(true);
 
     reject(new Error("dialog failed"));

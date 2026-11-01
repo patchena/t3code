@@ -1,4 +1,5 @@
 import { groupBy } from "effect/Array";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import * as DateTime from "effect/DateTime";
 import type {
   ModelSelection,
@@ -405,12 +406,15 @@ export function workflowOpeningParentThreadId(input: {
 }
 
 /** The opening block's heading: the workflow, what it does, and how its agents stand. */
-export function workflowOpeningHeadline(opening: WorkflowOpening): {
+export function workflowOpeningHeadline(
+  opening: WorkflowOpening,
+  t: TFunction<"activity">,
+): {
   readonly title: string;
   readonly description: string | null;
   readonly agents: string | null;
 } {
-  const title = opening.name ?? opening.description ?? "Workflow";
+  const title = opening.name ?? opening.description ?? t(($) => $.subagent.workflow);
   const members =
     opening.group === null
       ? []
@@ -418,7 +422,7 @@ export function workflowOpeningHeadline(opening: WorkflowOpening): {
           ...opening.group.phases.flatMap((phase) => phase.members),
           ...opening.group.unphasedMembers,
         ];
-  const counts = new Map<string, number>();
+  const counts = new Map<"working" | "done" | "failed" | "stopped", number>();
   for (const member of members) {
     const key = isTerminalSubagentStatus(member.status)
       ? member.status === "completed"
@@ -432,15 +436,15 @@ export function workflowOpeningHeadline(opening: WorkflowOpening): {
   const agents =
     members.length === 0
       ? null
-      : `${members.length} ${members.length === 1 ? "agent" : "agents"} · ${[
-          "working",
-          "done",
-          "failed",
-          "stopped",
-        ]
-          .filter((key) => counts.has(key))
-          .map((key) => `${counts.get(key)} ${key}`)
-          .join(" · ")}`;
+      : t(($) => $.subagent.agentsWithStatus, {
+          count: members.length,
+          statuses: (["working", "done", "failed", "stopped"] as const)
+            .flatMap((key) => {
+              const count = counts.get(key);
+              return count === undefined ? [] : [t(($) => $.subagent.counts[key], { count })];
+            })
+            .join(" · "),
+        });
   return {
     title,
     description:

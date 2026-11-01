@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { appI18n } from "~/i18n";
 import {
   type AtomCommandResult,
   isAtomCommandInterrupted,
@@ -15,7 +17,6 @@ import * as ThreadUndo from "@t3tools/client-runtime/state/thread-undo";
 type UndoOptions = {
   action: "Settled" | "Snoozed" | "Unpinned" | "Archived" | "Discarded";
   undo: () => Promise<AtomCommandResult<unknown, unknown>>;
-  failureTitle: string;
   claim: ReturnType<typeof ThreadUndo.begin>;
   commit?: () => void;
 };
@@ -28,14 +29,64 @@ type UndoNotice = {
 
 export const useThreadUndoNotice = create<{ notice: UndoNotice | null }>(() => ({ notice: null }));
 
-function threadUndoNoticeSummary(notice: Pick<UndoNotice, "action" | "count">): string {
-  const noun = notice.action === "Discarded" ? "draft" : "thread";
-  return `${notice.action} ${notice.count} ${noun}${notice.count === 1 ? "" : "s"}`;
+export function threadUndoActionLabel(
+  action: UndoOptions["action"],
+  t: TFunction<"workspace">,
+): string {
+  switch (action) {
+    case "Settled":
+      return t(($) => $.undo.settled);
+    case "Snoozed":
+      return t(($) => $.undo.snoozed);
+    case "Unpinned":
+      return t(($) => $.undo.unpinned);
+    case "Archived":
+      return t(($) => $.undo.archived);
+    case "Discarded":
+      return t(($) => $.undo.discarded);
+  }
 }
 
-export function threadUndoLabel(keybindings: Parameters<typeof shortcutLabelForCommand>[0]) {
+function threadUndoNoticeSummary(
+  notice: Pick<UndoNotice, "action" | "count">,
+  t: TFunction<"workspace">,
+): string {
+  const { count } = notice;
+  switch (notice.action) {
+    case "Settled":
+      return t(($) => $.undo.settledCount, { count });
+    case "Snoozed":
+      return t(($) => $.undo.snoozedCount, { count });
+    case "Unpinned":
+      return t(($) => $.undo.unpinnedCount, { count });
+    case "Archived":
+      return t(($) => $.undo.archivedCount, { count });
+    case "Discarded":
+      return t(($) => $.undo.discardedCount, { count });
+  }
+}
+
+export function threadUndoLabel(
+  keybindings: Parameters<typeof shortcutLabelForCommand>[0],
+  t: TFunction<"workspace">,
+) {
   const shortcut = shortcutLabelForCommand(keybindings, "thread.undo");
-  return shortcut ? `${shortcut} to undo` : "Undo";
+  return shortcut ? t(($) => $.undo.shortcut, { shortcut }) : t(($) => $.undo.label);
+}
+
+function threadUndoFailureTitle(action: UndoOptions["action"], t: TFunction<"workspace">): string {
+  switch (action) {
+    case "Settled":
+      return t(($) => $.undo.settleFailed);
+    case "Snoozed":
+      return t(($) => $.sidebar.wakeFailed);
+    case "Unpinned":
+      return t(($) => $.undo.unpinFailed);
+    case "Archived":
+      return t(($) => $.undo.archiveFailed);
+    case "Discarded":
+      return t(($) => $.undo.draftFailed);
+  }
 }
 
 let announcedSummary: string | null = null;
@@ -44,13 +95,17 @@ let announcedSummary: string | null = null;
 // usually moves focus to the next thread at the same moment, so the notice is announced
 // separately from the alert that shows it.
 function setNotice(notice: UndoNotice | null) {
+  const t = appI18n.getFixedT(null, "workspace");
   useThreadUndoNotice.setState({ notice });
-  const summary = notice ? threadUndoNoticeSummary(notice) : null;
+  const summary = notice ? threadUndoNoticeSummary(notice, t) : null;
   if (summary === announcedSummary) return;
   announcedSummary = summary;
   if (summary) {
-    const label = threadUndoLabel(appAtomRegistry.get(primaryServerKeybindingsAtom));
-    announce(`${summary}, ${label}`, "thread-undo-notice");
+    const label = threadUndoLabel(appAtomRegistry.get(primaryServerKeybindingsAtom), t);
+    announce(
+      t(($) => $.undo.announcement, { summary, undo: label }),
+      "thread-undo-notice",
+    );
   } else {
     cancelAnnouncement("thread-undo-notice");
   }
@@ -88,13 +143,16 @@ function refreshNotice() {
       for (const entry of current) entry.claim.finish();
       refreshNotice();
       await Promise.all(
-        current.map(async ({ undo, failureTitle }) => {
+        current.map(async ({ undo, action }) => {
           const reportFailure = (error: unknown) => {
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: failureTitle,
-                description: error instanceof Error ? error.message : "An error occurred.",
+                title: threadUndoFailureTitle(action, appI18n.getFixedT(null, "workspace")),
+                description:
+                  error instanceof Error
+                    ? error.message
+                    : appI18n.t(($) => $.palette.error, { ns: "workspace" }),
               }),
             );
           };

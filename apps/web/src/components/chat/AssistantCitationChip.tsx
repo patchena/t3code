@@ -1,4 +1,5 @@
 import type { AssistantCitation } from "@t3tools/contracts";
+import { useTranslation } from "react-i18next";
 import {
   assistantCitationLabel,
   serializeAssistantCitation,
@@ -51,6 +52,7 @@ export function AssistantCitationChip({
     onRestoreFocus?: () => void;
   };
 }) {
+  const { t } = useTranslation("chat");
   const navigate = useNavigate();
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const commentPopupRef = useRef<HTMLDivElement>(null);
@@ -129,7 +131,7 @@ export function AssistantCitationChip({
     <Link
       {...sourceLinkProps}
       className="inline-flex min-w-0 items-center gap-[0.2em] self-baseline text-inherit no-underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-current rounded-sm"
-      aria-label={`View cited assistant text: ${label}`}
+      aria-label={t(($) => $.citation.view, { label })}
     >
       <QuoteIcon aria-hidden="true" />
       <ContextChipLabel className="max-w-[16em]" dir={textDirection(label)}>
@@ -143,7 +145,7 @@ export function AssistantCitationChip({
         kind="citation"
         icon={<QuoteIcon />}
         label={label}
-        accessibleLabel={`Quoted assistant text: ${label}`}
+        accessibleLabel={t(($) => $.citation.quoted, { label })}
         copyMarkdown={serializeAssistantCitation(citation)}
       >
         <div className="flex max-h-[calc(var(--available-height)_-_1rem_-_2px)] flex-col items-start gap-3 p-1 text-sm">
@@ -152,7 +154,7 @@ export function AssistantCitationChip({
             render={<Button variant="outline" size="sm" render={<Link {...sourceLinkProps} />} />}
           >
             <ArrowUpRightIcon aria-hidden="true" />
-            Go to source
+            {t(($) => $.citation.goToSource)}
           </PopoverClose>
         </div>
       </ContextChipPopover>
@@ -178,7 +180,9 @@ export function AssistantCitationChip({
           }}
         >
           <PopoverTrigger
-            aria-label={citation.comment ? "Edit citation comment" : "Add comment to citation"}
+            aria-label={
+              citation.comment ? t(($) => $.citation.edit) : t(($) => $.citation.addComment)
+            }
             data-citation-comment-trigger="true"
             render={<ContextChipAction />}
           >
@@ -211,7 +215,7 @@ export function AssistantCitationChip({
                   : undefined
               }
               ref={commentPopupRef}
-              aria-label="Edit citation comment"
+              aria-label={t(($) => $.citation.edit)}
               width="md"
               padding="compact"
               onPointerDown={(event) => event.stopPropagation()}

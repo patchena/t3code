@@ -1,3 +1,11 @@
+import {
+  FileWorkerError,
+  decodeFileWorkerError,
+  encodeFileWorkerError,
+} from "~/components/files/fileWorkerError";
+import { checkZipDirectory } from "@t3tools/client-runtime/zip/directory";
+import { FilePreviewFailure, fileFailureText, fileFailure } from "~/components/files/fileFailure";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import JSZip from "jszip";
 import { openRtf, openNotebook, openDocument, openEpub } from "./extendedDocumentPreview";
 import type { ScopedThreadRef } from "@t3tools/contracts";
@@ -23,7 +31,56 @@ describe("file preview read errors", () => {
       _tag: "ProjectReadFileError",
       message: "Legacy file read failure.",
     });
-    expect(filePreviewReadErrorMessage(error)).toBe("Legacy file read failure.");
+    expect(filePreviewReadErrorMessage(error, createI18n("en").getFixedT(null, "files"))).toBe(
+      "Legacy file read failure.",
+    );
+  });
+  it("renders an existing preview failure in the current interface language", async () => {
+    const instance = createI18n("en");
+    const t = instance.getFixedT(null, "files");
+    const failure = new FilePreviewFailure({ describe: (t) => t(($) => $.font.loadFailed) });
+    const serializeFailure = (parse: () => unknown) => {
+      try {
+        parse();
+      } catch (cause) {
+        return structuredClone(encodeFileWorkerError(cause));
+      }
+      throw new Error("Expected a parsing error");
+    };
+    const payload = serializeFailure(() => openRtf(new TextEncoder().encode("Invalid RTF").buffer));
+    const zipPayload = serializeFailure(() => checkZipDirectory(new ArrayBuffer(0)));
+    const sheetPayload = serializeFailure(() => {
+      throw new FileWorkerError({
+        message: "Sheet 3 could not open",
+        detail: { kind: "sheet", sheet: 3 },
+      });
+    });
+    const sheetFailure = fileFailure(decodeFileWorkerError(sheetPayload), (t) =>
+      t(($) => $.document.readFailed),
+    );
+    const workerFailure = fileFailure(decodeFileWorkerError(payload), (t) =>
+      t(($) => $.document.readFailed),
+    );
+    const zipFailure = fileFailure(decodeFileWorkerError(zipPayload), (t) =>
+      t(($) => $.document.readFailed),
+    );
+    expect(fileFailureText(sheetFailure, t)).toBe("Sheet 3 could not open");
+    expect(payload.code).toBe("richTextInvalid");
+    expect(zipPayload.code).toBe("zipUnreadable");
+    expect(fileFailureText(zipFailure, t)).toBe("This is not a readable ZIP archive.");
+    expect(fileFailureText(failure, t)).toBe("The font could not be loaded.");
+    expect(fileFailureText(workerFailure, t)).toBe("This is not a valid rich text document.");
+    await instance.changeLanguage("de");
+    expect(fileFailureText(failure, t)).toBe("Die Schriftart konnte nicht geladen werden.");
+    expect(fileFailureText(workerFailure, t)).toBe("Dies ist kein gültiges Rich-Text-Dokument.");
+    expect(payload.message).toBe("This is not a valid rich text document.");
+    expect(fileFailureText(sheetFailure, t)).toBe("Tabellenblatt 3 konnte nicht geöffnet werden");
+    expect(sheetPayload.message).toBe("Sheet 3 could not open");
+    expect(zipPayload.message).toBe("This is not a readable ZIP archive.");
+    expect(fileFailureText(zipFailure, t)).toBe("Dies ist kein lesbares ZIP-Archiv.");
+    expect(
+      fileFailure(new Error("Parser diagnostic"), (t) => t(($) => $.document.readFailed)),
+    ).toBe("Parser diagnostic");
   });
 });
 
@@ -140,6 +197,7 @@ describe("document preview contents", () => {
       const result = openRtf(bytes(String.raw`{\rtf1{\*\unknown\u945` + fallback + "}Hello}"));
       if (result.type !== "document") throw new Error("Expected document");
       expect(result.pages[0]!.html).toBe("<p>Hello</p>");
+      expect(result.pages[0]!.generatedTitle).toBe(true);
     },
   );
 
@@ -208,6 +266,7 @@ describe("document preview contents", () => {
     const result = await openDocument(archive, "ods");
     if (result.type !== "ods") throw new Error("Expected workbook");
     expect(result.sheets[0]!.name).toBe("Accounts & names");
+    expect(result.sheets[0]!.generatedName).toBe(false);
     expect(result.sheets[0]!.rows[0]).toEqual(["Account Name   A\tB\nC"]);
   });
 

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   findSearchTokenRanges,
   splitSearchText,
@@ -36,11 +37,12 @@ export function ThreadSearchMatchExcerpt(props: {
     readonly query: string;
   };
 }) {
+  const { t } = useTranslation("workspace");
   const isUser = props.match.source === "user";
   return (
     <span className="truncate text-xs text-muted-foreground/85">
       <span className={isUser ? "text-info-foreground" : "text-success-foreground"}>
-        {isUser ? "You:" : "Agent:"}
+        {isUser ? t(($) => $.search.you) : t(($) => $.search.agent)}
       </span>{" "}
       <HighlightedSearchText
         text={props.match.snippet}

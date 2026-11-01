@@ -1,4 +1,6 @@
 import { TimelinePendingApprovalRow } from "./TimelinePendingApprovalRow";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { WorkLogDetails, WorkLogRow } from "./WorkLog";
 import {
   getQuestionAnswerPreview,
@@ -16,6 +18,7 @@ import { Link } from "@tanstack/react-router";
 import { notificationChildThreadId } from "@t3tools/client-runtime/state/thread-execution";
 import {
   resolveViewedImageAsset,
+  liveActivityToolStatus,
   toolGroupAction,
   workEntryViewedImagePath,
 } from "@t3tools/client-runtime/work-log/presentation";
@@ -30,14 +33,13 @@ import {
   workEntrySignalsSevereFailure,
   workLogEntryIsToolLike,
 } from "../../session-logic";
-import ChatMarkdown from "../ChatMarkdown";
+import { ChatMarkdown } from "../ChatMarkdown";
 import { ChatMarkdownAssetImage } from "./ChatMarkdownMedia";
 import { ChevronRightIcon, CircleAlertIcon, XIcon, RotateCcwIcon } from "lucide-react";
 import { Button, InlineButton } from "../ui/button";
 import { useAssetUrls } from "../../assets/assetUrls";
 import { useThreadShell } from "../../state/entities";
 import {
-  threadReadLabelPrefix,
   threadReadTargetId,
   threadReadTargetTitle,
   workEntryDisplayLabel,
@@ -64,8 +66,7 @@ import {
   workEntryRawCommand,
   buildToolCallExpandedBody,
   workEntryIconName,
-  THINKING_PREVIEW_PLUGINS,
-  THOUGHT_PREVIEW_PLUGINS,
+  thoughtPreviewPlugins,
 } from "./TimelineWorkEntryRow.logic";
 
 export function useThreadReadTarget(entry: TimelineWorkEntry, environmentId: EnvironmentId) {
@@ -76,9 +77,26 @@ export function useThreadReadTarget(entry: TimelineWorkEntry, environmentId: Env
   return threadId && title ? { threadId, title } : null;
 }
 
-export function threadReadLabel(label: string, target: ReturnType<typeof useThreadReadTarget>) {
-  const prefix = target && threadReadLabelPrefix(label);
-  return prefix ? { ...target, prefix, text: `${prefix} “${target.title}”` } : null;
+export function threadReadLabel(
+  entry: TimelineWorkEntry,
+  target: ReturnType<typeof useThreadReadTarget>,
+  t: TFunction<"activity">,
+  active = false,
+) {
+  if (target === null) return null;
+  const status = liveActivityToolStatus(entry.toolLifecycleStatus, active);
+  const title = target.title;
+  const text =
+    status === "declined"
+      ? t(($) => $.timeline.readThreadDeclined, { title })
+      : workEntryDisplayIndicatesToolFailure(entry)
+        ? t(($) => $.timeline.readThreadFailed, { title })
+        : status === "inProgress"
+          ? t(($) => $.timeline.readingThread, { title })
+          : status === "stopped"
+            ? t(($) => $.timeline.readThreadStopped, { title })
+            : t(($) => $.timeline.readThread, { title });
+  return { ...target, text };
 }
 
 export function ThreadReadLabel({
@@ -92,7 +110,6 @@ export function ThreadReadLabel({
 }) {
   return (
     <span className="flex min-w-0">
-      <span className="shrink-0">{label.prefix} “</span>
       {linked ? (
         <Link
           to="/$environmentId/$threadId"
@@ -101,12 +118,11 @@ export function ThreadReadLabel({
           onClick={stopRowToggle}
           onKeyDown={stopRowToggle}
         >
-          {label.title}
+          {label.text}
         </Link>
       ) : (
-        <span className="min-w-0 truncate">{label.title}</span>
+        <span className="min-w-0 truncate">{label.text}</span>
       )}
-      <span className="shrink-0">”</span>
     </span>
   );
 }
@@ -172,6 +188,9 @@ export const SimpleWorkEntryRow = memo(function SimpleWorkEntryRow(props: WorkEn
 });
 
 function WorkEntryLogRow(props: WorkEntryRowProps) {
+  const { t } = useTranslation("chat");
+  const { t: tActivity } = useTranslation("activity");
+  const { t: tCommon } = useTranslation("common");
   const { workEntry, workspaceRoot, displayLabel } = props;
   const ctx = use(TimelineRowCtx);
   const { threadRef, onImageExpand, timestampFormat } = ctx;
@@ -213,10 +232,12 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
     // unambiguous. Both read the zone now, since the device's can change.
     const timeZone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
     const resetTime = resetAt
-      ? `${formatUpcomingTimestamp(resetAt, timestampFormat, undefined, timeZone)} (${timeZone})`
+      ? `${formatUpcomingTimestamp(resetAt, timestampFormat, tCommon, undefined, timeZone)} (${timeZone})`
       : null;
     const label = warning
-      ? `Usage limit reached.${resetTime ? ` Retry after ${resetTime}.` : ""}`
+      ? resetTime
+        ? t(($) => $.limits.retryAfter, { time: resetTime })
+        : t(($) => $.limits.reachedPeriod)
       : workEntry.label;
     const retryRunId =
       failureItem.runId !== null &&
@@ -263,7 +284,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
               onClick={() => onRetryWorkspacePreparation(retryRunId)}
             >
               <RotateCcwIcon aria-hidden />
-              Retry
+              {t(($) => $.ui.retry)}
             </Button>
           </div>
         ) : null}
@@ -291,9 +312,10 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
   const previewText =
     isReasoning && expanded
       ? workEntry.toolLifecycleStatus === "inProgress"
-        ? "Thinking"
-        : "Thought"
-      : questionHeading || (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot));
+        ? tActivity(($) => $.timeline.thinking)
+        : tActivity(($) => $.timeline.thought)
+      : questionHeading ||
+        (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot, tActivity));
   const answerPreview =
     workEntry.questionAnswer && hasQuestionAnswer(workEntry.questionAnswer)
       ? getQuestionAnswerPreview(workEntry.questionAnswer)
@@ -336,6 +358,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
             workspaceRoot,
             previewText,
             viewedImage ? viewedImagePath : null,
+            tActivity,
           )
       : null;
   const plainOutputFetches =
@@ -373,12 +396,12 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
       : workLogEntryIsToolLike(workEntry)
         ? "text-secondary-label"
         : "text-foreground/80";
-  const threadLabel = isReasoning ? null : threadReadLabel(previewText, threadTarget);
+  const threadLabel = isReasoning ? null : threadReadLabel(workEntry, threadTarget, tActivity);
   const accessiblePreview = [threadLabel?.text ?? previewText, answerPreview]
     .filter(Boolean)
     .join(": ");
   const accessibleDisplayText = showFailedIndicator
-    ? `${accessiblePreview}, tool call failed`
+    ? tActivity(($) => $.timeline.failedLabel, { label: accessiblePreview })
     : accessiblePreview;
   const rowToggleProps = canExpandProjectedItem
     ? {
@@ -405,7 +428,7 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
         <span
           className={iconWrapperClass}
           role={showFailedIndicator ? "img" : undefined}
-          aria-label={showFailedIndicator ? "Tool call failed" : undefined}
+          aria-label={showFailedIndicator ? tActivity(($) => $.timeline.toolCallFailed) : undefined}
         >
           <ToolActivityIconView
             icon={entryToolIcon}
@@ -427,11 +450,10 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
                   text={workEntry.detail ?? previewText}
                   cwd={ctx.markdownCwd}
                   parseRawHtml={false}
-                  extraRemarkPlugins={
-                    workEntry.toolLifecycleStatus === "inProgress"
-                      ? THINKING_PREVIEW_PLUGINS
-                      : THOUGHT_PREVIEW_PLUGINS
-                  }
+                  extraRemarkPlugins={thoughtPreviewPlugins(
+                    tActivity,
+                    workEntry.toolLifecycleStatus === "inProgress",
+                  )}
                 />
               ) : threadLabel ? (
                 <ThreadReadLabel
@@ -466,26 +488,30 @@ function WorkEntryLogRow(props: WorkEntryRowProps) {
             <button
               type="button"
               className="shrink-0 rounded-sm text-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-              aria-label={`Open ${createdThread.title ?? "created thread"}`}
+              aria-label={
+                createdThread.title
+                  ? t(($) => $.ui.open, { name: createdThread.title })
+                  : t(($) => $.thread.openCreated)
+              }
               onClick={(event) => {
                 event.stopPropagation();
                 ctx.onOpenThread(createdThread.targetThreadId);
               }}
               onKeyDown={stopRowToggle}
             >
-              Open chat
+              {t(($) => $.thread.openChat)}
             </button>
           ) : null}
           {notifiedSubagentThreadId ? (
             <InlineButton
-              aria-label="Open subagent thread"
+              aria-label={t(($) => $.thread.openSubagent)}
               onClick={(event) => {
                 event.stopPropagation();
                 ctx.onOpenThread(notifiedSubagentThreadId);
               }}
               onKeyDown={stopRowToggle}
             >
-              Open subagent
+              {t(($) => $.thread.openSubagentAction)}
             </InlineButton>
           ) : null}
           {showFailedIndicator &&

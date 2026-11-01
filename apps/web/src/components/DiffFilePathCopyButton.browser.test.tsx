@@ -2,8 +2,8 @@ import { expect, it, vi } from "vite-plus/test";
 import { page } from "vite-plus/test/browser";
 
 import { render } from "../../test/render";
-import { DiffFilePathCopyButton } from "./DiffFilePathCopyButton";
-import { AnchoredToastProvider } from "./ui/toast";
+import { DiffFilePathCopyButton } from "~/components/DiffFilePathCopyButton";
+import { AnchoredToastProvider } from "~/components/ui/toast";
 
 it("explains a denied clipboard write and lets the same path be copied again", async () => {
   await using screen = await render(

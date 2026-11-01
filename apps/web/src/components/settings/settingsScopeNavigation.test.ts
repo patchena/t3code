@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { EnvironmentId, ProviderInstanceId, ScheduledTaskId } from "@t3tools/contracts";
 import {
   createMemoryHistory,
@@ -12,6 +13,8 @@ import { resolveSettingsScope } from "./settingsScope";
 import { retainSettingsScope, validateSettingsRouteSearch } from "./settingsScopeNavigation";
 
 import { validateScheduledTasksSearch } from "./scheduledTasksSettings.logic";
+
+const t = createI18n("en").getFixedT(null, "settings");
 
 const checkoutSearch = {
   project: "repository:t3code",
@@ -190,6 +193,7 @@ describe("settings scope navigation", () => {
         router.state.location.search,
         [],
         [{ environmentId: EnvironmentId.make("online"), label: "Online" }],
+        t,
       ),
     ).toMatchObject({
       kind: "unavailable",

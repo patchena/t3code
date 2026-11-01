@@ -1,3 +1,9 @@
+import {
+  isThemeError,
+  ThemeError,
+  type ThemeErrorDetail,
+  type ThemeErrorSubject,
+} from "~/themeErrors";
 import { sha256 } from "@noble/hashes/sha2";
 import JSZip from "jszip";
 import { parse, type ParseError } from "jsonc-parser";
@@ -176,7 +182,12 @@ function manifestLicenseMatches(manifest: Record<string, unknown>, license: stri
 
 function extensionFromDetail(value: unknown): OpenVsxThemeExtension | null {
   if (!isRecord(value) || !isRecord(value.files)) {
-    throw new Error("Open VSX returned malformed theme details.");
+    throw new ThemeError({
+      message: "Open VSX returned malformed theme details.",
+      detail: {
+        kind: "malformedDetails",
+      },
+    });
   }
   const namespace = typeof value.namespace === "string" ? value.namespace.trim() : "";
   const extensionName = typeof value.name === "string" ? value.name.trim() : "";
@@ -188,7 +199,12 @@ function extensionFromDetail(value: unknown): OpenVsxThemeExtension | null {
   const sha256Url = trustedOpenVsxUrl(value.files.sha256);
   const vsixUrl = trustedOpenVsxUrl(value.files.download);
   if (!namespace || !extensionName || !version || !manifestUrl || !sha256Url || !vsixUrl) {
-    throw new Error("Open VSX returned malformed theme details.");
+    throw new ThemeError({
+      message: "Open VSX returned malformed theme details.",
+      detail: {
+        kind: "malformedDetails",
+      },
+    });
   }
   if (!SUPPORTED_LICENSES.has(license)) return null;
   const id = `${namespace}.${extensionName}`;
@@ -228,7 +244,11 @@ async function withSearchTimeout<T>(
     return await operation(controller.signal);
   } catch (cause) {
     if (controller.signal.aborted && !parentSignal?.aborted) {
-      throw new Error("Open VSX took too long to respond.", { cause });
+      throw new ThemeError({
+        message: "Open VSX took too long to respond.",
+        detail: { kind: "timeout" },
+        cause,
+      });
     }
     throw cause;
   } finally {
@@ -251,20 +271,35 @@ export async function searchOpenVsxThemes(
   url.searchParams.set("size", "16");
   const value = await withSearchTimeout(async (requestSignal) => {
     const response = await fetch(url, { signal: requestSignal });
-    if (!response.ok) throw new Error("Open VSX search is unavailable right now.");
-    const searchBytes = await readCappedResponse(
-      response,
-      MAX_SEARCH_BYTES,
-      "Open VSX returned an unexpectedly large response.",
-    );
+    if (!response.ok)
+      throw new ThemeError({
+        message: "Open VSX search is unavailable right now.",
+        detail: {
+          kind: "searchUnavailable",
+        },
+      });
+    const searchBytes = await readCappedResponse(response, MAX_SEARCH_BYTES, {
+      message: "Open VSX returned an unexpectedly large response.",
+      detail: { kind: "responseTooLarge" },
+    });
     try {
       return JSON.parse(new TextDecoder().decode(searchBytes)) as unknown;
     } catch {
-      throw new Error("Open VSX returned an unreadable response.");
+      throw new ThemeError({
+        message: "Open VSX returned an unreadable response.",
+        detail: {
+          kind: "unreadableResponse",
+        },
+      });
     }
   }, signal);
   if (!isRecord(value) || !Array.isArray(value.extensions)) {
-    throw new Error("Open VSX returned an unreadable search response.");
+    throw new ThemeError({
+      message: "Open VSX returned an unreadable search response.",
+      detail: {
+        kind: "unreadableSearch",
+      },
+    });
   }
   const identities = value.extensions.flatMap((candidate): Array<[string, string]> => {
     if (!isRecord(candidate)) return [];
@@ -277,12 +312,17 @@ export async function searchOpenVsxThemes(
       withSearchTimeout(async (requestSignal) => {
         const detailUrl = `https://open-vsx.org/api/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`;
         const detailResponse = await fetch(detailUrl, { signal: requestSignal });
-        if (!detailResponse.ok) throw new Error("Open VSX theme details are unavailable.");
-        const detailBytes = await readCappedResponse(
-          detailResponse,
-          MAX_DETAIL_BYTES,
-          "Open VSX returned an unexpectedly large detail response.",
-        );
+        if (!detailResponse.ok)
+          throw new ThemeError({
+            message: "Open VSX theme details are unavailable.",
+            detail: {
+              kind: "detailsUnavailable",
+            },
+          });
+        const detailBytes = await readCappedResponse(detailResponse, MAX_DETAIL_BYTES, {
+          message: "Open VSX returned an unexpectedly large detail response.",
+          detail: { kind: "detailsTooLarge" },
+        });
         try {
           const extension = extensionFromDetail(JSON.parse(new TextDecoder().decode(detailBytes)));
           if (!extension) return null;
@@ -290,27 +330,34 @@ export async function searchOpenVsxThemes(
             fetch(extension.manifestUrl, { signal: requestSignal }),
             fetch(extension.vsixUrl, { method: "HEAD", signal: requestSignal }),
           ]);
-          if (!manifestResponse.ok) throw new Error("manifest unavailable");
+          if (!manifestResponse.ok)
+            throw new ThemeError({
+              message: "manifest unavailable",
+              detail: { kind: "manifestUnavailable" },
+            });
           if (!packageResponse.ok) return null;
           const packageLength = Number(packageResponse.headers.get("content-length"));
           if (Number.isFinite(packageLength) && packageLength > MAX_VSIX_BYTES) {
             return null;
           }
-          const manifestBytes = await readCappedResponse(
-            manifestResponse,
-            MAX_MANIFEST_BYTES,
-            "Open VSX returned an unexpectedly large manifest.",
-          );
-          const manifest = parseJsoncObject(
-            new TextDecoder().decode(manifestBytes),
-            "Extension manifest",
-          );
+          const manifestBytes = await readCappedResponse(manifestResponse, MAX_MANIFEST_BYTES, {
+            message: "Open VSX returned an unexpectedly large manifest.",
+            detail: { kind: "manifestTooLarge" },
+          });
+          const manifest = parseJsoncObject(new TextDecoder().decode(manifestBytes), {
+            kind: "manifest",
+          });
           return themeContributions(manifest).length > 0 &&
             manifestLicenseMatches(manifest, extension.license)
             ? extension
             : null;
         } catch {
-          throw new Error("Open VSX returned unreadable theme details.");
+          throw new ThemeError({
+            message: "Open VSX returned unreadable theme details.",
+            detail: {
+              kind: "unreadableDetails",
+            },
+          });
         }
       }, signal),
     ),
@@ -318,15 +365,25 @@ export async function searchOpenVsxThemes(
   if (signal?.aborted) throw new DOMException("The operation was aborted.", "AbortError");
   const completedDetails = details.filter((result) => result.status === "fulfilled");
   if (identities.length > 0 && completedDetails.length === 0) {
-    throw new Error("Open VSX theme details are unavailable right now.");
+    throw new ThemeError({
+      message: "Open VSX theme details are unavailable right now.",
+      detail: {
+        kind: "detailsUnavailableNow",
+      },
+    });
   }
   return completedDetails.flatMap((result) => (result.value ? [result.value] : [])).slice(0, 8);
 }
 
-function parseJsoncObject(source: string, description: string): Record<string, unknown> {
+function parseJsoncObject(source: string, subject: ThemeErrorSubject): Record<string, unknown> {
+  const description = subject.kind === "manifest" ? "Extension manifest" : subject.path;
   const errors: ParseError[] = [];
   const value: unknown = parse(source, errors, { allowTrailingComma: true });
-  if (errors.length > 0 || !isRecord(value)) throw new Error(`${description} is not valid JSON.`);
+  if (errors.length > 0 || !isRecord(value))
+    throw new ThemeError({
+      message: `${description} is not valid JSON.`,
+      detail: { kind: "invalidJson", subject },
+    });
   return value;
 }
 
@@ -356,7 +413,10 @@ function normalizePackagePath(path: string, relativeTo = "extension/"): string {
     path.startsWith("/") ||
     /^[a-zA-Z]:/.test(path)
   ) {
-    throw new Error("Theme path is not a safe relative package path.");
+    throw new ThemeError({
+      message: "Theme path is not a safe relative package path.",
+      detail: { kind: "unsafePath" },
+    });
   }
   const normalizedInput = path.replaceAll("\\", "/");
   const baseSegments = relativeTo.split("/").slice(0, -1);
@@ -364,7 +424,11 @@ function normalizePackagePath(path: string, relativeTo = "extension/"): string {
   for (const segment of normalizedInput.split("/")) {
     if (!segment || segment === ".") continue;
     if (segment === "..") {
-      if (segments.length <= 1) throw new Error("Theme path escapes the extension package.");
+      if (segments.length <= 1)
+        throw new ThemeError({
+          message: "Theme path escapes the extension package.",
+          detail: { kind: "escapedPath" },
+        });
       segments.pop();
       continue;
     }
@@ -402,13 +466,22 @@ function inspectZipDirectory(bytes: Uint8Array): Uint8Array {
   ) {
     endOffset -= 1;
   }
-  if (endOffset < minimumOffset) throw new Error("That extension package has no ZIP directory.");
+  if (endOffset < minimumOffset)
+    throw new ThemeError({
+      message: "That extension package has no ZIP directory.",
+      detail: { kind: "zipDirectory" },
+    });
 
   const directorySize = view.getUint32(endOffset + 12, true);
   const directoryOffset = view.getUint32(endOffset + 16, true);
   const directoryEnd = directoryOffset + directorySize;
   if (directoryEnd !== endOffset || directoryEnd > bytes.byteLength) {
-    throw new Error("That extension package has an invalid ZIP directory.");
+    throw new ThemeError({
+      message: "That extension package has an invalid ZIP directory.",
+      detail: {
+        kind: "zipInvalidDirectory",
+      },
+    });
   }
 
   let entryCount = 0;
@@ -416,26 +489,51 @@ function inspectZipDirectory(bytes: Uint8Array): Uint8Array {
   let offset = directoryOffset;
   while (offset < directoryEnd) {
     if (offset + 46 > directoryEnd || view.getUint32(offset, true) !== 0x02014b50) {
-      throw new Error("That extension package has an invalid ZIP directory.");
+      throw new ThemeError({
+        message: "That extension package has an invalid ZIP directory.",
+        detail: {
+          kind: "zipInvalidDirectory",
+        },
+      });
     }
     entryCount += 1;
     if (entryCount > MAX_ZIP_ENTRIES) {
-      throw new Error("That extension package has too many files.");
+      throw new ThemeError({
+        message: "That extension package has too many files.",
+        detail: {
+          kind: "zipTooManyFiles",
+        },
+      });
     }
     const compressed = view.getUint32(offset + 20, true);
     const uncompressed = view.getUint32(offset + 24, true);
     if (compressed === 0xffffffff || uncompressed === 0xffffffff) {
-      throw new Error("That extension package has unsupported ZIP64 metadata.");
+      throw new ThemeError({
+        message: "That extension package has unsupported ZIP64 metadata.",
+        detail: {
+          kind: "zip64",
+        },
+      });
     }
     totalUncompressed += uncompressed;
     if (totalUncompressed > MAX_UNCOMPRESSED_BYTES) {
-      throw new Error("That extension package expands beyond the safe import limit.");
+      throw new ThemeError({
+        message: "That extension package expands beyond the safe import limit.",
+        detail: {
+          kind: "zipExpansion",
+        },
+      });
     }
     if (
       uncompressed > 0 &&
       (compressed === 0 || uncompressed / compressed > MAX_COMPRESSION_RATIO)
     ) {
-      throw new Error("That extension package has an unsafe compression ratio.");
+      throw new ThemeError({
+        message: "That extension package has an unsafe compression ratio.",
+        detail: {
+          kind: "zipRatio",
+        },
+      });
     }
     const nameLength = view.getUint16(offset + 28, true);
     const extraLength = view.getUint16(offset + 30, true);
@@ -443,7 +541,12 @@ function inspectZipDirectory(bytes: Uint8Array): Uint8Array {
     offset += 46 + nameLength + extraLength + commentLength;
   }
   if (offset !== directoryEnd)
-    throw new Error("That extension package has an invalid ZIP directory.");
+    throw new ThemeError({
+      message: "That extension package has an invalid ZIP directory.",
+      detail: {
+        kind: "zipInvalidDirectory",
+      },
+    });
 
   const commentLength = view.getUint16(endOffset + 20, true);
   if (commentLength === 0) return bytes;
@@ -458,7 +561,10 @@ function inspectZipDirectory(bytes: Uint8Array): Uint8Array {
 function inspectZip(zip: JSZip): void {
   const entries = Object.values(zip.files) as InspectableZipObject[];
   if (entries.length > MAX_ZIP_ENTRIES)
-    throw new Error("That extension package has too many files.");
+    throw new ThemeError({
+      message: "That extension package has too many files.",
+      detail: { kind: "zipTooManyFiles" },
+    });
 
   for (const entry of entries) {
     if (entry.unsafeOriginalName) normalizePackagePath(entry.unsafeOriginalName);
@@ -468,17 +574,34 @@ function inspectZip(zip: JSZip): void {
 async function readZipText(
   zip: JSZip,
   path: string,
-  description: string,
+  subject: ThemeErrorSubject,
   signal?: AbortSignal,
 ): Promise<string> {
   signal?.throwIfAborted();
+  const description = subject.kind === "manifest" ? "Extension manifest" : subject.path;
   const file = zip.file(path) as InspectableZipObject | null;
-  if (!file) throw new Error(`${description} is missing from the extension package.`);
+  if (!file)
+    throw new ThemeError({
+      message: `${description} is missing from the extension package.`,
+      detail: {
+        kind: "missingFile",
+        subject,
+      },
+    });
   if (typeof file._data?.uncompressedSize !== "number" || !file.internalStream) {
-    throw new Error(`${description} has unreadable size metadata.`);
+    throw new ThemeError({
+      message: `${description} has unreadable size metadata.`,
+      detail: {
+        kind: "unreadableSize",
+        subject,
+      },
+    });
   }
   if (file._data.uncompressedSize > MAX_THEME_BYTES) {
-    throw new Error(`${description} is too large.`);
+    throw new ThemeError({
+      message: `${description} is too large.`,
+      detail: { kind: "fileTooLarge", subject },
+    });
   }
 
   return new Promise((resolve, reject) => {
@@ -503,7 +626,12 @@ async function readZipText(
           settled = true;
           stream.pause();
           cleanup();
-          reject(new Error(`${description} is too large.`));
+          reject(
+            new ThemeError({
+              message: `${description} is too large.`,
+              detail: { kind: "fileTooLarge", subject },
+            }),
+          );
           return;
         }
         chunks.push(chunk);
@@ -539,17 +667,33 @@ async function loadThemeObject(
   signal?: AbortSignal,
 ): Promise<Record<string, unknown>> {
   signal?.throwIfAborted();
-  if (ancestors.size >= MAX_INCLUDE_DEPTH) throw new Error("Theme includes are nested too deeply.");
-  if (ancestors.has(path)) throw new Error("Theme includes contain a cycle.");
+  if (ancestors.size >= MAX_INCLUDE_DEPTH)
+    throw new ThemeError({
+      message: "Theme includes are nested too deeply.",
+      detail: { kind: "includeDepth" },
+    });
+  if (ancestors.has(path))
+    throw new ThemeError({
+      message: "Theme includes contain a cycle.",
+      detail: { kind: "includeCycle" },
+    });
   const cached = cache.get(path);
   if (cached) return cached;
   budget.files += 1;
   if (budget.files > MAX_RESOLVED_THEME_FILES) {
-    throw new Error("That extension references too many theme files.");
+    throw new ThemeError({
+      message: "That extension references too many theme files.",
+      detail: {
+        kind: "includeCount",
+      },
+    });
   }
 
   const value = sanitizeThemeObject(
-    parseJsoncObject(await readZipText(zip, path, path, signal), path),
+    parseJsoncObject(await readZipText(zip, path, { kind: "file", path }, signal), {
+      kind: "file",
+      path,
+    }),
   );
   if (typeof value.include !== "string") {
     cache.set(path, value);
@@ -575,13 +719,15 @@ async function loadThemeObject(
 async function readCappedResponse(
   response: Response,
   limit: number,
-  tooLargeMessage: string,
+  tooLarge: { readonly message: string; readonly detail: ThemeErrorDetail },
 ): Promise<Uint8Array> {
   const contentLength = response.headers.get("content-length");
-  if (contentLength && Number(contentLength) > limit) throw new Error(tooLargeMessage);
+  if (contentLength && Number(contentLength) > limit)
+    throw new ThemeError({ message: tooLarge.message, detail: tooLarge.detail });
   if (!response.body) {
     const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.byteLength > limit) throw new Error(tooLargeMessage);
+    if (bytes.byteLength > limit)
+      throw new ThemeError({ message: tooLarge.message, detail: tooLarge.detail });
     return bytes;
   }
 
@@ -595,7 +741,7 @@ async function readCappedResponse(
       byteLength += value.byteLength;
       if (byteLength > limit) {
         await reader.cancel();
-        throw new Error(tooLargeMessage);
+        throw new ThemeError({ message: tooLarge.message, detail: tooLarge.detail });
       }
       chunks.push(value);
     }
@@ -614,12 +760,15 @@ async function readCappedResponse(
 
 async function fetchPackage(url: string, signal?: AbortSignal): Promise<Uint8Array> {
   const response = await fetch(url, signal ? { signal } : {});
-  if (!response.ok) throw new Error("That Open VSX theme could not be downloaded.");
-  return readCappedResponse(
-    response,
-    MAX_VSIX_BYTES,
-    "That theme extension is too large to import safely.",
-  );
+  if (!response.ok)
+    throw new ThemeError({
+      message: "That Open VSX theme could not be downloaded.",
+      detail: { kind: "download" },
+    });
+  return readCappedResponse(response, MAX_VSIX_BYTES, {
+    message: "That theme extension is too large to import safely.",
+    detail: { kind: "packageTooLarge" },
+  });
 }
 
 export async function importOpenVsxThemeExtension(
@@ -627,44 +776,70 @@ export async function importOpenVsxThemeExtension(
   signal?: AbortSignal,
 ): Promise<ReadonlyArray<ThemeDefinition>> {
   const manifestResponse = await fetch(extension.manifestUrl, signal ? { signal } : {});
-  if (!manifestResponse.ok) throw new Error("That Open VSX extension has no readable manifest.");
-  const manifestBytes = await readCappedResponse(
-    manifestResponse,
-    MAX_MANIFEST_BYTES,
-    "That Open VSX extension manifest is too large.",
-  );
-  const manifest = parseJsoncObject(new TextDecoder().decode(manifestBytes), "Extension manifest");
+  if (!manifestResponse.ok)
+    throw new ThemeError({
+      message: "That Open VSX extension has no readable manifest.",
+      detail: {
+        kind: "manifestUnreadable",
+      },
+    });
+  const manifestBytes = await readCappedResponse(manifestResponse, MAX_MANIFEST_BYTES, {
+    message: "That Open VSX extension manifest is too large.",
+    detail: { kind: "extensionManifestTooLarge" },
+  });
+  const manifest = parseJsoncObject(new TextDecoder().decode(manifestBytes), { kind: "manifest" });
   const advertisedContributions = themeContributions(manifest);
   if (advertisedContributions.length === 0) {
-    throw new Error("That extension does not contain color themes.");
+    throw new ThemeError({
+      message: "That extension does not contain color themes.",
+      detail: { kind: "noThemes" },
+    });
   }
   if (advertisedContributions.length > MAX_THEMES_PER_EXTENSION) {
-    throw new Error("That extension contains too many color themes to import safely.");
+    throw new ThemeError({
+      message: "That extension contains too many color themes to import safely.",
+      detail: {
+        kind: "tooManyThemes",
+      },
+    });
   }
 
   const packageBytes = await fetchPackage(extension.vsixUrl, signal);
   signal?.throwIfAborted();
   const checksumResponse = await fetch(extension.sha256Url, signal ? { signal } : {});
-  if (!checksumResponse.ok) throw new Error("That Open VSX theme has no readable checksum.");
+  if (!checksumResponse.ok)
+    throw new ThemeError({
+      message: "That Open VSX theme has no readable checksum.",
+      detail: {
+        kind: "checksumUnreadable",
+      },
+    });
   const expectedChecksum = new TextDecoder()
     .decode(
-      await readCappedResponse(
-        checksumResponse,
-        256,
-        "That Open VSX checksum response is invalid.",
-      ),
+      await readCappedResponse(checksumResponse, 256, {
+        message: "That Open VSX checksum response is invalid.",
+        detail: { kind: "checksumResponseInvalid" },
+      }),
     )
     .trim()
     .split(/\s+/)[0];
   if (!expectedChecksum || !/^[a-f\d]{64}$/i.test(expectedChecksum)) {
-    throw new Error("That Open VSX theme has an invalid checksum.");
+    throw new ThemeError({
+      message: "That Open VSX theme has an invalid checksum.",
+      detail: {
+        kind: "checksumInvalid",
+      },
+    });
   }
   signal?.throwIfAborted();
   const actualChecksum = [...sha256(packageBytes)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
   if (actualChecksum.toLowerCase() !== expectedChecksum.toLowerCase()) {
-    throw new Error("That Open VSX theme failed its integrity check.");
+    throw new ThemeError({
+      message: "That Open VSX theme failed its integrity check.",
+      detail: { kind: "integrity" },
+    });
   }
   signal?.throwIfAborted();
   let zip: JSZip;
@@ -675,13 +850,28 @@ export async function importOpenVsxThemeExtension(
     inspectZip(zip);
   } catch (cause) {
     if (signal?.aborted) signal.throwIfAborted();
-    if (cause instanceof Error && cause.message.startsWith("That extension package")) throw cause;
-    throw new Error("That Open VSX extension package could not be opened.", { cause });
+    if (
+      isThemeError(cause) &&
+      new Set<ThemeErrorDetail["kind"]>([
+        "zipDirectory",
+        "zipInvalidDirectory",
+        "zipTooManyFiles",
+        "zip64",
+        "zipExpansion",
+        "zipRatio",
+      ]).has(cause.detail.kind)
+    )
+      throw cause;
+    throw new ThemeError({
+      message: "That Open VSX extension package could not be opened.",
+      detail: { kind: "packageOpen" },
+      cause,
+    });
   }
 
   const packagedManifest = parseJsoncObject(
-    await readZipText(zip, "extension/package.json", "Extension manifest", signal),
-    "Extension manifest",
+    await readZipText(zip, "extension/package.json", { kind: "manifest" }, signal),
+    { kind: "manifest" },
   );
   if (
     typeof packagedManifest.publisher !== "string" ||
@@ -691,15 +881,34 @@ export async function importOpenVsxThemeExtension(
       extension.id.toLowerCase() ||
     packagedManifest.version !== extension.version
   ) {
-    throw new Error("That extension package does not match the selected Open VSX theme.");
+    throw new ThemeError({
+      message: "That extension package does not match the selected Open VSX theme.",
+      detail: {
+        kind: "packageMismatch",
+      },
+    });
   }
   if (!manifestLicenseMatches(packagedManifest, extension.license)) {
-    throw new Error("That extension package does not match its advertised license.");
+    throw new ThemeError({
+      message: "That extension package does not match its advertised license.",
+      detail: {
+        kind: "licenseMismatch",
+      },
+    });
   }
   const contributions = themeContributions(packagedManifest);
-  if (contributions.length === 0) throw new Error("That extension does not contain color themes.");
+  if (contributions.length === 0)
+    throw new ThemeError({
+      message: "That extension does not contain color themes.",
+      detail: { kind: "noThemes" },
+    });
   if (contributions.length > MAX_THEMES_PER_EXTENSION) {
-    throw new Error("That extension contains too many color themes to import safely.");
+    throw new ThemeError({
+      message: "That extension contains too many color themes to import safely.",
+      detail: {
+        kind: "tooManyThemes",
+      },
+    });
   }
 
   const parsed: Array<{ theme: ThemeDefinition; sourceName: string; sourcePath: string }> = [];
@@ -732,7 +941,11 @@ export async function importOpenVsxThemeExtension(
         displayName: label,
         ...(type ? { type } : {}),
       };
-      if (!isVsCodeThemeFile(decorated)) throw new Error("not a VS Code color theme");
+      if (!isVsCodeThemeFile(decorated))
+        throw new ThemeError({
+          message: "not a VS Code color theme",
+          detail: { kind: "notVsCode" },
+        });
       parsed.push({
         theme: parseVsCodeThemeFile(decorated),
         sourceName: path.split("/").at(-1)!,
@@ -744,10 +957,18 @@ export async function importOpenVsxThemeExtension(
     }
   }
   if (failures.length > 0) {
-    throw new Error("One or more color themes in that extension could not be imported safely.");
+    throw new ThemeError({
+      message: "One or more color themes in that extension could not be imported safely.",
+      detail: { kind: "unsafeImport" },
+    });
   }
   if (parsed.length === 0) {
-    throw new Error("That extension has no compatible color themes.");
+    throw new ThemeError({
+      message: "That extension has no compatible color themes.",
+      detail: {
+        kind: "noCompatibleThemes",
+      },
+    });
   }
   const extensionId = extension.id.toLowerCase();
   const sourcePathCounts = new Map<string, number>();

@@ -1,4 +1,5 @@
-import { type TimestampFormat } from "@t3tools/contracts/settings";
+import { InterfaceLanguage, type TimestampFormat } from "@t3tools/contracts/settings";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 
 function getTimestampFormatOptions(
   timestampFormat: TimestampFormat,
@@ -39,6 +40,27 @@ function readHostSystemLocale(): string | null {
 }
 
 const timestampLocale = resolveTimestampLocale(readHostSystemLocale());
+export const systemLocale = timestampLocale;
+const systemDateOptions = new Intl.DateTimeFormat(timestampLocale, {
+  hour: "numeric",
+}).resolvedOptions();
+const interfaceLocaleCache = new Map<string, string>();
+
+export function interfaceDateLocale(language: string): string {
+  if (!InterfaceLanguage.literals.some((supported) => supported === language)) {
+    throw new Error(`Unsupported interface language: ${language}.`);
+  }
+  const cached = interfaceLocaleCache.get(language);
+  if (cached) return cached;
+  const locale = new Intl.Locale(timestampLocale ?? systemDateOptions.locale, {
+    language,
+    calendar: systemDateOptions.calendar,
+    numberingSystem: systemDateOptions.numberingSystem,
+    ...(systemDateOptions.hourCycle ? { hourCycle: systemDateOptions.hourCycle } : {}),
+  }).toString();
+  interfaceLocaleCache.set(language, locale);
+  return locale;
+}
 
 const WEEKDAY_INDEXES = [0, 1, 2, 3, 4, 5, 6] as const;
 type WeekdayIndex = (typeof WEEKDAY_INDEXES)[number];
@@ -98,37 +120,27 @@ export function parseTimestampDate(isoDate: string): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-// Deliberately not the host locale: the tooltip's ordinal suffix and
-// day-before-month order below are English, so a localized month alone would
-// read "4th Juni 2026".
-const monthNameFormatter = new Intl.DateTimeFormat("en-US", { month: "long" });
-
-function ordinalSuffix(day: number): string {
-  const lastTwo = day % 100;
-  if (lastTwo >= 11 && lastTwo <= 13) return "th";
-  switch (day % 10) {
-    case 1:
-      return "st";
-    case 2:
-      return "nd";
-    case 3:
-      return "rd";
-    default:
-      return "th";
-  }
-}
+const monthNameFormatterCache = new Map<string, Intl.DateTimeFormat>();
 
 export function formatChatTimestampTooltip(
   isoDate: string,
   timestampFormat: TimestampFormat,
+  t: TFunction<"common">,
+  language: string,
 ): string {
   const date = parseTimestampDate(isoDate);
   if (!date) return "";
   const time = formatShortTimestamp(isoDate, timestampFormat);
   const day = date.getDate();
+  const locale = interfaceDateLocale(language);
+  let monthNameFormatter = monthNameFormatterCache.get(locale);
+  if (!monthNameFormatter) {
+    monthNameFormatter = new Intl.DateTimeFormat(locale, { month: "long", calendar: "gregory" });
+    monthNameFormatterCache.set(locale, monthNameFormatter);
+  }
   const month = monthNameFormatter.format(date);
   const year = date.getFullYear();
-  return `${time}, ${day}${ordinalSuffix(day)} ${month} ${year}`;
+  return t(($) => $.time.tooltip, { ordinal: true, count: day, time, day, month, year });
 }
 
 export function formatShortTimestamp(isoDate: string, timestampFormat: TimestampFormat): string {
@@ -184,6 +196,7 @@ function formatNumericDate(date: Date, sameYear: boolean, timeZone: string | und
 export function formatDayAwareTimestamp(
   isoDate: string,
   timestampFormat: TimestampFormat,
+  t: TFunction<"common">,
   nowMs: number = Date.now(),
   timeZone?: string,
 ): string {
@@ -196,14 +209,18 @@ export function formatDayAwareTimestamp(
   const dayDiff = today.index - messageDay.index;
 
   if (dayDiff <= 0) return time;
-  if (dayDiff === 1) return `yesterday at ${time}`;
-  return `${formatNumericDate(date, messageDay.year === today.year, timeZone)} ${time}`;
+  if (dayDiff === 1) return t(($) => $.time.yesterdayAt, { time });
+  return t(($) => $.time.dateTime, {
+    date: formatNumericDate(date, messageDay.year === today.year, timeZone),
+    time,
+  });
 }
 
 /** `timeZone` overrides the zone the formatters cached when they were built. */
 export function formatUpcomingTimestamp(
   isoDate: string,
   timestampFormat: TimestampFormat,
+  t: TFunction<"common">,
   nowMs: number = Date.now(),
   timeZone?: string,
 ): string {
@@ -215,17 +232,19 @@ export function formatUpcomingTimestamp(
   const targetDay = calendarDay(date, timeZone);
   const dayDiff = targetDay.index - today.index;
 
-  if (dayDiff < 0) return formatDayAwareTimestamp(isoDate, timestampFormat, nowMs, timeZone);
+  if (dayDiff < 0) return formatDayAwareTimestamp(isoDate, timestampFormat, t, nowMs, timeZone);
   if (dayDiff === 0) return time;
-  if (dayDiff === 1) return `tomorrow at ${time}`;
-  return `${formatNumericDate(date, targetDay.year === today.year, timeZone)} ${time}`;
+  if (dayDiff === 1) return t(($) => $.time.tomorrowAt, { time });
+  return t(($) => $.time.dateTime, {
+    date: formatNumericDate(date, targetDay.year === today.year, timeZone),
+    time,
+  });
 }
 
-type RelativeTimeParts = { value: string; suffix: string | null };
 export type RelativeTimeState =
   | { status: "missing" }
   | { status: "invalid" }
-  | { status: "relative"; value: string; suffix: string | null };
+  | { status: "relative"; label: string };
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 3_600_000;
@@ -259,66 +278,92 @@ export function msUntilRelativeTimeChange(
   return Math.min(nextChangeMs - nowMs, DAY_MS);
 }
 
-export function formatRelativeElapsed(elapsedMs: number): RelativeTimeParts {
+export function formatRelativeElapsed(elapsedMs: number, t: TFunction<"common">): string {
   const seconds = Math.floor(elapsedMs / 1000);
-  if (seconds < 60) return { value: "just now", suffix: null };
+  if (seconds < 60) return t(($) => $.time.justNow);
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return { value: `${minutes}m`, suffix: "ago" };
+  if (minutes < 60) return t(($) => $.time.minutesAgo, { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return { value: `${hours}h`, suffix: "ago" };
+  if (hours < 24) return t(($) => $.time.hoursAgo, { count: hours });
   const days = Math.floor(hours / 24);
-  return { value: `${days}d`, suffix: "ago" };
+  return t(($) => $.time.daysAgo, { count: days });
 }
 
 export function formatRelativeTime(
   isoDate: string,
+  t: TFunction<"common">,
   nowMs: number = Date.now(),
-): RelativeTimeParts | null {
+): string | null {
   const elapsedMs = relativeTimeElapsedMs(isoDate, nowMs);
-  return elapsedMs === null ? null : formatRelativeElapsed(elapsedMs);
+  return elapsedMs === null ? null : formatRelativeElapsed(elapsedMs, t);
 }
 
-export function formatRelativeTimeLabel(isoDate: string, nowMs: number = Date.now()) {
-  const relative = formatRelativeTime(isoDate, nowMs);
-  if (!relative) return "";
-  return relative.suffix ? `${relative.value} ${relative.suffix}` : relative.value;
+export function formatRelativeTimeLabel(
+  isoDate: string,
+  t: TFunction<"common">,
+  nowMs: number = Date.now(),
+): string {
+  return formatRelativeTime(isoDate, t, nowMs) ?? "";
 }
 
-export function formatElapsedDurationLabel(isoDate: string, nowMs: number = Date.now()): string {
+export function formatCompactRelativeTimeLabel(
+  isoDate: string,
+  t: TFunction<"common">,
+  nowMs: number = Date.now(),
+): string {
+  const elapsedMs = relativeTimeElapsedMs(isoDate, nowMs);
+  if (elapsedMs === null) return "";
+  if (elapsedMs < MINUTE_MS) return t(($) => $.time.now);
+  if (elapsedMs < HOUR_MS) return t(($) => $.time.minutes, { count: elapsedMs / MINUTE_MS });
+  if (elapsedMs < DAY_MS) return t(($) => $.time.hours, { count: elapsedMs / HOUR_MS });
+  return t(($) => $.time.days, { count: elapsedMs / DAY_MS });
+}
+
+export function formatElapsedDurationLabel(
+  isoDate: string,
+  t: TFunction<"common">,
+  nowMs: number = Date.now(),
+): string {
   const date = parseTimestampDate(isoDate);
   if (!date) return "";
   const diffMs = nowMs - date.getTime();
-  if (diffMs <= 0) return "just now";
+  if (diffMs <= 0) return t(($) => $.time.justNow);
 
   const seconds = Math.floor(diffMs / 1000);
-  if (seconds < 5) return "just now";
-  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 5) return t(($) => $.time.justNow);
+  if (seconds < 60) return t(($) => $.time.seconds, { count: seconds });
 
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 60) return t(($) => $.time.minutes, { count: minutes });
 
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
+  if (hours < 24) return t(($) => $.time.hours, { count: hours });
 
   const days = Math.floor(hours / 24);
-  return `${days}d`;
+  return t(($) => $.time.days, { count: days });
 }
 
 /** Pass nowMs to match a parent-driven render tick. */
-export function formatExpiresInLabel(isoDate: string, nowMs: number = Date.now()): string {
+export function formatExpiresInLabel(
+  isoDate: string,
+  t: TFunction<"common">,
+  nowMs: number = Date.now(),
+): string {
   const date = parseTimestampDate(isoDate);
   if (!date) return "";
   const diffMs = date.getTime() - nowMs;
-  if (diffMs <= 0) return "Expired";
+  if (diffMs <= 0) return t(($) => $.time.expired);
 
   const totalSeconds = Math.floor(diffMs / 1000);
-  if (totalSeconds < 5) return "Expires in a moment";
-  if (totalSeconds < 60) return `Expires in ${totalSeconds}s`;
+  if (totalSeconds < 5) return t(($) => $.time.expiresSoon);
+  if (totalSeconds < 60) return t(($) => $.time.expiresSeconds, { seconds: totalSeconds });
 
   if (totalSeconds < 3600) {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
-    return seconds === 0 ? `Expires in ${minutes}m` : `Expires in ${minutes}m ${seconds}s`;
+    return seconds === 0
+      ? t(($) => $.time.expiresMinutes, { minutes })
+      : t(($) => $.time.expiresMinutesSeconds, { minutes, seconds });
   }
 
   if (totalSeconds < 86_400) {
@@ -326,22 +371,34 @@ export function formatExpiresInLabel(isoDate: string, nowMs: number = Date.now()
     const rem = totalSeconds % 3600;
     const minutes = Math.floor(rem / 60);
     const seconds = rem % 60;
-    const parts = [`${hours}h`];
-    if (minutes > 0) parts.push(`${minutes}m`);
-    if (seconds > 0) parts.push(`${seconds}s`);
-    return `Expires in ${parts.join(" ")}`;
+    if (minutes > 0 && seconds > 0) {
+      return t(($) => $.time.expiresHoursMinutesSeconds, { hours, minutes, seconds });
+    }
+    if (minutes > 0) return t(($) => $.time.expiresHoursMinutes, { hours, minutes });
+    if (seconds > 0) return t(($) => $.time.expiresHoursSeconds, { hours, seconds });
+    return t(($) => $.time.expiresHours, { hours });
   }
 
   const days = Math.floor(totalSeconds / 86_400);
   const remAfterDays = totalSeconds % 86_400;
-  if (remAfterDays === 0) return `Expires in ${days}d`;
+  if (remAfterDays === 0) return t(($) => $.time.expiresDays, { days });
   const hours = Math.floor(remAfterDays / 3600);
   const rem = remAfterDays % 3600;
   const minutes = Math.floor(rem / 60);
   const seconds = rem % 60;
-  const tail: string[] = [];
-  if (hours > 0) tail.push(`${hours}h`);
-  if (minutes > 0) tail.push(`${minutes}m`);
-  if (seconds > 0) tail.push(`${seconds}s`);
-  return tail.length > 0 ? `Expires in ${days}d ${tail.join(" ")}` : `Expires in ${days}d`;
+  if (hours > 0 && minutes > 0 && seconds > 0) {
+    return t(($) => $.time.expiresDaysHoursMinutesSeconds, { days, hours, minutes, seconds });
+  }
+  if (hours > 0 && minutes > 0) {
+    return t(($) => $.time.expiresDaysHoursMinutes, { days, hours, minutes });
+  }
+  if (hours > 0 && seconds > 0) {
+    return t(($) => $.time.expiresDaysHoursSeconds, { days, hours, seconds });
+  }
+  if (minutes > 0 && seconds > 0) {
+    return t(($) => $.time.expiresDaysMinutesSeconds, { days, minutes, seconds });
+  }
+  if (hours > 0) return t(($) => $.time.expiresDaysHours, { days, hours });
+  if (minutes > 0) return t(($) => $.time.expiresDaysMinutes, { days, minutes });
+  return t(($) => $.time.expiresDaysSeconds, { days, seconds });
 }

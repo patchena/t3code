@@ -1,5 +1,6 @@
 import { ChildThreadApprovals } from "./ChildThreadApprovals";
 import { useOpenThreadInspector } from "./thread-inspector-navigation";
+import { mobileI18n } from "~/i18n";
 import { useSidebarWorkspaceTabs } from "../layout/workspace/useSystemWorkspaceTabBar";
 import { useWorkspaceTabs } from "../layout/workspace/WorkspaceTabsContext";
 import {
@@ -736,6 +737,8 @@ function ThreadDetailBody(
   };
   const pendingBackgroundWork = presentPendingBackgroundWork(
     props.selectedThread.pendingBackgroundTasks,
+    mobileI18n.getFixedT("en", "activity"),
+    "en",
   );
   const extensionStatus = props.extensionStatuses?.length
     ? {
@@ -800,7 +803,7 @@ function ThreadDetailBody(
     if (childInput && contentPresentationKind === "ready") {
       return {
         kind: "child-input",
-        label: childThreadInputsTitle(childThreadInputs),
+        label: childThreadInputsTitle(childThreadInputs, mobileI18n.getFixedT("en", "activity")),
         accessibilityLabel: `Open ${childInput.hasPendingApprovals ? "approval" : "question"} from ${childInput.title}`,
         onPress: () => {
           Keyboard.dismiss();
@@ -841,7 +844,7 @@ function ThreadDetailBody(
       const state = lifecycleSnoozed ? "snoozed" : settled ? "settled" : "woke";
       const label =
         lifecycleSnoozed && snoozedUntil !== null
-          ? `Snoozed, wakes in ${snoozeWakeLabel(snoozedUntil, { now: lifecycleNow })}`
+          ? `Snoozed, wakes in ${snoozeWakeLabel(snoozedUntil, { now: lifecycleNow, t: mobileI18n.getFixedT(null, "common") })}`
           : settled
             ? "Settled"
             : "Woke from snooze";
@@ -866,7 +869,11 @@ function ThreadDetailBody(
       };
     }
     if (props.selectedThread.goal !== null && contentPresentationKind === "ready") {
-      const goal = presentProviderGoal(props.selectedThread.goal, false);
+      const goal = presentProviderGoal(
+        props.selectedThread.goal,
+        false,
+        mobileI18n.getFixedT("en", "activity"),
+      );
       return {
         kind: "goal",
         label: goal.title,

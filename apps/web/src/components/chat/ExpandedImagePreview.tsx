@@ -1,4 +1,5 @@
 import type { SnapShotSource } from "@t3tools/contracts";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 
 import type { ComposerFileAttachment } from "../../composerDraftStore";
 import { type ChatFileAttachment, type ChatImageAttachment, isVideoAttachment } from "../../types";
@@ -38,18 +39,21 @@ export interface ExpandedImagePreview {
   index: number;
 }
 
-export async function resolveMarkdownMediaPreview(input: {
-  source: string;
-  resolvedFilePath?: string | undefined;
-  cwd?: string | undefined;
-  threadRef?: ScopedThreadRef | undefined;
-  httpBaseUrl?: string | undefined;
-  onOpenFile?: ((relativePath: string) => void) | undefined;
-  createAssetUrl: (input: {
-    environmentId: EnvironmentId;
-    input: { resource: AssetResource };
-  }) => Promise<AtomCommandResult<AssetCreateUrlResult, unknown>>;
-}): Promise<ExpandedImagePreview | null> {
+export async function resolveMarkdownMediaPreview(
+  input: {
+    source: string;
+    resolvedFilePath?: string | undefined;
+    cwd?: string | undefined;
+    threadRef?: ScopedThreadRef | undefined;
+    httpBaseUrl?: string | undefined;
+    onOpenFile?: ((relativePath: string) => void) | undefined;
+    createAssetUrl: (input: {
+      environmentId: EnvironmentId;
+      input: { resource: AssetResource };
+    }) => Promise<AtomCommandResult<AssetCreateUrlResult, unknown>>;
+  },
+  t: TFunction<"chat">,
+): Promise<ExpandedImagePreview | null> {
   const media = resolveMediaSource(input.source, {
     threadId: input.threadRef?.threadId,
     workspaceRoot: input.cwd,
@@ -65,7 +69,7 @@ export async function resolveMarkdownMediaPreview(input: {
     src = resolveProtocolRelativeMediaUrl(media.uri);
   } else {
     if (media.access === "unavailable" || !input.threadRef || !input.httpBaseUrl) {
-      throw new Error("Reconnect to this environment and open the media again.");
+      throw new Error(t(($) => $.media.reconnectPreview));
     }
     asset = { environmentId: input.threadRef.environmentId, resource: media.resource };
     const result = await input.createAssetUrl({
@@ -74,7 +78,7 @@ export async function resolveMarkdownMediaPreview(input: {
     });
     if (result._tag === "Failure") throw squashAtomCommandFailure(result);
     const assetUrl = resolveAssetUrl(input.httpBaseUrl, result.value.relativeUrl);
-    if (assetUrl === null) throw new Error("The environment returned an invalid media URL.");
+    if (assetUrl === null) throw new Error(t(($) => $.media.invalidUrl));
     src = assetUrl + media.srcFragment;
   }
   return {

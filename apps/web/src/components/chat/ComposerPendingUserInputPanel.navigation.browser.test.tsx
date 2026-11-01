@@ -11,10 +11,10 @@ import { useLayoutEffect, useRef, type ComponentProps } from "react";
 import { expect, it, vi } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 
-vi.mock(import("../ChatMarkdown"), async (importOriginal) => ({
-  ...(await importOriginal()),
-  default: (({ text }: { text: string }) => <p>{text}</p>) as never,
-}));
+vi.mock(import("../ChatMarkdown"), async () => {
+  const { memo } = await import("react");
+  return { ChatMarkdown: memo(({ text }: { text: string }) => <p>{text}</p>) };
+});
 
 import { act, fakeTimers, render } from "../../../test/render";
 import { useComposerDraftStore } from "../../composerDraftStore";

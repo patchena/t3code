@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import * as Schema from "effect/Schema";
 import { deriveProjectIdentity } from "../../projectIdentity";
 import { ProjectMonogram } from "../ProjectMonogram";
@@ -84,6 +85,7 @@ function ProjectIconPickerBody({
   readonly onClose: () => void;
   readonly onSelect: (icon: ProjectIconOverride) => void;
 }) {
+  const { t } = useTranslation("settings");
   const automatic = deriveProjectIdentity(projectName);
   const [mode, setMode] = useState<ProjectIconOverride["kind"]>(current?.kind ?? "lucide");
   const [iconName, setIconName] = useState<string>(
@@ -118,12 +120,12 @@ function ProjectIconPickerBody({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Choose project icon</DialogTitle>
-        <DialogDescription>Choose an icon, emoji, or monogram.</DialogDescription>
+        <DialogTitle>{t(($) => $.extra.projects.chooseProjectIcon)}</DialogTitle>
+        <DialogDescription>{t(($) => $.extra.projects.iconDescription)}</DialogDescription>
       </DialogHeader>
       <DialogPanel className="flex min-h-0 flex-col">
         <ToggleGroup
-          aria-label="Icon type"
+          aria-label={t(($) => $.extra.projects.iconType)}
           variant="segmented"
           value={[mode]}
           onValueChange={(next) => {
@@ -131,20 +133,26 @@ function ProjectIconPickerBody({
             if (value === "lucide" || value === "emoji" || value === "monogram") setMode(value);
           }}
         >
-          <Toggle value="lucide">Icons</Toggle>
-          <Toggle value="emoji">Emoji</Toggle>
-          <Toggle value="monogram">Monogram</Toggle>
+          <Toggle value="lucide">{t(($) => $.extra.projects.icons)}</Toggle>
+          <Toggle value="emoji">{t(($) => $.extra.projects.emoji)}</Toggle>
+          <Toggle value="monogram">{t(($) => $.extra.projects.monogram)}</Toggle>
         </ToggleGroup>
 
         {mode !== "emoji" ? (
           <div>
-            <div className="mb-2 text-xs font-medium text-muted-foreground">Color</div>
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Icon color">
+            <div className="mb-2 text-xs font-medium text-muted-foreground">
+              {t(($) => $.extra.projects.color)}
+            </div>
+            <div
+              className="flex flex-wrap gap-1.5"
+              role="group"
+              aria-label={t(($) => $.extra.projects.iconColor)}
+            >
               {PROJECT_ICON_COLORS.map((option) => (
                 <button
                   key={option.value}
                   type="button"
-                  aria-label={option.label}
+                  aria-label={t(($) => $.extra.projectColors[option.value])}
                   aria-pressed={color === option.value}
                   className={cn(
                     "flex size-6 items-center justify-center rounded-full border border-transparent outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
@@ -164,8 +172,8 @@ function ProjectIconPickerBody({
             <Input
               type="search"
               value={query}
-              aria-label="Search Lucide icons"
-              placeholder="Search all Lucide icons"
+              aria-label={t(($) => $.extra.projects.searchLucide)}
+              placeholder={t(($) => $.extra.projects.searchAllLucide)}
               onChange={(event) => setQuery(event.currentTarget.value)}
             />
             <ScrollArea scrollFade className="max-h-64">
@@ -189,7 +197,9 @@ function ProjectIconPickerBody({
               </div>
             </ScrollArea>
             {icons.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">No icons found.</p>
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                {t(($) => $.extra.projects.noIcons)}
+              </p>
             ) : null}
           </>
         ) : mode === "monogram" ? (
@@ -201,7 +211,7 @@ function ProjectIconPickerBody({
             />
             <div className="flex-1 space-y-2">
               <label htmlFor="project-monogram" className="text-sm font-medium">
-                Letters
+                {t(($) => $.extra.projects.letters)}
               </label>
               <Input
                 id="project-monogram"
@@ -212,7 +222,7 @@ function ProjectIconPickerBody({
                 autoComplete="off"
               />
               <p id="project-monogram-hint" className="text-xs text-muted-foreground">
-                One or two letters or numbers.
+                {t(($) => $.extra.projects.lettersDescription)}
               </p>
             </div>
           </div>
@@ -224,7 +234,7 @@ function ProjectIconPickerBody({
                   <button
                     key={option.emoji}
                     type="button"
-                    aria-label={option.label}
+                    aria-label={t(($) => $.extra.projectEmoji[option.id])}
                     aria-pressed={emoji === option.emoji}
                     className={cn(
                       "flex aspect-square items-center justify-center rounded-md border border-transparent text-xl outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
@@ -239,12 +249,12 @@ function ProjectIconPickerBody({
             </ScrollArea>
             <div>
               <div className="mb-2 text-xs font-medium text-muted-foreground">
-                Or paste any emoji
+                {t(($) => $.extra.projects.pasteEmoji)}
               </div>
               <Input
                 value={customEmoji}
-                aria-label="Custom emoji"
-                placeholder="Paste an emoji"
+                aria-label={t(($) => $.extra.projects.customEmoji)}
+                placeholder={t(($) => $.extra.projects.emojiPlaceholder)}
                 onChange={(event) => {
                   const value = event.currentTarget.value;
                   setCustomEmoji(value);
@@ -258,10 +268,10 @@ function ProjectIconPickerBody({
       </DialogPanel>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>
-          Cancel
+          {t(($) => $.extra.projects.cancel)}
         </Button>
         <Button onClick={save} disabled={mode === "monogram" && !validMonogram}>
-          Save icon
+          {t(($) => $.extra.projects.saveIcon)}
         </Button>
       </DialogFooter>
     </>

@@ -2,7 +2,14 @@
   "name": "@t3tools/client-runtime",
   "private": true,
   "type": "module",
+  "imports": {
+    "#client/*": "./src/*.ts"
+  },
   "exports": {
+    "./i18n": {
+      "types": "./src/i18n/index.ts",
+      "default": "./src/i18n/index.ts"
+    },
     "./assembly-highlighting": {
       "types": "./src/assemblyHighlighting.ts",
       "default": "./src/assemblyHighlighting.ts"
@@ -561,6 +568,7 @@
     "@t3tools/source-control-core": "workspace:*",
     "@t3tools/source-control-definitions": "workspace:*",
     "effect": "catalog:",
+    "i18next": "26.5.12",
     "jszip": "3.10.1",
     "three": "0.180.0"
   },

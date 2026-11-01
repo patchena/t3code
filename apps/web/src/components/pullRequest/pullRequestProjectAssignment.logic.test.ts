@@ -5,7 +5,7 @@ import {
   assignProjectsToEnvironments,
   resolvePickableEnvironments,
   type AssignableProject,
-} from "./pullRequestProjectAssignment.logic";
+} from "~/components/pullRequest/pullRequestProjectAssignment.logic";
 
 const project = (
   id: string,

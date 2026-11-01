@@ -1,3 +1,4 @@
+import { appI18n } from "~/i18n";
 import { useAtomValue } from "@effect/atom-react";
 import { serverUpdateStateAtom } from "@t3tools/client-runtime/state/server";
 import { EnvironmentId } from "@t3tools/contracts";
@@ -10,8 +11,8 @@ import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { desktopUpdateStateAtom } from "~/state/desktopUpdate";
 import { serverEnvironment } from "~/state/server";
 import { resolveVersionMismatch } from "~/versionSkew";
-import type { ServerUpdateOutcome, ServerUpdateTarget } from "../ServerUpdateAction";
-import { stackedThreadToast, toastManager } from "../ui/toast";
+import type { ServerUpdateOutcome, ServerUpdateTarget } from "~/components/ServerUpdateAction";
+import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import {
   closeFinishedUpdateRun,
   getUpdateEverythingToastView,
@@ -19,7 +20,7 @@ import {
   type UpdateEverythingResult,
   type UpdateEverythingRun,
   type UpdateRunMachine,
-} from "./updateEverything.logic";
+} from "~/components/sidebar/updateEverything.logic";
 
 const updateEverythingRunAtom = Atom.make<UpdateEverythingRun | null>(null).pipe(
   Atom.keepAlive,
@@ -69,6 +70,7 @@ export function retryFailedUpdateRunServers(
     options: { readonly quiet: boolean },
   ) => Promise<ServerUpdateOutcome>,
 ): void {
+  const t = appI18n.getFixedT(null, "workspace");
   const failed = (appAtomRegistry.get(updateEverythingRunAtom)?.machines ?? []).flatMap(
     (machine) =>
       machine.result === "failed" && machine.server !== null
@@ -91,7 +93,7 @@ export function retryFailedUpdateRunServers(
           ? providerFailure
           : outcome.status === "failed"
             ? outcome.message
-            : "Could not start the update",
+            : t(($) => $.updates.couldNotStartTheUpdate),
         { serverUpdated: outcome.status === "updated" },
       ),
     );
@@ -233,7 +235,8 @@ function takeSavedUpdateEverythingResult(): typeof SavedResult.Type | null {
 }
 
 export function showUpdateEverythingResult(result: UpdateEverythingResult): void {
-  const view = getUpdateEverythingToastView(result, APP_VERSION);
+  const t = appI18n.getFixedT(null, "workspace");
+  const view = getUpdateEverythingToastView(result, APP_VERSION, t);
   if (!view) return;
   toastManager.add(
     stackedThreadToast({
@@ -247,6 +250,7 @@ export function showUpdateEverythingResult(result: UpdateEverythingResult): void
 }
 
 function followHandedOffServers(servers: ReadonlyArray<HandedOffServer>): void {
+  const t = appI18n.getFixedT(null, "workspace");
   if (servers.length === 0) return;
   setUpdateEverythingRun(() => ({
     localVersion: null,
@@ -303,7 +307,7 @@ function followHandedOffServers(servers: ReadonlyArray<HandedOffServer>): void {
       }
     };
     const timer = setTimeout(
-      () => settle(`Not back after ${HANDOFF_TIMEOUT_MS / 60_000} minutes`),
+      () => settle(t(($) => $.updates.notBack, { minutes: HANDOFF_TIMEOUT_MS / 60_000 })),
       server.startedAt + HANDOFF_TIMEOUT_MS - Date.now(),
     );
     const unsubscribe = appAtomRegistry.subscribe(
@@ -323,6 +327,7 @@ function followHandedOffServers(servers: ReadonlyArray<HandedOffServer>): void {
 
 /** Reports, once per launch, how the update run that restarted the app ended. */
 export function startDesktopUpdateLaunchNotice(): () => void {
+  const t = appI18n.getFixedT(null, "workspace");
   const saved = takeSavedUpdateEverythingResult();
   if (saved) {
     const handedOff = saved.handedOff ?? [];
@@ -341,8 +346,11 @@ export function startDesktopUpdateLaunchNotice(): () => void {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Update did not apply",
-          description: `T3 Code is still on ${APP_VERSION}. Install ${notAppliedVersion} again from the update button.`,
+          title: t(($) => $.updates.updateDidNotApply),
+          description: t(($) => $.updates.appStillOld, {
+            current: APP_VERSION,
+            version: notAppliedVersion,
+          }),
         }),
       );
     },

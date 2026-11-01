@@ -17,6 +17,7 @@ import type {
   ThreadId,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 
 import { formatSubagentDisplayTitle } from "./subagentDisplay.ts";
 
@@ -392,10 +393,10 @@ export function resolveThreadWorkingStartedAt(input: {
   return null;
 }
 
-export function formatWorkingDurationLabel(elapsedMs: number): string {
+export function formatWorkingDurationLabel(elapsedMs: number, t: TFunction<"common">): string {
   const seconds = Number.isFinite(elapsedMs) ? Math.max(0, Math.floor(elapsedMs / 1000)) : 0;
-  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 60) return t(($) => $.time.seconds, { count: seconds });
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  if (minutes < 60) return t(($) => $.time.minutes, { count: minutes });
+  return t(($) => $.time.hoursMinutes, { hours: Math.floor(minutes / 60), minutes: minutes % 60 });
 }

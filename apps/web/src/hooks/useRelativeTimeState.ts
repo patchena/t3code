@@ -1,13 +1,15 @@
 import { useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   formatRelativeElapsed,
   msUntilRelativeTimeChange,
   relativeTimeElapsedMs,
   type RelativeTimeState,
-} from "../timestampFormat";
+} from "~/timestampFormat";
 
 export function useRelativeTimeState(isoDate: string | null): RelativeTimeState {
+  const { t } = useTranslation("common");
   const subscribe = (onChange: () => void) => {
     if (isoDate === null) return () => {};
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -27,5 +29,5 @@ export function useRelativeTimeState(isoDate: string | null): RelativeTimeState 
 
   if (isoDate === null) return { status: "missing" };
   if (elapsedMs === null) return { status: "invalid" };
-  return { status: "relative", ...formatRelativeElapsed(elapsedMs) };
+  return { status: "relative", label: formatRelativeElapsed(elapsedMs, t) };
 }

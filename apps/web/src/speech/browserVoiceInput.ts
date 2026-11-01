@@ -11,6 +11,7 @@ import {
 import type { PreparedConnection } from "@t3tools/client-runtime/connection";
 import type { SpeechTranscriptionOptions, SpeechStreamText } from "@t3tools/contracts";
 
+import { appI18n } from "~/i18n";
 import { runtime } from "../lib/runtime";
 import { createBrowserPcmCapture } from "./browserPcmCapture";
 
@@ -24,6 +25,7 @@ export function createBrowserVoiceInputPlatform(input: {
   readonly onText: (text: SpeechStreamText) => void;
   readonly onError: (message: string) => void;
 }) {
+  const t = appI18n.getFixedT(null, "voice");
   return createBrowserPcmCapture(input, async (options) => {
     const recordingOptions = input.getTranscriptionOptions();
     const status = await runtime.runPromise(getEnvironmentSpeechStatus(input.prepared), options);
@@ -64,7 +66,7 @@ export function createBrowserVoiceInputPlatform(input: {
         throwIfVoiceTranscriptionAborted(transcriptionSignal);
         throw new VoiceTranscriptionError({
           code: "transcription-failed",
-          message: "Voice transcription on this environment failed.",
+          message: t(($) => $.errors.environmentFailed),
           cause,
         });
       }
@@ -83,6 +85,7 @@ export function createBrowserVoiceInputPlatform(input: {
         signal: options.signal,
         onText: input.onText,
         onError: (error) => input.onError(error.message),
+        t,
       }),
     };
   });

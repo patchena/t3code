@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   EasDeviceHostConfig,
   type EasDeviceHostConfig as EasDeviceHostConfigType,
@@ -35,8 +36,10 @@ export function updateEasDeviceHosts(
     : [...hosts, next];
 }
 
-export function easSessionLimits(host: EasDeviceHostConfigType) {
-  const sessions =
-    host.maxConcurrentSessions === 1 ? "1 session" : `${host.maxConcurrentSessions} sessions`;
-  return `Up to ${sessions} at once, each stopped after ${host.maxSessionMinutes} min or ${host.idleMinutes} idle min`;
+export function easSessionLimits(host: EasDeviceHostConfigType, t: TFunction<"settings">) {
+  return t(($) => $.providers.easLimits, {
+    count: host.maxConcurrentSessions,
+    minutes: host.maxSessionMinutes,
+    idle: host.idleMinutes,
+  });
 }

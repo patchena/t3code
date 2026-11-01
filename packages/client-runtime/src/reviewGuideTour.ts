@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { FileDiffMetadata } from "@pierre/diffs";
 import type { PullRequestReviewGuideExcerpt, PullRequestReviewGuideStop } from "@t3tools/contracts";
 
@@ -14,10 +15,10 @@ export function stopFilePaths(stop: PullRequestReviewGuideStop): ReadonlyArray<s
   ];
 }
 
-export function stopSubline(stop: PullRequestReviewGuideStop): string {
+export function stopSubline(stop: PullRequestReviewGuideStop, t: TFunction<"workspace">): string {
   const count = stopFilePaths(stop).length;
-  if (count === 0) return "Context, no code";
-  return count === 1 ? "1 file" : `${count} files`;
+  if (count === 0) return t(($) => $.git.contextWithoutCode);
+  return t(($) => $.git.fileCount, { count });
 }
 
 function noteMarker(index: number): string {

@@ -6,7 +6,7 @@ import {
   isFileDiffCollapsed,
   isLineInFileDiff,
   toggleFileDiffFoldForViewed,
-} from "./pullRequestDiff.logic";
+} from "~/components/pullRequest/pullRequestDiff.logic";
 
 function fileWithHunks(
   hunks: ReadonlyArray<{

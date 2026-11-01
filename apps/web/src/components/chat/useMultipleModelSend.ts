@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   type EnvironmentId,
   type ModelSelection,
@@ -61,6 +62,7 @@ interface MultipleModelSendInput {
  * user has moved on, through a "Restore prompt" toast.
  */
 export function useMultipleModelSend(input: MultipleModelSendInput) {
+  const { t } = useTranslation("chat");
   const {
     environmentId,
     routeThreadKey,
@@ -149,61 +151,64 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
       setThreadError(threadId, null);
       const starts = Promise.all(
         targets.map(async (target) => {
-          const started = await startFanoutThread({
-            retryKey: JSON.stringify([
-              routeThreadKey,
-              target.selection.instanceId,
-              target.selection.model,
-            ]),
-            model: target.selection.model,
-            uncertainSubmissions: uncertainSubmissionsRef.current,
-            start: (targetThreadId) => {
-              return startThreadTurn({
-                environmentId,
-                input: {
-                  threadId: targetThreadId,
-                  message: {
-                    messageId: newMessageId(),
-                    role: "user",
-                    attachments,
-                    ...withMessageContext({
-                      text: target.text,
-                      context,
-                    }),
-                  },
-                  modelSelection: target.selection,
-                  titleSeed: title,
-                  runtimeMode,
-                  interactionMode: target.interactionMode,
-                  bootstrap: {
-                    createThread: {
-                      projectId: project.id,
-                      title,
-                      modelSelection: target.selection,
-                      runtimeMode,
-                      interactionMode: target.interactionMode,
-                      branch,
-                      worktreePath: null,
-                      createdAt: createdAt,
+          const started = await startFanoutThread(
+            {
+              retryKey: JSON.stringify([
+                routeThreadKey,
+                target.selection.instanceId,
+                target.selection.model,
+              ]),
+              model: target.selection.model,
+              uncertainSubmissions: uncertainSubmissionsRef.current,
+              start: (targetThreadId) => {
+                return startThreadTurn({
+                  environmentId,
+                  input: {
+                    threadId: targetThreadId,
+                    message: {
+                      messageId: newMessageId(),
+                      role: "user",
+                      attachments,
+                      ...withMessageContext({
+                        text: target.text,
+                        context,
+                      }),
                     },
-                    prepareWorktree: {
-                      projectCwd: project.workspaceRoot,
-                      baseBranch: branch,
-                      requireWorktree: true,
-                      ...(startFromOrigin ? { startFromOrigin: true } : {}),
+                    modelSelection: target.selection,
+                    titleSeed: title,
+                    runtimeMode,
+                    interactionMode: target.interactionMode,
+                    bootstrap: {
+                      createThread: {
+                        projectId: project.id,
+                        title,
+                        modelSelection: target.selection,
+                        runtimeMode,
+                        interactionMode: target.interactionMode,
+                        branch,
+                        worktreePath: null,
+                        createdAt: createdAt,
+                      },
+                      prepareWorktree: {
+                        projectCwd: project.workspaceRoot,
+                        baseBranch: branch,
+                        requireWorktree: true,
+                        ...(startFromOrigin ? { startFromOrigin: true } : {}),
+                      },
+                      runSetupScript: true,
                     },
-                    runSetupScript: true,
+                    createdAt: createdAt,
                   },
-                  createdAt: createdAt,
-                },
-              });
+                });
+              },
+              openThread: (threadId) =>
+                void navigate({
+                  to: "/$environmentId/$threadId",
+                  params: buildThreadRouteParams(scopeThreadRef(environmentId, threadId)),
+                }),
             },
-            openThread: (threadId) =>
-              void navigate({
-                to: "/$environmentId/$threadId",
-                params: buildThreadRouteParams(scopeThreadRef(environmentId, threadId)),
-              }),
-          });
+            t,
+          );
           if (started) startedCount += 1;
           else failedSelections.push(target.selection);
         }),
@@ -216,7 +221,7 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
         toastManager.add(
           stackedThreadToast({
             type: "success",
-            title: `Started ${startedCount} ${startedCount === 1 ? "thread" : "threads"} in background`,
+            title: t(($) => $.composer.startedThreads, { count: startedCount }),
           }),
         );
       }
@@ -227,7 +232,10 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
     if (sendResult._tag === "Failure") {
       const error = squashAtomCommandFailure(sendResult);
       failedSelections.push(...selections);
-      setThreadError(threadId, error instanceof Error ? error.message : "Failed to send messages.");
+      setThreadError(
+        threadId,
+        error instanceof Error ? error.message : t(($) => $.composer.sendMessagesFailed),
+      );
     }
     const restoreFailedDraft = () => {
       appAtomRegistry.set(fanoutSelectionsAtom, failedSelections);
@@ -250,12 +258,11 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
         const recoveryToastId = toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "A background prompt could not be sent",
-            description:
-              "Your newer draft is unchanged. Restore the failed prompt when this composer is empty.",
+            title: t(($) => $.composer.backgroundPromptFailed),
+            description: t(($) => $.composer.newerDraftKept),
             timeout: 0,
             actionProps: {
-              children: "Restore prompt",
+              children: t(($) => $.composer.restorePrompt),
               onClick: () => {
                 if (
                   !draftId ||
@@ -266,8 +273,7 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
                   )
                 ) {
                   toastManager.update(recoveryToastId, {
-                    description:
-                      "Return to the original draft and send or clear its current prompt before restoring.",
+                    description: t(($) => $.composer.returnOriginalDraft),
                   });
                   return;
                 }

@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { AssetResource, ProjectReadFileError, ScopedThreadRef } from "@t3tools/contracts";
 import { mediaFileReference } from "@t3tools/client-runtime/media-reference";
 import { isHostPath, workspaceRelativeFilePath } from "@t3tools/shared/path";
@@ -10,20 +11,23 @@ export function resolveFilePreviewPath(path: string | null, cwd: string): string
 export const isMarkdownPreviewFile = (path: string): boolean =>
   /\.(?:md|mdx|markdown|mdown|mkd)$/i.test(path);
 
-export function filePreviewReadErrorMessage(error: ProjectReadFileError): string {
+export function filePreviewReadErrorMessage(
+  error: ProjectReadFileError,
+  t: TFunction<"files">,
+): string {
   switch (error.failure) {
     case "path_not_file":
-      return "The path is a directory or special file, not a regular file.";
+      return t(($) => $.readError.pathNotFile);
     case "binary_file":
-      return "The file is binary and cannot be displayed as text.";
+      return t(($) => $.readError.binaryFile);
     case "workspace_path_outside_root":
-      return "The requested path is outside the workspace.";
+      return t(($) => $.readError.outsideWorkspace);
     case "resolved_path_outside_root":
-      return "The path resolves to a location outside the workspace.";
+      return t(($) => $.readError.resolvedOutside);
     case "operation_failed":
       return error.operation === "realpath-workspace-root"
-        ? "The workspace folder could not be accessed."
-        : "The file could not be accessed or read. It may be missing or inaccessible.";
+        ? t(($) => $.readError.workspaceUnavailable)
+        : t(($) => $.readError.fileUnavailable);
     default:
       return error.message;
   }

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   type AddProjectRemoteSource,
   type NewProjectPublishTarget,
@@ -81,6 +82,7 @@ export function NewProjectPublishHostPicker(props: {
   readonly onValueChange: (kind: SourceControlProviderKind) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { t } = useTranslation("workspace");
   return (
     <span
       className="flex"
@@ -101,7 +103,7 @@ export function NewProjectPublishHostPicker(props: {
           if (kind !== null) props.onValueChange(kind);
         }}
       >
-        <SelectTrigger size="xs" variant="ghost" aria-label="Host for the new repository">
+        <SelectTrigger size="xs" variant="ghost" aria-label={t(($) => $.palette.repositoryHost)}>
           <SelectValue>
             {(kind: SourceControlProviderKind) => sourceControlClients.get(kind).label}
           </SelectValue>
@@ -127,6 +129,7 @@ export function NewProjectSummary(props: {
   readonly projectsRoot: string | null;
   readonly environmentLabel: string | null;
 }) {
+  const { t } = useTranslation("workspace");
   return (
     <div className="p-2 pb-0">
       <div className="flex min-h-8 items-center gap-2 rounded-sm px-2 py-1.5">
@@ -135,13 +138,22 @@ export function NewProjectSummary(props: {
         </CommandPaletteTitleIcon>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate text-foreground text-sm">
-            {props.name.length > 0 ? props.name : "New project"}
+            {props.name.length > 0 ? props.name : t(($) => $.palette.newProject)}
           </span>
           <span className="truncate text-muted-foreground/85 text-xs">
             {props.name.length > 0
-              ? `Creates ${props.pathPreview}`
-              : `Goes in ${props.projectsRoot}`}
-            {props.environmentLabel === null ? null : ` on ${props.environmentLabel}`}
+              ? props.environmentLabel === null
+                ? t(($) => $.palette.creates, { path: props.pathPreview })
+                : t(($) => $.palette.createsOn, {
+                    path: props.pathPreview,
+                    environment: props.environmentLabel,
+                  })
+              : props.environmentLabel === null
+                ? t(($) => $.palette.goesIn, { path: String(props.projectsRoot) })
+                : t(($) => $.palette.goesInOn, {
+                    path: String(props.projectsRoot),
+                    environment: props.environmentLabel,
+                  })}
           </span>
         </span>
       </div>
@@ -154,9 +166,12 @@ export function RemoteRepositorySummary(props: {
   readonly title: string;
   readonly description: string;
 }) {
+  const { t } = useTranslation("workspace");
   return (
     <div className="shrink-0 p-2 pb-0">
-      <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">Repository</div>
+      <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">
+        {t(($) => $.palette.repositoryHeading)}
+      </div>
       <div className="flex min-h-8 items-center gap-2 rounded-sm px-2 py-1.5">
         <CommandPaletteTitleIcon>
           {remoteProjectSourceIcon(props.source, ITEM_ICON_CLASS)}

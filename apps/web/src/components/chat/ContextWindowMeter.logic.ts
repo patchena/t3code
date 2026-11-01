@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { ModelSelection, ProviderDriverKind, ProviderInstanceId } from "@t3tools/contracts";
 import {
   resolveSelectableProviderInstanceEntry,
@@ -52,14 +53,18 @@ export function resolveContextWindowModelDisplayName(
 
 export function formatContextWindowCompactionMessage(
   modelDisplayName: string | null | undefined,
-  autoCompactThreshold?: number | null,
+  autoCompactThreshold: number | null | undefined,
+  t: TFunction<"chat">,
 ): string {
   if (typeof autoCompactThreshold === "number" && autoCompactThreshold > 0) {
-    return `Compacts automatically at about ${autoCompactThreshold.toLocaleString("en-US")} tokens.`;
+    return t(($) => $.composer.compactsAt, {
+      count: autoCompactThreshold,
+      tokens: autoCompactThreshold.toLocaleString("en-US"),
+    });
   }
   return modelDisplayName
-    ? `Context for ${modelDisplayName} compacts automatically when needed.`
-    : "Context compacts automatically when needed.";
+    ? t(($) => $.composer.modelCompacts, { model: modelDisplayName })
+    : t(($) => $.composer.contextCompacts);
 }
 
 export function shouldReserveContextWindowMeter(input: {

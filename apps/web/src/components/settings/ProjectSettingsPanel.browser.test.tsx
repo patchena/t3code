@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { RegistryContext } from "@effect/atom-react";
 import type {
   DeleteProjectInput,
@@ -217,12 +218,15 @@ function setup() {
 }
 
 function projectKey() {
-  return buildSidebarProjectSnapshots({
-    projects: state.projects,
-    settings: DEFAULT_CLIENT_SETTINGS,
-    primaryEnvironmentId: primaryId,
-    resolveEnvironmentLabel: (id) => id,
-  })[0]!.projectKey;
+  return buildSidebarProjectSnapshots(
+    {
+      projects: state.projects,
+      settings: DEFAULT_CLIENT_SETTINGS,
+      primaryEnvironmentId: primaryId,
+      resolveEnvironmentLabel: (id) => id,
+    },
+    createI18n("en").getFixedT(null, "common"),
+  )[0]!.projectKey;
 }
 
 async function mountPanel(search: Omit<SettingsScopeSearch, "project"> = {}) {

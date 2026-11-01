@@ -11,7 +11,7 @@ import { AppAtomRegistryProvider, appAtomRegistry } from "../rpc/atomRegistry";
 import { extractTerminalLinks } from "../terminal-links";
 import { expect, it, vi } from "vite-plus/test";
 import { act, fakeTimers, render } from "../../test/render";
-import ThreadTerminalDrawer from "./ThreadTerminalDrawer";
+import { ThreadTerminalDrawer } from "~/components/ThreadTerminalDrawer";
 
 const fixture = vi.hoisted(() => ({
   statusByThreadId: new Map<string, "running" | "exited">(),

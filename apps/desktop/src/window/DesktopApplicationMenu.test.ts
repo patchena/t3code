@@ -3,6 +3,9 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Exit from "effect/Exit";
+import type { InterfaceLanguage } from "@t3tools/contracts/settings";
+import { desktopI18n } from "#desktop/i18n";
 
 import type * as Electron from "electron";
 
@@ -95,10 +98,13 @@ const layerDesktopWindow = (selectedAction: Deferred.Deferred<string>) =>
 
 const layerElectronMenu = (
   applicationMenuTemplate: Deferred.Deferred<readonly Electron.MenuItemConstructorOptions[]>,
+  reject = false,
 ) =>
   Layer.succeed(ElectronMenu.ElectronMenu, {
     setApplicationMenu: (template) =>
-      Deferred.succeed(applicationMenuTemplate, template).pipe(Effect.asVoid),
+      reject
+        ? Effect.die("native menu update rejected")
+        : Deferred.succeed(applicationMenuTemplate, template).pipe(Effect.asVoid),
     popupTemplate: () => Effect.void,
     showContextMenu: () => Effect.succeedNone,
   } satisfies ElectronMenu.ElectronMenu["Service"]);
@@ -107,14 +113,16 @@ const configureMenu = (
   selectedAction: Deferred.Deferred<string>,
   applicationMenuTemplate: Deferred.Deferred<readonly Electron.MenuItemConstructorOptions[]>,
   environment: Partial<DesktopEnvironment.MakeDesktopEnvironmentInput> = {},
+  language?: InterfaceLanguage,
+  reject = false,
 ) =>
   Effect.gen(function* () {
     const menu = yield* DesktopApplicationMenu.DesktopApplicationMenu;
-    yield* menu.configure;
+    yield* language ? menu.setLanguage(language) : menu.configure;
   }).pipe(
     Effect.provide(
       DesktopApplicationMenu.layer.pipe(
-        Layer.provideMerge(layerElectronMenu(applicationMenuTemplate)),
+        Layer.provideMerge(layerElectronMenu(applicationMenuTemplate, reject)),
         Layer.provideMerge(layerDesktopWindow(selectedAction)),
         Layer.provideMerge(layerDesktopUpdates),
         Layer.provideMerge(layerElectronDialog),
@@ -129,6 +137,59 @@ const configureMenu = (
   );
 
 describe("DesktopApplicationMenu", () => {
+  it.effect("changes native role labels and preserves their actions in both languages", () =>
+    Effect.gen(function* () {
+      for (const [language, label, paste] of [
+        ["de", "Bearbeiten", "Als Text einfügen"],
+        ["en", "Edit", "Paste as Text"],
+      ] as const) {
+        const selectedAction = yield* Deferred.make<string>();
+        const applicationMenuTemplate =
+          yield* Deferred.make<readonly Electron.MenuItemConstructorOptions[]>();
+        yield* configureMenu(selectedAction, applicationMenuTemplate, {}, language);
+        const template = yield* Deferred.await(applicationMenuTemplate);
+        const edit = template.find((item) => item.label === label);
+        if (!Array.isArray(edit?.submenu)) throw new Error("Expected native edit submenu.");
+        assert.equal(
+          edit.submenu.find((item) => item.role === "copy")?.label,
+          language === "de" ? "Kopieren" : "Copy",
+        );
+        const pasteItem = edit.submenu.find((item) => item.label === paste);
+        assert.equal(pasteItem?.accelerator, "CmdOrCtrl+Shift+V");
+        if (typeof pasteItem?.click !== "function")
+          throw new Error("Expected native paste action.");
+        pasteItem.click({} as Electron.MenuItem, {} as Electron.BrowserWindow, {} as KeyboardEvent);
+        assert.equal(yield* Deferred.await(selectedAction), "paste-as-text");
+      }
+    }).pipe(Effect.ensuring(Effect.promise(() => desktopI18n.changeLanguage("en")))),
+  );
+
+  it.effect("rejects failed native language updates and restores the effective language", () =>
+    Effect.gen(function* () {
+      for (const failureSource of ["menu", "labels"]) {
+        let calls = 0;
+        const rejectLabels = () => {
+          if (failureSource === "labels" && calls++ === 0)
+            throw new Error("native labels rejected");
+        };
+        desktopI18n.on("languageChanged", rejectLabels);
+        const failure = yield* Effect.exit(
+          configureMenu(
+            yield* Deferred.make<string>(),
+            yield* Deferred.make<readonly Electron.MenuItemConstructorOptions[]>(),
+            {},
+            "de",
+            failureSource === "menu",
+          ).pipe(
+            Effect.ensuring(Effect.sync(() => desktopI18n.off("languageChanged", rejectLabels))),
+          ),
+        );
+        assert.isTrue(Exit.isFailure(failure));
+        assert.equal(desktopI18n.language, "en");
+      }
+    }).pipe(Effect.ensuring(Effect.promise(() => desktopI18n.changeLanguage("en")))),
+  );
+
   it.effect("leaves the accelerator to Chromium instead of injecting a paste", () =>
     Effect.gen(function* () {
       const selectedAction = yield* Deferred.make<string>();

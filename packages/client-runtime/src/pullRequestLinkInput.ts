@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { RepositoryIdentity } from "@t3tools/contracts";
 import { canonicalizeGitCafePullRequestUrl } from "@t3tools/source-control-definitions/registry";
 
@@ -59,6 +60,25 @@ export function pullRequestLinkProject(identity: RepositoryIdentity | null | und
   };
 }
 
+export type PullRequestLinkInputError =
+  | { readonly kind: "project-unavailable"; readonly host: string; readonly repository: string }
+  | { readonly kind: "repository-required" }
+  | { readonly kind: "unknown-host-url"; readonly term: string };
+
+export function formatPullRequestLinkInputError(
+  error: PullRequestLinkInputError,
+  t: TFunction<"workspace">,
+): string {
+  switch (error.kind) {
+    case "project-unavailable":
+      return t(($) => $.git.projectCannotRead, { host: error.host, repository: error.repository });
+    case "repository-required":
+      return t(($) => $.git.repositoryRequired);
+    case "unknown-host-url":
+      return t(($) => $.git.unknownRequestUrl, { term: error.term });
+  }
+}
+
 interface ResolvedLink {
   readonly host: string;
   readonly repository: string;
@@ -75,7 +95,7 @@ export function resolveLinkPullRequestInput(input: {
     readonly webUrl: (number: number) => string | null;
   } | null;
   readonly hasProject: (reference: ResolvedLink) => boolean;
-}): { link: ResolvedLink } | { error: string } | null {
+}): { link: ResolvedLink } | { error: PullRequestLinkInputError } | null {
   const parsed =
     sourceControlClients.parseChangeRequestUrl(input.reference.trim()) !== null
       ? input.reference.trim()
@@ -84,7 +104,7 @@ export function resolveLinkPullRequestInput(input: {
   const url = sourceControlClients.parseChangeRequestUrl(parsed)?.link;
   if (url !== undefined) {
     if (!input.hasProject({ ...url, url: parsed })) {
-      return { error: `No project in this environment can read ${url.host}/${url.repository}.` };
+      return { error: { kind: "project-unavailable", host: url.host, repository: url.repository } };
     }
     return {
       link: {
@@ -99,8 +119,7 @@ export function resolveLinkPullRequestInput(input: {
   if (!Number.isSafeInteger(number) || number < 1) return null;
   if (input.project === null) {
     return {
-      error:
-        "Paste the full pull request URL; this thread has no repository to resolve the number against.",
+      error: { kind: "repository-required" },
     };
   }
   const webUrl = input.project.webUrl(number);
@@ -108,7 +127,7 @@ export function resolveLinkPullRequestInput(input: {
     webUrl === null ? undefined : sourceControlClients.parseChangeRequestUrl(webUrl)?.link;
   if (webUrl === null || webReference === undefined) {
     return {
-      error: `Paste a full URL; this project's host has no known ${input.project.terminology.singular} URL.`,
+      error: { kind: "unknown-host-url", term: input.project.terminology.singular },
     };
   }
   return {

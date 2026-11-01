@@ -1,4 +1,10 @@
-import DocumentPages, { sanitizeDocumentHtml } from "./DocumentPages";
+import { createI18n } from "@t3tools/client-runtime/i18n";
+import {
+  FilePreviewFailure,
+  fileFailureText,
+  isFilePreviewFailure,
+} from "~/components/files/fileFailure";
+import { DocumentPages, sanitizeDocumentHtml } from "~/components/files/DocumentPages";
 import { act, render, stubGlobal, type Screen } from "../../../test/render";
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
@@ -20,6 +26,14 @@ vi.mock(import("pdfjs-dist/build/pdf.worker.min.mjs?url"), () => ({
   default: pdfWorkerUrl,
 }));
 
+// Keep the real PDF worker without Vite's large inline source map, as in PdfViewer.browser.test.tsx.
+vi.mock(import("pdfjs-dist/build/pdf.worker.min.mjs?url"), async () => {
+  const { default: source } = await import("pdfjs-dist/build/pdf.worker.min.mjs?raw");
+  return {
+    default: URL.createObjectURL(new Blob([source], { type: "text/javascript" })),
+  };
+});
+
 vi.mock(import("~/assets/assetUrls"), async (original) => ({
   ...(await original()),
   useAssetUrlRefresh: () => refresh,
@@ -40,7 +54,7 @@ vi.mock(import("./pdfDocument"), async (original) => {
 // The real source view highlights through a worker pool; the text it receives is what matters here.
 // Never load the original: its highlighter graph can outlast waitFor on a cold CI browser.
 vi.mock(import("./ReadOnlySourcePreview"), () => ({
-  default: ({ text, wordWrap }: { text: string; wordWrap?: boolean }) => (
+  ReadOnlySourcePreview: ({ text, wordWrap }: { text: string; wordWrap?: boolean }) => (
     <pre data-word-wrap={String(wordWrap)}>{text}</pre>
   ),
 }));
@@ -57,7 +71,7 @@ vi.mock(import("./office/WordDocument"), async () => {
       .then((zip) => zip.file("word/document.xml")!.async("string"))
       .then((xml) => xml.replace(/<[^>]+>/g, " "));
   return {
-    default: ({ bytes }: { bytes: ArrayBuffer }) => {
+    WordDocument: ({ bytes }: { bytes: ArrayBuffer }) => {
       let text = texts.get(bytes);
       if (!text) texts.set(bytes, (text = read(bytes)));
       return <pre>{use(text)}</pre>;
@@ -67,13 +81,13 @@ vi.mock(import("./office/WordDocument"), async () => {
 
 import { getClientSettings } from "~/hooks/useSettings";
 import { AttachmentFilePreview } from "./AttachmentFilePreview";
-import LargeTextViewer from "./LargeTextViewer";
-import VirtualTablePreview from "./VirtualTablePreview";
+import { LargeTextViewer } from "~/components/files/LargeTextViewer";
+import { VirtualTablePreview } from "~/components/files/VirtualTablePreview";
 import { OfficeFilePreview } from "./OfficeFilePreview";
 import { MermaidFilePreview } from "./MermaidFilePreview";
 import JSZip from "jszip";
 import { boundedZip } from "@t3tools/client-runtime/zip/bounded-zip";
-import BinaryViewer from "./BinaryViewer";
+import { BinaryViewer } from "~/components/files/BinaryViewer";
 import { decodeImagePreview } from "./decodeImagePreview";
 import type { BinaryWorkerResult } from "./binaryPreviewProtocol";
 import type { TextPreviewResult } from "./largeTextProtocol";
@@ -304,7 +318,7 @@ describe("bounded binary previews", () => {
         await act(() => trigger.focus());
         await userEvent.keyboard("{Enter}");
         await expect
-          .element(page.getByRole("option", { name: "zzInventory (1 rows)" }))
+          .element(page.getByRole("option", { name: "zzInventory (1 row)" }))
           .toBeVisible();
         await userEvent.keyboard("{ArrowDown}{Enter}");
         await vi.waitFor(() =>
@@ -315,7 +329,7 @@ describe("bounded binary previews", () => {
         await vi.waitFor(() => expect(document.activeElement).toBe(trigger));
         await userEvent.keyboard("{Enter}");
         await expect
-          .element(page.getByRole("option", { name: "zzInventory (1 rows)" }))
+          .element(page.getByRole("option", { name: "zzInventory (1 row)" }))
           .toBeVisible();
         await userEvent.keyboard("{Escape}");
       } finally {
@@ -537,7 +551,9 @@ describe("large text preview recovery", () => {
       await vi.waitFor(() => expect(screen.container.textContent).toContain("original"));
       // A cold worker can take longer than waitFor allows to load and index on CI.
       await indexed[0];
-      await vi.waitFor(() => expect(screen.container.textContent).toContain("1,000 lines"));
+      await vi.waitFor(() =>
+        expect(screen.container.textContent).toContain(`${(1_000).toLocaleString()} lines`),
+      );
       const viewport = screen.container.querySelector<HTMLElement>('[tabindex="0"]')!;
       await act(() =>
         viewport.dispatchEvent(
@@ -2251,7 +2267,12 @@ it("copies every indexed line rather than the mounted preview rows", async () =>
     timeout: 10_000,
   });
   const first = copyContents.current!();
-  await expect(copyContents.current!()).rejects.toThrow("Another copy is in progress.");
+  const duplicate = await copyContents.current!().catch((cause: unknown) => cause);
+  expect(duplicate).toBeInstanceOf(FilePreviewFailure);
+  if (!isFilePreviewFailure(duplicate)) throw duplicate;
+  expect(fileFailureText(duplicate, createI18n("en").getFixedT("en", "files"))).toBe(
+    "Another copy is in progress.",
+  );
   expect(await first).toBe(text);
   expect(await copyContents.current!()).toBe(text);
   expect(screen.container.querySelector('[role="alert"]')).toBeNull();
@@ -2762,7 +2783,7 @@ it.each(["rtf", "epub", "ods"] as const)(
           expect(screen.container.textContent).toContain("North");
           expect(screen.container.textContent).toContain("150");
           expect(screen.container.textContent).not.toContain("private note");
-          expect(screen.container.textContent).toContain("1 rows · 2 columns");
+          expect(screen.container.textContent).toContain("1 row · 2 columns");
           expect(screen.container.textContent).not.toContain("Limited to 500");
         } else {
           const frame = screen.container.querySelector("iframe");

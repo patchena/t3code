@@ -1,3 +1,4 @@
+import { desktopI18n, desktopT, getAnnotationLabels } from "#desktop/i18n";
 import * as NodeZlib from "node:zlib";
 import {
   DesktopPreviewAnnotationVoiceEventSchema,
@@ -73,6 +74,7 @@ import {
   ANNOTATION_VOICE_EVENT_CHANNEL,
   ANNOTATION_VOICE_STATE_CHANNEL,
   ANNOTATION_THEME_CHANNEL,
+  ANNOTATION_LABELS_CHANNEL,
   CANCEL_PICK_CHANNEL,
   ELEMENT_PICKED_CHANNEL,
   HUMAN_INPUT_CHANNEL,
@@ -160,7 +162,7 @@ const DEFAULT_ANNOTATION_THEME: DesktopPreviewAnnotationTheme = {
 
 const buildPreviewPictureInPictureDataUrl = (): string => {
   const html = `<!doctype html>
-<html>
+<html lang="${desktopI18n.language}">
   <head>
     <meta charset="utf-8">
     <meta
@@ -175,11 +177,15 @@ const buildPreviewPictureInPictureDataUrl = (): string => {
     </style>
   </head>
   <body>
-    <img id="preview-frame" alt="Live browser preview">
+    <img id="preview-frame" alt="${desktopT(($) => $.browser.livePreview)}">
     <script>
       const frame = document.getElementById("preview-frame");
       window.previewPictureInPicture.onFrame((next) => {
         frame.src = "data:image/jpeg;base64," + next.data;
+      });
+      window.previewPictureInPicture.onLabels((labels) => {
+        document.documentElement.lang = labels.language;
+        frame.alt = labels.livePreview;
       });
     </script>
   </body>
@@ -1512,10 +1518,14 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
         return;
       }
     };
+    const syncAnnotationLabels = () => {
+      if (!wc.isDestroyed()) wc.send(ANNOTATION_LABELS_CHANNEL, getAnnotationLabels());
+    };
     yield* Scope.addFinalizer(
       scope,
       attempt({ operation: "detachListeners", tabId, webContentsId: wc.id }, () => {
         cancelFaviconCapture();
+        desktopI18n.off("languageChanged", syncAnnotationLabels);
         wc.off("did-start-navigation", navigationStarted);
         wc.off("did-navigate", syncNavigation);
         wc.off("did-navigate-in-page", syncInPageNavigation);
@@ -1537,6 +1547,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
     const install = Effect.fn("PreviewManager.installWebContentsListeners")(function* () {
       yield* attempt({ operation: "attachListeners", tabId, webContentsId: wc.id }, () => {
         wc.setIgnoreMenuShortcuts(true);
+        desktopI18n.on("languageChanged", syncAnnotationLabels);
         wc.on("did-start-navigation", navigationStarted);
         wc.on("did-navigate", syncNavigation);
         wc.on("did-navigate-in-page", syncInPageNavigation);
@@ -2270,6 +2281,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
               START_PICK_CHANNEL,
               annotationTheme,
               annotationSendEnabled.get(tabId) === true,
+              getAnnotationLabels(),
               voice,
             );
           });
@@ -2827,7 +2839,10 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
               height: PICTURE_IN_PICTURE_INITIAL_HEIGHT,
               minWidth: PICTURE_IN_PICTURE_MIN_WIDTH,
               minHeight: PICTURE_IN_PICTURE_MIN_HEIGHT,
-              title: title.length > 0 ? `Preview · ${title}` : "Browser preview",
+              title:
+                title.length > 0
+                  ? desktopT(($) => $.browser.previewTitle, { title })
+                  : desktopT(($) => $.browser.preview),
               show: false,
               alwaysOnTop: true,
               autoHideMenuBar: true,
@@ -2866,7 +2881,21 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
             ),
           );
         };
+        const syncLanguage = () => {
+          if (pictureInPictureWindow.isDestroyed()) return;
+          const pageTitle = wc.isDestroyed() ? title : wc.getTitle();
+          pictureInPictureWindow.setTitle(
+            pageTitle.length > 0
+              ? desktopT(($) => $.browser.previewTitle, { title: pageTitle })
+              : desktopT(($) => $.browser.preview),
+          );
+          pictureInPictureWindow.webContents.send(ANNOTATION_LABELS_CHANNEL, {
+            language: desktopI18n.language,
+            livePreview: desktopT(($) => $.browser.livePreview),
+          });
+        };
         const onDidFinishLoad = () => {
+          syncLanguage();
           runFork(
             SynchronizedRef.update(frameCaptureSessionsRef, (sessions) => {
               const current = sessions.get(tabId);
@@ -2886,6 +2915,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
           },
           () => {
             pictureInPictureWindow.once("closed", onClosed);
+            desktopI18n.on("languageChanged", syncLanguage);
             pictureInPictureWindow.setAlwaysOnTop(
               true,
               hostPlatform === "darwin" ? "floating" : "normal",
@@ -2916,6 +2946,7 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
           initializationScope,
           Effect.sync(() => {
             pipWebContents.off("did-finish-load", onDidFinishLoad);
+            desktopI18n.off("languageChanged", syncLanguage);
           }).pipe(Effect.ignore),
         );
         yield* SynchronizedRef.update(pictureInPictureSessionsRef, (sessions) =>

@@ -1,5 +1,6 @@
 import { resolveQueuedEditExit } from "@t3tools/client-runtime/queued-run-edit";
 import type { ChatAttachment } from "@t3tools/contracts";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   composerDraftHasUserContent,
   useComposerDraftStore,
@@ -29,18 +30,21 @@ export function recoverQueuedMessageEdit(input: {
   return recovery;
 }
 
-export async function prepareQueuedEditAttachments(input: {
-  readonly existingAttachments: ReadonlyArray<ChatAttachment>;
-  readonly images: ReadonlyArray<ComposerImageAttachment>;
-  readonly files: ReadonlyArray<ComposerFileAttachment>;
-  readonly uploadFiles: (
-    files: ReadonlyArray<ComposerFileAttachment>,
-  ) => Promise<ReadonlyArray<ChatAttachment>>;
-  readonly readImage: (file: File) => Promise<string>;
-}) {
+export async function prepareQueuedEditAttachments(
+  input: {
+    readonly existingAttachments: ReadonlyArray<ChatAttachment>;
+    readonly images: ReadonlyArray<ComposerImageAttachment>;
+    readonly files: ReadonlyArray<ComposerFileAttachment>;
+    readonly uploadFiles: (
+      files: ReadonlyArray<ComposerFileAttachment>,
+    ) => Promise<ReadonlyArray<ChatAttachment>>;
+    readonly readImage: (file: File) => Promise<string>;
+  },
+  t: TFunction<"chat">,
+) {
   const files = input.files.length === 0 ? [] : await input.uploadFiles(input.files);
   if (files.length !== input.files.length)
-    throw new Error("Retry or remove failed uploads before saving.");
+    throw new Error(t(($) => $.composer.retryUploadsBeforeSave));
   const images = await Promise.all(
     input.images.map(async (image) => ({
       type: "image" as const,

@@ -53,7 +53,7 @@ describe("loadCitedHistory", () => {
     const history = scriptedHistory([notLoaded, { message: null, hasMoreHistory: false }]);
     await expect(history.run()).resolves.toMatchObject({
       _tag: "failed",
-      title: "The cited response is unavailable",
+      reason: "unavailable",
     });
   });
 
@@ -61,7 +61,7 @@ describe("loadCitedHistory", () => {
     const history = scriptedHistory([{ message: "other", hasMoreHistory: false }]);
     await expect(history.run()).resolves.toMatchObject({
       _tag: "failed",
-      title: "The citation does not refer to an assistant response",
+      reason: "notAssistant",
     });
   });
 
@@ -69,7 +69,7 @@ describe("loadCitedHistory", () => {
     const history = scriptedHistory([notLoaded]);
     await expect(history.run(["error"])).resolves.toMatchObject({
       _tag: "failed",
-      title: "Could not load the cited response",
+      reason: "load",
     });
     expect(history.loads).toBe(1);
   });
@@ -78,7 +78,7 @@ describe("loadCitedHistory", () => {
     const history = scriptedHistory([notLoaded]);
     await expect(history.run(["noop"])).resolves.toMatchObject({
       _tag: "failed",
-      title: "The cited response is unavailable",
+      reason: "unavailable",
     });
     expect(history.loads).toBe(1);
   });
@@ -87,7 +87,7 @@ describe("loadCitedHistory", () => {
     const history = scriptedHistory([notLoaded]);
     await expect(history.run()).resolves.toMatchObject({
       _tag: "failed",
-      title: "Could not load the cited response",
+      reason: "load",
     });
     expect(history.loads).toBe(20);
   });
@@ -126,7 +126,7 @@ describe("citedThreadSnapshot", () => {
     expect(snapshot).not.toBeNull();
     await expect(scriptedHistory([snapshot]).run()).resolves.toMatchObject({
       _tag: "failed",
-      title: "Could not load the cited response",
+      reason: "load",
     });
   });
 });

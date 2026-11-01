@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   codexFeedbackNotice,
   type CodexFeedbackSubmission,
@@ -12,8 +13,9 @@ import type { ComposerBannerStackItem } from "./ComposerBannerStack";
 export function feedbackBannerItem(
   submission: CodexFeedbackSubmission,
   onDismiss: () => void,
+  t: TFunction<"chat">,
 ): ComposerBannerStackItem | null {
-  const notice = codexFeedbackNotice(submission);
+  const notice = codexFeedbackNotice(submission, t);
   if (!notice) return null;
   return {
     id: `feedback:${submission.id}`,
@@ -27,22 +29,24 @@ export function feedbackBannerItem(
           size="xs"
           variant="ghost"
           onClick={() => {
-            void writeTextToClipboard(submission.feedbackId, "Codex feedback thread ID").catch(
-              (error: unknown) => {
-                toastManager.add({
-                  type: "error",
-                  title: "Could not copy thread ID",
-                  description: error instanceof Error ? error.message : "An error occurred.",
-                });
-              },
-            );
+            void writeTextToClipboard(
+              submission.feedbackId,
+              t(($) => $.composer.feedbackThreadId),
+            ).catch((error: unknown) => {
+              toastManager.add({
+                type: "error",
+                title: t(($) => $.composer.copyThreadIdFailed),
+                description:
+                  error instanceof Error ? error.message : t(($) => $.composer.errorOccurred),
+              });
+            });
           }}
         >
-          Copy ID
+          {t(($) => $.composer.copyId)}
         </Button>
       ) : undefined,
     ...(submission.status !== "uploading"
-      ? { dismissLabel: "Dismiss feedback notice", onDismiss }
+      ? { dismissLabel: t(($) => $.composer.dismissFeedback), onDismiss }
       : {}),
   };
 }

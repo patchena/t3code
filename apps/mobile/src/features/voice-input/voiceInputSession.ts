@@ -8,6 +8,7 @@ import {
   type VoiceInputState,
 } from "@t3tools/client-runtime/voice-input";
 
+import { mobileI18n } from "~/i18n";
 import { normalizeVoiceInputDecibels, VOICE_WAVEFORM_SAMPLE_COUNT } from "./voiceInputMetering";
 
 const VOICE_METERING_INTERVAL_MS = 80;
@@ -37,7 +38,7 @@ export type VoiceRecordingSample = {
 
 export type VoiceInputSessionDependencies = Omit<
   VoiceInputControllerDependencies,
-  "readDraft" | "commitDraft" | "onStateChange"
+  "t" | "readDraft" | "commitDraft" | "onStateChange"
 > & {
   /** Reads the live recorder, or null when it is not capturing. */
   readonly sampleRecording: () => VoiceRecordingSample | null;
@@ -101,6 +102,7 @@ export class VoiceInputSession {
     this.dependencies = dependencies;
     this.controller = new VoiceInputController({
       ...dependencies,
+      t: mobileI18n.getFixedT(null, "voice"),
       onStateChange: (state) => this.handleStateChange(state),
       readDraft: () => this.target?.readDraft() ?? null,
       commitDraft: (text, selection) => this.target?.commitDraft(text, selection),

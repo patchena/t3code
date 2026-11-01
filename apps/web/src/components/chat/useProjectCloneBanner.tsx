@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import {
   isAtomCommandInterrupted,
@@ -9,11 +10,7 @@ import { stackedThreadToast, toastManager } from "../ui/toast";
 import { useRemoveClonedProject } from "../../hooks/useRemoveClonedProject";
 import { sourceControlEnvironment } from "../../state/sourceControl";
 import { useProjectClone } from "../../state/projectClones";
-import {
-  projectCloneDisplayName,
-  projectCloneProgressSummary,
-  type ScopedProjectRef,
-} from "@t3tools/contracts";
+import { projectCloneDisplayName, type ScopedProjectRef } from "@t3tools/contracts";
 import { dismissProjectFileCopy, useProjectFileCopy } from "../../lib/addProjectToMachine";
 import { type ComposerBannerStackItem } from "./ComposerBannerStack";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -23,6 +20,7 @@ import { Button } from "../ui/button";
  * retry, and remove actions, and the reason sending waits until it is done.
  */
 export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null) {
+  const { t } = useTranslation("chat");
   const activeProjectClone = useProjectClone(activeProjectRef);
   const cancelProjectClone = useAtomCommand(sourceControlEnvironment.cancelProjectClone, {
     reportFailure: false,
@@ -42,7 +40,7 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
         stackedThreadToast({
           type: "error",
           title,
-          description: error instanceof Error ? error.message : "An error occurred.",
+          description: error instanceof Error ? error.message : t(($) => $.composer.errorOccurred),
         }),
       );
     }
@@ -51,11 +49,11 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
   const activeProjectFileCopy = useProjectFileCopy(activeProjectRef);
   const projectCloneSendBlockReason =
     activeProjectClone?.phase === "running"
-      ? "Cloning repository"
+      ? t(($) => $.composer.cloningRepo)
       : activeProjectClone !== null && activeProjectClone.phase !== "done"
-        ? "Repository not cloned"
+        ? t(($) => $.composer.repoNotCloned)
         : activeProjectFileCopy?.phase === "copying"
-          ? "Copying files"
+          ? t(($) => $.composer.copyingFiles)
           : null;
   const projectCloneBannerItem = (() => {
     if (activeProjectFileCopy?.phase === "failed" && activeProjectRef) {
@@ -78,19 +76,34 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
         id: `project-clone:${projectId}`,
         variant: "info",
         icon: <DownloadIcon />,
-        title: `Cloning ${name}`,
-        description: projectCloneProgressSummary(activeProjectClone),
+        title: t(($) => $.composer.cloningProject, { name }),
+        description: [
+          {
+            connecting: t(($) => $.composer.cloneConnecting),
+            counting: t(($) => $.composer.countingObjects),
+            receiving: t(($) => $.composer.receivingObjects),
+            resolving: t(($) => $.composer.resolvingDeltas),
+            checkout: t(($) => $.composer.checkingOutFiles),
+          }[activeProjectClone.stage],
+          ...(activeProjectClone.percent !== null ? [`${activeProjectClone.percent}%`] : []),
+          ...(activeProjectClone.stalled
+            ? [t(($) => $.composer.stalled)]
+            : activeProjectClone.detail
+              ? [activeProjectClone.detail]
+              : []),
+        ].join(" · "),
         actions: (
           <Button
             size="xs"
             variant="ghost"
             onClick={() =>
-              void runProjectCloneActionStable("Failed to cancel clone", () =>
-                cancelProjectClone({ environmentId, input: { projectId } }),
+              void runProjectCloneActionStable(
+                t(($) => $.composer.cancelCloneFailed),
+                () => cancelProjectClone({ environmentId, input: { projectId } }),
               )
             }
           >
-            Cancel
+            {t(($) => $.composer.cancel)}
           </Button>
         ),
       };
@@ -100,8 +113,10 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
       id: `project-clone:${projectId}`,
       variant: cancelled ? "warning" : "error",
       icon: <DownloadIcon />,
-      title: cancelled ? `Cancelled cloning ${name}` : `Failed to clone ${name}`,
-      description: cancelled ? "Retry to bring in the repository." : activeProjectClone.error,
+      title: cancelled
+        ? t(($) => $.composer.cancelledCloning, { name })
+        : t(($) => $.composer.cloneFailed, { name }),
+      description: cancelled ? t(($) => $.composer.retryClone) : activeProjectClone.error,
       actions: (
         <>
           <Button
@@ -109,18 +124,19 @@ export function useProjectCloneBanner(activeProjectRef: ScopedProjectRef | null)
             variant="ghost"
             onClick={() => void removeClonedProject({ environmentId, projectId })}
           >
-            Remove project
+            {t(($) => $.composer.removeProject)}
           </Button>
           <Button
             size="xs"
             variant="ghost"
             onClick={() =>
-              void runProjectCloneActionStable("Failed to retry clone", () =>
-                retryProjectClone({ environmentId, input: { projectId } }),
+              void runProjectCloneActionStable(
+                t(($) => $.composer.retryCloneFailed),
+                () => retryProjectClone({ environmentId, input: { projectId } }),
               )
             }
           >
-            Retry
+            {t(($) => $.composer.retry)}
           </Button>
         </>
       ),

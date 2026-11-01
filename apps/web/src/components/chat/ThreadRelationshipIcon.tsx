@@ -1,45 +1,49 @@
 import type { ProviderDriverKind, ServerProvider } from "@t3tools/contracts";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { BotIcon, type LucideIcon } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { shouldShowInstanceBadge, type ProviderInstanceEntry } from "../../providerInstances";
 import { ProviderInstanceIcon } from "./ProviderInstanceIcon";
 
-export function threadRelationshipStatusLabel(status: string | null): string {
+export function threadRelationshipStatusLabel(
+  status: string | null,
+  t: TFunction<"activity">,
+): string {
   switch (status) {
     case "preparing":
     case "starting":
-      return "Starting";
+      return t(($) => $.status.starting);
     case "running":
     case "in_progress":
-      return "Running";
+      return t(($) => $.status.running);
     case "pending":
     case "queued":
-      return "Queued";
+      return t(($) => $.status.queued);
     case "waiting":
     case "blocked":
-      return "Waiting";
+      return t(($) => $.status.waiting);
     case "completed":
-      return "Done";
+      return t(($) => $.status.done);
     case "failed":
     case "error":
-      return "Failed";
+      return t(($) => $.status.failed);
     case "cancelled":
     case "interrupted":
-      return "Stopped";
+      return t(($) => $.status.stopped);
     case "rolled_back":
-      return "Reverted";
+      return t(($) => $.status.reverted);
     case "resolved_native":
-      return "Resolved (native)";
+      return t(($) => $.status.resolvedNative);
     case "resolved_portable":
-      return "Resolved (portable)";
+      return t(($) => $.status.resolvedPortable);
     case "consumed":
-      return "Consumed";
+      return t(($) => $.status.consumed);
     case "superseded":
-      return "Superseded";
+      return t(($) => $.status.superseded);
     case "idle":
-      return "Idle";
+      return t(($) => $.status.idle);
     default:
-      return "Unknown";
+      return t(($) => $.status.unknown);
   }
 }
 

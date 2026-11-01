@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { useTranslation } from "react-i18next";
 import { ThreadPullRequestLink, type EnvironmentId, type PullRequestRef } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
 import * as Schema from "effect/Schema";
@@ -29,10 +30,11 @@ export function usePullRequestStack(
   environmentId: EnvironmentId,
   reference: PullRequestRef | null,
 ) {
+  const { t } = useTranslation("workspace");
   const links = useAtomValue(environmentPullRequestLinksAtom(environmentId));
   const saved = reference === null ? null : savedPullRequestStack(links, reference);
   const query = useEnvironmentQuery(
     reference === null ? null : pullRequestStackAtom({ environmentId, input: reference }),
   );
-  return { ...query, ...pullRequestStackView(query, saved) };
+  return { ...query, ...pullRequestStackView(query, saved, t) };
 }

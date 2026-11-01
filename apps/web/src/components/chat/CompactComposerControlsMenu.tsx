@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { ProviderInteractionMode, RuntimeMode } from "@t3tools/contracts";
 import { memo, useRef } from "react";
 import { EllipsisIcon } from "lucide-react";
@@ -26,6 +27,7 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
   onToggleInteractionMode: () => void;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
 }) {
+  const { t } = useTranslation("chat");
   const composerFloatingLayerProps = useComposerMenuProps();
   const size = props.size ?? "sm";
   const [open, setOpen] = useComposerMenuState(props.hidden);
@@ -43,7 +45,7 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
             ref={triggerRef}
             size={size}
             className="shrink-0"
-            aria-label="More composer controls"
+            aria-label={t(($) => $.composer.moreControls)}
             data-composer-shortcut={props.showPermissions !== false ? "composer.mode" : undefined}
           />
         }
@@ -53,7 +55,9 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
       <MenuPopup align="start" {...composerFloatingLayerProps}>
         {props.showInteractionModeToggle ? (
           <>
-            <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">Mode</div>
+            <div className="px-2 py-1.5 font-medium text-muted-foreground text-xs">
+              {t(($) => $.composer.mode)}
+            </div>
             <MenuRadioGroup
               value={props.interactionMode}
               onValueChange={(value) => {
@@ -61,8 +65,8 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
                 props.onToggleInteractionMode();
               }}
             >
-              <MenuRadioItem value="default">Chat</MenuRadioItem>
-              <MenuRadioItem value="plan">Plan</MenuRadioItem>
+              <MenuRadioItem value="default">{t(($) => $.composer.chat)}</MenuRadioItem>
+              <MenuRadioItem value="plan">{t(($) => $.composer.plan)}</MenuRadioItem>
             </MenuRadioGroup>
             {props.showPermissions !== false ? <MenuDivider /> : null}
           </>

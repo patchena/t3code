@@ -31,7 +31,7 @@ export function resolveFilesystemReadAccess(input: {
   readonly sessionError: string | null;
 }) {
   if (input.sessionError !== null) {
-    return { canReadFiles: false, isPending: false, error: input.sessionError };
+    return { canReadFiles: false, isPending: false, error: input.sessionError, failure: null };
   }
   if (input.session === null) {
     // Wait for the catalog before interpreting a missing presentation as offline.
@@ -45,12 +45,14 @@ export function resolveFilesystemReadAccess(input: {
       canReadFiles: false,
       isPending,
       error: isPending ? null : (input.connection?.error ?? "This environment is not connected."),
+      failure: !isPending && input.connection?.error == null ? ("disconnected" as const) : null,
     };
   }
   return {
     canReadFiles: sessionGrantsScope(input.session, AuthFilesystemReadScope),
     isPending: false,
     error: null,
+    failure: null,
   };
 }
 

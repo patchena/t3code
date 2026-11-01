@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema";
+import { useTranslation } from "react-i18next";
 import type { DeviceHostSummary, DeviceSummary, EnvironmentId } from "@t3tools/contracts";
 import { useRef, useState } from "react";
 import {
@@ -26,10 +27,11 @@ export function DeviceWorkspace(props: {
   onClose: () => void;
   onPowerOff: () => void;
 }) {
+  const { t } = useTranslation("tools");
   const [toolsOpen, setToolsOpen] = useState(false);
   const [axOverlay, setAxOverlay] = useState(false);
   const [screenshotPending, setScreenshotPending] = useState(false);
-  const [screenshotError, setScreenshotError] = useState<string | null>(null);
+  const [screenshotError, setScreenshotError] = useState<Error | "failed" | null>(null);
   // A capture always finishes, even if the panel hides or closes meanwhile; the user asked for it.
   const capturing = useRef(false);
   const access = useDeviceHubAccess(props.environmentId, props.device.hostId);
@@ -64,9 +66,7 @@ export function DeviceWorkspace(props: {
       .catch((cause: unknown) => {
         if (isDeviceScreenshotError(cause) && cause.status === 401)
           refreshDeviceHubAccess(props.environmentId);
-        setScreenshotError(
-          cause instanceof Error ? cause.message : "Screenshot capture failed. Try again.",
-        );
+        setScreenshotError(cause instanceof Error ? cause : "failed");
       })
       .finally(() => {
         capturing.current = false;
@@ -78,7 +78,11 @@ export function DeviceWorkspace(props: {
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         {screenshotError || (controls.error && !toolsOpen) ? (
           <p role="alert" className="px-3 py-2 text-xs text-destructive">
-            {screenshotError ?? controls.error}
+            {screenshotError instanceof Error
+              ? screenshotError.message
+              : screenshotError
+                ? t(($) => $.deviceScreenshotError)
+                : controls.error}
           </p>
         ) : null}
         <div className="min-h-0 flex-1">

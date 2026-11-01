@@ -1,4 +1,5 @@
 import type { EnvironmentId } from "@t3tools/contracts";
+import { mobileI18n } from "~/i18n";
 import { buildProjectGroups } from "@t3tools/client-runtime/state/project-grouping";
 import {
   createContext,
@@ -45,10 +46,13 @@ function settingsProjectGroups(
   if (!byMode) groupsCache.set(projects, (byMode = new Map()));
   let groups = byMode.get(groupingMode);
   if (!groups) {
-    groups = buildProjectGroups({
-      projects,
-      settings: { sidebarProjectGroupingMode: groupingMode, sidebarProjectGroupingOverrides: {} },
-    });
+    groups = buildProjectGroups(
+      {
+        projects,
+        settings: { sidebarProjectGroupingMode: groupingMode, sidebarProjectGroupingOverrides: {} },
+      },
+      mobileI18n.getFixedT(null, "common"),
+    );
     byMode.set(groupingMode, groups);
   }
   return groups;

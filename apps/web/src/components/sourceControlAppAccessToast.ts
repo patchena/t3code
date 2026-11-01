@@ -1,9 +1,10 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { appSignInTargetForRemote } from "@t3tools/client-runtime/source-control-clients";
 import { runAtomCommand } from "@t3tools/client-runtime/state/runtime";
-import { appAtomRegistry } from "../rpc/atomRegistry";
-import { sourceControlEnvironment } from "../state/sourceControl";
-import { toastManager } from "./ui/toast";
+import { appAtomRegistry } from "~/rpc/atomRegistry";
+import { sourceControlEnvironment } from "~/state/sourceControl";
+import { toastManager } from "~/components/ui/toast";
 
 /**
  * After a clone, suggests installing the forge app on the repository's owner when the server is
@@ -12,6 +13,7 @@ import { toastManager } from "./ui/toast";
 export async function suggestAppAccessForRemote(
   environmentId: EnvironmentId,
   remoteUrl: string,
+  t: TFunction<"workspace">,
 ): Promise<void> {
   const target = appSignInTargetForRemote(remoteUrl);
   if (target === null) return;
@@ -25,10 +27,10 @@ export async function suggestAppAccessForRemote(
   const owner = target.input.repository.split("/")[0] ?? target.input.repository;
   const id = toastManager.add({
     type: "info",
-    title: `Give ${target.appSignIn.appName} access to ${owner}`,
-    description: `It isn't installed there, so GitHub requests for ${target.input.repository} use your own login and its lower rate limit.`,
+    title: t(($) => $.git.appAccessTitle, { app: target.appSignIn.appName, owner: owner }),
+    description: t(($) => $.git.appAccessDescription, { repository: target.input.repository }),
     actionProps: {
-      children: "Install",
+      children: t(($) => $.git.install),
       onClick: () => {
         toastManager.close(id);
         window.open(target.appSignIn.installUrl, "_blank", "noopener,noreferrer");

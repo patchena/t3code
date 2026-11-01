@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   ANTIGRAVITY_DEFAULT_MODEL,
   type ProviderInstanceId,
@@ -113,6 +114,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   effortColumn?: ReactNode;
   footer?: ReactNode;
 }) {
+  const { t } = useTranslation("chat");
   const composerFloatingLayerProps = useComposerMenuProps();
   const [uncontrolledIsMenuOpen, setUncontrolledIsMenuOpen] = useState(false);
   const isMenuOpen = props.open ?? uncontrolledIsMenuOpen;
@@ -139,10 +141,12 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   const triggerTitle = selectedModel
     ? getTriggerDisplayModelName(selectedModel, activeEntry?.driverKind)
     : props.model === ANTIGRAVITY_DEFAULT_MODEL
-      ? "Choose model"
-      : props.model || "Choose model";
+      ? t(($) => $.composer.chooseModel)
+      : props.model || t(($) => $.composer.chooseModel);
   const triggerLabel = selectedModel
-    ? `${getDisplayModelName(selectedModel)}${selectedModel.isUnavailable ? " (Unavailable)" : ""}`
+    ? selectedModel.isUnavailable
+      ? t(($) => $.composer.unavailableModel, { model: getDisplayModelName(selectedModel) })
+      : getDisplayModelName(selectedModel)
     : triggerTitle;
   const showInstanceBadge =
     activeEntry !== null && shouldShowInstanceBadge(activeEntry, props.instanceEntries);
@@ -207,26 +211,33 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
       model: selection.model,
       options: props.modelOptionsByInstance.get(selection.instanceId) ?? [],
     });
-    const unavailable = model?.isUnavailable ? " (Unavailable)" : "";
+    const labelFor = (name: string) =>
+      model?.isUnavailable ? t(($) => $.composer.unavailableModel, { model: name }) : name;
     return {
       ...selection,
       entry,
       label: model
-        ? `${getTriggerDisplayModelName(model, entry?.driverKind)}${unavailable}`
+        ? labelFor(getTriggerDisplayModelName(model, entry?.driverKind))
         : selection.model,
-      fullLabel: model ? `${getDisplayModelName(model)}${unavailable}` : selection.model,
+      fullLabel: model ? labelFor(getDisplayModelName(model)) : selection.model,
     };
   });
   const multipleLabel = selectedEntries
     ? selectedEntries.length === 0
-      ? "Choose models"
-      : `${selectedEntries
-          .slice(0, 2)
-          .map((selection) => selection.label)
-          .join(", ")}${selectedEntries.length > 2 ? `, ${selectedEntries.length - 2} more` : ""}`
+      ? t(($) => $.composer.chooseModels)
+      : selectedEntries.length > 2
+        ? t(($) => $.composer.moreModels, {
+            models: selectedEntries
+              .slice(0, 2)
+              .map((selection) => selection.label)
+              .join(", "),
+            count: selectedEntries.length - 2,
+          })
+        : selectedEntries.map((selection) => selection.label).join(", ")
     : undefined;
   const allModelNames = selectedEntries
-    ? selectedEntries.map((selection) => selection.fullLabel).join(", ") || "Choose models"
+    ? selectedEntries.map((selection) => selection.fullLabel).join(", ") ||
+      t(($) => $.composer.chooseModels)
     : undefined;
   const triggerTooltipContent = [
     props.triggerLabel ?? allModelNames ?? triggerLabel,
@@ -270,7 +281,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
       {...(props.onOpenProviderSetup ? { onOpenProviderSetup: props.onOpenProviderSetup } : {})}
       getModelDisabledReason={(instanceId, model) =>
         props.disabled
-          ? "Model picker is disabled"
+          ? t(($) => $.composer.modelPickerDisabled)
           : (props.getModelDisabledReason?.(instanceId, model) ?? null)
       }
       onInstanceModelChange={handleInstanceModelChange}
@@ -398,7 +409,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
           {props.triggerSuffix}
           {selectedModel?.isUnavailable && !selectedEntries && props.triggerLabel === undefined ? (
             <Badge variant="outline" size="sm">
-              Unavailable
+              {t(($) => $.composer.unavailable)}
             </Badge>
           ) : null}
         </span>

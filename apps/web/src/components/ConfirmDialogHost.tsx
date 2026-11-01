@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
 import { useSyncExternalStore } from "react";
 
 import {
@@ -22,7 +24,7 @@ type ConfirmationCopy = {
   readonly description: string | null;
 };
 
-function resolveConfirmDialogCopy(message: string): ConfirmationCopy {
+function resolveConfirmDialogCopy(message: string, t: TFunction<"workspace">): ConfirmationCopy {
   const normalizedMessage = message.trim();
   const lines = normalizedMessage.split("\n");
   const questionLineIndex = lines.findIndex((line) => line.trim().endsWith("?"));
@@ -45,19 +47,20 @@ function resolveConfirmDialogCopy(message: string): ConfirmationCopy {
   }
 
   return {
-    title: "Confirm action",
-    description: normalizedMessage || "This action requires your confirmation.",
+    title: t(($) => $.confirmation.title),
+    description: normalizedMessage || t(($) => $.confirmation.description),
   };
 }
 
 export function ConfirmDialogHost() {
+  const { t } = useTranslation("workspace");
   const state = useSyncExternalStore(
     subscribeConfirmDialogHost,
     readConfirmDialogState,
     readConfirmDialogState,
   );
 
-  const copy = resolveConfirmDialogCopy(state.status === "idle" ? "" : state.message);
+  const copy = resolveConfirmDialogCopy(state.status === "idle" ? "" : state.message, t);
   const confirmVariant = state.status === "idle" ? "default" : state.variant;
   const onCancel = () => respondToConfirmDialog(false);
   const onConfirm = () => respondToConfirmDialog(true);
@@ -82,9 +85,11 @@ export function ConfirmDialogHost() {
           ) : null}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogClose render={<Button variant="outline" />}>Cancel</AlertDialogClose>
+          <AlertDialogClose render={<Button variant="outline" />}>
+            {t(($) => $.cancel)}
+          </AlertDialogClose>
           <Button variant={confirmVariant} onClick={onConfirm}>
-            Confirm
+            {t(($) => $.confirm)}
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>

@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type {
   EnvironmentId,
   OrchestrationV2ShellSnapshot,
@@ -154,15 +155,30 @@ const sameRequests = (
 
 export function childThreadInputsTitle(
   children: ReadonlyArray<Pick<EnvironmentThreadShell, "hasPendingApprovals" | "lineage">>,
+  t: TFunction<"activity">,
 ): string {
   const approvals = children.filter((child) => child.hasPendingApprovals).length;
-  const need = approvals === 0 ? "input" : approvals === children.length ? "approval" : "you";
   const sideChats = children.filter((child) => child.lineage.sideChat === true).length;
-  const noun =
-    sideChats === children.length ? "side chat" : sideChats === 0 ? "subagent" : "thread";
-  return children.length === 1
-    ? `${noun === "side chat" ? "Side chat" : "Subagent"} needs ${need}`
-    : `${children.length} ${noun}s need ${need}`;
+  const count = children.length;
+  if (sideChats === count) {
+    return approvals === 0
+      ? t(($) => $.child.sideInput, { count })
+      : approvals === count
+        ? t(($) => $.child.sideApproval, { count })
+        : t(($) => $.child.sideYou, { count });
+  }
+  if (sideChats === 0) {
+    return approvals === 0
+      ? t(($) => $.child.agentInput, { count })
+      : approvals === count
+        ? t(($) => $.child.agentApproval, { count })
+        : t(($) => $.child.agentYou, { count });
+  }
+  return approvals === 0
+    ? t(($) => $.child.threadInput, { count })
+    : approvals === count
+      ? t(($) => $.child.threadApproval, { count })
+      : t(($) => $.child.threadYou, { count });
 }
 
 const sameWireThreadShell = Schema.toEquivalence(OrchestrationV2ThreadShell);

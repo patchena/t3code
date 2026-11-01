@@ -28,6 +28,8 @@ import * as DesktopObservability from "./DesktopObservability.ts";
 import * as DesktopPreReadyPlatform from "./DesktopPreReadyPlatform.ts";
 import * as DesktopShutdown from "./DesktopShutdown.ts";
 import * as DesktopServerExposure from "../backend/DesktopServerExposure.ts";
+import { desktopI18n, desktopT } from "#desktop/i18n";
+import * as DesktopClientSettings from "#desktop/settings/DesktopClientSettings";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopShellEnvironment from "../shell/DesktopShellEnvironment.ts";
 import * as DesktopStartupRecovery from "./DesktopStartupRecovery.ts";
@@ -72,6 +74,15 @@ export class DesktopDevelopmentBackendPortRequiredError extends Schema.TaggedErr
 ) {
   override get message(): string {
     return "T3CODE_PORT is required in desktop development.";
+  }
+}
+
+class DesktopInterfaceTranslationError extends Schema.TaggedError<DesktopInterfaceTranslationError>()(
+  "DesktopInterfaceTranslationError",
+  { cause: Schema.Defect() },
+) {
+  override get message(): string {
+    return "Could not translate the desktop interface.";
   }
 }
 
@@ -142,10 +153,21 @@ const handleFatalStartupError = Effect.fn("desktop.startup.handleFatalStartupErr
   });
   const wasQuitting = yield* Ref.getAndSet(state.quitting, true);
   if (!wasQuitting) {
-    yield* electronDialog.showErrorBox(
-      "T3 Code failed to start",
-      `Stage: ${stage}\n${message}${detail}`,
+    const presentation = yield* Effect.try({
+      try: () => ({
+        title: desktopT(($) => $.startup.failed),
+        content: desktopT(($) => $.startup.stage, { stage, diagnostic: `${message}${detail}` }),
+      }),
+      catch: (cause) => new DesktopInterfaceTranslationError({ cause }),
+    }).pipe(
+      Effect.catch((translationError) =>
+        Effect.succeed({
+          title: "T3 Code",
+          content: `UI-Fehler / UI error\n${String(translationError.cause)}\n\n${stage}\n${message}${detail}`,
+        }),
+      ),
     );
+    yield* electronDialog.showErrorBox(presentation.title, presentation.content);
   }
   yield* shutdown.request;
   yield* electronApp.quit;
@@ -339,8 +361,19 @@ const startup = Effect.gen(function* () {
     });
   }
   yield* appIdentity.configure;
+  const clientSettings = yield* (yield* DesktopClientSettings.DesktopClientSettings).get.pipe(
+    Effect.catchCause((cause) => fatalStartupCause("client-settings", cause)),
+  );
+  if (Option.isSome(clientSettings)) {
+    yield* Effect.tryPromise({
+      try: () => desktopI18n.changeLanguage(clientSettings.value.interfaceLanguage),
+      catch: (cause) => new DesktopInterfaceTranslationError({ cause }),
+    }).pipe(Effect.catchCause((cause) => fatalStartupCause("interface-language", cause)));
+  }
   yield* previewPasskeys.configure;
-  yield* applicationMenu.configure;
+  yield* applicationMenu.configure.pipe(
+    Effect.catchCause((cause) => fatalStartupCause("native-interface", cause)),
+  );
   yield* updates.configure;
   yield* DesktopRemoteUpdates.listen;
   yield* DesktopStartupRecovery.listen;

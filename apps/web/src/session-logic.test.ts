@@ -18,21 +18,21 @@ import {
   type OrchestrationV2TurnItem,
 } from "@t3tools/contracts";
 import type { ThreadRuntimeSummary } from "@t3tools/client-runtime/state/shell";
-import { deriveMessagesTimelineRows } from "./components/chat/MessagesTimeline.logic";
+import { deriveMessagesTimelineRows as deriveTranslatedRows } from "./components/chat/MessagesTimeline.logic";
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   deriveCanInterruptRunningThread,
-  deriveTimelineEntriesFromVisibleTurnItems,
-  deriveTimelineEntriesFromVisibleTurnItemsWithState,
+  deriveTimelineEntriesFromVisibleTurnItems as deriveTranslatedEntries,
+  deriveTimelineEntriesFromVisibleTurnItemsWithState as deriveTranslatedProjection,
   deriveRevertTurnCountByUserMessageId,
   derivePhase,
   isLatestRunSettled,
   selectHandoffImageResources,
   selectMessageImageResources,
   createMessageAttachmentPreviewProjector,
-  providerErrorPresentation,
+  providerErrorPresentation as translatedProviderError,
   type TimelineEntry,
   workEntryIndicatesToolFailure,
   workEntryDisplayIndicatesToolFailure,
@@ -41,7 +41,41 @@ import {
 import { makeStreamingTimelineFixture, makeThreadProjectionFixture } from "./test-fixtures";
 import type { ChatMessage } from "./types";
 
+import { createI18n } from "@t3tools/client-runtime/i18n";
+
+const activityT = createI18n("en").getFixedT("en", "activity");
+const deriveTimelineEntriesFromVisibleTurnItems = (
+  input: Parameters<typeof deriveTranslatedEntries>[0],
+) => deriveTranslatedEntries(input, activityT);
+const deriveTimelineEntriesFromVisibleTurnItemsWithState = (
+  input: Parameters<typeof deriveTranslatedProjection>[0],
+  previous?: Parameters<typeof deriveTranslatedProjection>[2],
+) => deriveTranslatedProjection(input, activityT, previous);
+const providerErrorPresentation = (item: Parameters<typeof translatedProviderError>[0]) =>
+  translatedProviderError(item, activityT);
+
+const deriveMessagesTimelineRows = (input: Parameters<typeof deriveTranslatedRows>[0]) =>
+  deriveTranslatedRows(input, activityT, "en");
+
 describe("V2 session presentation", () => {
+  it("refreshes translated work after a language change and preserves message objects", () => {
+    const fixture = makeStreamingTimelineFixture("Agent output remains unchanged.");
+    const input = { visibleTurnItems: fixture.visibleTurnItems, optimisticMessages: [] };
+    const previous = deriveTranslatedProjection(input, activityT);
+    const germanT = createI18n("de").getFixedT("de", "activity");
+    const next = deriveTranslatedProjection(input, germanT, previous);
+    const work = next.entries.filter((entry) => entry.kind === "work");
+    expect(work.map((entry) => entry.entry.label)).toEqual([
+      "Befehl ausgeführt",
+      "/repo/src/index.ts gelesen",
+    ]);
+    for (const [index, entry] of previous.entries.entries()) {
+      if (entry.kind === "message") expect(next.entries[index]).toBe(entry);
+    }
+    const restored = deriveTranslatedProjection(input, activityT, next);
+    expect(restored.entries).toEqual(previous.entries);
+  });
+
   it("uses run status as the settlement boundary", () => {
     const runId = RunId.make("run-1");
     expect(

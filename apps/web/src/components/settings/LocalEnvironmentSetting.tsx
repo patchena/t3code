@@ -1,6 +1,7 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 
-import { isLocalEnvironmentDisabled } from "../../localEnvironment";
+import { isLocalEnvironmentDisabled } from "~/localEnvironment";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -9,15 +10,16 @@ import {
   AlertDialogHeader,
   AlertDialogPopup,
   AlertDialogTitle,
-} from "../ui/alert-dialog";
-import { Button } from "../ui/button";
-import { Spinner } from "../ui/spinner";
-import { Switch } from "../ui/switch";
-import { SettingsRow } from "./settingsLayout";
-import { searchableSetting } from "./settingsSearch";
+} from "~/components/ui/alert-dialog";
+import { Button } from "~/components/ui/button";
+import { Spinner } from "~/components/ui/spinner";
+import { Switch } from "~/components/ui/switch";
+import { SettingsRow } from "~/components/settings/settingsLayout";
+import { searchableSetting } from "~/components/settings/settingsSearch";
 
 // Toggling relaunches desktop; the switch reflects startup state.
 export function LocalEnvironmentSetting() {
+  const { t } = useTranslation("settings");
   const setEnabled = window.desktopBridge?.setLocalEnvironmentEnabled;
   const [enabled] = useState(() => !isLocalEnvironmentDisabled());
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -31,7 +33,7 @@ export function LocalEnvironmentSetting() {
     try {
       await setEnabled(!enabled);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Couldn't change this setting.");
+      setError(cause instanceof Error ? cause.message : t(($) => $.local.couldnTChangeThisSetting));
       setIsUpdating(false);
     }
   };
@@ -39,18 +41,18 @@ export function LocalEnvironmentSetting() {
   return (
     <>
       <SettingsRow
-        {...searchableSetting("local-environment")}
+        {...searchableSetting("local-environment", t)}
         description={
           enabled
-            ? "Run agents on this computer. Turn off to use T3 Code only with remote environments."
-            : "Turned off. Agents only run in remote environments."
+            ? t(($) => $.local.runAgentsOnThisComputerTurnOffTo)
+            : t(($) => $.local.turnedOffAgentsOnlyRunInRemoteEnvironments)
         }
         control={
           <Switch
             checked={enabled}
             disabled={isUpdating}
             onCheckedChange={() => setConfirmOpen(true)}
-            aria-label="Local environment"
+            aria-label={t(($) => $.local.localEnvironment)}
           />
         }
       />
@@ -65,18 +67,20 @@ export function LocalEnvironmentSetting() {
         <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {enabled ? "Turn off local environment?" : "Turn on local environment?"}
+              {enabled
+                ? t(($) => $.local.turnOffLocalEnvironment)
+                : t(($) => $.local.turnOnLocalEnvironment)}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {enabled
-                ? "T3 Code will restart without running a server on this computer. Any agents and terminals running here will stop, and other devices will no longer be able to connect to this computer. Your projects, history, and remote environments are unaffected."
-                : "T3 Code will restart and start running a server on this computer again."}
+                ? t(($) => $.local.t3CodeWillRestartWithoutRunningAServer)
+                : t(($) => $.local.t3CodeWillRestartAndStartRunningA)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error ? <p className="px-6 pb-4 text-sm text-destructive">{error}</p> : null}
           <AlertDialogFooter>
             <AlertDialogClose disabled={isUpdating} render={<Button variant="outline" />}>
-              Cancel
+              {t(($) => $.local.cancel)}
             </AlertDialogClose>
             <Button
               variant={enabled ? "destructive" : "default"}
@@ -86,12 +90,12 @@ export function LocalEnvironmentSetting() {
               {isUpdating ? (
                 <>
                   <Spinner size="sm" />
-                  Restarting…
+                  {t(($) => $.local.restarting)}
                 </>
               ) : enabled ? (
-                "Restart and turn off"
+                t(($) => $.local.restartAndTurnOff)
               ) : (
-                "Restart and turn on"
+                t(($) => $.local.restartAndTurnOn)
               )}
             </Button>
           </AlertDialogFooter>

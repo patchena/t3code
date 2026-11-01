@@ -6,6 +6,9 @@ import {
 import type { ProviderDriverKind, ProviderInstanceId, ServerProvider } from "@t3tools/contracts";
 import { ChevronDownIcon, SquareIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { threadRelationshipStatusLabel } from "./ThreadRelationshipIcon";
 
 import { AgentElapsed } from "./AgentElapsed";
 import { SubagentTooltipContent } from "./SubagentTooltipContent";
@@ -38,15 +41,16 @@ function phaseElapsed(phase: SubagentWorkflowGroup["phases"][number]) {
   };
 }
 
-function phaseStatusLabel(phase: SubagentWorkflowGroup["phases"][number]) {
-  if (phase.state === "running") return "running";
-  if (phase.members.some((member) => member.status === "failed")) return "failed";
+function phaseStatusLabel(phase: SubagentWorkflowGroup["phases"][number], t: TFunction<"chat">) {
+  if (phase.state === "running") return t(($) => $.workflow.running);
+  if (phase.members.some((member) => member.status === "failed"))
+    return t(($) => $.workflow.failed);
   if (
     phase.members.some((member) => member.status === "cancelled" || member.status === "interrupted")
   ) {
-    return "stopped";
+    return t(($) => $.workflow.stopped);
   }
-  return phase.state === "done" ? "done" : "not started";
+  return phase.state === "done" ? t(($) => $.workflow.done) : t(($) => $.workflow.notStarted);
 }
 
 function WorkflowMemberRow({
@@ -66,6 +70,8 @@ function WorkflowMemberRow({
   driver: ProviderDriverKind | undefined;
   onOpen: (threadId: string) => void;
 }) {
+  const { t } = useTranslation("chat");
+  const { t: tActivity } = useTranslation("activity");
   const threadId = member.childThreadId;
   const canOpen = threadId !== null;
   return (
@@ -76,7 +82,7 @@ function WorkflowMemberRow({
           render={
             <ThreadDetailsControl
               part="row"
-              aria-label={`Open ${member.title} chat`}
+              aria-label={t(($) => $.workflow.openChat, { title: member.title })}
               disabled={!canOpen}
               onClick={() => canOpen && onOpen(threadId)}
             />
@@ -89,7 +95,7 @@ function WorkflowMemberRow({
             status={member.status}
           />
           <span className="min-w-0 flex-1 truncate">{member.title}</span>
-          <span className="sr-only">{member.status}</span>
+          <span className="sr-only">{threadRelationshipStatusLabel(member.status, tActivity)}</span>
           {member.startedAt ? (
             <span className="shrink-0 text-2xs font-normal tabular-nums text-muted-foreground">
               <AgentElapsed agent={member} />
@@ -142,6 +148,8 @@ export function ThreadLineageWorkflowRow({
   readonly stopping: boolean;
   readonly stopDisabled: boolean;
 }) {
+  const { t } = useTranslation("chat");
+  const { t: tActivity } = useTranslation("activity");
   const [expanded, setExpanded] = useState(false);
   const [phaseOpen, setPhaseOpen] = useState<ReadonlyMap<number, boolean>>(() => new Map());
   const label = group.workflow.workflowName ?? group.workflow.title;
@@ -160,7 +168,7 @@ export function ThreadLineageWorkflowRow({
                     variant="ghost"
                     part="icon"
                     tone="destructive"
-                    aria-label={`Stop workflow ${label}`}
+                    aria-label={t(($) => $.workflow.stopNamed, { label })}
                     disabled={stopDisabled}
                     onClick={onStop}
                   />
@@ -172,7 +180,7 @@ export function ThreadLineageWorkflowRow({
                   <SquareIcon aria-hidden className="size-3 fill-current" />
                 )}
               </TooltipTrigger>
-              <TooltipPopup side="left">Stop entire workflow</TooltipPopup>
+              <TooltipPopup side="left">{t(($) => $.workflow.stopAll)}</TooltipPopup>
             </Tooltip>
           </div>
         ) : null}
@@ -182,7 +190,11 @@ export function ThreadLineageWorkflowRow({
           variant="ghost"
           part="secondary"
           aria-expanded={expanded}
-          aria-label={`${expanded ? "Collapse" : "Expand"} ${label}`}
+          aria-label={
+            expanded
+              ? t(($) => $.workflow.collapse, { label })
+              : t(($) => $.workflow.expand, { label })
+          }
           onClick={() => setExpanded((value) => !value)}
         >
           <ChevronDownIcon
@@ -198,23 +210,31 @@ export function ThreadLineageWorkflowRow({
         <ul className="m-0 list-none p-0 ps-6.5">
           {phases.map((phase) => {
             const open = phaseOpen.get(phase.index) ?? phase.state === "running";
-            const status = phaseStatusLabel(phase);
+            const status = phaseStatusLabel(phase, t);
             return (
               <li key={phase.index}>
                 <CollapsibleSectionHeader
                   variant="panel"
                   tone={phase.state === "running" ? "emphasized" : "muted"}
                   expanded={open}
-                  aria-label={`${open ? "Collapse" : "Expand"} ${phase.title} phase, ${status}`}
+                  aria-label={
+                    open
+                      ? t(($) => $.workflow.collapsePhase, { title: phase.title, status })
+                      : t(($) => $.workflow.expandPhase, { title: phase.title, status })
+                  }
                   onClick={() => setPhaseOpen((phases) => new Map(phases).set(phase.index, !open))}
                   accessory={
                     <>
-                      {status === "failed" ? (
-                        <SectionHeaderStatus>Failed</SectionHeaderStatus>
+                      {phase.members.some((member) => member.status === "failed") ? (
+                        <SectionHeaderStatus>
+                          {tActivity(($) => $.status.failed)}
+                        </SectionHeaderStatus>
                       ) : null}
                       <span className="shrink-0 text-2xs font-normal tabular-nums">
-                        {phase.settledCount}/{phase.members.length}{" "}
-                        {phase.members.length === 1 ? "agent" : "agents"}
+                        {t(($) => $.workflow.agentsSettled, {
+                          count: phase.members.length,
+                          settled: phase.settledCount,
+                        })}
                       </span>
                       <span className="shrink-0 text-2xs font-normal tabular-nums empty:hidden">
                         <AgentElapsed agent={phaseElapsed(phase)} />
@@ -256,7 +276,9 @@ export function ThreadLineageWorkflowRow({
             />
           ))}
           {phases.length === 0 && group.unphasedMembers.length === 0 ? (
-            <li className="px-2.5 py-1.5 text-2xs text-muted-foreground/70">No agents yet</li>
+            <li className="px-2.5 py-1.5 text-2xs text-muted-foreground/70">
+              {t(($) => $.workflow.noAgents)}
+            </li>
           ) : null}
         </ul>
       ) : null}

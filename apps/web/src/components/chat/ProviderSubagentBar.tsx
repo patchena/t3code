@@ -5,6 +5,7 @@ import {
 import { isOrchestrationV2WorkActive } from "@t3tools/contracts";
 import { ArrowUpLeftIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { tickTextContent } from "~/lib/tickTextContent";
 import type { ProviderInstanceEntry } from "../../providerInstances";
@@ -20,6 +21,8 @@ export function ProviderSubagentBar(props: {
   readonly onOpenParent: (() => void) | null;
   readonly actions?: ReactNode;
 }) {
+  const { t } = useTranslation("chat");
+  const { t: tActivity } = useTranslation("activity");
   const { status } = props;
   const live = status !== null && isOrchestrationV2WorkActive(status.status);
   const modelDescription =
@@ -27,6 +30,7 @@ export function ProviderSubagentBar(props: {
   const announcement = formatProviderSubagentStatus(
     status === null ? null : { ...status, startedAt: null },
     0,
+    tActivity,
   );
 
   // Sized by the composer, not the viewport: a docked side panel narrows the
@@ -55,22 +59,27 @@ export function ProviderSubagentBar(props: {
           )}
         </span>
         <span
-          ref={tickTextContent((nowMs) => formatProviderSubagentStatus(status, nowMs), live)}
+          ref={tickTextContent(
+            (nowMs) => formatProviderSubagentStatus(status, nowMs, tActivity),
+            live,
+          )}
           aria-hidden
           className="min-w-0 max-w-full truncate text-muted-foreground tabular-nums @max-[560px]/composer-surface:text-xs"
         />
       </div>
       <span role="status" className="sr-only">
-        {`${modelDescription} subagent: ${announcement}`}
+        {t(($) => $.thread.subagentAnnouncement, { model: modelDescription, status: announcement })}
       </span>
       <span className="shrink-0 text-muted-foreground @max-[640px]/composer-surface:sr-only">
-        Runs on its own
+        {t(($) => $.thread.runsIndependently)}
       </span>
       {props.actions}
       {props.onOpenParent ? (
         <Button size="sm" variant="ghost" onClick={props.onOpenParent}>
           <ArrowUpLeftIcon />
-          <span className="@max-[320px]/composer-surface:sr-only">Open parent</span>
+          <span className="@max-[320px]/composer-surface:sr-only">
+            {t(($) => $.thread.openParent)}
+          </span>
         </Button>
       ) : null}
     </div>

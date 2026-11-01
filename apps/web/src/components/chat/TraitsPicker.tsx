@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
 import {
   buildTraitsTriggerDisplay,
   getDescriptorStringValue,
@@ -54,34 +56,38 @@ export function readPromptUltrathink(prompt: string): PromptUltrathink {
   return isClaudeUltrathinkPrompt(prompt.replace(/^Ultrathink:\s*/i, "")) ? "body" : "prefix";
 }
 
-const SAVED_OPTION_LABELS: Readonly<Record<string, string>> = {
-  agent: "Agent",
-  effort: "Effort",
-  reasoningEffort: "Reasoning effort",
-  variant: "Reasoning",
-};
-
-function savedOptionLabel(id: string): string {
-  return (
-    SAVED_OPTION_LABELS[id] ??
-    id.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/^./, (character) => character.toUpperCase())
-  );
+function savedOptionLabel(id: string, t: TFunction<"chat">): string {
+  switch (id) {
+    case "agent":
+      return t(($) => $.composer.agent);
+    case "effort":
+      return t(($) => $.composer.effort);
+    case "reasoningEffort":
+      return t(($) => $.composer.reasoningEffort);
+    case "variant":
+      return t(($) => $.composer.reasoning);
+    default:
+      return id
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .replace(/^./, (character) => character.toUpperCase());
+  }
 }
 
 function buildUnavailableModelOptionDescriptors(
   selections: ProviderOptions | null | undefined,
+  label: (id: string) => string,
 ): ReadonlyArray<ProviderOptionDescriptor> {
   return (selections ?? []).map((selection) =>
     typeof selection.value === "boolean"
       ? {
           id: selection.id,
-          label: savedOptionLabel(selection.id),
+          label: label(selection.id),
           type: "boolean" as const,
           currentValue: selection.value,
         }
       : {
           id: selection.id,
-          label: savedOptionLabel(selection.id),
+          label: label(selection.id),
           type: "select" as const,
           options: [{ id: selection.value, label: selection.value }],
           currentValue: selection.value,
@@ -101,9 +107,10 @@ type TraitsPersistence =
     };
 
 function DefaultBadge() {
+  const { t } = useTranslation("chat");
   return (
     <Badge variant="outline" size="sm" className="min-w-0">
-      Default
+      {t(($) => $.composer.default)}
     </Badge>
   );
 }
@@ -116,6 +123,7 @@ function getSelectedTraits(
   modelOptions: ProviderOptions | null | undefined,
   allowPromptInjectedEffort: boolean,
   planModeEnabled: boolean,
+  optionLabel: (id: string) => string,
 ) {
   const caps = getProviderModelCapabilities(models, model, provider, planModeEnabled);
   const modelIsUnavailable =
@@ -126,6 +134,7 @@ function getSelectedTraits(
         planModeEnabled
           ? modelOptions
           : modelOptions?.filter((option) => option.id !== "agent" || option.value !== "plan"),
+        optionLabel,
       )
     : getProviderOptionDescriptors({
         caps,
@@ -186,15 +195,18 @@ function getSelectedTraits(
   };
 }
 
-export function getTraitsSectionVisibility(input: {
-  provider: ProviderDriverKind;
-  models: ReadonlyArray<ServerProviderModel>;
-  model: string | null | undefined;
-  promptUltrathink?: PromptUltrathink | undefined;
-  modelOptions?: ProviderOptions | null | undefined;
-  allowPromptInjectedEffort?: boolean;
-  planModeEnabled: boolean;
-}) {
+export function getTraitsSectionVisibility(
+  input: {
+    provider: ProviderDriverKind;
+    models: ReadonlyArray<ServerProviderModel>;
+    model: string | null | undefined;
+    promptUltrathink?: PromptUltrathink | undefined;
+    modelOptions?: ProviderOptions | null | undefined;
+    allowPromptInjectedEffort?: boolean;
+    planModeEnabled: boolean;
+  },
+  t: TFunction<"chat">,
+) {
   const selected = getSelectedTraits(
     input.provider,
     input.models,
@@ -203,6 +215,7 @@ export function getTraitsSectionVisibility(input: {
     input.modelOptions,
     input.allowPromptInjectedEffort ?? true,
     input.planModeEnabled,
+    (id) => savedOptionLabel(id, t),
   );
 
   const showEffort = selected.primarySelectDescriptor !== null;
@@ -252,6 +265,7 @@ export function getReasoningTraitStep(input: {
     input.modelOptions,
     true,
     input.planModeEnabled,
+    (id) => id,
   );
   if (selected.modelIsUnavailable || selected.ultrathinkInBodyText) return null;
   const descriptor = selected.selectDescriptors.find(isReasoningSelect);
@@ -311,6 +325,7 @@ export function useTraitsSelection({
   triggerClassName: _triggerClassName,
   ...persistence
 }: TraitsSelectionInput) {
+  const { t } = useTranslation("chat");
   const modelSelection =
     instanceId && model ? { instanceId, model, options: modelOptions ?? [] } : null;
   const setProviderModelOptions = useComposerDraftStore((store) => store.setProviderModelOptions);
@@ -329,15 +344,18 @@ export function useTraitsSelection({
       persistSticky: true,
     });
   };
-  const selected = getTraitsSectionVisibility({
-    provider,
-    models,
-    model,
-    promptUltrathink,
-    modelOptions,
-    allowPromptInjectedEffort,
-    planModeEnabled,
-  });
+  const selected = getTraitsSectionVisibility(
+    {
+      provider,
+      models,
+      model,
+      promptUltrathink,
+      modelOptions,
+      allowPromptInjectedEffort,
+      planModeEnabled,
+    },
+    t,
+  );
   return {
     ...selected,
     /** The option a select shows, where an Ultrathink prompt owns the primary select. */
@@ -369,10 +387,8 @@ export function useTraitsSelection({
   };
 }
 
-export const ULTRATHINK_IN_BODY_NOTE =
-  'Your prompt contains "ultrathink" in the text. Remove it to change this option.';
-
 const TraitsMenuContent = memo(function TraitsMenuContentImpl(props: TraitsSelectionInput) {
+  const { t } = useTranslation("chat");
   const traits = useTraitsSelection(props);
   const {
     descriptors,
@@ -421,7 +437,7 @@ const TraitsMenuContent = memo(function TraitsMenuContentImpl(props: TraitsSelec
             </div>
             {ultrathinkInBodyText && descriptor.id === primarySelectDescriptor?.id ? (
               <div className="px-2 pb-1.5 text-muted-foreground/80 text-xs">
-                {ULTRATHINK_IN_BODY_NOTE}
+                {t(($) => $.composer.ultrathinkBody)}
               </div>
             ) : null}
             <MenuRadioGroup
@@ -467,7 +483,9 @@ const TraitsMenuContent = memo(function TraitsMenuContentImpl(props: TraitsSelec
               {(["on", "off"] as const).map((value) => (
                 <MenuRadioItem key={value} value={value} hideIndicator closeOnClick>
                   <span className="flex w-full min-w-0 items-center justify-between gap-3">
-                    <span>{value === "on" ? "On" : "Off"}</span>
+                    <span>
+                      {value === "on" ? t(($) => $.composer.on) : t(($) => $.composer.off)}
+                    </span>
                   </span>
                 </MenuRadioItem>
               ))}

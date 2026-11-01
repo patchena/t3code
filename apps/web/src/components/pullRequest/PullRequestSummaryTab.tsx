@@ -1,4 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
+import { useTranslation } from "react-i18next";
+import { resolveHour12, systemLocale } from "~/timestampFormat";
+import { useClientSettings } from "~/hooks/useSettings";
 import {
   capitalizeTerm,
   sourceControlClients,
@@ -31,9 +34,9 @@ import { cn } from "~/lib/utils";
 import { useOpenLink } from "~/browser/useOpenLink";
 import { RelativeTime } from "~/components/RelativeTime";
 
-import { Button } from "../ui/button";
-import { PullRequestEditButton } from "./PullRequestEditButton";
-import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
+import { Button } from "~/components/ui/button";
+import { PullRequestEditButton } from "~/components/pullRequest/PullRequestEditButton";
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "~/components/ui/collapsible";
 import {
   Menu,
   MenuCheckboxItem,
@@ -41,9 +44,9 @@ import {
   MenuGroupLabel,
   MenuPopup,
   MenuTrigger,
-} from "../ui/menu";
-import { toastManager } from "../ui/toast";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+} from "~/components/ui/menu";
+import { toastManager } from "~/components/ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import {
   PullRequestActorLabel,
   PullRequestCheckStatusIcon,
@@ -54,10 +57,10 @@ import {
   PullRequestReviewOutcomeAvatarBadge,
   pullRequestReviewOutcomeRingClassName,
   pullRequestReviewOutcomeStaleLabel,
-} from "./pullRequestPresentation";
-import { PullRequestLabelPicker } from "./PullRequestLabelPicker";
-import { PullRequestReviewerPicker } from "./PullRequestReviewerPicker";
-import { PullRequestActivityUnavailableState } from "./PullRequestActivityUnavailableState";
+} from "~/components/pullRequest/pullRequestPresentation";
+import { PullRequestLabelPicker } from "~/components/pullRequest/PullRequestLabelPicker";
+import { PullRequestReviewerPicker } from "~/components/pullRequest/PullRequestReviewerPicker";
+import { PullRequestActivityUnavailableState } from "~/components/pullRequest/PullRequestActivityUnavailableState";
 import {
   filterPullRequestConversationItems,
   isPullRequestCommentFinished,
@@ -72,7 +75,7 @@ import {
   type PullRequestChatSubject,
   type PullRequestConversationItem,
   type PullRequestFinding,
-} from "./pullRequestDetail.logic";
+} from "~/components/pullRequest/pullRequestDetail.logic";
 import {
   canEditPullRequestChangeRequest,
   canEditPullRequestComment,
@@ -82,17 +85,17 @@ import {
   type DescriptionDraft,
 } from "@t3tools/client-runtime/pull-request-editing";
 import { setMarkdownTaskChecked } from "@t3tools/shared/markdownTaskList";
-import { PullRequestMarkdown } from "./PullRequestMarkdown";
-import { PullRequestCommentBody } from "./PullRequestCommentBody";
-import { PullRequestMoreReplies } from "./PullRequestMoreReplies";
-import { PullRequestMarkdownEditor } from "./PullRequestMarkdownEditor";
+import { PullRequestMarkdown } from "~/components/pullRequest/PullRequestMarkdown";
+import { PullRequestCommentBody } from "~/components/pullRequest/PullRequestCommentBody";
+import { PullRequestMoreReplies } from "~/components/pullRequest/PullRequestMoreReplies";
+import { PullRequestMarkdownEditor } from "~/components/pullRequest/PullRequestMarkdownEditor";
 import {
   type PullRequestCompletionScope,
   pullRequestCompletionScope,
-} from "./PullRequestMarkdownTextarea";
-import { PullRequestReactionBar } from "./PullRequestReactions";
-import { PullRequestConversationGhost } from "./PullRequestGhosts";
-import { sectionCollapseAnchorScrollTop } from "./pullRequestSummaryScroll.logic";
+} from "~/components/pullRequest/PullRequestMarkdownTextarea";
+import { PullRequestReactionBar } from "~/components/pullRequest/PullRequestReactions";
+import { PullRequestConversationGhost } from "~/components/pullRequest/PullRequestGhosts";
+import { sectionCollapseAnchorScrollTop } from "~/components/pullRequest/pullRequestSummaryScroll.logic";
 
 function reviewerKey(login: string): string {
   return login.toLowerCase();
@@ -105,6 +108,8 @@ function CommentIdentity({
   comment: PullRequestComment;
   detail: PullRequestDetailView;
 }) {
+  const { t } = useTranslation("workspace");
+  const timestampFormat = useClientSettings((settings) => settings.timestampFormat);
   const actor = comment.author;
   const profileUrl = actor
     ? sourceControlClients.get(detail.provider).authorProfileUrl(actor.login, detail.url)
@@ -132,8 +137,10 @@ function CommentIdentity({
           </time>
         </TooltipTrigger>
         <TooltipPopup>
-          {new Date(comment.createdAt).toLocaleString()}
-          {comment.url ? " · Open comment on host" : ""}
+          {new Date(comment.createdAt).toLocaleString(systemLocale, {
+            hour12: resolveHour12(timestampFormat),
+          })}
+          {comment.url ? t(($) => $.git.openCommentOnHost) : ""}
         </TooltipPopup>
       </Tooltip>
     </div>
@@ -147,6 +154,7 @@ function CommentLocation({
   comment: PullRequestComment;
   thread: PullRequestReviewThread | undefined;
 }) {
+  const { t } = useTranslation("workspace");
   const path = thread?.path ?? comment.path;
   if (!path) return null;
   const label = `${path}${thread?.line ? `:${thread.line}` : ""}`;
@@ -156,7 +164,7 @@ function CommentLocation({
         <TooltipTrigger render={<span className="truncate font-mono" />}>{label}</TooltipTrigger>
         <TooltipPopup>{label}</TooltipPopup>
       </Tooltip>
-      {thread?.isOutdated ? <span className="shrink-0">Outdated</span> : null}
+      {thread?.isOutdated ? <span className="shrink-0">{t(($) => $.git.outdated)}</span> : null}
     </div>
   );
 }
@@ -187,6 +195,7 @@ function CommentBody({
   editing: CommentEditing;
   className?: string | undefined;
 }) {
+  const { t } = useTranslation("workspace");
   if (editing.editingId === comment.id) {
     return (
       <PullRequestMarkdownEditor
@@ -196,7 +205,7 @@ function CommentBody({
         environmentId={editing.environmentId}
         completionScope={editing.completionScope}
         threadRef={editing.threadRef}
-        label="Edit comment"
+        label={t(($) => $.git.editComment)}
         saving={editing.saving}
         onSave={(body) => editing.onSave(comment, body)}
         onCancel={() => editing.onEdit(null)}
@@ -214,7 +223,10 @@ function CommentBody({
         threadRef={editing.threadRef}
       />
       {editing.canEdit(comment) ? (
-        <PullRequestEditButton aria-label="Edit comment" onClick={() => editing.onEdit(comment)} />
+        <PullRequestEditButton
+          aria-label={t(($) => $.git.editComment)}
+          onClick={() => editing.onEdit(comment)}
+        />
       ) : null}
     </div>
   );
@@ -237,12 +249,13 @@ function chatSubject(
 }
 
 function AddToChatButton({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation("workspace");
   return (
     <Button size="xs" variant="ghost" className="shrink-0" onClick={onClick}>
       {/* Wrapped like Fix's label so both sit on the header's baseline. */}
       <span className="inline-flex items-baseline gap-1">
         <MessageSquarePlusIcon className="size-3 self-center" />
-        <span>Add to chat</span>
+        <span>{t(($) => $.git.addToChat)}</span>
       </span>
     </Button>
   );
@@ -273,6 +286,7 @@ function CollapsedComment({
   moreReplies?: ReactNode;
   onAddToChat?: (() => void) | undefined;
 }) {
+  const { t } = useTranslation("workspace");
   const [open, setOpen] = useState(false);
   const statusTriggerRef = useRef<HTMLButtonElement>(null);
   return (
@@ -283,7 +297,7 @@ function CollapsedComment({
             <CommentIdentity comment={comment} detail={detail} />
             {replyCount > 0 ? (
               <span className="shrink-0 py-1 text-xs text-muted-foreground">
-                {replyCount} {replyCount === 1 ? "reply" : "replies"}
+                {t(($) => $.git.replyCount, { count: replyCount, value: String(replyCount) })}
               </span>
             ) : null}
             <CollapsibleTrigger
@@ -431,8 +445,8 @@ export function PullRequestSummaryTab({
   checksStale = false,
   activityError,
   pendingFinding,
-  fixFindingLabel = "Fix in a thread",
-  fixCheckLabel = "Fix",
+  fixFindingLabel: fixFindingLabelOverride,
+  fixCheckLabel: fixCheckLabelOverride,
   onFixFinding,
   onAddToChat,
   onRefresh,
@@ -455,6 +469,9 @@ export function PullRequestSummaryTab({
   onRefresh: () => void;
   onRefreshChecks?: () => void;
 }) {
+  const { t } = useTranslation("workspace");
+  const fixFindingLabel = fixFindingLabelOverride ?? t(($) => $.git.fixInThread);
+  const fixCheckLabel = fixCheckLabelOverride ?? t(($) => $.git.fix);
   const terminology = sourceControlClients.get(detail.provider).changeRequest;
   const [shown, setShown] = useState({ url: detail.url, count: COMMENT_PAGE });
   const shownConversations = shown.url === detail.url ? shown.count : COMMENT_PAGE;
@@ -489,8 +506,10 @@ export function PullRequestSummaryTab({
         className="w-full"
         onClick={() => setShown({ url: detail.url, count: shownConversations + COMMENT_PAGE })}
       >
-        Show {Math.min(hiddenConversationCount, COMMENT_PAGE)} older conversation
-        {hiddenConversationCount === 1 ? "" : "s"} ({hiddenConversationCount} hidden)
+        {t(($) => $.git.showOlderConversations, {
+          count: Math.min(hiddenConversationCount, COMMENT_PAGE),
+        })}
+        {t(($) => $.git.conversationHiddenCount, { count: hiddenConversationCount })}
       </Button>
     ) : null;
   // Verdicts outside the visible comment window still count.
@@ -529,7 +548,7 @@ export function PullRequestSummaryTab({
   const openCheck = (url: string) => {
     void openLink(url).catch((error: unknown) => {
       console.error(error);
-      toastManager.add({ type: "error", title: "Unable to open check details" });
+      toastManager.add({ type: "error", title: t(($) => $.git.checkDetailsUnavailable) });
     });
   };
 
@@ -571,7 +590,7 @@ export function PullRequestSummaryTab({
     descriptionSavesRunning.current -= 1;
     const saved = result._tag === "Success";
     setDescriptionDraft((draft) => settleDescriptionSave(draft, key, saved));
-    if (!saved) toastManager.add({ type: "error", title: "Could not save the description" });
+    if (!saved) toastManager.add({ type: "error", title: t(($) => $.git.descriptionSaveFailed) });
     if (descriptionSavesRunning.current === 0) onRefresh();
     return saved;
   };
@@ -604,7 +623,7 @@ export function PullRequestSummaryTab({
       });
       setCommentSaving(false);
       if (result._tag === "Failure") {
-        toastManager.add({ type: "error", title: "Could not save the comment" });
+        toastManager.add({ type: "error", title: t(($) => $.git.commentSaveFailure) });
         return;
       }
       setCommentScope(null);
@@ -669,7 +688,7 @@ export function PullRequestSummaryTab({
                 <HammerIcon className="size-3 self-center" />
                 <span>
                   {pendingFinding === pullRequestFindingKey(finding)
-                    ? "Preparing..."
+                    ? t(($) => $.git.preparing)
                     : fixFindingLabel}
                 </span>
               </span>
@@ -712,7 +731,7 @@ export function PullRequestSummaryTab({
           editing={commentEditing}
           detail={detail}
           thread={thread}
-          label={thread?.isResolved ? "Resolved" : "Review dismissed"}
+          label={thread?.isResolved ? t(($) => $.git.resolved) : t(($) => $.git.reviewDismissed)}
           body={visibleBody(comment.body)}
           replyCount={item.kind === "thread" ? item.replies.length + item.moreReplies : 0}
           replies={replies}
@@ -736,10 +755,10 @@ export function PullRequestSummaryTab({
     <div ref={scrollerRef} className="h-full overflow-y-auto" data-pull-request-summary-scroll>
       <section className="px-4 pt-2.5 pb-1">
         <div className="space-y-2">
-          <MetaRow icon={<UsersIcon className="size-3.5" />} label="Reviewers">
+          <MetaRow icon={<UsersIcon className="size-3.5" />} label={t(($) => $.git.reviewers)}>
             <span className="flex min-w-0 flex-wrap items-center gap-1.5">
               {reviewerEntries.length === 0 ? (
-                <span className="text-muted-foreground">None</span>
+                <span className="text-muted-foreground">{t(($) => $.git.none)}</span>
               ) : (
                 <span className="flex items-center -space-x-1">
                   {reviewerEntries.map((entry) => {
@@ -778,8 +797,8 @@ export function PullRequestSummaryTab({
                               />
                               <span className="sr-only">
                                 {entry.stale
-                                  ? pullRequestReviewOutcomeStaleLabel(entry.outcome)
-                                  : pullRequestReviewOutcomeLabel(entry.outcome)}
+                                  ? pullRequestReviewOutcomeStaleLabel(entry.outcome, t)
+                                  : pullRequestReviewOutcomeLabel(entry.outcome, t)}
                               </span>
                             </>
                           ) : null}
@@ -788,8 +807,8 @@ export function PullRequestSummaryTab({
                           {entry.outcome
                             ? `${named}: ${
                                 entry.stale
-                                  ? pullRequestReviewOutcomeStaleLabel(entry.outcome)
-                                  : pullRequestReviewOutcomeLabel(entry.outcome)
+                                  ? pullRequestReviewOutcomeStaleLabel(entry.outcome, t)
+                                  : pullRequestReviewOutcomeLabel(entry.outcome, t)
                               }`
                             : named}
                         </TooltipPopup>
@@ -811,10 +830,10 @@ export function PullRequestSummaryTab({
             </span>
           </MetaRow>
           {detail.labels.length > 0 || detail.capabilities.labels === true ? (
-            <MetaRow icon={<TagIcon className="size-3.5" />} label="Labels">
+            <MetaRow icon={<TagIcon className="size-3.5" />} label={t(($) => $.git.labels)}>
               <span className="flex min-w-0 flex-wrap items-center gap-1">
                 {detail.labels.length === 0 ? (
-                  <span className="text-muted-foreground">None</span>
+                  <span className="text-muted-foreground">{t(($) => $.git.none)}</span>
                 ) : (
                   detail.labels.map((label) => (
                     <PullRequestLabelChip
@@ -838,7 +857,7 @@ export function PullRequestSummaryTab({
         </div>
       </section>
 
-      <Section key={`description:${detail.url}`} title="Description" keepMounted>
+      <Section key={`description:${detail.url}`} title={t(($) => $.git.description)} keepMounted>
         <div className="group">
           {bodyScope?.url === detail.url ? (
             <PullRequestMarkdownEditor
@@ -848,8 +867,10 @@ export function PullRequestSummaryTab({
               environmentId={environmentId}
               completionScope={completionScope}
               threadRef={threadRef}
-              label={`${capitalizeTerm(terminology.singular)} description`}
-              placeholder={`Describe this ${terminology.singular}`}
+              label={t(($) => $.git.requestDescription, {
+                term: capitalizeTerm(terminology.singular),
+              })}
+              placeholder={t(($) => $.git.describeRequest, { term: terminology.singular })}
               saving={descriptionSaving}
               onSave={(body) => void saveBody(body)}
               onCancel={() => setBodyScope(null)}
@@ -858,7 +879,7 @@ export function PullRequestSummaryTab({
             <div className="flex items-start gap-1">
               <PullRequestMarkdown
                 className="min-w-0 flex-1"
-                text={description.trim().length > 0 ? description : "_No description provided._"}
+                text={description.trim().length > 0 ? description : t(($) => $.git.noDescription)}
                 cwd={detail.workspaceRoot}
                 environmentId={environmentId}
                 threadRef={threadRef}
@@ -866,7 +887,7 @@ export function PullRequestSummaryTab({
               />
               {canEditDescription ? (
                 <PullRequestEditButton
-                  aria-label="Edit description"
+                  aria-label={t(($) => $.git.editDescription)}
                   onClick={() => setBodyScope({ url: detail.url, body: description })}
                 />
               ) : null}
@@ -875,16 +896,16 @@ export function PullRequestSummaryTab({
         </div>
       </Section>
 
-      <Section key={`checks:${detail.url}`} title="Checks" defaultOpen={false}>
+      <Section key={`checks:${detail.url}`} title={t(($) => $.git.checks)} defaultOpen={false}>
         {checksStale ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>Check details are out of date.</span>
+            <span>{t(($) => $.git.checkDetailsStale)}</span>
             <Button size="xs" variant="ghost" onClick={onRefreshChecks}>
-              Refresh
+              {t(($) => $.git.refresh)}
             </Button>
           </div>
         ) : detail.checks.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No checks reported.</p>
+          <p className="text-xs text-muted-foreground">{t(($) => $.git.noChecksSentence)}</p>
         ) : (
           detail.checks.map(
             (
@@ -910,7 +931,7 @@ export function PullRequestSummaryTab({
                       <PullRequestCheckStatusIcon status={check.status} />
                       <span className="min-w-0 flex-1 wrap-anywhere">{check.name}</span>
                       <span className="shrink-0 text-muted-foreground">
-                        {pullRequestCheckStatusLabel(check)}
+                        {pullRequestCheckStatusLabel(check, t)}
                       </span>
                     </button>
                     {onFixFinding && failing ? (
@@ -923,7 +944,7 @@ export function PullRequestSummaryTab({
                       >
                         <HammerIcon className="size-3" />
                         {pendingFinding === pullRequestFindingKey(finding)
-                          ? "Preparing..."
+                          ? t(($) => $.git.preparing)
                           : fixCheckLabel}
                       </Button>
                     ) : null}
@@ -935,26 +956,28 @@ export function PullRequestSummaryTab({
       </Section>
 
       <Section
-        title={`Comments (${detail.commentCount})`}
+        title={t(($) => $.git.commentsCount, { count: detail.commentCount })}
         actions={
           <div className="flex shrink-0 items-center gap-1">
             <Menu>
               <MenuTrigger
                 render={<Button size="xs" variant="ghost-muted" />}
-                aria-label="Filter comments"
+                aria-label={t(($) => $.git.filterComments)}
               >
                 <ListFilterIcon aria-hidden className="size-3" />
-                {filteredOutCount > 0 ? `${filteredOutCount} hidden` : "Filter"}
+                {filteredOutCount > 0
+                  ? t(($) => $.git.hiddenCount, { count: filteredOutCount })
+                  : t(($) => $.git.filter)}
               </MenuTrigger>
               <MenuPopup align="end">
                 <MenuGroup>
-                  <MenuGroupLabel>Show</MenuGroupLabel>
+                  <MenuGroupLabel>{t(($) => $.git.show)}</MenuGroupLabel>
                   <MenuCheckboxItem
                     checked={commentFilter.bots}
                     closeOnClick={false}
                     onCheckedChange={(bots) => setCommentFilter((value) => ({ ...value, bots }))}
                   >
-                    Bot comments
+                    {t(($) => $.git.botComments)}
                   </MenuCheckboxItem>
                   <MenuCheckboxItem
                     checked={commentFilter.resolved}
@@ -963,7 +986,7 @@ export function PullRequestSummaryTab({
                       setCommentFilter((value) => ({ ...value, resolved }))
                     }
                   >
-                    Resolved or dismissed
+                    {t(($) => $.git.resolvedOrDismissed)}
                   </MenuCheckboxItem>
                 </MenuGroup>
               </MenuPopup>
@@ -973,13 +996,15 @@ export function PullRequestSummaryTab({
               variant="ghost-muted"
               aria-label={
                 commentOrder === "newest"
-                  ? "Show oldest comments first"
-                  : "Show newest comments first"
+                  ? t(($) => $.git.oldestCommentsFirst)
+                  : t(($) => $.git.newestCommentsFirst)
               }
               onClick={() => setCommentOrder((value) => (value === "newest" ? "oldest" : "newest"))}
             >
               <ArrowDownUpIcon aria-hidden className="size-3" />
-              {commentOrder === "newest" ? "Newest first" : "Oldest first"}
+              {commentOrder === "newest"
+                ? t(($) => $.git.newestFirst)
+                : t(($) => $.git.oldestFirst)}
             </Button>
           </div>
         }
@@ -997,17 +1022,17 @@ export function PullRequestSummaryTab({
           <>
             {detail.commentsTruncated ? (
               <p className="mb-2 rounded-md border border-warning/30 bg-warning-surface px-2 py-1.5 text-xs">
-                This conversation is only partially loaded. {commentCount} comment
-                {commentCount === 1 ? " is" : "s are"} loaded; open it on the host to read the rest.
+                {t(($) => $.git.partialConversation)}
+                {t(($) => $.git.partialCommentsLoaded, { count: commentCount })}
               </p>
             ) : null}
             {items.length === 0 ? (
-              <p className="py-2 text-xs text-muted-foreground">No comments yet.</p>
+              <p className="py-2 text-xs text-muted-foreground">{t(($) => $.git.noComments)}</p>
             ) : filteredItems.length === 0 ? (
               <p className="py-2 text-xs text-muted-foreground">
                 {filteredOutCount === 1
-                  ? "The only comment is hidden by the filter."
-                  : `All ${filteredOutCount} comments are hidden by the filter.`}
+                  ? t(($) => $.git.onlyCommentHidden)
+                  : t(($) => $.git.allCommentsHidden, { count: filteredOutCount })}
               </p>
             ) : (
               <div className="space-y-3">
@@ -1021,7 +1046,7 @@ export function PullRequestSummaryTab({
                     className="w-full"
                     onClick={() => setShown({ url: detail.url, count: COMMENT_PAGE })}
                   >
-                    Show only {COMMENT_PAGE} recent conversations
+                    {t(($) => $.git.showRecentConversations, { count: COMMENT_PAGE })}
                   </Button>
                 ) : null}
               </div>

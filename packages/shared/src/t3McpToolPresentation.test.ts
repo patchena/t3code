@@ -4,6 +4,7 @@ import {
   T3_MCP_TOOL_NAMES,
   resolveT3McpSummaryAction,
   resolveT3McpToolDefinition,
+  resolveT3McpToolId,
   resolveT3McpToolPresentation,
 } from "./t3McpToolPresentation.ts";
 
@@ -43,6 +44,12 @@ describe("resolveT3McpToolPresentation", () => {
 
 describe("resolveT3McpToolDefinition", () => {
   it("labels an action tool call as the action it ran", () => {
+    expect(resolveT3McpToolId("mcp__t3-code__preview_act", { action: "type" })).toBe(
+      "preview_type",
+    );
+    expect(resolveT3McpToolId("t3_thread_transfer", { action: "fork" })).toBe("t3_thread_fork");
+    expect(resolveT3McpToolId("preview_act", { action: "unknown" })).toBe("preview_act");
+
     expect(
       resolveT3McpToolDefinition("mcp__t3-code__preview_act", { action: "type" })?.labels,
     ).toEqual(resolveT3McpToolDefinition("preview_type")?.labels);

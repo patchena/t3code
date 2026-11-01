@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { runAtomCommand, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { PreviewViewportSetting, ScopedThreadRef } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
@@ -67,6 +68,7 @@ const runHandlerWithTimeout = (tabId: string, operation: Promise<void>): Promise
 async function resizeBrowserViewport(
   target: BrowserViewportTarget,
   viewport: PreviewViewportSetting,
+  t: TFunction<"tools">,
 ): Promise<void> {
   const result = await runAtomCommand(
     appAtomRegistry,
@@ -81,8 +83,8 @@ async function resizeBrowserViewport(
     const error = squashAtomCommandFailure(result);
     toastManager.add({
       type: "error",
-      title: "Unable to resize browser viewport",
-      description: error instanceof Error ? error.message : "An error occurred.",
+      title: t(($) => $.browserResizeFailed),
+      description: error instanceof Error ? error.message : t(($) => $.error),
     });
     throw error;
   }
@@ -105,8 +107,9 @@ export function queueBrowserViewportCommit(
 export function commitBrowserViewportChange(
   target: BrowserViewportTarget,
   setting: PreviewViewportSetting,
+  t: TFunction<"tools">,
 ): Promise<void> {
   return queueBrowserViewportCommit(target.runtimeTabId, () =>
-    resizeBrowserViewport(target, setting),
+    resizeBrowserViewport(target, setting, t),
   );
 }

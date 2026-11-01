@@ -1,8 +1,10 @@
-import { ThreadDetailsControl } from "./chat/ThreadDetailsControl";
-import { ComposerContextLabel } from "./ComposerContextLabel";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
+import { ThreadDetailsControl } from "~/components/chat/ThreadDetailsControl";
+import { ComposerContextLabel } from "~/components/ComposerContextLabel";
 import { useSupportsMultiplePullRequests } from "~/hooks/useSupportsMultiplePullRequests";
 import { resolveThreadCurrentPullRequestLink } from "@t3tools/client-runtime/thread-pull-requests";
-import { useRightPanelStore } from "../rightPanelStore";
+import { useRightPanelStore } from "~/rightPanelStore";
 import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
   isAtomCommandInterrupted,
@@ -27,23 +29,23 @@ import {
   type Ref,
 } from "react";
 
-import { useComposerDraftStore, type DraftId } from "../composerDraftStore";
-import { writeTextToClipboard } from "../hooks/useCopyToClipboard";
-import { readLocalApi } from "../localApi";
-import { useOpenPrLink } from "../lib/openPullRequestLink";
-import { usePaginatedBranches } from "../state/queries";
-import { useProject, useQuietThreadShell } from "../state/entities";
-import { useEnvironmentQuery } from "../state/query";
+import { useComposerDraftStore, type DraftId } from "~/composerDraftStore";
+import { clipboardErrorMessage, writeTextToClipboard } from "~/hooks/useCopyToClipboard";
+import { readLocalApi } from "~/localApi";
+import { useOpenPrLink } from "~/lib/openPullRequestLink";
+import { usePaginatedBranches } from "~/state/queries";
+import { useProject, useQuietThreadShell } from "~/state/entities";
+import { useEnvironmentQuery } from "~/state/query";
 import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
-import { threadEnvironment } from "../state/threads";
-import { useAtomCommand } from "../state/use-atom-command";
-import { vcsEnvironment } from "../state/vcs";
-import { cn } from "../lib/utils";
-import { THREAD_DETAILS_PANEL_ICON_CLASS } from "./chat/threadDetailsPanelStyles";
-import { ThreadDetailsPrRows } from "./chat/ThreadDetailsPrRows";
+import { threadEnvironment } from "~/state/threads";
+import { useAtomCommand } from "~/state/use-atom-command";
+import { vcsEnvironment } from "~/state/vcs";
+import { cn } from "~/lib/utils";
+import { THREAD_DETAILS_PANEL_ICON_CLASS } from "~/components/chat/threadDetailsPanelStyles";
+import { ThreadDetailsPrRows } from "~/components/chat/ThreadDetailsPrRows";
 import { parsePullRequestReference } from "@t3tools/client-runtime/pull-request-link-input";
-import { getSourceControlPresentation } from "../sourceControlPresentation";
-import { useComposerMenuProps } from "./chat/composerEventScope";
+import { getSourceControlPresentation } from "~/sourceControlPresentation";
+import { useComposerMenuProps } from "~/components/chat/composerEventScope";
 import {
   deriveLocalBranchNameFromRemoteRef,
   resolveBranchTriggerLabel,
@@ -54,19 +56,19 @@ import {
   resolveEffectiveEnvMode,
   sanitizeNewRefName,
   shouldIncludeBranchPickerItem,
-} from "./BranchToolbar.logic";
+} from "~/components/BranchToolbar.logic";
 import {
   ThreadPullRequestBadgeControl,
   prStatusIndicator,
   resolveThreadPullRequestBadge,
   useLinkedThreadPullRequest,
-} from "./ThreadStatusIndicators";
+} from "~/components/ThreadStatusIndicators";
 
-import { ComboboxItem, ComboboxTrigger } from "./ui/combobox";
-import { ComposerControl } from "./chat/ComposerControl";
-import { MiddleTruncate } from "./ui/middle-truncate";
-import { BranchPicker, BranchPickerRefItem } from "./BranchPicker";
-import { stackedThreadToast, toastManager } from "./ui/toast";
+import { ComboboxItem, ComboboxTrigger } from "~/components/ui/combobox";
+import { ComposerControl } from "~/components/chat/ComposerControl";
+import { MiddleTruncate } from "~/components/ui/middle-truncate";
+import { BranchPicker, BranchPickerRefItem } from "~/components/BranchPicker";
+import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 
 export interface BranchToolbarBranchSelectorHandle {
   open: () => void;
@@ -90,8 +92,8 @@ interface BranchToolbarBranchSelectorProps {
   onComposerFocusRequest?: () => void;
 }
 
-function toBranchActionErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "An error occurred.";
+function toBranchActionErrorMessage(error: unknown, t: TFunction<"workspace">): string {
+  return error instanceof Error ? error.message : t(($) => $.git.errorOccurred);
 }
 
 export function BranchToolbarBranchSelector({
@@ -111,6 +113,8 @@ export function BranchToolbarBranchSelector({
   onCheckoutPullRequestRequest,
   onComposerFocusRequest,
 }: BranchToolbarBranchSelectorProps) {
+  const { t } = useTranslation("workspace");
+  const { t: tCommon } = useTranslation("common");
   const composerFloatingLayerProps = useComposerMenuProps();
   const canWriteSourceControl = useEnvironmentScope(environmentId, AuthSourceControlWriteScope);
   const canOperateThread = useEnvironmentScope(environmentId, AuthOrchestrationOperateScope);
@@ -319,11 +323,11 @@ export function BranchToolbarBranchSelector({
   const [isBranchActionPending, startBranchActionTransition] = useTransition();
   const totalBranchCount = branchRefState.data?.totalCount ?? 0;
   const branchStatusText = isInitialBranchesLoadPending
-    ? "Loading refs..."
+    ? t(($) => $.git.loadingRefs)
     : isFetchingNextPage
-      ? "Loading more refs..."
+      ? t(($) => $.git.loadingMoreRefs)
       : hasNextPage
-        ? `Showing ${refs.length} of ${totalBranchCount} refs`
+        ? t(($) => $.git.showingRefs, { count: refs.length, total: totalBranchCount })
         : null;
 
   const copyBranchName = (branchName: string) => {
@@ -332,7 +336,7 @@ export function BranchToolbarBranchSelector({
         if (!didCopy) return;
         toastManager.add({
           type: "success",
-          title: "Branch name copied",
+          title: t(($) => $.git.branchCopied),
           description: branchName,
         });
       },
@@ -340,8 +344,8 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to copy branch name",
-            description: toBranchActionErrorMessage(error),
+            title: t(($) => $.git.copyBranchFailed),
+            description: clipboardErrorMessage(error, tCommon),
           }),
         );
       },
@@ -355,7 +359,7 @@ export function BranchToolbarBranchSelector({
     event.preventDefault();
     event.stopPropagation();
     const items: ContextMenuItem<"copy-branch-name">[] = [
-      { id: "copy-branch-name", label: "Copy branch name", icon: "copy" },
+      { id: "copy-branch-name", label: t(($) => $.git.copyBranch), icon: "copy" },
     ];
     void api.contextMenu.show(items, { x: event.clientX, y: event.clientY }).then((action) => {
       if (action === "copy-branch-name") copyBranchName(branchName);
@@ -370,8 +374,8 @@ export function BranchToolbarBranchSelector({
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Action unavailable",
-          description: "This connection cannot change the thread's branch.",
+          title: t(($) => $.git.actionUnavailable),
+          description: t(($) => $.git.branchPermissionDenied),
         }),
       );
       return;
@@ -437,8 +441,8 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to switch ref.",
-            description: toBranchActionErrorMessage(squashAtomCommandFailure(checkoutResult)),
+            title: t(($) => $.git.switchRefFailed),
+            description: toBranchActionErrorMessage(squashAtomCommandFailure(checkoutResult), t),
           }),
         );
       }
@@ -474,8 +478,11 @@ export function BranchToolbarBranchSelector({
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Failed to create and switch ref.",
-            description: toBranchActionErrorMessage(squashAtomCommandFailure(createBranchResult)),
+            title: t(($) => $.git.createSwitchRefFailed),
+            description: toBranchActionErrorMessage(
+              squashAtomCommandFailure(createBranchResult),
+              t,
+            ),
           }),
         );
       }
@@ -530,13 +537,16 @@ export function BranchToolbarBranchSelector({
     [handleOpenChange, isBranchActionPending, isInitialBranchesLoadPending],
   );
 
-  const triggerLabel = resolveBranchTriggerLabel({
-    activeWorktreePath,
-    effectiveEnvMode,
-    resolvedActiveBranch,
-    resolvedActiveBranchIsRemote,
-    startFromOrigin,
-  });
+  const triggerLabel = resolveBranchTriggerLabel(
+    {
+      activeWorktreePath,
+      effectiveEnvMode,
+      resolvedActiveBranch,
+      resolvedActiveBranchIsRemote,
+      startFromOrigin,
+    },
+    t,
+  );
 
   const branchPrBranch = resolveBranchToolbarPrBranch({
     activeThreadBranch,
@@ -564,6 +574,7 @@ export function BranchToolbarBranchSelector({
   const displayedPrStatus = prStatusIndicator(
     displayedPr,
     linkedStatus?.sourceControlProvider ?? branchStatusQuery.data?.sourceControlProvider,
+    t,
   );
   const prNumber = currentLinkedPr?.number ?? displayedPr?.number;
   const prUrl = currentLinkedPr?.url ?? displayedPr?.url;
@@ -600,7 +611,8 @@ export function BranchToolbarBranchSelector({
             <SourceControlIcon className="size-3.5 shrink-0 text-muted-foreground" />
             <span className="flex min-w-0 flex-col items-start">
               <span className="truncate font-medium">
-                Checkout {sourceControlPresentation.terminology.singular}
+                {t(($) => $.git.checkout)}
+                {sourceControlPresentation.terminology.singular}
               </span>
               <span className="truncate text-muted-foreground text-xs">{prReference}</span>
             </span>
@@ -617,7 +629,7 @@ export function BranchToolbarBranchSelector({
           value={itemValue}
           onClick={() => selectPickerItem(itemValue)}
         >
-          <span className="truncate">Create new ref &quot;{newRefName}&quot;</span>
+          <span className="truncate">{t(($) => $.git.createRef, { ref: newRefName })}</span>
         </ComboboxItem>
       );
     }
@@ -748,7 +760,10 @@ export function BranchToolbarBranchSelector({
             status={displayedPrStatus}
             project={activeProject}
             label={panelPrLabel}
-            openAriaLabel={prUrl ?? `Open ${sourceControlPresentation.terminology.singular}`}
+            openAriaLabel={
+              prUrl ??
+              t(($) => $.git.openRequest, { term: sourceControlPresentation.terminology.singular })
+            }
             onOpen={(event) => openPrLink(event, prUrl)}
             onActed={() => branchStatusQuery.refresh()}
           />

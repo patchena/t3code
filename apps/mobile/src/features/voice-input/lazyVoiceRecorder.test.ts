@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { VoiceInputController } from "@t3tools/client-runtime/voice-input";
 
 import { createLazyVoiceRecorder, type VoiceRecordingInput } from "./lazyVoiceRecorder";
@@ -131,6 +132,7 @@ describe("createLazyVoiceRecorder", () => {
       const harness = createHarness(selectInput, configure);
       const deleted: string[] = [];
       const controller = new VoiceInputController({
+        t: createI18n("en").getFixedT("en", "voice"),
         recorder: harness.recorder,
         getTranscriber: () => ({
           prepare: async () => ({ locale: "en-US", transcribe: async () => "text" }),

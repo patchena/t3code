@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 export interface ShareSegment {
+  readonly id: string;
   readonly label: string;
   readonly value: number;
   readonly color: string;
@@ -36,7 +37,7 @@ export function UsageShareBar({
         className="flex h-2 gap-0.5"
       >
         {visible.map((segment) => (
-          <Tooltip key={segment.label}>
+          <Tooltip key={segment.id}>
             <TooltipTrigger
               render={
                 <div
@@ -53,7 +54,7 @@ export function UsageShareBar({
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
         {visible.map((segment) => (
-          <span key={segment.label} className="flex items-center gap-1.5">
+          <span key={segment.id} className="flex items-center gap-1.5">
             <span
               aria-hidden
               className="size-2 rounded-xs"

@@ -1,12 +1,14 @@
+import { appI18n } from "~/i18n";
 import { hostFreezeNotice } from "@t3tools/client-runtime/connection";
 
-import { appAtomRegistry } from "../rpc/atomRegistry";
-import { environmentSummaries } from "../state/presentation";
-import { environmentServerConfigsAtom } from "../state/server";
-import { toastManager } from "./ui/toast";
+import { appAtomRegistry } from "~/rpc/atomRegistry";
+import { environmentSummaries } from "~/state/presentation";
+import { environmentServerConfigsAtom } from "~/state/server";
+import { toastManager } from "~/components/ui/toast";
 
 /** Tells the user why a host dropped, once per stall, when it reports one on reconnect. */
 export function startHostFreezeToasts(): () => void {
+  const t = appI18n.getFixedT(null, "workspace");
   const shown = new Set<string>();
   return appAtomRegistry.subscribe(
     environmentServerConfigsAtom,
@@ -22,7 +24,7 @@ export function startHostFreezeToasts(): () => void {
             .get(environmentSummaries.identitiesAtom)
             .find((identity) => identity.environmentId === environmentId)?.label ??
           config.environment.label;
-        const notice = hostFreezeNotice(label, stall);
+        const notice = hostFreezeNotice(label, stall, t);
         if (notice !== null) {
           toastManager.add({ type: "warning", ...notice });
         }

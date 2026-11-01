@@ -7,6 +7,7 @@ import { deviceEnvironment } from "../../state/device";
 import { useAtomCommand } from "../../state/use-atom-command";
 import {
   checkDeviceHostConnections,
+  DeviceHostAccessError,
   deviceHostConnectionKey,
   type DeviceHostCheck,
   type DeviceHostCheckTarget,
@@ -27,7 +28,7 @@ export function useHostConnectionChecks(targets: ReadonlyArray<DeviceHostCheckTa
       host,
       async (environmentId, input) => {
         if (!readEnvironmentScope(environmentId, AuthSettingsWriteScope)) {
-          throw new Error("This connection cannot test device hosts.");
+          throw new DeviceHostAccessError();
         }
         const result = await test({ environmentId, input });
         if (result._tag === "Failure") throw squashAtomCommandFailure(result);

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { AuthProvidersManageScope, PROVIDER_DISPLAY_NAMES } from "@t3tools/contracts";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import { useRef, useState } from "react";
@@ -11,12 +12,13 @@ import {
   collectProviderUpdateCandidates,
   getProviderUpdateRunToastView,
   type ProviderUpdateRun,
-} from "./ProviderUpdateLaunchNotification.logic";
-import { Button } from "./ui/button";
-import { stackedThreadToast, toastManager } from "./ui/toast";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
+} from "~/components/ProviderUpdateLaunchNotification.logic";
+import { Button } from "~/components/ui/button";
+import { stackedThreadToast, toastManager } from "~/components/ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 
 export function useProviderUpdates() {
+  const { t } = useTranslation("workspace");
   const { environments } = useEnvironments();
   const manageableIds = useEnvironmentsWithScope(environments, AuthProvidersManageScope);
   const providersByEnvironment = useEnvironmentProviders();
@@ -54,7 +56,7 @@ export function useProviderUpdates() {
         })),
       ),
     );
-    const view = quiet ? null : getProviderUpdateRunToastView(runs);
+    const view = quiet ? null : getProviderUpdateRunToastView(runs, t);
     if (view) {
       toastManager.add(
         stackedThreadToast({
@@ -70,6 +72,7 @@ export function useProviderUpdates() {
 }
 
 export function ProviderUpdatesAction() {
+  const { t } = useTranslation("workspace");
   const { machines, updateAll } = useProviderUpdates();
   const pending = useRef(false);
   const [isPending, setIsPending] = useState(false);
@@ -96,7 +99,7 @@ export function ProviderUpdatesAction() {
             disabled={isPending}
             onClick={() => void handleUpdate()}
           >
-            {isPending ? "Updating…" : "Update all"}
+            {isPending ? t(($) => $.updates.updating) : t(($) => $.updates.updateAll)}
           </Button>
         }
       />

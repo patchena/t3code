@@ -6,10 +6,12 @@ import {
   type EnvironmentId,
   type ServerConfig,
 } from "@t3tools/contracts";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 
 import { useUpdateEnvironmentSettings } from "../../hooks/useSettings";
 import { useEnvironmentScope } from "../../state/session";
-import { ENVIRONMENT_MACHINE_KIND_LABELS, EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
+import { environmentMachineLabels, EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import {
   MenuItem,
   MenuRadioGroup,
@@ -20,15 +22,18 @@ import {
   MenuSubTrigger,
 } from "../ui/menu";
 
-export function resolveEnvironmentIconPickerLock(input: {
-  readonly serverConfig: Pick<ServerConfig, "environment"> | null;
-  readonly operateAccess: "granted" | "denied" | "pending";
-}): string | null {
+export function resolveEnvironmentIconPickerLock(
+  input: {
+    readonly serverConfig: Pick<ServerConfig, "environment"> | null;
+    readonly operateAccess: "granted" | "denied" | "pending";
+  },
+  t: TFunction<"connect">,
+): string | null {
   if (input.serverConfig === null) {
-    return "Connect to this environment to change its icon.";
+    return t(($) => $.icons.connect);
   }
   if (input.operateAccess !== "granted") {
-    return "Your session on this environment cannot change its settings.";
+    return t(($) => $.icons.noPermission);
   }
   return null;
 }
@@ -40,11 +45,12 @@ export function EnvironmentIconMenu({
   readonly environmentId: EnvironmentId;
   readonly serverConfig: Pick<ServerConfig, "environment"> | null;
 }) {
+  const { t } = useTranslation("connect");
   const updateSettings = useUpdateEnvironmentSettings(environmentId);
   const operateAccess = useEnvironmentScope(environmentId, AuthSettingsWriteScope)
     ? "granted"
     : "denied";
-  const lock = resolveEnvironmentIconPickerLock({ serverConfig, operateAccess });
+  const lock = resolveEnvironmentIconPickerLock({ serverConfig, operateAccess }, t);
   const detected = serverConfig?.environment.platform.machine ?? "server";
   const resolved = resolveEnvironmentMachineKind(serverConfig);
 
@@ -52,7 +58,7 @@ export function EnvironmentIconMenu({
     <MenuSub>
       <MenuSubTrigger>
         <EnvironmentMachineIcon kind={resolved} />
-        Icon
+        {t(($) => $.icons.icon)}
       </MenuSubTrigger>
       <MenuSubPopup>
         {lock !== null ? (
@@ -74,12 +80,12 @@ export function EnvironmentIconMenu({
             <MenuRadioItem key={kind} value={kind} disabled={lock !== null}>
               <span className="flex min-w-0 items-center gap-2">
                 <EnvironmentMachineIcon kind={kind} className="size-3.5 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">
-                  {ENVIRONMENT_MACHINE_KIND_LABELS[kind]}
-                </span>
+                <span className="min-w-0 flex-1 truncate">{environmentMachineLabels(t)[kind]}</span>
                 {kind === detected ? (
                   <span className="shrink-0 text-xs text-muted-foreground">
-                    {serverConfig?.environment.platform.machine ? "detected" : "default"}
+                    {serverConfig?.environment.platform.machine
+                      ? t(($) => $.icons.detected)
+                      : t(($) => $.icons.default)}
                   </span>
                 ) : null}
               </span>

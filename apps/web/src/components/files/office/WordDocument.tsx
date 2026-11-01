@@ -1,3 +1,6 @@
+import { FilePreviewFailure } from "~/components/files/fileFailure";
+import { useTranslation } from "react-i18next";
+import type { OfficeDetails } from "~/components/files/office/OfficePages";
 /* oxlint-disable react/no-array-index-key -- Text spans retain their order within an immutable page. */
 /* oxlint-disable react/no-unstable-nested-components -- These callbacks return overlays, and are invoked as render functions. */
 import { Tooltip, TooltipTrigger, TooltipPopup } from "~/components/ui/tooltip";
@@ -20,11 +23,12 @@ type Opened = {
   engine: ReturnType<typeof createWorkerClient<WordMethods>>;
 };
 
-export default function WordDocument(props: {
+export function WordDocument(props: {
   bytes: ArrayBuffer;
-  onDetails: (text: string) => void;
+  onDetails: (details: OfficeDetails) => void;
   onError: (cause: unknown) => void;
 }) {
+  const { t } = useTranslation("files");
   const { onError, bytes, onDetails } = props;
   const [opened, setOpened] = useState<Opened>();
   const scroll = useRef<((index: number, y?: number) => void) | null>(null);
@@ -63,15 +67,16 @@ export default function WordDocument(props: {
       .then(async (first) => {
         if (controller.signal.aborted) return;
         setOpened({ pages: first.pages, paint, engine });
-        onDetails(`${first.pages.length}${first.loading ? "+" : ""} pages`);
+        onDetails({ count: first.pages.length, unit: "pages", loading: first.loading });
         if (!first.loading) return;
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         while (!controller.signal.aborted) {
           const step = await engine.call("layout", undefined, { signal: controller.signal });
           if (!step.done) continue;
-          if (step.pages.length > 1000) throw new Error("Preview limited to 1,000 pages.");
+          if (step.pages.length > 1000)
+            throw new FilePreviewFailure({ describe: (t) => t(($) => $.document.pageLimit) });
           setOpened({ pages: step.pages, paint, engine });
-          onDetails(`${step.pages.length} pages`);
+          onDetails({ count: step.pages.length, unit: "pages" });
           break;
         }
       })
@@ -98,7 +103,7 @@ export default function WordDocument(props: {
     <OfficePages
       pages={opened.pages}
       paint={opened.paint}
-      label="Page"
+      label={t(($) => $.document.page)}
       scrollRef={scroll}
       onError={onError}
       overlay={(index) => (

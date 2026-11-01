@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Textarea } from "../ui/textarea";
 import { SettingsRow, SettingResetButton } from "./settingsLayout";
@@ -11,6 +12,7 @@ import {
 } from "./useScopedSettings";
 
 export function ThreadTitleInstructionsSettings() {
+  const { t } = useTranslation("settings");
   const settings = useScopedSettings();
   const { targets } = useSettingsScope();
   const scopeKey = targets.map((target) => `${target.environmentId}:${target.projectId}`).join(",");
@@ -22,12 +24,12 @@ export function ThreadTitleInstructionsSettings() {
     <SettingsRow
       serverScoped
       settingKeys={["threadTitleInstructions"]}
-      {...searchableSetting("thread-title-instructions")}
-      description="Appended to the prompt for new and regenerated thread titles."
+      {...searchableSetting("thread-title-instructions", t)}
+      description={t(($) => $.extra.titles.description)}
       resetAction={
         mixed || settings.threadTitleInstructions !== "" ? (
           <SettingResetButton
-            label="thread title instructions"
+            label={t(($) => $.extra.titles.reset)}
             onClick={() => updateSettings({ threadTitleInstructions: "" })}
           />
         ) : null
@@ -36,16 +38,14 @@ export function ThreadTitleInstructionsSettings() {
       <div className="mt-3 max-w-2xl pb-3.5">
         <Textarea
           key={`${scopeKey}:${mixed}:${settings.threadTitleInstructions}`}
-          aria-label="Thread title instructions"
+          aria-label={t(($) => $.extra.titles.instructions)}
           onChange={() => {
             edited.current = true;
           }}
           rows={4}
           defaultValue={mixed ? "" : settings.threadTitleInstructions}
           placeholder={
-            mixed
-              ? "Mixed. Enter instructions to apply to all selected targets."
-              : "Keep titles to a few words. Lead with the main subject."
+            mixed ? t(($) => $.extra.titles.mixed) : t(($) => $.extra.titles.placeholder)
           }
           onBlur={(event) => {
             const value = event.target.value.trim();

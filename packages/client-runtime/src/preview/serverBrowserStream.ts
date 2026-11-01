@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 // @effect-diagnostics globalTimers:off globalFetch:off - This browser and WebView transport runs without an Effect runtime.
 import { type DeviceHubAccess, withDeviceHubQuery } from "../device/hubAccess.ts";
 import {
@@ -26,18 +27,21 @@ export interface PreviewStreamControl {
   };
 }
 
-export const previewStreamControlLabel = (control: PreviewStreamControl | null): string =>
+export const previewStreamControlLabel = (
+  control: PreviewStreamControl | null,
+  t: TFunction<"tools">,
+): string =>
   !control
-    ? "Connecting..."
+    ? t(($) => $.browserConnecting)
     : !control.canOperate
-      ? "Read-only"
+      ? t(($) => $.browserReadOnly)
       : control.controller === "you"
-        ? "You have control"
+        ? t(($) => $.browserYouControl)
         : control.controller === "agent"
-          ? "Agent has control"
+          ? t(($) => $.browserAgentControl)
           : control.controller === "another-viewer"
-            ? "Another viewer has control"
-            : "Watching";
+            ? t(($) => $.browserOtherControl)
+            : t(($) => $.browserWatching);
 
 const isPreviewStreamDialog = (value: unknown): value is PreviewStreamControl["dialog"] =>
   value === null ||
@@ -463,7 +467,7 @@ const decodeHostSetup = (reason: string): PreviewStreamHostSetup => {
   return { need: "sandbox", command: "sudo npx t3 browser setup" };
 };
 
-export const previewStreamHostSetupMessage = (setup: PreviewStreamHostSetup) =>
-  setup.need === "sandbox"
-    ? "This server's host blocks the sandbox its browser runs in. Run this once on the host, then try again:"
-    : "This server's host is missing libraries its browser needs. Run this once on the host, then try again:";
+export const previewStreamHostSetupMessage = (
+  setup: PreviewStreamHostSetup,
+  t: TFunction<"tools">,
+) => (setup.need === "sandbox" ? t(($) => $.browserHostSandbox) : t(($) => $.browserHostLibraries));

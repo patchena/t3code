@@ -8,7 +8,7 @@ import { PREFERRED_HIGHLIGHTER } from "~/lib/syntaxHighlighting";
 
 import { FILE_LINK_REVEAL_UNSAFE_CSS } from "./fileSurfaceChrome";
 
-export default function ReadOnlySourcePreview(props: {
+export function ReadOnlySourcePreview(props: {
   readonly name: string;
   readonly text: string;
   readonly cacheKey?: string;

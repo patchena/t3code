@@ -1,23 +1,24 @@
+import { useTranslation } from "react-i18next";
 import type { EnvironmentId, PullRequestRef, PullRequestReviewGuideStop } from "@t3tools/contracts";
 import { SparklesIcon, TriangleAlertIcon } from "lucide-react";
 import { useEffect, useEffectEvent } from "react";
 
 import type { ReviewCommentContext } from "~/reviewCommentContext";
 
-import { Alert, AlertAction, AlertDescription } from "../ui/alert";
-import { Button } from "../ui/button";
-import { Spinner } from "../ui/spinner";
-import type { ExcerptCommenting } from "./guide/GuideExcerpt";
-import { GuideProseContext } from "./guide/GuideProse";
-import { GuideTour } from "./guide/GuideTour";
-import { useReviewGuideWriter } from "./guide/useReviewGuideWriter";
+import { Alert, AlertAction, AlertDescription } from "~/components/ui/alert";
+import { Button } from "~/components/ui/button";
+import { Spinner } from "~/components/ui/spinner";
+import type { ExcerptCommenting } from "~/components/pullRequest/guide/GuideExcerpt";
+import { GuideProseContext } from "~/components/pullRequest/guide/GuideProse";
+import { GuideTour } from "~/components/pullRequest/guide/GuideTour";
+import { useReviewGuideWriter } from "~/components/pullRequest/guide/useReviewGuideWriter";
 import {
   nextPendingReviewCommentId,
   pullRequestReviewKey,
   usePendingReviewComments,
   usePullRequestReviewStore,
-} from "./pullRequestReviewStore";
-import type { PullRequestCompletionScope } from "./PullRequestMarkdownTextarea";
+} from "~/components/pullRequest/pullRequestReviewStore";
+import type { PullRequestCompletionScope } from "~/components/pullRequest/PullRequestMarkdownTextarea";
 
 export function PullRequestGuideTab({
   environmentId,
@@ -50,6 +51,7 @@ export function PullRequestGuideTab({
   onOpenFile: (path: string) => void;
   onTourShown?: (() => void) | undefined;
 }) {
+  const { t } = useTranslation("workspace");
   const { query, data, running, canWrite, write } = useReviewGuideWriter({
     environmentId,
     reference,
@@ -95,7 +97,7 @@ export function PullRequestGuideTab({
     canWrite ? (
       <Button size={size} variant="outline" disabled={running} onClick={() => void write()}>
         {running ? <Spinner /> : <SparklesIcon aria-hidden className="size-3.5" />}
-        {running ? "Reading the change..." : label}
+        {running ? t(($) => $.git.readingChange) : label}
       </Button>
     ) : null;
 
@@ -111,20 +113,22 @@ export function PullRequestGuideTab({
       <div className="scrollbar-gutter-both flex h-full flex-col items-center justify-center-safe gap-2 overflow-y-auto px-4 py-10 text-center">
         <p className="text-sm font-medium text-foreground">
           {running
-            ? "Writing a review guide"
+            ? t(($) => $.git.writingReviewGuide)
             : failure === null
-              ? "No review guide yet"
-              : "Could not write a review guide"}
+              ? t(($) => $.git.noReviewGuide)
+              : t(($) => $.git.writeReviewGuideFailed)}
         </p>
         <p className="max-w-md text-xs text-muted-foreground">
           {running
-            ? "An agent is reading the change. A large one takes a few minutes. You can leave; you will be told when it is ready."
+            ? t(($) => $.git.writingGuideDescription)
             : failure === null
-              ? (query.error ??
-                "A guide is a tour of the change: stops through the code in reading order, with the calls only a maintainer can make.")
-              : FAILURE_HINT}
+              ? (query.error ?? t(($) => $.git.reviewGuideDescription))
+              : t(($) => $.git.checkGuideModel)}
         </p>
-        {writeButton(failure === null ? "Write guide" : "Try again", "sm")}
+        {writeButton(
+          failure === null ? t(($) => $.git.writeGuide) : t(($) => $.git.tryAgain),
+          "sm",
+        )}
         {failure === null || running ? null : <FailureDetails detail={failure} />}
       </div>
     );
@@ -136,17 +140,24 @@ export function PullRequestGuideTab({
         {running ? <Spinner /> : <TriangleAlertIcon />}
         <AlertDescription>
           {running ? (
-            "Rewriting this guide. You will be told when the new one is ready."
+            t(($) => $.git.rewritingGuideDescription)
           ) : failure === null ? (
-            "Written before the latest push."
+            t(($) => $.git.guideBeforeLatestPush)
           ) : (
             <>
-              {`Could not rewrite this guide. ${FAILURE_HINT}`}
+              {t(($) => $.git.rewriteGuideFailedDescription)}
               <FailureDetails detail={failure} />
             </>
           )}
         </AlertDescription>
-        {!running && canWrite ? <AlertAction>{writeButton("Rewrite", "xs")}</AlertAction> : null}
+        {!running && canWrite ? (
+          <AlertAction>
+            {writeButton(
+              t(($) => $.git.rewrite),
+              "xs",
+            )}
+          </AlertAction>
+        ) : null}
       </Alert>
     ) : null;
 
@@ -174,13 +185,12 @@ export function PullRequestGuideTab({
   );
 }
 
-const FAILURE_HINT = "Check the review guide model in Settings → Source control.";
-
 function FailureDetails({ detail }: { detail: string }) {
+  const { t } = useTranslation("workspace");
   return (
     <details className="w-full max-w-lg text-xs text-muted-foreground">
       <summary className="cursor-pointer rounded-sm -outline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
-        Technical details
+        {t(($) => $.git.technicalDetails)}
       </summary>
       <pre className="scrollbar-gutter-both mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 p-3 text-left font-mono text-xs">
         {detail}

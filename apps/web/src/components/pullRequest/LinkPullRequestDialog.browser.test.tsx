@@ -20,7 +20,10 @@ import { RegistryContext } from "@effect/atom-react";
 
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { act, render } from "../../../test/render";
-import { LinkPullRequestDialogHost, openLinkPullRequestDialog } from "./LinkPullRequestDialog";
+import {
+  LinkPullRequestDialogHost,
+  openLinkPullRequestDialog,
+} from "~/components/pullRequest/LinkPullRequestDialog";
 
 it("focuses the reference input when the dialog opens", async () => {
   await using _screen = await render(

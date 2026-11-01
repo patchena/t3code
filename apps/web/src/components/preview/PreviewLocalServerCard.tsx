@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import { DiscoveryListRow } from "../ui/discovery-list";
 
@@ -11,7 +13,8 @@ interface Props {
 }
 
 export function PreviewLocalServerCard({ threadRef, server, onOpen }: Props) {
-  const subtitle = describeServer(server);
+  const { t } = useTranslation("tools");
+  const subtitle = describeServer(server, t);
   return (
     <DiscoveryListRow
       onClick={onOpen}
@@ -22,7 +25,7 @@ export function PreviewLocalServerCard({ threadRef, server, onOpen }: Props) {
   );
 }
 
-function describeServer(server: PreviewableServer): string {
+function describeServer(server: PreviewableServer, t: TFunction<"tools">): string {
   if (server.processName) return server.processName;
-  return "Listening";
+  return t(($) => $.previewListening);
 }

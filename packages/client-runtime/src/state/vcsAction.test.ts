@@ -186,15 +186,18 @@ describe("vcsActionState", () => {
 
     expect(phase).toMatchObject({
       isRunning: true,
+      currentPhase: "commit",
       currentLabel: "Committing...",
       currentPhaseLabel: "Committing...",
     });
     expect(output).toMatchObject({
+      currentPhase: "commit",
       currentLabel: "Running post-commit...",
       hookName: "post-commit",
       lastOutputLine: "hook output",
     });
     expect(finished).toMatchObject({
+      currentPhase: "commit",
       currentLabel: "Committing...",
       hookName: null,
       lastOutputLine: null,

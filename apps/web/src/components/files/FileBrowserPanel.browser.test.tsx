@@ -5,7 +5,7 @@ import { page, userEvent } from "vite-plus/test/browser";
 import { COMPOSER_MENTION_DRAG_TYPE } from "~/components/chat/composerMentionDrag";
 import { dismissContextMenu } from "~/contextMenuFallback";
 import { render } from "../../../test/render";
-import FileBrowserPanel from "./FileBrowserPanel";
+import { FileBrowserPanel } from "~/components/files/FileBrowserPanel";
 
 const entries: readonly ProjectEntry[] = [
   { path: "src", kind: "directory" },

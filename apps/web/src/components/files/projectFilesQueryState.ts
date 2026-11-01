@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import {
   type EnvironmentId,
@@ -184,9 +186,9 @@ function failureCause<A>(result: AsyncResult.AsyncResult<A, unknown>): unknown {
   return result._tag === "Failure" ? Cause.squash(result.cause) : null;
 }
 
-function errorMessage(cause: unknown): string | null {
+function errorMessage(cause: unknown, t: TFunction<"files">): string | null {
   if (cause === null) return null;
-  return cause instanceof Error ? cause.message : "Workspace query failed.";
+  return cause instanceof Error ? cause.message : t(($) => $.query.failed);
 }
 
 const isProjectReadFileError = Schema.is(ProjectReadFileError);
@@ -198,6 +200,7 @@ export function useProjectEntriesQuery(
   directoryPath?: string,
   revision?: string | null,
 ): ProjectQueryState<ProjectListEntriesResult> {
+  const { t } = useTranslation("files");
   const fileAccess = useFilesystemReadAccess(environmentId);
   const { canReadFiles } = fileAccess;
   const atom = canReadFiles
@@ -211,8 +214,8 @@ export function useProjectEntriesQuery(
     error: fileAccess.isPending
       ? null
       : canReadFiles
-        ? errorMessage(failureCause(result))
-        : (fileAccess.error ?? "This connection cannot read host files."),
+        ? errorMessage(failureCause(result), t)
+        : (fileAccess.error ?? t(($) => $.query.cannotRead)),
     isPending: fileAccess.isPending || result.waiting,
     refresh,
   };
@@ -252,6 +255,7 @@ export function useProjectFileQuery(
   relativePath: string | null,
   enabled = true,
 ): ProjectFileQueryState {
+  const { t } = useTranslation("files");
   // Read media-like paths too; a failed read is how folders with those names are detected.
   const fileAccess = useFilesystemReadAccess(environmentId);
   const { canReadFiles } = fileAccess;
@@ -281,9 +285,9 @@ export function useProjectFileQuery(
         ? null
         : canReadFiles
           ? isMissing && !optimisticFile
-            ? `'${relativePath}' does not exist.`
-            : errorMessage(cause)
-          : (fileAccess.error ?? "This connection cannot read host files."),
+            ? t(($) => $.query.missing, { path: String(relativePath) })
+            : errorMessage(cause, t)
+          : (fileAccess.error ?? t(($) => $.query.cannotRead)),
     isPending: isQueryEnabled && (fileAccess.isPending || result.waiting),
     readError,
     isNotFile,

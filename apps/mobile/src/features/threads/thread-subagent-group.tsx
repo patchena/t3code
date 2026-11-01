@@ -6,6 +6,7 @@ import {
   shouldShowInstanceBadge,
 } from "@t3tools/client-runtime/state/provider-instance-display";
 import { summarizeSubagentStatuses } from "@t3tools/client-runtime/state/subagent-display";
+import { mobileI18n } from "~/i18n";
 import { isActiveSubagentStatus } from "@t3tools/client-runtime/state/subagentRuntime";
 import type {
   EnvironmentId,
@@ -133,7 +134,10 @@ export function ThreadSubagentGroup(props: {
   });
   const grouped = agents.length > 1;
   const label = `${agents.length} subagents`;
-  const summary = summarizeSubagentStatuses(agents.map((agent) => agent.status));
+  const summary = summarizeSubagentStatuses(
+    agents.map((agent) => agent.status),
+    mobileI18n.getFixedT("en", "activity"),
+  );
   const expanded = props.expandedRows[props.anchorKey] ?? false;
   const serverConfigs = useServerConfigs();
   // A task in a linked environment runs a provider instance of that environment.

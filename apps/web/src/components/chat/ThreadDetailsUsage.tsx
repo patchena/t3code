@@ -7,12 +7,11 @@ import type {
 import {
   collectProviderUsageLimits,
   formatDuration,
-  type LimitPace,
-  limitsNotice,
   paceOf,
   remainingPercent,
 } from "@t3tools/shared/usageLimits";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { usePrimarySettings } from "../../hooks/useSettings";
 import { useNowMinute } from "../../hooks/useNowMinute";
@@ -23,12 +22,6 @@ import { formatUpcomingTimestamp } from "../../timestampFormat";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { formatContextWindowCompactionMessage } from "./ContextWindowMeter.logic";
 import { ThreadDetailsSection } from "./ThreadDetailsSection";
-
-const PACE_LABEL: Record<LimitPace, string> = {
-  ahead: "Ahead of pace",
-  on: "On pace",
-  under: "Under pace",
-};
 
 export interface ThreadDetailsUsageInput {
   readonly providerInstanceId: ProviderInstanceId | null;
@@ -45,6 +38,7 @@ export function ThreadDetailsUsage({
   providers,
   sources,
 }: Omit<ThreadDetailsUsageInput, "contextWindow">) {
+  const { t } = useTranslation("chat");
   const nowMinute = useNowMinute();
   const now = Date.parse(`${nowMinute}:00Z`);
   const report =
@@ -57,21 +51,28 @@ export function ThreadDetailsUsage({
     report?.accounts.find((entry) => entry.instanceId === providerInstanceId)?.limits ??
     providers.find((provider) => provider.instanceId === providerInstanceId)?.usageLimits;
   if (!limits) return null;
-  const notice = limitsNotice(limits);
+  const notice =
+    limits.unavailable?.reason === "unsupported"
+      ? (limits.unavailable.message ?? t(($) => $.details.noSubscriptionLimits))
+      : limits.unavailable?.reason === "probeFailed"
+        ? (limits.unavailable.message ?? t(($) => $.details.readLimitsFailed))
+        : limits.windows.length === 0
+          ? t(($) => $.details.noLimitsReported)
+          : null;
 
   return (
     <ThreadDetailsSection
       headingId="thread-details-usage-heading"
-      title="Usage limits"
+      title={t(($) => $.details.usage)}
       showHeading={false}
     >
       <div className="grid grid-cols-[auto_minmax(3rem,1fr)_auto] gap-x-3 text-xs">
         {notice ? (
           <UsageRow
-            label="Limits"
+            label={t(($) => $.details.limits)}
             fill={null}
             tone={null}
-            value="Unavailable"
+            value={t(($) => $.ui.unavailable)}
             tooltip={<span className="text-foreground">{notice}</span>}
           />
         ) : (
@@ -84,6 +85,7 @@ export function ThreadDetailsUsage({
 
 /** The thread's context window. The bar fills as context is used; the tick marks auto-compaction. */
 export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowSnapshot }) {
+  const { t } = useTranslation("chat");
   const maxTokens = usage.maxTokens != null && usage.maxTokens > 0 ? usage.maxTokens : null;
   const used =
     maxTokens !== null && usage.usedPercentage !== null
@@ -98,12 +100,12 @@ export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowS
   return (
     <ThreadDetailsSection
       headingId="thread-details-context-heading"
-      title="Context window"
+      title={t(($) => $.details.contextWindow)}
       showHeading={false}
     >
       <div className="grid grid-cols-[auto_minmax(3rem,1fr)_auto] gap-x-3 text-xs">
         <UsageRow
-          label="Context"
+          label={t(($) => $.details.context)}
           fill={used}
           tone={used === null ? null : used >= 90 ? "error" : used >= 80 ? "warning" : null}
           tick={tick}
@@ -113,21 +115,29 @@ export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowS
               ? `${usedTokens} / ${formatContextWindowTokens(maxTokens)}`
               : usedTokens
           }
-          ariaValue={used !== null ? `${used}% used` : `${usedTokens} tokens used`}
+          ariaValue={
+            used !== null
+              ? t(($) => $.details.percentUsed, { percent: used })
+              : t(($) => $.details.tokensUsed, { tokens: usedTokens })
+          }
           tooltip={
             <>
               <span className="text-foreground">
-                {used !== null ? `Context: ${used}% used` : `Context: ${usedTokens} tokens used`}
+                {used !== null
+                  ? t(($) => $.details.contextPercentUsed, { percent: used })
+                  : t(($) => $.details.contextTokensUsed, { tokens: usedTokens })}
               </span>
               {maxTokens !== null ? (
                 <span className="text-muted-foreground">
-                  {usage.usedTokens.toLocaleString("en-US")} of {maxTokens.toLocaleString("en-US")}{" "}
-                  tokens
+                  {t(($) => $.details.tokenCount, {
+                    used: usage.usedTokens.toLocaleString("en-US"),
+                    max: maxTokens.toLocaleString("en-US"),
+                  })}
                 </span>
               ) : null}
               {threshold !== null && threshold > 0 ? (
                 <span className="text-muted-foreground">
-                  {formatContextWindowCompactionMessage(null, threshold)}
+                  {formatContextWindowCompactionMessage(null, threshold, t)}
                 </span>
               ) : null}
             </>
@@ -145,6 +155,13 @@ function LimitRow({
   readonly window: ServerProviderUsageWindow;
   readonly now: number;
 }) {
+  const { t } = useTranslation("chat");
+  const { t: tCommon } = useTranslation("common");
+  const paceLabels = {
+    ahead: t(($) => $.details.aheadPace),
+    on: t(($) => $.details.onPace),
+    under: t(($) => $.details.underPace),
+  };
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
   const left = remainingPercent(window);
   const pace = paceOf(window, now);
@@ -155,19 +172,21 @@ function LimitRow({
       fill={left}
       tone={left <= 10 ? "error" : left <= 20 ? "warning" : null}
       value={`${left}%`}
-      ariaValue={`${left}% left`}
+      ariaValue={t(($) => $.details.percentLeft, { percent: left })}
       tooltip={
         <>
           <span className="text-foreground">
-            {window.label}: {left}% left
+            {t(($) => $.details.windowPercentLeft, { window: window.label, percent: left })}
           </span>
           {window.resetsAt && resetsAt > now ? (
             <span className="text-muted-foreground">
-              Resets in {formatDuration(resetsAt - now)} ·{" "}
-              {formatUpcomingTimestamp(window.resetsAt, timestampFormat, now)}
+              {t(($) => $.details.resetsIn, {
+                duration: formatDuration(resetsAt - now),
+                time: formatUpcomingTimestamp(window.resetsAt, timestampFormat, tCommon, now),
+              })}
             </span>
           ) : null}
-          {pace ? <span className="text-muted-foreground">{PACE_LABEL[pace]}</span> : null}
+          {pace ? <span className="text-muted-foreground">{paceLabels[pace]}</span> : null}
         </>
       }
     />

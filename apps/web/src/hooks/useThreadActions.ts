@@ -1,3 +1,6 @@
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { appI18n } from "~/i18n";
 import {
   parseScopedThreadKey,
   scopeProjectRef,
@@ -165,11 +168,51 @@ export class ThreadActiveReorderUnsupportedError extends Schema.TaggedError<Thre
   }
 }
 
-async function requestThreadUnpinConfirmation(input: {
-  enabled: boolean;
-  title: string;
-  confirm: ((message: string) => Promise<boolean>) | null;
-}) {
+const isThreadActionError = Schema.is(
+  Schema.Union([
+    ThreadArchiveBlockedError,
+    ThreadSettlementUnsupportedError,
+    ThreadSnoozeUnsupportedError,
+    ThreadSnoozeBlockedError,
+    ThreadAutoSettleOptOutUnsupportedError,
+    ThreadPinningUnsupportedError,
+    ThreadPinReorderUnsupportedError,
+    ThreadActiveReorderUnsupportedError,
+  ]),
+);
+
+export function threadActionErrorMessage(error: unknown, t: TFunction<"workspace">): string {
+  if (isThreadActionError(error)) {
+    switch (error._tag) {
+      case "ThreadArchiveBlockedError":
+        return t(($) => $.threadActions.archiveBlocked);
+      case "ThreadSettlementUnsupportedError":
+        return t(($) => $.threadActions.settlementUnsupported);
+      case "ThreadSnoozeUnsupportedError":
+        return t(($) => $.threadActions.snoozeUnsupported);
+      case "ThreadSnoozeBlockedError":
+        return t(($) => $.threadActions.snoozeBlocked);
+      case "ThreadAutoSettleOptOutUnsupportedError":
+        return t(($) => $.threadActions.autoSettleUnsupported);
+      case "ThreadPinningUnsupportedError":
+        return t(($) => $.threadActions.pinningUnsupported);
+      case "ThreadPinReorderUnsupportedError":
+        return t(($) => $.threadActions.pinReorderUnsupported);
+      case "ThreadActiveReorderUnsupportedError":
+        return t(($) => $.threadActions.activeReorderUnsupported);
+    }
+  }
+  return error instanceof Error ? error.message : t(($) => $.palette.error);
+}
+
+async function requestThreadUnpinConfirmation(
+  input: {
+    enabled: boolean;
+    title: string;
+    confirm: ((message: string) => Promise<boolean>) | null;
+  },
+  t: TFunction<"workspace">,
+) {
   const { confirm } = input;
   if (!input.enabled || confirm === null) {
     return AsyncResult.success(true);
@@ -178,22 +221,25 @@ async function requestThreadUnpinConfirmation(input: {
   return settlePromise(() =>
     confirm(
       [
-        `Unpin thread "${input.title}"?`,
-        "This will move the thread out of your pinned section.",
+        t(($) => $.threadActions.unpinConfirm, { title: input.title }),
+        t(($) => $.threadActions.unpinDescription),
       ].join("\n"),
     ),
   );
 }
 
-export async function navigateAfterThreadDeletion(navigate: () => Promise<void>) {
+export async function navigateAfterThreadDeletion(
+  navigate: () => Promise<void>,
+  t: TFunction<"workspace">,
+) {
   const result = await settlePromise(navigate);
   if (result._tag === "Failure") {
     const error = squashAtomCommandFailure(result);
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: "Thread deleted, but navigation failed",
-        description: error instanceof Error ? error.message : "An error occurred.",
+        title: t(($) => $.threadActions.deletedNavigationFailed),
+        description: error instanceof Error ? error.message : t(($) => $.palette.error),
       }),
     );
   }
@@ -261,12 +307,13 @@ export function canTurnThreadIntoProject(threadRef: ScopedThreadRef): boolean {
 }
 
 function threadOperationFailure(target: ScopedThreadRef) {
+  const t = appI18n.getFixedT(null, "workspace");
   return readEnvironmentScope(target.environmentId, AuthOrchestrationOperateScope)
     ? null
     : AsyncResult.failure(
         Cause.fail(
           new EnvironmentAuthorizationError({
-            message: "This connection cannot change threads.",
+            message: t(($) => $.threadActions.cannotChange),
             requiredScope: AuthOrchestrationOperateScope,
           }),
         ),
@@ -274,6 +321,7 @@ function threadOperationFailure(target: ScopedThreadRef) {
 }
 
 export function useThreadActions() {
+  const { t } = useTranslation("workspace");
   const archiveThreadMutation = useOrchestrationCommand(threadEnvironment.archive, {
     reportFailure: false,
   });
@@ -416,7 +464,6 @@ export function useThreadActions() {
       action: "Archived",
       claim: action,
       undo: () => unarchiveThread(threadRef, { navigate: shouldNavigateToDraft }),
-      failureTitle: "Failed to undo archive",
     });
 
     if (shouldNavigateToDraft && router.state.location.href === requestingRouteHref) {
@@ -523,10 +570,10 @@ export function useThreadActions() {
       const confirmationResult = await settlePromise(() =>
         localApi.dialogs.confirm(
           [
-            "This thread is the only one linked to this worktree:",
+            t(($) => $.threadActions.worktreeOnly),
             displayWorktreePath ?? orphanedWorktreePath,
             "",
-            "Delete the worktree too?",
+            t(($) => $.threadActions.deleteWorktreeConfirm),
           ].join("\n"),
           { variant: "destructive" },
         ),
@@ -578,16 +625,18 @@ export function useThreadActions() {
       const fallbackThread = fallbackThreadId
         ? readThreadShell(scopeThreadRef(threadRef.environmentId, fallbackThreadId))
         : null;
-      await navigateAfterThreadDeletion(() =>
-        fallbackThread
-          ? router.navigate({
-              to: "/$environmentId/$threadId",
-              params: buildThreadRouteParams(
-                scopeThreadRef(fallbackThread.environmentId, fallbackThread.id),
-              ),
-              replace: true,
-            })
-          : router.navigate({ to: "/", replace: true }),
+      await navigateAfterThreadDeletion(
+        () =>
+          fallbackThread
+            ? router.navigate({
+                to: "/$environmentId/$threadId",
+                params: buildThreadRouteParams(
+                  scopeThreadRef(fallbackThread.environmentId, fallbackThread.id),
+                ),
+                replace: true,
+              })
+            : router.navigate({ to: "/", replace: true }),
+        t,
       );
     }
 
@@ -607,7 +656,7 @@ export function useThreadActions() {
       : AsyncResult.failure(
           Cause.fail(
             new EnvironmentAuthorizationError({
-              message: "This connection can no longer remove worktrees.",
+              message: t(($) => $.threadActions.cannotRemoveWorktree),
               requiredScope: AuthSourceControlWriteScope,
             }),
           ),
@@ -628,7 +677,7 @@ export function useThreadActions() {
     if (cleanupFailure) {
       const removalFailed = removeResult._tag === "Failure";
       const error = squashAtomCommandFailure(cleanupFailure);
-      const message = error instanceof Error ? error.message : "An error occurred.";
+      const message = error instanceof Error ? error.message : t(($) => $.palette.error);
       console.error("Worktree cleanup failed after thread deletion", {
         threadId: threadRef.threadId,
         projectCwd: threadProject.workspaceRoot,
@@ -639,10 +688,13 @@ export function useThreadActions() {
         stackedThreadToast({
           type: "error",
           title: removalFailed
-            ? "Failed to delete worktree"
-            : "Worktree deleted, but Git status refresh failed",
+            ? t(($) => $.threadActions.deleteWorktreeFailed)
+            : t(($) => $.threadActions.worktreeRefreshFailed),
           description: removalFailed
-            ? `Could not remove ${displayWorktreePath ?? orphanedWorktreePath}. ${message}`
+            ? t(($) => $.threadActions.removeWorktreeFailed, {
+                path: displayWorktreePath ?? orphanedWorktreePath,
+                error: message,
+              })
             : message,
         }),
       );
@@ -735,7 +787,6 @@ export function useThreadActions() {
         action: "Unpinned",
         claim: action,
         undo: () => runUndoPlan(target, undoPlan),
-        failureTitle: "Failed to undo unpin",
       });
     } else {
       action.finish();
@@ -776,10 +827,9 @@ export function useThreadActions() {
       markThreadVisited(scopedThreadKey(target), wokeAt);
     }
     showThreadUndoNotice({
-      action: "Settled",
+      action: t(($) => $.sidebar.settled),
       claim: action,
       undo: () => runUndoPlan(target, undoPlan),
-      failureTitle: "Failed to undo settle",
     });
     return result;
   };
@@ -789,11 +839,14 @@ export function useThreadActions() {
     if (permissionFailure) return permissionFailure;
     const localApi = readLocalApi();
     const resolved = resolveThreadTarget(target);
-    const confirmationResult = await requestThreadUnpinConfirmation({
-      enabled: confirmThreadUnpin,
-      title: resolved?.thread.title ?? "this thread",
-      confirm: localApi ? (message) => localApi.dialogs.confirm(message) : null,
-    });
+    const confirmationResult = await requestThreadUnpinConfirmation(
+      {
+        enabled: confirmThreadUnpin,
+        title: resolved?.thread.title ?? t(($) => $.threadActions.thisThread),
+        confirm: localApi ? (message) => localApi.dialogs.confirm(message) : null,
+      },
+      t,
+    );
     if (confirmationResult._tag === "Failure") {
       return confirmationResult;
     }
@@ -889,10 +942,9 @@ export function useThreadActions() {
       return result;
     }
     showThreadUndoNotice({
-      action: "Snoozed",
+      action: t(($) => $.sidebar.snoozed),
       claim: action,
       undo: () => runUndoPlan(target, ThreadUndo.planThreadUndo("snooze")),
-      failureTitle: "Failed to wake thread",
     });
     return result;
   };
@@ -928,12 +980,12 @@ export function useThreadActions() {
     const resolved = resolveThreadTarget(target);
 
     if (confirmThreadDelete && localApi) {
-      const title = resolved?.thread.title ?? "this thread";
+      const title = resolved?.thread.title ?? t(($) => $.threadActions.thisThread);
       const confirmationResult = await settlePromise(() =>
         localApi.dialogs.confirm(
           [
-            `Delete thread "${title}"?`,
-            "This permanently clears conversation history for this thread.",
+            t(($) => $.sidebar.deleteThread, { title }),
+            t(($) => $.sidebar.deleteThreadDescription),
           ].join("\n"),
           { variant: "destructive" },
         ),

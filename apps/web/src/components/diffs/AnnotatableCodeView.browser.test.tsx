@@ -47,8 +47,8 @@ vi.mock("./StyledDiffCodeView", () => ({
       )),
 }));
 
-import { AnnotatableCodeView } from "./AnnotatableCodeView";
-import type { StyledDiffCodeView } from "./StyledDiffCodeView";
+import { AnnotatableCodeView } from "~/components/diffs/AnnotatableCodeView";
+import type { StyledDiffCodeView } from "~/components/diffs/StyledDiffCodeView";
 
 const target = DraftId.make("diff-draft-test");
 const range: SelectedLineRange = { start: 1, end: 1, side: "additions" };

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Spinner } from "~/components/ui/spinner";
 import { useNavigate } from "@tanstack/react-router";
 import { useAtomValue } from "@effect/atom-react";
@@ -5,12 +6,12 @@ import type { ServerProvider } from "@t3tools/contracts";
 import { CircleCheckIcon, DownloadIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { useEffect, useEffectEvent, useState, type CSSProperties } from "react";
 
-import { primaryServerProvidersAtom } from "../../state/server";
+import { primaryServerProvidersAtom } from "~/state/server";
 import {
   getProviderUpdateSidebarPillView,
   type ProviderUpdateSidebarPillView,
-} from "../ProviderUpdateLaunchNotification.logic";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+} from "~/components/ProviderUpdateLaunchNotification.logic";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 
 // Matches the pill's `duration-180` class.
 const PROVIDER_UPDATE_PILL_EXIT_MS = 180;
@@ -43,6 +44,7 @@ function latestProviderCheckedAt(
 }
 
 export function SidebarProviderUpdatePill() {
+  const { t } = useTranslation("workspace");
   const navigate = useNavigate();
   const providers = useAtomValue(primaryServerProvidersAtom);
   const [dismissedKeys, setDismissedKeys] = useState<ReadonlySet<string>>(() => new Set());
@@ -52,7 +54,7 @@ export function SidebarProviderUpdatePill() {
   const [dismissAfterExitKey, setDismissAfterExitKey] = useState<string | null>(null);
   const [visibleAfterIso, setVisibleAfterIso] = useState<string | undefined>();
   const effectiveVisibleAfterIso = visibleAfterIso ?? latestProviderCheckedAt(providers);
-  const view = getProviderUpdateSidebarPillView(providers, {
+  const view = getProviderUpdateSidebarPillView(providers, t, {
     ...(effectiveVisibleAfterIso !== undefined
       ? { visibleAfterIso: effectiveVisibleAfterIso }
       : {}),
@@ -66,7 +68,7 @@ export function SidebarProviderUpdatePill() {
   const openProviderSettings = () => {
     void navigate({ to: "/settings/providers" });
   };
-  const displayedView = renderedView ?? view;
+  const displayedView = renderedView?.key === view?.key ? view : (renderedView ?? view);
   const dismissAfterVisibleMs = displayedView?.dismissAfterVisibleMs;
   const viewKey = displayedView?.key ?? null;
   const showDismissProgress =
@@ -194,7 +196,7 @@ export function SidebarProviderUpdatePill() {
             render={
               <button
                 type="button"
-                aria-label="Dismiss provider update notice"
+                aria-label={t(($) => $.updates.dismissProviderUpdateNotice)}
                 className="relative z-[1] mr-1 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md opacity-70 outline-none hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 onClick={() => startExit(displayedView.key, null, displayedView.key)}
               >
@@ -202,7 +204,7 @@ export function SidebarProviderUpdatePill() {
               </button>
             }
           />
-          <TooltipPopup side="top">Dismiss until provider status changes</TooltipPopup>
+          <TooltipPopup side="top">{t(($) => $.updates.dismissUntilStatusChanges)}</TooltipPopup>
         </Tooltip>
       )}
     </div>

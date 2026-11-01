@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   lazy,
   Suspense,
@@ -35,9 +36,9 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 
-import { cn } from "../../lib/utils";
-import { Button } from "../ui/button";
-import { Kbd } from "../ui/kbd";
+import { cn } from "~/lib/utils";
+import { Button } from "~/components/ui/button";
+import { Kbd } from "~/components/ui/kbd";
 import {
   SidebarContent,
   SidebarFooter,
@@ -46,20 +47,20 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarInput,
-} from "../ui/sidebar";
-import { scrollToSettingsTarget } from "./settingsLayout";
+} from "~/components/ui/sidebar";
+import { scrollToSettingsTarget } from "~/components/settings/settingsLayout";
 import {
   searchSettings,
   revealSettingsSearchTarget,
-  SETTINGS_NAV_GROUPS,
-  SETTINGS_SECTION_LABELS,
+  settingsNavGroups,
+  settingsSectionLabels,
   type SettingsPath,
   type SettingsSearchItem,
-} from "./settingsSearch";
-import { useAvailableSettingsSearchItems } from "./useAvailableSettingsSearchItems";
-import { validateSettingsScopeSearch } from "./settingsScope";
-import { useSettingsSectionNavigation } from "./useSettingsSectionNavigation";
-import { workspaceAreaProps } from "../../lib/workspaceFocus";
+} from "~/components/settings/settingsSearch";
+import { useAvailableSettingsSearchItems } from "~/components/settings/useAvailableSettingsSearchItems";
+import { validateSettingsScopeSearch } from "~/components/settings/settingsScope";
+import { useSettingsSectionNavigation } from "~/components/settings/useSettingsSectionNavigation";
+import { workspaceAreaProps } from "~/lib/workspaceFocus";
 
 const SnapShotIcon = createLucideIcon("snap-shot", [
   [
@@ -129,13 +130,20 @@ function SettingsSectionIcon({ to }: { to: SettingsPath }) {
 }
 
 export function SettingsSidebarNav({ pathname }: { pathname: string }) {
-  const navArea = workspaceAreaProps("settings-nav", 0, "Settings sections");
+  const { t } = useTranslation("settings");
+  const navGroups = settingsNavGroups(t);
+  const sectionLabels = settingsSectionLabels(t);
+  const navArea = workspaceAreaProps(
+    "settings-nav",
+    0,
+    t(($) => $.navUi.settingsSections),
+  );
   const navigate = useNavigate();
   const currentHash = useLocation({ select: (location) => location.hash });
   const currentSearch = useLocation({ select: (location) => location.search });
   const scopeSearch = validateSettingsScopeSearch(currentSearch);
   const activePath = SETTINGS_DETAIL_PAGE_PARENTS[pathname] ?? pathname;
-  const navPaths = SETTINGS_NAV_GROUPS.flatMap((group) => group.paths);
+  const navPaths = navGroups.flatMap((group) => group.paths);
   const sectionNavigation = useSettingsSectionNavigation(
     navPaths.find((to) => activePath === to || activePath.startsWith(`${to}/`)) ??
       navPaths[0] ??
@@ -147,7 +155,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const [compactSearchOpen, setCompactSearchOpen] = useState(false);
   const [activeResultIndex, setActiveResultIndex] = useState(0);
   const searchableItems = useAvailableSettingsSearchItems(scopeSearch);
-  const results = searchSettings(query, searchableItems);
+  const results = searchSettings(query, t, searchableItems);
   const isSearching = query.trim().length > 0;
   const hasResults = results.length > 0;
   const maxResultIndex = Math.max(results.length - 1, 0);
@@ -289,8 +297,8 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                 onBlur={() => {
                   if (!isSearching) setCompactSearchOpen(false);
                 }}
-                placeholder="Search"
-                aria-label="Search settings"
+                placeholder={t(($) => $.navUi.search)}
+                aria-label={t(($) => $.navUi.searchSettings)}
                 role="combobox"
                 aria-autocomplete="list"
                 aria-expanded={isSearching && hasResults}
@@ -308,7 +316,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                   size="icon-micro"
                   variant="ghost-muted"
                   className="shrink-0"
-                  aria-label="Clear settings search"
+                  aria-label={t(($) => $.navUi.clearSettingsSearch)}
                   onClick={() => {
                     clearSearch();
                     searchInputRef.current?.focus();
@@ -325,14 +333,14 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                 role="status"
                 className="px-2 py-6 text-center text-xs text-sidebar-muted-foreground"
               >
-                No settings found
+                {t(($) => $.navUi.noSettingsFound)}
               </p>
             ) : null}
             {isSearching ? (
               <SidebarMenu
                 id={hasResults ? "settings-search-results" : undefined}
                 role={hasResults ? "listbox" : undefined}
-                aria-label={hasResults ? "Settings search results" : undefined}
+                aria-label={hasResults ? t(($) => $.navUi.settingsSearchResults) : undefined}
               >
                 {results.map((item, index) => (
                   <SidebarMenuItem
@@ -357,7 +365,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                           {item.title}
                         </span>
                         <span className="block truncate text-2xs text-sidebar-muted-foreground/75">
-                          {SETTINGS_SECTION_LABELS[item.to]}
+                          {sectionLabels[item.to]}
                         </span>
                       </span>
                     </SidebarMenuButton>
@@ -370,7 +378,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                   <SidebarMenu className="md:hidden">
                     <SidebarMenuItem>
                       <SidebarMenuButton
-                        aria-label="Search settings"
+                        aria-label={t(($) => $.navUi.searchSettings)}
                         onClick={() => setCompactSearchOpen(true)}
                       >
                         <SearchIcon />
@@ -381,12 +389,12 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                 <div
                   {...sectionNavigation.containerProps}
                   role="tree"
-                  aria-label="Settings sections"
+                  aria-label={t(($) => $.navUi.settingsSections)}
                   className="flex flex-col gap-4"
                 >
-                  {SETTINGS_NAV_GROUPS.map((group, index) => (
+                  {navGroups.map((group, index) => (
                     <div
-                      key={group.heading ?? index}
+                      key={group.paths[0] ?? index}
                       role="group"
                       aria-label={group.heading ?? undefined}
                       className="flex flex-col gap-1 max-md:border-t max-md:border-sidebar-border max-md:pt-4 max-md:first:border-t-0 max-md:first:pt-0"
@@ -422,7 +430,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                                 <span
                                   className={cn("truncate", !compactSearchOpen && "max-md:sr-only")}
                                 >
-                                  {SETTINGS_SECTION_LABELS[to]}
+                                  {sectionLabels[to]}
                                 </span>
                               </SidebarMenuButton>
                             </SidebarMenuItem>

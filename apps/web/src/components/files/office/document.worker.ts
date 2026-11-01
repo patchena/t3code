@@ -1,3 +1,4 @@
+import { FileWorkerError } from "~/components/files/fileWorkerError";
 // Adapted from opencode (MIT). Copyright (c) 2025 opencode. See LICENSE.opencode.
 import * as Schema from "effect/Schema";
 import {
@@ -73,7 +74,11 @@ const opened: Lazy<Opened> = { value: undefined };
 
 serveWorker<WordMethods>({
   open: async (input) => {
-    if (opened.value) throw new Error("The worker already holds a document");
+    if (opened.value)
+      throw new FileWorkerError({
+        message: "The worker already holds a document",
+        code: "workerHasDocument",
+      });
 
     const loaded = await open(new Uint8Array(input.bytes));
 
@@ -97,7 +102,11 @@ serveWorker<WordMethods>({
 });
 
 function required() {
-  if (!opened.value) throw new Error("The worker holds no document");
+  if (!opened.value)
+    throw new FileWorkerError({
+      message: "The worker holds no document",
+      code: "workerNoDocument",
+    });
 
   return opened.value;
 }
@@ -141,7 +150,11 @@ async function open(bytes: Uint8Array) {
 
   const measurement = measure.measurementConfigForRequirements(requirements);
 
-  if (!measurement) throw new Error("The document's fonts could not be prepared");
+  if (!measurement)
+    throw new FileWorkerError({
+      message: "The document's fonts could not be prepared",
+      code: "documentFonts",
+    });
 
   const input = JSON.stringify({ ...request, measurement });
 
@@ -182,7 +195,10 @@ async function open(bytes: Uint8Array) {
   const retained = { frame: display(null, prefix) };
 
   if (retained.frame.displayList.pages.length === 0)
-    throw new Error("The document produced no pages");
+    throw new FileWorkerError({
+      message: "The document produced no pages",
+      code: "documentNoPages",
+    });
 
   // The region layout that finishes the document: begun on the first step, `cost` the running average milliseconds a
   // body block takes.

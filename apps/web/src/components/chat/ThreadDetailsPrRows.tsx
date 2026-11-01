@@ -1,5 +1,6 @@
+import { useTranslation } from "react-i18next";
 import { pipe } from "effect/Function";
-import { ThreadDetailsControl } from "./ThreadDetailsControl";
+import { ThreadDetailsControl } from "~/components/chat/ThreadDetailsControl";
 import type { EnvironmentId, ScopedThreadRef, ThreadPullRequestLink } from "@t3tools/contracts";
 import {
   pullRequestListLines,
@@ -18,9 +19,12 @@ import { threadEnvironment } from "~/state/threads";
 import { useAtomCommand } from "~/state/use-atom-command";
 
 import { MorphIcon } from "~/components/MorphIcon";
-import { linkedPullRequestSnapshotStatus, prStatusIndicator } from "../ThreadStatusIndicators";
+import {
+  linkedPullRequestSnapshotStatus,
+  prStatusIndicator,
+} from "~/components/ThreadStatusIndicators";
 
-import { ThreadDetailsPrRow } from "./ThreadDetailsPrRow";
+import { ThreadDetailsPrRow } from "~/components/chat/ThreadDetailsPrRow";
 
 function ThreadDetailsPrLinkRow({
   environmentId,
@@ -35,6 +39,7 @@ function ThreadDetailsPrLinkRow({
   onActed?: (() => void) | undefined;
   onStopWatching?: (() => void) | undefined;
 }) {
+  const { t } = useTranslation("workspace");
   const projects = useProjects();
   const parsed = sourceControlClients.parseChangeRequestUrl(link.url)?.link;
   const project =
@@ -52,7 +57,7 @@ function ThreadDetailsPrLinkRow({
       pr={pr}
       number={link.number}
       reference={link}
-      status={prStatusIndicator(pr, linked?.sourceControlProvider)}
+      status={prStatusIndicator(pr, linked?.sourceControlProvider, t)}
       project={project}
       label={`#${link.number}${link.snapshot === null ? "" : `: ${link.snapshot.title}`}`}
       openAriaLabel={link.url}
@@ -75,6 +80,7 @@ export function ThreadDetailsPrRows({
   currentLink: ThreadPullRequestLink | null;
   onOpenLink: (event: ReactMouseEvent<HTMLElement>, url: string) => void;
 }) {
+  const { t } = useTranslation("workspace");
   const [expanded, setExpanded] = useState(false);
   const watch = useAtomCommand(threadEnvironment.watchPullRequest, { reportFailure: true });
   const stopWatching = (link: ThreadPullRequestLink | null) =>
@@ -131,7 +137,9 @@ export function ThreadDetailsPrRows({
           // Chevrons, not plus and minus: the plus already means "add" in this card.
           icon={expanded ? ChevronUp : ChevronDown}
         />
-        {expanded ? "Show less" : `Show ${rest.length} more`}
+        {expanded
+          ? t(($) => $.git.showLess)
+          : t(($) => $.git.showMoreCount, { count: rest.length })}
       </ThreadDetailsControl>
     </>
   );

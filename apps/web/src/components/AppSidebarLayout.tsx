@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useAtomValue } from "@effect/atom-react";
 import * as Schema from "effect/Schema";
 import {
@@ -39,7 +40,7 @@ import {
 } from "../panelAnimations";
 import { BackgroundThreadAnnouncer } from "./BackgroundThreadAnnouncer";
 import { HistorySwipeNavigation } from "./HistorySwipeNavigation";
-import ThreadSidebar from "./Sidebar";
+import { Sidebar as ThreadSidebar } from "./Sidebar";
 import { SidebarBrandWidthProbe } from "./sidebar/SidebarChrome";
 import { isAppModalPage } from "./sidebar/mainAppLocation";
 import type { SidebarRouteReveal } from "./sidebar/routeReveal";
@@ -313,6 +314,7 @@ function registerAppShellCommands(router: AnyRouter, shellElement: Element): () 
 }
 
 function SidebarControl() {
+  const { t } = useTranslation("workspace");
   const router = useRouter();
   const usagePageOpen = useLocation({ select: (location) => location.pathname === "/usage" });
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
@@ -389,12 +391,14 @@ function SidebarControl() {
                 "pointer-events-auto",
                 isSidebarVisible && stageBackdropVariant && "relative top-auto translate-y-0",
               )}
-              aria-label="Toggle main sidebar"
+              aria-label={t(($) => $.sidebar.toggleSidebar)}
             />
           }
         />
         <TooltipPopup side="bottom">
-          Toggle main sidebar{shortcutLabel ? ` (${shortcutLabel})` : ""}
+          {shortcutLabel
+            ? t(($) => $.sidebar.toggleSidebarShortcut, { shortcut: shortcutLabel })
+            : t(($) => $.sidebar.toggleSidebar)}
         </TooltipPopup>
       </Tooltip>
     </div>
@@ -402,7 +406,12 @@ function SidebarControl() {
 }
 
 export function AppSidebarLayout({ children }: { children: ReactNode }) {
-  const sidebarArea = workspaceAreaProps("sidebar", 0, "Threads");
+  const { t } = useTranslation("workspace");
+  const sidebarArea = workspaceAreaProps(
+    "sidebar",
+    0,
+    t(($) => $.palette.threads),
+  );
   const [sidebarRouteReveal] = useState<SidebarRouteReveal>(() => ({
     observedKey: null,
     pendingKey: null,
@@ -457,7 +466,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
           data-app-sidebar=""
           {...sidebarArea}
           role="navigation"
-          aria-label="Threads"
+          aria-label={t(($) => $.palette.threads)}
           resizable={{
             maxWidth: sidebarMaximumWidth,
             minWidth: sidebarMinimumWidth,

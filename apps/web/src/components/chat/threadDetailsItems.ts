@@ -2,18 +2,18 @@ import type { ClientSettings } from "@t3tools/contracts";
 
 // Ids are stored in client settings, so never rename one.
 export const THREAD_DETAILS_ITEMS = [
-  { id: "environment", label: "Environment and worktree", defaultVisible: true },
-  { id: "openIn", label: "Open in editor", defaultVisible: true },
-  { id: "scripts", label: "Project scripts", defaultVisible: true },
-  { id: "branch", label: "Branch and pull request", defaultVisible: true },
-  { id: "gitActions", label: "Git actions", defaultVisible: true },
-  { id: "changes", label: "Changes", defaultVisible: true },
-  { id: "servers", label: "Servers", defaultVisible: true },
-  { id: "automations", label: "Automations", defaultVisible: true },
-  { id: "lineage", label: "Lineage", defaultVisible: true },
-  { id: "sideChats", label: "Side chats", defaultVisible: true },
-  { id: "usage", label: "Usage limits", defaultVisible: false },
-  { id: "context", label: "Context window", defaultVisible: false },
+  { id: "environment", defaultVisible: true },
+  { id: "openIn", defaultVisible: true },
+  { id: "scripts", defaultVisible: true },
+  { id: "branch", defaultVisible: true },
+  { id: "gitActions", defaultVisible: true },
+  { id: "changes", defaultVisible: true },
+  { id: "servers", defaultVisible: true },
+  { id: "automations", defaultVisible: true },
+  { id: "lineage", defaultVisible: true },
+  { id: "sideChats", defaultVisible: true },
+  { id: "usage", defaultVisible: false },
+  { id: "context", defaultVisible: false },
 ] as const;
 
 export type ThreadDetailsItemId = (typeof THREAD_DETAILS_ITEMS)[number]["id"];

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   buildRemoteOpenUrl,
   type EditorId,
@@ -53,6 +54,7 @@ export function useOpenFavoriteEditorShortcut({
   availableEditors: ReadonlyArray<EditorId>;
   openInCwd: string | null;
 }) {
+  const { t } = useTranslation("chat");
   const openInEditorMutation = useAtomCommand(shellEnvironment.openInEditor, "open in editor");
   const remote = useRemoteOpenState(environmentId);
   const remoteCapableEditors = useRemoteCapableEditors();
@@ -83,7 +85,7 @@ export function useOpenFavoriteEditorShortcut({
         });
         if (url === undefined) return;
         void openRemoteEditorUrl(url).then((opened) => {
-          if (opened) announce(`Opened in ${label}`);
+          if (opened) announce(t(($) => $.composer.openedIn, { editor: label }));
         });
         return;
       }
@@ -94,12 +96,13 @@ export function useOpenFavoriteEditorShortcut({
           editor: preferredEditor,
         },
       }).then((result) => {
-        if (result._tag === "Success") announce(`Opened in ${label}`);
+        if (result._tag === "Success") announce(t(($) => $.composer.openedIn, { editor: label }));
       });
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [
+    t,
     enabled,
     environmentId,
     keybindings,

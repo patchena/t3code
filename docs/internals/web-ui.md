@@ -21,6 +21,35 @@ Style with Tailwind classes in the component that renders the element.
   runtime are fine.
 - Theme-only rules use `@variant dark` and `@variant light`, not `.dark` selectors.
 
+## Interface text
+
+Interface language is a client preference shared across environments. Each renderer and Electron
+main process owns one instance from [`client-runtime/i18n`](../../packages/client-runtime/src/i18n/index.ts).
+Switch its language without remounting the app. Component keys, command IDs, and settings anchors
+stay independent of translated labels; searches retain their English aliases.
+
+The [renderer startup](../../apps/web/src/main.tsx) hydrates client settings before rendering T3 or
+Clerk. A language change publishes after persistence succeeds. The Clerk auth shell stays outside
+T3's translation provider and receives the official localization through its existing client
+settings subscription.
+
+React components read translations through `useTranslation`; shared presentation helpers receive
+the translation function from their caller. Keep user text, provider output, paths, URLs, and saved
+names intact. Rich messages carry raw text as React children of controlled `Trans` components,
+not through `Trans` interpolation values.
+
+The English reference catalog and German catalog are local data. Missing messages, empty values,
+and missing interpolation parameters raise errors; neither English replacements nor `defaultValue`
+are allowed. i18next's selector types still permit omitting the entire options argument, so runtime
+parameter validation remains required. The independent
+[interface error boundary](../../apps/web/src/components/InterfaceErrorBoundary.tsx) handles
+translation failures without translating its own message.
+
+Interface language and regional formatting remain separate. Use the existing
+[timestamp formatters](../../apps/web/src/timestampFormat.ts) to preserve system region and clock
+preferences, including Electron's system locale. Server events, diagnostics, and agent prompts
+remain in their original form.
+
 ## Composition
 
 The composer banners are the reference.

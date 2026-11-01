@@ -1,7 +1,9 @@
+import { useTranslation } from "react-i18next";
 import type { ScopedThreadRef } from "@t3tools/contracts";
 import {
   pullRequestLinkProject,
   resolveLinkPullRequestInput,
+  formatPullRequestLinkInputError,
 } from "@t3tools/client-runtime/pull-request-link-input";
 import { useAtomValue } from "@effect/atom-react";
 import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
@@ -11,7 +13,7 @@ import { useProjects, useThreadShell } from "~/state/entities";
 import { usePullRequestLinking } from "~/hooks/usePullRequestLinking";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { Atom } from "effect/reactivity";
-import { Button } from "../ui/button";
+import { Button } from "~/components/ui/button";
 import {
   Dialog,
   DialogDescription,
@@ -20,8 +22,8 @@ import {
   DialogPanel,
   DialogPopup,
   DialogTitle,
-} from "../ui/dialog";
-import { Input } from "../ui/input";
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
 
 // Host in chat to survive command palette dismissal.
 const linkPullRequestDialogThreadAtom = Atom.make<ScopedThreadRef | null>(null).pipe(
@@ -63,10 +65,11 @@ function LinkPullRequestDialog({
   projectId,
   onOpenChange,
 }: LinkPullRequestDialogProps) {
+  const { t } = useTranslation("workspace");
   const inputRef = useRef<HTMLInputElement>(null);
   const [reference, setReference] = useState("");
   const [dirty, setDirty] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<{ readonly cause: unknown } | null>(null);
   const projects = useProjects();
   const ownProject = pullRequestLinkProject(
     projects.find(
@@ -103,7 +106,7 @@ function LinkPullRequestDialog({
     setPending(false);
     if (result._tag === "Failure") {
       const error = squashAtomCommandFailure(result);
-      setSubmitError(error instanceof Error ? error.message : "Could not link the pull request.");
+      setSubmitError({ cause: error });
       return;
     }
     onOpenChange(false);
@@ -112,27 +115,30 @@ function LinkPullRequestDialog({
   const validation = !dirty
     ? null
     : reference.trim().length === 0
-      ? "Paste a pull request URL or enter 123 / #123."
+      ? t(($) => $.git.pasteLinkReference)
       : resolved === null
-        ? "Use a pull request URL, 123, or #123."
+        ? t(($) => $.git.linkReferenceHelp)
         : "error" in resolved
-          ? resolved.error
+          ? formatPullRequestLinkInputError(resolved.error, t)
           : null;
+  const submitErrorMessage =
+    submitError === null
+      ? null
+      : submitError.cause instanceof Error
+        ? submitError.cause.message
+        : t(($) => $.git.linkFailed);
 
   return (
     <Dialog open={open} onOpenChange={(next) => (pending ? undefined : onOpenChange(next))}>
       <DialogPopup className="max-w-xl" initialFocus={inputRef}>
         <DialogHeader>
-          <DialogTitle>Link pull request</DialogTitle>
-          <DialogDescription>
-            Attach a pull request to this thread by its URL, or by its number for this thread's
-            repository.
-          </DialogDescription>
+          <DialogTitle>{t(($) => $.git.linkPullRequest)}</DialogTitle>
+          <DialogDescription>{t(($) => $.git.linkDescription)}</DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <Input
             ref={inputRef}
-            placeholder="Pull request URL or #42"
+            placeholder={t(($) => $.git.linkPlaceholder)}
             value={reference}
             onChange={(event) => {
               setDirty(true);
@@ -149,8 +155,8 @@ function LinkPullRequestDialog({
               {resolved.link.host}/{resolved.link.repository} #{resolved.link.number}
             </p>
           ) : null}
-          {(validation ?? submitError) ? (
-            <p className="text-destructive text-xs">{validation ?? submitError}</p>
+          {(validation ?? submitErrorMessage) ? (
+            <p className="text-destructive text-xs">{validation ?? submitErrorMessage}</p>
           ) : null}
         </DialogPanel>
         <DialogFooter>
@@ -161,7 +167,7 @@ function LinkPullRequestDialog({
             onClick={() => onOpenChange(false)}
             disabled={pending}
           >
-            Cancel
+            {t(($) => $.git.cancel)}
           </Button>
           <Button
             type="button"
@@ -169,7 +175,7 @@ function LinkPullRequestDialog({
             onClick={() => void submit()}
             disabled={pending || resolved === null || "error" in resolved}
           >
-            {pending ? "Linking..." : "Link"}
+            {pending ? t(($) => $.git.linking) : t(($) => $.git.link)}
           </Button>
         </DialogFooter>
       </DialogPopup>

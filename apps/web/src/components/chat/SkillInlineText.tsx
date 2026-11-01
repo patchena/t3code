@@ -2,6 +2,7 @@ import type { ScopedThreadRef, ServerProviderSkill } from "@t3tools/contracts";
 import { formatProviderSkillDisplayName } from "@t3tools/shared/inlineSkills";
 import { Children, cloneElement, isValidElement, type ReactNode } from "react";
 import { matchInlineSkills } from "@t3tools/shared/inlineSkills";
+import { useTranslation } from "react-i18next";
 
 import { useRightPanelStore } from "~/rightPanelStore";
 import { SKILL_CHIP_ICON_SVG } from "../composerInlineChip";
@@ -89,20 +90,21 @@ export function SkillChipPopover(props: {
   copyMarkdown?: string | undefined;
   onViewInstructions: (() => void) | undefined;
 }) {
+  const { t } = useTranslation("chat");
   return (
     <ContextChipPopover
       kind="skill"
       icon={<SkillChipIcon />}
       label={props.label}
-      accessibleLabel={`Skill ${props.label}`}
+      accessibleLabel={t(($) => $.markdown.skillName, { name: props.label })}
       copyMarkdown={props.copyMarkdown}
     >
       <div className="space-y-3 p-2 text-sm">
         <p className="font-medium">{props.label}</p>
-        <p>{props.description || "No description is available for this skill."}</p>
+        <p>{props.description || t(($) => $.markdown.skillNoDescription)}</p>
         {props.onViewInstructions ? (
           <Button variant="outline" size="sm" onClick={props.onViewInstructions}>
-            View instructions
+            {t(($) => $.markdown.skillViewInstructions)}
           </Button>
         ) : null}
       </div>

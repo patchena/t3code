@@ -3,11 +3,12 @@ import type {
   EnvironmentThreadShell,
 } from "@t3tools/client-runtime/state/shell";
 import type { Dispatch } from "react";
+import { useTranslation } from "react-i18next";
 import type { ComposerHandleRef } from "../../composerHandleContext";
 import type { selectThreadTerminalUiState } from "../../terminalUiStateStore";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { useThreadTerminalActions } from "../terminal/useThreadTerminalActions";
-import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
+import { getTerminalLabel } from "~/terminalLabels";
 import {
   AuthTerminalReadScope,
   AuthTerminalOperateScope,
@@ -84,6 +85,8 @@ interface ChatTerminalActionsInput {
  * code blocks, which run in a reused or new drawer terminal.
  */
 export function useChatTerminalActions(input: ChatTerminalActionsInput) {
+  const { t } = useTranslation("chat");
+  const { t: tTools } = useTranslation("tools");
   const {
     environmentId,
     composerRef,
@@ -267,7 +270,9 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
         const error = squashAtomCommandFailure(openResult);
         setThreadError(
           activeThreadId,
-          error instanceof Error ? error.message : `Failed to run script "${script.name}".`,
+          error instanceof Error
+            ? error.message
+            : t(($) => $.terminal.scriptFailed, { name: script.name }),
         );
       }
       return;
@@ -285,7 +290,9 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
         const error = squashAtomCommandFailure(writeResult);
         setThreadError(
           activeThreadId,
-          error instanceof Error ? error.message : `Failed to run script "${script.name}".`,
+          error instanceof Error
+            ? error.message
+            : t(($) => $.terminal.scriptFailed, { name: script.name }),
         );
       }
       return;
@@ -301,8 +308,8 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not open preview",
-            description: error instanceof Error ? error.message : "An unexpected error occurred.",
+            title: t(($) => $.details.openPreviewFailed),
+            description: error instanceof Error ? error.message : t(($) => $.ui.unexpectedError),
           }),
         );
       }
@@ -381,8 +388,8 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
   const closePanelTerminalStable = useStableCallback(closePanelTerminal);
   const requestCloseTerminal = (terminalId: string) => {
     if (!hasTerminalWriteAccess()) return;
-    const label = activeTerminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId);
-    void confirmTerminalClose([label]).then((confirmed) => {
+    const label = activeTerminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId, tTools);
+    void confirmTerminalClose([label], tTools).then((confirmed) => {
       if (confirmed && readEnvironmentScope(environmentId, AuthTerminalOperateScope)) {
         closeTerminal(terminalId);
       }
@@ -391,8 +398,8 @@ export function useChatTerminalActions(input: ChatTerminalActionsInput) {
   const requestCloseTerminalStable = useStableCallback(requestCloseTerminal);
   const requestClosePanelTerminal = (terminalId: string) => {
     if (!hasTerminalWriteAccess()) return;
-    const label = activeTerminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId);
-    void confirmTerminalClose([label]).then((confirmed) => {
+    const label = activeTerminalLabelsById.get(terminalId) ?? getTerminalLabel(terminalId, tTools);
+    void confirmTerminalClose([label], tTools).then((confirmed) => {
       if (confirmed && readEnvironmentScope(environmentId, AuthTerminalOperateScope)) {
         closePanelTerminal(terminalId);
       }

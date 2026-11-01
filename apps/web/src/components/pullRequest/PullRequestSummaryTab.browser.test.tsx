@@ -38,7 +38,7 @@ function setup() {
 }
 
 import { act, render as renderUi } from "../../../test/render";
-import { PullRequestSummaryTab } from "./PullRequestSummaryTab";
+import { PullRequestSummaryTab } from "~/components/pullRequest/PullRequestSummaryTab";
 
 const detail: PullRequestDetailView = {
   provider: SourceControlProviderKind.make("github"),

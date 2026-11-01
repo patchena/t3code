@@ -1,3 +1,4 @@
+import { FileWorkerError, encodeFileWorkerError } from "~/components/files/fileWorkerError";
 import { parseDelimitedPreview } from "@t3tools/shared/delimitedPreview";
 import {
   LARGE_TEXT_MAX_BYTES,
@@ -74,13 +75,19 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
     response = new Response(new Blob([]));
   }
   if (!response.ok || !response.body)
-    throw new Error("The file could not be loaded. Close it and try again.");
+    throw new FileWorkerError({
+      message: "The file could not be loaded. Close it and try again.",
+      code: "fileDownload",
+    });
   const total = Number(
     response.headers.get("content-range")?.split("/")[1] ?? response.headers.get("content-length"),
   );
   if (total > LARGE_TEXT_MAX_BYTES) {
     await response.body.cancel();
-    throw new Error("Text previews support files up to 256 MB.");
+    throw new FileWorkerError({
+      message: "Text previews support files up to 256 MB.",
+      code: "textSizeLimit",
+    });
   }
   const reader = response.body.getReader();
   let state = 0;
@@ -93,7 +100,10 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
       const { value, done } = await reader.read();
       if (done) break;
       if (size + value.length > LARGE_TEXT_MAX_BYTES)
-        throw new Error("Text previews support files up to 256 MB.");
+        throw new FileWorkerError({
+          message: "Text previews support files up to 256 MB.",
+          code: "textSizeLimit",
+        });
       chunks.push({ start: size, blob: new Blob([value]) });
       for (let i = 0; i < value.length; i++) {
         const byte = value[i]!;
@@ -104,9 +114,16 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
           (pos === 2 && byte === 191)
         )
           continue;
-        if (byte === 0) throw new Error("This file contains binary data.");
+        if (byte === 0)
+          throw new FileWorkerError({
+            message: "This file contains binary data.",
+            code: "textBinary",
+          });
         if (pos - at(entries - 1) > 1024 * 1024)
-          throw new Error("A line or record exceeds the 1 MB preview limit.");
+          throw new FileWorkerError({
+            message: "A line or record exceeds the 1 MB preview limit.",
+            code: "textRecordLimit",
+          });
         if (cr) {
           cr = false;
           if (byte === 10) {
@@ -139,7 +156,10 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
         }
         if (byte === 10 || byte === 13) {
           if (entries > LARGE_TEXT_MAX_ROWS)
-            throw new Error("Text previews support up to 5 million rows.");
+            throw new FileWorkerError({
+              message: "Text previews support up to 5 million rows.",
+              code: "textRowLimit",
+            });
           set(entries++, pos + 1);
           columns = Math.min(LARGE_TEXT_MAX_COLUMNS, Math.max(columns, rowColumns));
           rowColumns = 1;
@@ -155,10 +175,16 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
       }
     }
     if (total > 0 && size !== total)
-      throw new Error("The file download was incomplete. Close it and try again.");
+      throw new FileWorkerError({
+        message: "The file download was incomplete. Close it and try again.",
+        code: "downloadIncomplete",
+      });
     if (size > at(entries - 1)) {
       if (entries > LARGE_TEXT_MAX_ROWS)
-        throw new Error("Text previews support up to 5 million rows.");
+        throw new FileWorkerError({
+          message: "Text previews support up to 5 million rows.",
+          code: "textRowLimit",
+        });
       set(entries++, size);
       columns = Math.min(LARGE_TEXT_MAX_COLUMNS, Math.max(columns, rowColumns));
     }
@@ -178,12 +204,17 @@ self.addEventListener("message", (event: MessageEvent<TextPreviewRequest>) => {
         ? page(input.index)
         : complete
           ? read(0, size).then((text) => reply({ type: "copy", text }))
-          : Promise.reject(new Error("Wait for the file to finish loading before copying."))
+          : Promise.reject(
+              new FileWorkerError({
+                message: "Wait for the file to finish loading before copying.",
+                code: "copyBeforeLoaded",
+              }),
+            )
   ).catch((cause: unknown) =>
     reply({
       type: "error",
       operation: input.type,
-      message: cause instanceof Error ? cause.message : "Could not read this file.",
+      ...encodeFileWorkerError(cause),
     }),
   );
 });

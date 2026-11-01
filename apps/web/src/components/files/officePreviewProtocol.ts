@@ -1,3 +1,4 @@
+import type { FileWorkerCode } from "~/components/files/fileWorkerError";
 import type { OfficePreviewKind } from "@t3tools/shared/filePreview";
 
 export const OFFICE_PREVIEW_MAX_BYTES = 50 * 1024 * 1024;
@@ -18,10 +19,10 @@ export type OfficeWorkerResult =
   | {
       readonly type: "document";
       readonly navigation: "page" | "slide" | "chapter";
-      readonly pages: { title: string; html: string }[];
+      readonly pages: { title: string; generatedTitle: boolean; html: string }[];
     }
   | { readonly type: "notebook"; readonly language: string; readonly cells: NotebookCell[] }
-  | { readonly type: "error"; readonly message: string }
+  | { readonly type: "error"; readonly message: string; readonly code?: FileWorkerCode }
   | {
       readonly type: "docx" | "xlsx" | "pptx";
       readonly bytes: ArrayBuffer;
@@ -31,6 +32,7 @@ export type OfficeWorkerResult =
       readonly type: "ods";
       readonly sheets: {
         name: string;
+        generatedName: boolean;
         rows: string[][];
         truncated: boolean;
         rowCount: number;

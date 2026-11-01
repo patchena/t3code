@@ -1,8 +1,13 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it } from "vite-plus/test";
 
 import { sourceControlClients } from "./sourceControlClients.ts";
 
-import { parsePullRequestReference, resolveLinkPullRequestInput } from "./pullRequestLinkInput.ts";
+import {
+  parsePullRequestReference,
+  resolveLinkPullRequestInput,
+  formatPullRequestLinkInputError,
+} from "./pullRequestLinkInput.ts";
 
 const changeRequestWebUrl = (kind: string, host: string, repository: string, number: number) =>
   sourceControlClients.get(kind).changeRequestUrl({ host, repository, number });
@@ -72,7 +77,13 @@ describe("resolveLinkPullRequestInput", () => {
         project: null,
         hasProject,
       }),
-    ).toMatchObject({ error: expect.stringContaining("org-b/project/_git/web") });
+    ).toMatchObject({
+      error: {
+        kind: "project-unavailable",
+        host: "dev.azure.com",
+        repository: "org-b/project/_git/web",
+      },
+    });
   });
 
   it("resolves bare Azure numbers into canonical browser URLs", () => {
@@ -123,7 +134,7 @@ describe("resolveLinkPullRequestInput", () => {
         hasProject: () => true,
       }),
     ).toEqual({
-      error: "Paste a full URL; this project's host has no known merge request URL.",
+      error: { kind: "unknown-host-url", term: "merge request" },
     });
   });
 
@@ -150,7 +161,30 @@ describe("resolveLinkPullRequestInput", () => {
       project,
       hasProject: () => false,
     });
-    expect(result).toMatchObject({ error: expect.stringContaining("gitlab.com") });
+    expect(result).toMatchObject({
+      error: { kind: "project-unavailable", host: "gitlab.com", repository: "acme/api" },
+    });
+    if (result === null || !("error" in result)) throw new Error("Expected link validation error");
+    const instance = createI18n("de");
+    expect(
+      formatPullRequestLinkInputError(result.error, instance.getFixedT(null, "workspace")),
+    ).toBe("Kein Projekt in dieser Umgebung kann gitlab.com/acme/api lesen.");
+    const missingRepository = resolveLinkPullRequestInput({
+      reference: "#42",
+      project: null,
+      hasProject: () => true,
+    });
+    expect(missingRepository).toEqual({ error: { kind: "repository-required" } });
+    if (missingRepository === null || !("error" in missingRepository))
+      throw new Error("Expected missing repository");
+    expect(
+      formatPullRequestLinkInputError(
+        missingRepository.error,
+        instance.getFixedT("en", "workspace"),
+      ),
+    ).toBe(
+      "Paste the full pull request URL; this thread has no repository to resolve the number against.",
+    );
   });
 });
 

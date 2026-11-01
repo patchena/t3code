@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useClientSettings } from "~/hooks/useSettings";
 import {
   computeStableMessagesTimelineRows,
   handoffRunsSignature,
@@ -43,19 +45,30 @@ export function useIncrementalTimelineRows(
   identity: string,
   input: MessagesTimelineRowsInput,
 ): MessagesTimelineRow[] {
+  const { t } = useTranslation("activity");
+  const language = useClientSettings((settings) => settings.interfaceLanguage);
   const [state, setState] = useState(() => ({
     identity,
     input,
-    projection: deriveMessagesTimelineRowsWithState(input),
+    t,
+    language,
+    projection: deriveMessagesTimelineRowsWithState(input, t, language),
   }));
-  if (state.identity === identity && sameRowsInput(state.input, input)) {
+  if (
+    state.identity === identity &&
+    state.t === t &&
+    state.language === language &&
+    sameRowsInput(state.input, input)
+  ) {
     return state.projection.rows;
   }
   const projection = deriveMessagesTimelineRowsWithState(
     input,
+    t,
+    language,
     state.identity === identity ? state.projection : null,
   );
-  setState({ identity, input, projection });
+  setState({ identity, input, t, language, projection });
   return projection.rows;
 }
 

@@ -72,7 +72,9 @@ const HTML_RENDER_SHORTCUT_COMMANDS: ReadonlySet<KeybindingCommand> = new Set([
 export const isPdfPreviewFile = (path: string): boolean =>
   /\.pdf$/i.test(path.split(/[?#]/, 1)[0] ?? "");
 
-const PdfViewer = lazy(() => import("./PdfViewer"));
+const PdfViewer = lazy(() =>
+  import("~/components/files/PdfViewer").then((module) => ({ default: module.PdfViewer })),
+);
 
 // The document stays mounted while each revision gets a fresh PDF.js document.
 function PdfDocument(props: { src: string; title: string; documentKey: string }) {

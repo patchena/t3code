@@ -1,7 +1,8 @@
+import { useTranslation } from "react-i18next";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { cn } from "~/lib/utils";
 
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 
 export function PullRequestCopyableCode({
   value,
@@ -20,6 +21,7 @@ export function PullRequestCopyableCode({
   readonly tooltipSide?: "top" | "bottom";
   readonly onError?: (error: Error) => void;
 }) {
+  const { t } = useTranslation("workspace");
   const { copyToClipboard, isCopied } = useCopyToClipboard({
     target,
     timeout: 1600,
@@ -55,11 +57,11 @@ export function PullRequestCopyableCode({
             isCopied ? "opacity-100" : "opacity-0",
           )}
         >
-          Copied
+          {t(($) => $.git.copied)}
         </span>
       </TooltipTrigger>
       <TooltipPopup variant="code" side={tooltipSide}>
-        {`${isCopied ? "Copied" : copyLabel}: ${value}`}
+        {`${isCopied ? t(($) => $.git.copied) : copyLabel}: ${value}`}
       </TooltipPopup>
     </Tooltip>
   );

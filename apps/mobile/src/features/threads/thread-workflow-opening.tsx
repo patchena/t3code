@@ -1,5 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { mobileI18n } from "~/i18n";
 import {
   resolveWorkflowOpening,
   workflowMemberModelSelection,
@@ -84,7 +85,7 @@ export function ThreadWorkflowOpening(props: {
 }) {
   const openLinkedThread = useOpenLinkedThread();
   const { opening } = props;
-  const headline = workflowOpeningHeadline(opening);
+  const headline = workflowOpeningHeadline(opening, mobileI18n.getFixedT("en", "activity"));
   const canListMembers = opening.driver !== null && opening.providerInstanceId !== null;
   const phases = (opening.group?.phases ?? []).filter((phase) => phase.members.length > 0);
   const unphased = opening.group?.unphasedMembers ?? [];

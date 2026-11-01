@@ -24,6 +24,11 @@ vi.mock("react", async (importOriginal) => ({
   useMemo: <A>(factory: () => A) => factory(),
   useState: <A>(value: A) => [value, vi.fn()],
 }));
+vi.mock("react-i18next", async () => {
+  const { createI18n } = await import("@t3tools/client-runtime/i18n");
+  const t = createI18n("en").getFixedT("en", "files");
+  return { useTranslation: () => ({ t }) };
+});
 vi.mock("./session", () => ({
   environmentSession: { sessionStateAtom: () => state.sessionAtom },
 }));

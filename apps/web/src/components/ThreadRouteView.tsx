@@ -6,7 +6,7 @@ import * as Option from "effect/Option";
 import { Navigate, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import ChatView from "./ChatView";
+import { ChatView } from "~/components/ChatView";
 import { BackgroundThreadContext } from "./chat/backgroundThread";
 import { SidebarInset } from "./ui/sidebar";
 import { useComposerDraftStore } from "../composerDraftStore";

@@ -9,8 +9,12 @@ import { isElectron } from "./env";
 import { startAppServices } from "./appInit";
 import { AppRoot } from "./AppRoot";
 import { clearChunkReloadGuard, reloadOnceForChunkLoadError } from "./lib/chunkReloadGuard";
+import { ensureClientSettingsHydrated, getClientSettings } from "~/hooks/useSettings";
+import { appI18n } from "~/i18n";
+import { InterfaceErrorBoundary } from "~/components/InterfaceErrorBoundary";
+import { startProviderAuthDelivery } from "~/providerAuthDelivery";
 
-const router = startAppServices();
+startProviderAuthDelivery();
 
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
@@ -24,31 +28,37 @@ window.addEventListener("vite:preloadError", (event) => {
   }
 });
 
-const app = <AppRoot router={router} />;
-
 // Split by runtime to keep Clerk out of local startup and clerk-js out of browser builds.
 const managedAuthShellModule =
   clerkPublishableKey && hasCloudPublicConfig()
     ? isElectron
-      ? import("./components/clerk/ElectronManagedAuthShell")
-      : import("./components/clerk/BrowserManagedAuthShell")
+      ? import("./components/clerk/ElectronManagedAuthShell").then(
+          (module) => module.ElectronManagedAuthShell,
+        )
+      : import("./components/clerk/BrowserManagedAuthShell").then(
+          (module) => module.BrowserManagedAuthShell,
+        )
     : null;
 
-export const startup = Promise.all([
-  managedAuthShellModule?.then((module) => module.default) ?? null,
-  router.load(),
-])
-  .then(([ManagedAuthShell]) => {
+export const startup = Promise.all([managedAuthShellModule, ensureClientSettingsHydrated()])
+  .then(async ([ManagedAuthShell]) => {
+    await appI18n.changeLanguage(getClientSettings().interfaceLanguage);
+    document.documentElement.lang = getClientSettings().interfaceLanguage;
+    const router = startAppServices();
+    const app = <AppRoot router={router} />;
+    await router.load();
     // Route chunk failures resolve router.load() and surface later through the error boundary.
     if (reloadScheduled) return;
     if (!chunkLoadFailed) clearChunkReloadGuard();
     ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       <React.StrictMode>
-        {ManagedAuthShell && clerkPublishableKey ? (
-          <ManagedAuthShell publishableKey={clerkPublishableKey}>{app}</ManagedAuthShell>
-        ) : (
-          app
-        )}
+        <InterfaceErrorBoundary>
+          {ManagedAuthShell && clerkPublishableKey ? (
+            <ManagedAuthShell publishableKey={clerkPublishableKey}>{app}</ManagedAuthShell>
+          ) : (
+            app
+          )}
+        </InterfaceErrorBoundary>
       </React.StrictMode>,
     );
   })

@@ -1,5 +1,6 @@
 import type { EnvironmentSpeechModel } from "@t3tools/contracts";
 import { CheckIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "../../lib/utils";
 import { languageLabel } from "./SpeechLanguageSelect";
@@ -80,6 +81,7 @@ export function ModelBenchmarks({
   /** Plain facts, such as language count and size, shown after the scores. */
   facts: readonly string[];
 }) {
+  const { t } = useTranslation("voice");
   const data = model.benchmark;
   const visible = !data
     ? []
@@ -97,20 +99,20 @@ export function ModelBenchmarks({
             {languageLabel(code)}:{" "}
             {score ? (
               <>
-                <strong className="font-medium text-foreground">{score.grade}</strong> (
-                {score.errorPercent}% error)
+                <strong className="font-medium text-foreground">{score.grade}</strong>{" "}
+                {t(($) => $.models.errorRate, { percent: score.errorPercent })}
               </>
             ) : (
-              "not benchmarked"
+              t(($) => $.models.notBenchmarked)
             )}
           </span>
         );
       })}
       {data ? (
         <span>
-          Speed:{" "}
+          {t(($) => $.models.speed)}{" "}
           {data.secondsPer30s === null ? (
-            "not benchmarked"
+            t(($) => $.models.notBenchmarked)
           ) : (
             <>
               <strong className="font-medium text-foreground">{data.secondsPer30s} s</strong> / 30 s

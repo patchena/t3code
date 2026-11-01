@@ -8,13 +8,13 @@ import type { ReactNode } from "react";
 import { cn } from "~/lib/utils";
 import { RelativeTime } from "~/components/RelativeTime";
 
-import { MiddleTruncate } from "../ui/middle-truncate";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { MiddleTruncate } from "~/components/ui/middle-truncate";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import {
   PullRequestActorAvatar,
   PullRequestConflictGlyph,
   PullRequestStateGlyph,
-} from "./pullRequestPresentation";
+} from "~/components/pullRequest/pullRequestPresentation";
 
 export const PULL_REQUEST_ROW_CLASS =
   "group/pr-row flex w-full items-center gap-2 rounded-md py-1 pr-1 text-left";

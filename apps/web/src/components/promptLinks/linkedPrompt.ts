@@ -1,15 +1,16 @@
 import type { LinkedPrompt } from "@t3tools/shared/promptLinks";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 
 import { type ComposerThreadTarget, useComposerDraftStore } from "~/composerDraftStore";
 
 import { toastManager } from "../ui/toast";
 
-export function warnAboutHiddenCharacters(prompt: LinkedPrompt): void {
+export function warnAboutHiddenCharacters(prompt: LinkedPrompt, t: TFunction<"chat">): void {
   if (prompt.hiddenCharacters === 0) return;
   toastManager.add({
     type: "warning",
-    title: "This prompt had hidden characters, it may be malicious",
-    description: `T3 Code removed ${prompt.hiddenCharacters} hidden character${prompt.hiddenCharacters === 1 ? "" : "s"}. Read the prompt before you send it.`,
+    title: t(($) => $.links.prompt.hiddenTitle),
+    description: t(($) => $.links.prompt.hiddenDescription, { count: prompt.hiddenCharacters }),
     timeout: 0,
   });
 }
@@ -17,15 +18,16 @@ export function warnAboutHiddenCharacters(prompt: LinkedPrompt): void {
 export function placeLinkedPrompt(
   target: ComposerThreadTarget,
   prompt: LinkedPrompt,
+  t: TFunction<"chat">,
   notes: ReadonlyArray<string> = [],
 ): void {
-  warnAboutHiddenCharacters(prompt);
+  warnAboutHiddenCharacters(prompt, t);
   const place = () => {
     useComposerDraftStore.getState().setPrompt(target, prompt.text);
     toastManager.add({
       type: "info",
-      title: "Prompt added from a link",
-      description: ["Read it before you send.", ...notes].join(" "),
+      title: t(($) => $.links.prompt.added),
+      description: [t(($) => $.links.prompt.review), ...notes].join(" "),
     });
   };
   const existing = useComposerDraftStore.getState().getComposerDraft(target)?.prompt ?? "";
@@ -35,11 +37,11 @@ export function placeLinkedPrompt(
   }
   const id = toastManager.add({
     type: "info",
-    title: "Linked prompt ready",
-    description: "This thread already has a draft. Replace it with the linked prompt?",
+    title: t(($) => $.links.prompt.ready),
+    description: t(($) => $.links.prompt.replaceDescription),
     timeout: 0,
     actionProps: {
-      children: "Replace draft",
+      children: t(($) => $.links.prompt.replace),
       onClick: () => {
         toastManager.close(id);
         place();

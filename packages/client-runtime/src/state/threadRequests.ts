@@ -16,6 +16,7 @@ import { parseThreadKey, threadKey } from "./entities.ts";
 import { getProjectionArrayReplacementIndex } from "./orchestrationV2Projection.ts";
 import type { EnvironmentThreadShell } from "./models.ts";
 import * as DateTime from "effect/DateTime";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { AtomCommandResult } from "./runtime.ts";
 import type { ThreadStructure, ThreadStructureVisibleTurnItem } from "./models.ts";
 
@@ -62,14 +63,13 @@ export interface ThreadPendingApproval {
   readonly supportsFeedback?: boolean;
 }
 
-export const FULL_ACCESS_OVERRIDE_QUESTION = "Why am I being asked this?";
+export const fullAccessOverrideQuestion = (t: TFunction<"chat">) => t(($) => $.approval.why);
 
 export function fullAccessOverrideExplanation(
   override: ProviderApprovalFullAccessOverride,
+  t: TFunction<"chat">,
 ): string {
-  return override === "ask_rule"
-    ? "Full access skips approvals, but an ask rule in the agent's own settings matches this action, so it still asks. Remove or narrow that rule to stop these prompts."
-    : "Full access skips approvals, but the agent still stops for a few safety checks of its own that no setting can skip, such as a delete whose path it can't verify. T3 Code can't turn these off, so check the request and approve it if it's what you expect.";
+  return override === "ask_rule" ? t(($) => $.approval.askRule) : t(($) => $.approval.safetyCheck);
 }
 
 export interface ThreadUserInputQuestion extends Omit<

@@ -1,5 +1,8 @@
 import * as React from "react";
 import * as Schema from "effect/Schema";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { toastManager } from "~/components/ui/toastManager";
 import {
   COMPOSER_CONTEXT_CLIPBOARD_MIME,
   encodeComposerContextClipboardHtml,
@@ -52,6 +55,11 @@ export class ClipboardReadError extends Schema.TaggedError<ClipboardReadError>()
   }
 }
 
+const isWriteUnavailable = Schema.is(ClipboardApiUnavailableError);
+const isWriteError = Schema.is(ClipboardWriteError);
+const isReadUnavailable = Schema.is(ClipboardReadUnavailableError);
+const isReadError = Schema.is(ClipboardReadError);
+
 function writeTextWithExecCommand(
   value: string,
   extraFlavors?: Readonly<Record<string, string>>,
@@ -93,6 +101,71 @@ function writeTextWithExecCommand(
       restoreFocus.call(previouslyFocused);
     }
   }
+}
+
+function clipboardTargetLabel(target: string, t: TFunction<"common">): string {
+  switch (target) {
+    case "text":
+      return t(($) => $.misc.clipboard.text);
+    case "command":
+      return t(($) => $.misc.clipboard.command);
+    case "plan":
+      return t(($) => $.misc.clipboard.plan);
+    case "error-report":
+      return t(($) => $.misc.clipboard.errorReport);
+    case "error-message":
+      return t(($) => $.misc.clipboard.errorMessage);
+    case "guest link":
+      return t(($) => $.misc.clipboard.guestLink);
+    case "webhook URL":
+      return t(($) => $.misc.clipboard.webhookUrl);
+    case "thread":
+      return t(($) => $.misc.clipboard.thread);
+    case "pull request link":
+      return t(($) => $.misc.clipboard.pullRequestLink);
+    case "branch name":
+      return t(($) => $.misc.clipboard.branchName);
+    case "branch":
+      return t(($) => $.misc.clipboard.branch);
+    case "path":
+      return t(($) => $.misc.clipboard.path);
+    case "workspace path":
+      return t(($) => $.misc.clipboard.workspacePath);
+    case "link":
+      return t(($) => $.misc.clipboard.link);
+    case "version":
+      return t(($) => $.misc.clipboard.version);
+    case "trace ID":
+      return t(($) => $.misc.clipboard.traceId);
+    case "connection diagnostics":
+      return t(($) => $.misc.clipboard.diagnostics);
+    case "message":
+      return t(($) => $.misc.clipboard.message);
+    default:
+      return target;
+  }
+}
+
+export function clipboardErrorMessage(error: unknown, t: TFunction<"common">): string {
+  if (isWriteUnavailable(error)) {
+    return t(($) => $.misc.clipboard.unavailable, {
+      target: clipboardTargetLabel(error.target, t),
+    });
+  }
+  if (isWriteError(error)) {
+    return t(($) => $.misc.clipboard.writeFailed, {
+      target: clipboardTargetLabel(error.target, t),
+    });
+  }
+  if (isReadUnavailable(error)) {
+    return t(($) => $.misc.clipboard.readUnavailable, {
+      target: clipboardTargetLabel(error.target, t),
+    });
+  }
+  if (isReadError(error)) {
+    return t(($) => $.misc.clipboard.readFailed, { target: clipboardTargetLabel(error.target, t) });
+  }
+  return error instanceof Error ? error.message : String(error);
 }
 
 export async function writeTextToClipboard(
@@ -205,6 +278,7 @@ export function useCopyToClipboard<TContext = void>({
   onError?: (error: Error, ctx: TContext) => void;
   extraFlavors?: Readonly<Record<string, string>>;
 } = {}): { copyToClipboard: (value: string, ctx: TContext) => void; isCopied: boolean } {
+  const { t } = useTranslation("common");
   const [isCopied, setIsCopied] = React.useState(false);
   const timeoutIdRef = React.useRef<NodeJS.Timeout | null>(null);
   const copyToClipboard = useStableCallback((value: string, ctx: TContext): void => {
@@ -225,9 +299,16 @@ export function useCopyToClipboard<TContext = void>({
           }, timeout);
         }
       },
-      (error) => {
+      (error: unknown) => {
         console.error(error);
-        onError?.(error, ctx);
+        const message = clipboardErrorMessage(error, t);
+        if (onError) onError(new Error(message, { cause: error }), ctx);
+        else
+          toastManager.add({
+            type: "error",
+            title: t(($) => $.misc.clipboard.failed),
+            description: message,
+          });
       },
     );
   });

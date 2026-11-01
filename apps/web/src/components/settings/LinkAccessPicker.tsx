@@ -1,7 +1,8 @@
 import { AuthMcpClientAccess } from "@t3tools/contracts";
 import { useId } from "react";
+import { useTranslation } from "react-i18next";
 
-import { accessConfig } from "../auth/ConnectAgentSurface";
+import { getAccessConfig } from "../auth/ConnectAgentSurface";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 
 /** What agents here may do in an environment being linked, with what that does not allow. */
@@ -14,12 +15,15 @@ export function LinkAccessPicker({
   readonly onChange: (access: AuthMcpClientAccess) => void;
   readonly disabled?: boolean;
 }) {
+  const { t } = useTranslation("connect");
+  const { t: tChat } = useTranslation("chat");
+  const accessConfig = getAccessConfig(t, tChat);
   const labelId = useId();
   const selected = accessConfig[value];
   return (
     <div className="space-y-1.5">
       <span id={labelId} className="block text-xs font-medium">
-        What agents here may do there
+        {t(($) => $.links.access)}
       </span>
       <Select
         value={value}
@@ -54,9 +58,7 @@ export function LinkAccessPicker({
         </SelectPopup>
       </Select>
       <p className="text-xs text-muted-foreground">
-        {selected.description} An agent never gets more access there than its own mode here. Below
-        full access, it can change only threads this link started, not that machine's own threads,
-        projects or settings.
+        {t(($) => $.links.accessDescription, { description: selected.description })}
       </p>
     </div>
   );

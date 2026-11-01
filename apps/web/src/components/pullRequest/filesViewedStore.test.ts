@@ -12,7 +12,7 @@ import {
   createFilesViewedStore,
   type FilesViewedStoreDeps,
   type FilesViewedTarget,
-} from "./filesViewedStore";
+} from "~/components/pullRequest/filesViewedStore";
 
 const reference = (number: number): PullRequestRef => ({
   projectId: ProjectId.make("project"),

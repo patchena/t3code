@@ -31,6 +31,7 @@ import {
 import { isListedThreadLineage, type EnvironmentId, type ProjectId } from "@t3tools/contracts";
 import type { SnoozePresetSetting } from "@t3tools/contracts/settings";
 import type { MenuAction } from "@react-native-menu/menu";
+import { mobileI18n } from "~/i18n";
 
 import type { ThreadListProvider } from "../../state/thread-list-environments";
 import type { ThreadMoveAvailability } from "./threadOrder";
@@ -89,7 +90,7 @@ export function resolveThreadListV2SnoozePresets(input: {
 }
 
 function presetOptions(presets: ReadonlyArray<SnoozePresetSetting> | undefined) {
-  return presets ? { presets } : {};
+  return { t: mobileI18n.getFixedT(null, "common"), ...(presets ? { presets } : {}) };
 }
 
 export function resolveThreadListV2SnoozeMenuSelection(input: {
@@ -539,7 +540,10 @@ export function buildThreadListV2ListItems(input: {
   const threadItems = input.items.map((item): ThreadListV2ListItem => {
     const snoozeWakeLabelText =
       item.snoozed && item.thread.snoozedUntil != null && input.snoozeLabelNow !== undefined
-        ? snoozeWakeLabel(item.thread.snoozedUntil, { now: input.snoozeLabelNow })
+        ? snoozeWakeLabel(item.thread.snoozedUntil, {
+            now: input.snoozeLabelNow,
+            t: mobileI18n.getFixedT(null, "common"),
+          })
         : undefined;
     // Put the clock on items so recycler equality limits ticks to rows displaying snooze preset times.
     const snoozePresetMinute =

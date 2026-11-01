@@ -9,6 +9,7 @@ import {
 import { builtInSecretProviderDefinitions } from "@t3tools/secret-provider-definitions/registry";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 
 export type SecretRequestItem = Extract<
   OrchestrationV2TurnItem,
@@ -16,11 +17,11 @@ export type SecretRequestItem = Extract<
 >;
 
 /** A `file` request lets the agent's commands read the value, so its card must not promise more. */
-export const secretRequestPrivacyNote = (item: Pick<SecretRequestItem, "delivery">) =>
-  item.delivery === "file"
-    ? "Kept out of chat, in a private file this agent's commands can read for 24 hours"
-    : "Stored securely, never shown to the agent";
-export const SECRET_REQUEST_DEFAULT_PLACEHOLDER = "Paste the secret";
+export const secretRequestPrivacyNote = (
+  item: Pick<SecretRequestItem, "delivery">,
+  t: TFunction<"chat">,
+) =>
+  item.delivery === "file" ? t(($) => $.secret.privateFile) : t(($) => $.secret.privateStorage);
 
 export type SecretRequestDisplay =
   | { readonly kind: "pending" }
@@ -31,26 +32,7 @@ export type SecretRequestDisplay =
       readonly label: string;
     };
 
-const SAVED_DISPLAY: SecretRequestDisplay = {
-  kind: "answered",
-  outcome: "saved",
-  label: "Saved securely and kept private",
-};
-const DECLINED_DISPLAY: SecretRequestDisplay = {
-  kind: "answered",
-  outcome: "declined",
-  label: "Declined",
-};
-const ENDED_DISPLAY: SecretRequestDisplay = {
-  kind: "answered",
-  outcome: "ended",
-  label: "Request ended",
-};
 const PENDING_DISPLAY: SecretRequestDisplay = { kind: "pending" };
-const PENDING_ELSEWHERE_DISPLAY: SecretRequestDisplay = {
-  kind: "pending-elsewhere",
-  label: "Waiting for an answer in the original thread",
-};
 
 /**
  * `visibility` is the projected row's: a request inherited from another
@@ -59,16 +41,19 @@ const PENDING_ELSEWHERE_DISPLAY: SecretRequestDisplay = {
 export function secretRequestDisplay(
   item: Pick<SecretRequestItem, "secretStatus">,
   visibility: "local" | "inherited" | "synthetic",
+  t: TFunction<"chat">,
 ): SecretRequestDisplay {
   switch (item.secretStatus) {
     case "pending":
-      return visibility === "local" ? PENDING_DISPLAY : PENDING_ELSEWHERE_DISPLAY;
+      return visibility === "local"
+        ? PENDING_DISPLAY
+        : { kind: "pending-elsewhere", label: t(($) => $.secret.waitingOriginal) };
     case "saved":
-      return SAVED_DISPLAY;
+      return { kind: "answered", outcome: "saved", label: t(($) => $.secret.saved) };
     case "declined":
-      return DECLINED_DISPLAY;
+      return { kind: "answered", outcome: "declined", label: t(($) => $.secret.declined) };
     case "cancelled":
-      return ENDED_DISPLAY;
+      return { kind: "answered", outcome: "ended", label: t(($) => $.secret.ended) };
   }
 }
 
@@ -156,11 +141,7 @@ export function secretRequestAnswerInput(
 
 const USER_FACING_FAILURE_TAGS = new Set(["SecretRequestError", "EnvironmentAuthorizationError"]);
 
-/**
- * Only known server errors pass their message through: anything else (transport or encoding
- * failures) gets the generic copy, so the typed value can never surface in the UI.
- */
-export function secretRequestFailureMessage(failure: unknown): string {
+export function secretRequestFailureDetail(failure: unknown): string | null {
   if (
     typeof failure === "object" &&
     failure !== null &&
@@ -173,5 +154,9 @@ export function secretRequestFailureMessage(failure: unknown): string {
   ) {
     return failure.message;
   }
-  return "Could not answer the request. Try again.";
+  return null;
+}
+
+export function secretRequestFailureMessage(failure: unknown, t: TFunction<"chat">): string {
+  return secretRequestFailureDetail(failure) ?? t(($) => $.secret.answerFailed);
 }

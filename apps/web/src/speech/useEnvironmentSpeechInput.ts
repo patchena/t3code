@@ -25,8 +25,10 @@ import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { resolveSpeechVocabulary } from "@t3tools/shared/speech";
 import * as Option from "effect/Option";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useStableCallback } from "~/hooks/useStableCallback";
+import { appI18n } from "~/i18n";
 import { toastManager } from "../components/ui/toast";
 import {
   useClientSettings,
@@ -119,6 +121,7 @@ export function useVoiceTranscriptionDestination() {
 }
 
 export function useEnvironmentSpeechInput(input: HookInput) {
+  const { t } = useTranslation("voice");
   const destination = useVoiceTranscriptionDestination();
   const prepared = destination.prepared;
   const grantId = destination.grantId;
@@ -309,7 +312,9 @@ export function useEnvironmentSpeechInput(input: HookInput) {
         )
         .then((result) => result.text);
     };
+    const controllerT = appI18n.getFixedT(null, "voice");
     controller = new VoiceInputController({
+      t: controllerT,
       retryFailedRecording: true,
       recorder: platform.recorder,
       getTranscriber: () => platform.transcriber,
@@ -321,8 +326,8 @@ export function useEnvironmentSpeechInput(input: HookInput) {
       onPostProcessingError: () =>
         toastManager.add({
           type: "warning",
-          title: "Transcript cleanup failed",
-          description: "The original transcript was added.",
+          title: controllerT(($) => $.input.cleanupFailed),
+          description: controllerT(($) => $.input.cleanupFailedDescription),
         }),
       readDraft,
       commitDraft: (text, selection) => {
@@ -442,7 +447,7 @@ export function useEnvironmentSpeechInput(input: HookInput) {
       setQueuedStart(null);
       toastManager.add({
         type: "error",
-        title: "Could not start voice input",
+        title: t(($) => $.input.startToastFailed),
         description: error instanceof Error ? error.message : String(error),
       });
       return;
@@ -453,7 +458,7 @@ export function useEnvironmentSpeechInput(input: HookInput) {
     if (!latestStatus.supported) {
       toastManager.add({
         type: "error",
-        title: "Voice input is not available",
+        title: t(($) => $.input.notAvailable),
         description: latestStatus.reason,
       });
       return;
@@ -481,16 +486,14 @@ export function useEnvironmentSpeechInput(input: HookInput) {
         downloading: false,
         step: next.supported && next.state !== "missing-model" ? 1 : current.step,
         error:
-          next.supported && next.state !== "missing-model"
-            ? null
-            : "The model is not ready. Try downloading it again.",
+          next.supported && next.state !== "missing-model" ? null : t(($) => $.input.modelNotReady),
       }));
     } catch {
       if (request !== startRequestRef.current) return;
       setSetup((current) => ({
         ...current,
         downloading: false,
-        error: "Could not download the model. Check this environment's connection and try again.",
+        error: t(($) => $.input.modelDownloadFailed),
       }));
     }
   });

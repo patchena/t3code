@@ -15,6 +15,7 @@ import { SymbolView } from "../../components/ui/AppSymbol";
 import { AppText as Text } from "../../components/ui/AppText";
 import { ScreenContent } from "../../components/ui/ScreenContent";
 import { environmentThreadShells } from "../../state/threads";
+import { mobileI18n } from "~/i18n";
 
 const KIND_LABELS = {
   subagent: "Subagent",
@@ -32,7 +33,11 @@ export function ThreadBackgroundWorkSheet({ route }: StaticScreenProps<Backgroun
   const thread = useAtomValue(
     environmentThreadShells.threadShellAtom(scopeThreadRef(target.environmentId, target.threadId)),
   );
-  const presentation = presentPendingBackgroundWork(thread?.pendingBackgroundTasks ?? []);
+  const presentation = presentPendingBackgroundWork(
+    thread?.pendingBackgroundTasks ?? [],
+    mobileI18n.getFixedT("en", "activity"),
+    "en",
+  );
   const openThread = (threadId: ThreadId) => {
     void Haptics.selectionAsync();
     // A thread replaces the leaf sheet so workspace back navigation still works.

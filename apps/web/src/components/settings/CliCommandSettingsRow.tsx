@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   desktopCliCommandStateAtom,
@@ -12,6 +13,7 @@ import { SettingsRow } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 
 export function CliCommandSettingsRow() {
+  const { t } = useTranslation("settings");
   const bridge = getDesktopCliCommandBridge();
   const query = useEnvironmentQuery(bridge ? desktopCliCommandStateAtom : null);
   const state = query.data;
@@ -26,8 +28,11 @@ export function CliCommandSettingsRow() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: action === "install" ? "Could not install t3" : "Could not remove t3",
-            description: error instanceof Error ? error.message : "Something went wrong.",
+            title:
+              action === "install"
+                ? t(($) => $.extra.cli.installFailed)
+                : t(($) => $.extra.cli.removeFailed),
+            description: error instanceof Error ? error.message : t(($) => $.extra.cli.error),
           }),
         );
       })
@@ -37,16 +42,16 @@ export function CliCommandSettingsRow() {
   if (!bridge || !state?.supported) return null;
   const installed = state.installedPath !== null;
   const description = state.shadowedBy
-    ? `Another t3 at ${state.shadowedBy} runs first in a new terminal. Remove it to use T3 Code's.`
+    ? t(($) => $.extra.cli.shadowed, { path: state.shadowedBy })
     : !installed
-      ? "Run T3 Code's CLI as `t3` from any terminal."
+      ? t(($) => $.extra.cli.description)
       : state.onPath
-        ? `Installed at ${state.installedPath}. Open a new terminal to use it.`
-        : `Installed at ${state.installedPath}, which is not on your PATH yet. Add its folder to your PATH to run \`t3\`.`;
+        ? t(($) => $.extra.cli.installed, { path: state.installedPath })
+        : t(($) => $.extra.cli.missingPath, { path: state.installedPath });
 
   return (
     <SettingsRow
-      {...searchableSetting("cli-command")}
+      {...searchableSetting("cli-command", t)}
       description={description}
       control={
         <Button
@@ -55,7 +60,7 @@ export function CliCommandSettingsRow() {
           disabled={pending || query.isPending || (!installed && Boolean(state.shadowedBy))}
           onClick={() => change(installed ? "uninstall" : "install")}
         >
-          {installed ? "Remove" : "Install"}
+          {installed ? t(($) => $.extra.cli.remove) : t(($) => $.extra.cli.install)}
         </Button>
       }
     />

@@ -2,11 +2,25 @@ import { RunId, ThreadId, TurnItemId, type OrchestrationV2TurnItem } from "@t3to
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
 
-import { deriveTimelineEntriesFromVisibleTurnItems } from "./session-logic";
+import { deriveTimelineEntriesFromVisibleTurnItems as deriveTranslatedEntries } from "./session-logic";
 import {
-  deriveMessagesTimelineRows,
-  workEntryDisplayLabel,
+  deriveMessagesTimelineRows as deriveTranslatedRows,
+  workEntryDisplayLabel as translatedWorkEntryLabel,
 } from "./components/chat/MessagesTimeline.logic";
+
+import { createI18n } from "@t3tools/client-runtime/i18n";
+
+const activityT = createI18n("en").getFixedT("en", "activity");
+const deriveTimelineEntriesFromVisibleTurnItems = (
+  input: Parameters<typeof deriveTranslatedEntries>[0],
+) => deriveTranslatedEntries(input, activityT);
+
+const deriveMessagesTimelineRows = (input: Parameters<typeof deriveTranslatedRows>[0]) =>
+  deriveTranslatedRows(input, activityT, "en");
+const workEntryDisplayLabel = (
+  entry: Parameters<typeof translatedWorkEntryLabel>[0],
+  workspaceRoot: Parameters<typeof translatedWorkEntryLabel>[1],
+) => translatedWorkEntryLabel(entry, workspaceRoot, activityT);
 
 const retainedMessage =
   "2026-03-14T16:11:12.550224Z ERROR codex_core::codex: failed to load skill /home/sebherrerabe/repos/devsuite/.agent/skills/monorepo-scaffolding/SKILL.md: invalid YAML: mapping va...";

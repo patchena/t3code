@@ -358,13 +358,18 @@ function searchTargetName(value: string | undefined): string | undefined {
   return value.split(/[\\/]/u).findLast((part) => part.length > 0 && part !== ".");
 }
 
-export function formatSearchToolLabel(
-  data: Record<string, unknown> | undefined,
-): string | undefined {
+export function resolveSearchToolInput(data: Record<string, unknown> | undefined) {
   const input = searchInputRecord(data);
   const query = firstInputString(input, SEARCH_QUERY_KEYS);
   const glob = firstInputString(input, SEARCH_GLOB_KEYS);
   const target = searchTargetName(firstInputString(input, SEARCH_TARGET_KEYS));
+  return { query, glob, target };
+}
+
+export function formatSearchToolLabel(
+  data: Record<string, unknown> | undefined,
+): string | undefined {
+  const { query, glob, target } = resolveSearchToolInput(data);
   if (query && target) {
     return `Searched ${query} in ${target}`;
   }

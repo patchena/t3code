@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 /* oxlint-disable react/no-array-index-key -- A page keeps its ordinal throughout incremental layout. */
 import { observeResize } from "~/lib/observeResize";
 import {
@@ -8,6 +9,12 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+
+export type OfficeDetails = {
+  readonly count: number;
+  readonly unit: "pages" | "slides" | "sheets";
+  readonly loading?: boolean;
+};
 
 export type PageSize = {
   readonly width: number;
@@ -129,6 +136,7 @@ function OfficePage(props: {
   footer?: (index: number) => ReactNode;
   onError: (error: unknown) => void;
 }) {
+  const { t } = useTranslation("files");
   const {
     root,
     rasterScale,
@@ -189,7 +197,7 @@ function OfficePage(props: {
           register(el);
         }}
         role="group"
-        aria-label={`${label} ${index + 1}`}
+        aria-label={t(($) => $.document.numberedLabel, { label, number: index + 1 })}
         className="relative shrink-0 shadow-md"
         style={{
           width: page.width * scale,

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useSyncExternalStore } from "react";
 
 import { isMacPlatform } from "../lib/utils";
@@ -49,14 +50,15 @@ function subscribeQuitHint(listener: () => void): () => void {
 const readQuitHint = () => visibleMode;
 
 export function QuitHoldOverlay() {
+  const { t } = useTranslation("workspace");
   const visibleMode = useSyncExternalStore(subscribeQuitHint, readQuitHint, readQuitHint);
 
   if (!visibleMode) return null;
   const shortcut = isMacPlatform(navigator.platform) ? "⌘Q" : "Ctrl+Q";
   const message =
     visibleMode === "hold"
-      ? `Hold ${shortcut} or press twice to quit`
-      : `Press ${shortcut} again to quit`;
+      ? t(($) => $.quit.hold, { shortcut })
+      : t(($) => $.quit.again, { shortcut });
   return (
     <div
       role="status"

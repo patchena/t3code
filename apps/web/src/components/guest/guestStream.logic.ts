@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   GUEST_ATTACHMENT_ROUTE,
   GUEST_MEDIA_ROUTE,
@@ -188,10 +189,12 @@ export function unplacedGuestMessages(
 }
 
 /** "23h left" or "5m left", rounded down, for the guest page header. */
-export function formatGuestExpiry(expiresAt: string, nowMs: number): string {
+export function formatGuestExpiry(expiresAt: string, nowMs: number, t: TFunction<"chat">): string {
   const minutes = Math.floor((Date.parse(expiresAt) - nowMs) / 60_000);
-  if (minutes <= 0) return "Expired";
-  return minutes >= 60 ? `${Math.floor(minutes / 60)}h left` : `${minutes}m left`;
+  if (minutes <= 0) return t(($) => $.links.guest.expired);
+  return minutes >= 60
+    ? t(($) => $.links.guest.hoursLeft, { count: Math.floor(minutes / 60) })
+    : t(($) => $.links.guest.minutesLeft, { count: minutes });
 }
 
 /**
@@ -215,14 +218,18 @@ export const guestMediaUrl = (shareId: string, path: string) =>
  * Why these files cannot go with one message, or null. The server checks the same limits; this
  * only says so before the upload.
  */
+export type GuestFilesProblem =
+  | { readonly kind: "files-limit"; readonly limit: number }
+  | { readonly kind: "files-size" | "file-unsupported" };
+
 export function guestFilesProblem(
   files: ReadonlyArray<Pick<File, "type" | "size">>,
-): string | null {
+): GuestFilesProblem | null {
   if (files.length > GUEST_MESSAGE_MAX_ATTACHMENTS) {
-    return `Attach up to ${GUEST_MESSAGE_MAX_ATTACHMENTS} files to a message.`;
+    return { kind: "files-limit", limit: GUEST_MESSAGE_MAX_ATTACHMENTS };
   }
   if (files.reduce((total, file) => total + file.size, 0) > GUEST_MESSAGE_MAX_ATTACHMENT_BYTES) {
-    return "Attached files can total up to 10 MB per message.";
+    return { kind: "files-size" };
   }
   const unsupported = files.some(
     (file) =>
@@ -230,9 +237,7 @@ export function guestFilesProblem(
       (file.type.toLowerCase().startsWith("image/") &&
         !isProviderSendTurnSupportedImageMimeType(file.type)),
   );
-  return unsupported
-    ? "This file cannot be attached. Images must be PNG, JPEG, GIF, or WebP."
-    : null;
+  return unsupported ? { kind: "file-unsupported" } : null;
 }
 
 /**

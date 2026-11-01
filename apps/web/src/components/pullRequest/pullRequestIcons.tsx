@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   GitMergeIcon,
   GitPullRequestArrowIcon,
@@ -30,25 +31,26 @@ export interface PullRequestStatePresentation {
   readonly Icon: PullRequestGlyphIcon;
 }
 
-export const PULL_REQUEST_STATE_PRESENTATION = {
-  open: {
-    label: "Open",
-    toneClassName: "text-emerald-600 dark:text-emerald-300/90",
-    Icon: PullRequestGlyph.pullRequest,
-  },
-  draft: {
-    label: "Draft",
-    toneClassName: "text-zinc-500 dark:text-zinc-400/80",
-    Icon: PullRequestGlyph.draft,
-  },
-  closed: {
-    label: "Closed",
-    toneClassName: "text-red-600 dark:text-red-300/90",
-    Icon: PullRequestGlyph.closed,
-  },
-  merged: {
-    label: "Merged",
-    toneClassName: "text-violet-600 dark:text-violet-300/90",
-    Icon: PullRequestGlyph.merged,
-  },
-} as const satisfies Record<PullRequestState | "draft", PullRequestStatePresentation>;
+export const pullRequestStatePresentation = (t: TFunction<"workspace">) =>
+  ({
+    open: {
+      label: t(($) => $.git.open),
+      toneClassName: "text-emerald-600 dark:text-emerald-300/90",
+      Icon: PullRequestGlyph.pullRequest,
+    },
+    draft: {
+      label: t(($) => $.git.draft),
+      toneClassName: "text-zinc-500 dark:text-zinc-400/80",
+      Icon: PullRequestGlyph.draft,
+    },
+    closed: {
+      label: t(($) => $.git.closed),
+      toneClassName: "text-red-600 dark:text-red-300/90",
+      Icon: PullRequestGlyph.closed,
+    },
+    merged: {
+      label: t(($) => $.git.merged),
+      toneClassName: "text-violet-600 dark:text-violet-300/90",
+      Icon: PullRequestGlyph.merged,
+    },
+  }) as const satisfies Record<PullRequestState | "draft", PullRequestStatePresentation>;

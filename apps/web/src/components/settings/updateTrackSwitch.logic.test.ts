@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import type { DesktopUpdateChannel, DesktopUpdateState } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -44,7 +45,11 @@ function fakeBridge(offer: string | null | Error) {
 }
 
 const prepare = (bridge: ReturnType<typeof fakeBridge>["bridge"], reinstall = true) =>
-  prepareLocalTrackSwitch(bridge, { channel: "latest", version: STABLE, reinstall });
+  prepareLocalTrackSwitch(
+    bridge,
+    { channel: "latest", version: STABLE, reinstall },
+    createI18n("en").getFixedT(null, "settings"),
+  );
 
 describe("prepareLocalTrackSwitch", () => {
   it("installs the checked release or a newer one on the track, never an older one", async () => {

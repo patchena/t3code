@@ -3,7 +3,7 @@ import remarkParse from "remark-parse";
 import { unified } from "unified";
 import { describe, expect, it } from "vite-plus/test";
 
-import { remarkPullRequestAutolinks } from "./pullRequestMarkdown.logic";
+import { remarkPullRequestAutolinks } from "~/components/pullRequest/pullRequestMarkdown.logic";
 
 type Node = {
   type: string;

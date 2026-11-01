@@ -8,7 +8,7 @@ import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { __setClientSettingsForTests, getClientSettings } from "../hooks/useSettings";
 import { useProjects } from "../state/entities";
 import type { Project } from "../types";
-import Sidebar from "./Sidebar";
+import { Sidebar } from "./Sidebar";
 import { SidebarProvider } from "./ui/sidebar";
 
 vi.mock("../state/entities", { spy: true });

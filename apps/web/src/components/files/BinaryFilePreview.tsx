@@ -2,7 +2,9 @@ import { lazy, Suspense } from "react";
 
 import { FileSurfaceLoading } from "./fileSurfaceChrome";
 
-const BinaryViewer = lazy(() => import("./BinaryViewer"));
+const BinaryViewer = lazy(() =>
+  import("~/components/files/BinaryViewer").then((module) => ({ default: module.BinaryViewer })),
+);
 
 export function BinaryFilePreview(props: {
   readonly src: string;

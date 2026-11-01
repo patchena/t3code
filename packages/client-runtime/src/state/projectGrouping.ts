@@ -7,6 +7,7 @@ import {
   type SidebarProjectGroupingMode,
 } from "@t3tools/contracts";
 import type { ClientSettings } from "@t3tools/contracts/settings";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 
 import type { EnvironmentProject } from "./models.ts";
 import { normalizeProjectPathForComparison } from "./projects.ts";
@@ -295,12 +296,15 @@ function selectProjectIdentitySource<TProject extends EnvironmentProject>(
   return freshestIdentifiedProject ?? winner;
 }
 
-export function buildProjectGroups<TProject extends EnvironmentProject>(input: {
-  readonly projects: ReadonlyArray<TProject>;
-  readonly settings: ProjectGroupingSettings;
-  readonly preferredEnvironmentId?: EnvironmentId | null;
-  readonly groupScratchProjects?: boolean;
-}): ReadonlyArray<ProjectGroup<TProject>> {
+export function buildProjectGroups<TProject extends EnvironmentProject>(
+  input: {
+    readonly projects: ReadonlyArray<TProject>;
+    readonly settings: ProjectGroupingSettings;
+    readonly preferredEnvironmentId?: EnvironmentId | null;
+    readonly groupScratchProjects?: boolean;
+  },
+  t: TFunction<"common">,
+): ReadonlyArray<ProjectGroup<TProject>> {
   const projectsByPhysicalKey = new Map<string, TProject[]>();
   for (const project of input.projects) {
     const physicalProjectKey = derivePhysicalProjectKey(project);
@@ -364,7 +368,7 @@ export function buildProjectGroups<TProject extends EnvironmentProject>(input: {
       key,
       label:
         input.groupScratchProjects && representative.isScratch
-          ? "No project"
+          ? t(($) => $.noProject)
           : members.length > 1
             ? deriveProjectGroupLabel({
                 representative,

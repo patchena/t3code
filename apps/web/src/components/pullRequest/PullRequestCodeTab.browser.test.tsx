@@ -71,7 +71,7 @@ vi.mock(import("~/state/pullRequests"), async (original) => {
 });
 
 import { render } from "../../../test/render";
-import PullRequestCodeTab from "./PullRequestCodeTab";
+import { PullRequestCodeTab } from "~/components/pullRequest/PullRequestCodeTab";
 
 const detail: PullRequestDetailView = {
   provider: SourceControlProviderKind.make("github"),

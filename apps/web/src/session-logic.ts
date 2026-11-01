@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { ThreadStructure, ThreadStructureRuntime } from "@t3tools/client-runtime/state/shell";
 import { resolveThreadWorkingStartedAt } from "@t3tools/client-runtime/state/models";
 import {
@@ -17,18 +18,16 @@ import {
   type TurnItemId,
 } from "@t3tools/contracts";
 import { extractToolActivityPresentation } from "@t3tools/client-runtime/work-log/tool-presentation";
-import {
-  classifyToolActivity,
-  collectToolFilePaths,
-  formatReadToolLabel,
-  formatSearchToolLabel,
-} from "@t3tools/shared/toolActivity";
+import { classifyToolActivity, collectToolFilePaths } from "@t3tools/shared/toolActivity";
 import type { HtmlRenderReference } from "@t3tools/shared/htmlRender";
 import { turnItemDetailRevision } from "@t3tools/client-runtime/work-log/item-detail";
 import type { McpAppReference } from "@t3tools/shared/mcpApp";
 import { htmlRenderFromToolItem, mcpAppFromToolItem } from "@t3tools/shared/toolOutput";
 import {
   contextCompactionLabel,
+  formatReadToolLabel,
+  formatSearchToolLabel,
+  resolveWorkEntryToolPresentation,
   workEntryIndicatesToolFailure,
 } from "@t3tools/client-runtime/work-log/presentation";
 import type { ThreadCheckpointSummary } from "@t3tools/client-runtime/state/thread-checkpoints";
@@ -363,13 +362,14 @@ function projectedWorkEntryTone(item: OrchestrationV2TurnItem): WorkLogEntry["to
 
 export function providerErrorPresentation(
   item: Extract<OrchestrationV2TurnItem, { readonly type: "error" }>,
+  t: TFunction<"activity">,
 ): { readonly label: string; readonly detail: string } {
   if (item.retry === undefined) {
     return {
       label:
         item.failure.class === "usage_limit"
-          ? "Usage limit reached"
-          : item.title?.trim() || "Provider error",
+          ? t(($) => $.shared.projection.usageLimit)
+          : item.title?.trim() || t(($) => $.shared.projection.providerError),
       detail: item.failure.message,
     };
   }
@@ -379,25 +379,32 @@ export function providerErrorPresentation(
       : `${item.retry.attempt}/${item.retry.maxAttempts}`;
   const label =
     item.status === "running"
-      ? `Retrying provider (${progress})`
+      ? t(($) => $.shared.projection.retrying, { progress })
       : item.status === "completed"
-        ? `Provider recovered (${progress} retries)`
+        ? t(($) => $.shared.projection.recovered, { progress })
         : item.status === "failed"
-          ? `${item.failure.class === "usage_limit" ? "Usage limit reached" : "Provider error"} after ${progress} retries`
-          : `Provider retry stopped (${progress})`;
-  const retryDelay =
-    item.status === "running" && item.retry.retryDelayMs !== null && item.retry.retryDelayMs > 0
-      ? item.retry.retryDelayMs < 1_000
-        ? ` Retrying in ${item.retry.retryDelayMs}ms.`
-        : ` Retrying in ${(item.retry.retryDelayMs / 1_000).toFixed(1).replace(/\.0$/u, "")}s.`
-      : "";
-  return {
-    label,
-    detail: `${item.failure.message}${retryDelay}`,
-  };
+          ? item.failure.class === "usage_limit"
+            ? t(($) => $.shared.projection.usageAfterRetry, { progress })
+            : t(($) => $.shared.projection.providerAfterRetry, { progress })
+          : t(($) => $.shared.projection.retryStopped, { progress });
+  const delay = item.retry.retryDelayMs;
+  const diagnostic = item.failure.message;
+  const detail =
+    item.status === "running" && delay !== null && delay > 0
+      ? delay < 1000
+        ? t(($) => $.shared.projection.retryMillis, { diagnostic, delay })
+        : t(($) => $.shared.projection.retrySeconds, {
+            diagnostic,
+            delay: (delay / 1000).toFixed(1).replace(/\.0$/u, ""),
+          })
+      : diagnostic;
+  return { label, detail };
 }
 
-function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry {
+function projectedWorkEntry(
+  row: OrchestrationV2ProjectedTurnItem,
+  t: TFunction<"activity">,
+): WorkLogEntry {
   const { item } = row;
   const title = item.title?.trim() || null;
   const common = {
@@ -416,28 +423,28 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
     case "thread_created":
       return {
         ...common,
-        label: "Created thread",
+        label: t(($) => $.shared.projection.createdThread),
       };
     case "compaction":
       return {
         ...common,
-        label: contextCompactionLabel(item),
+        label: contextCompactionLabel(item, t),
         sourceActivityKind: "context-compaction",
         ...(item.summary ? { detail: item.summary } : {}),
       };
     case "reasoning":
       return {
         ...common,
-        label: title ?? "Thinking",
+        label: title ?? t(($) => $.shared.projection.thinking),
         ...(item.text ? { detail: item.text } : {}),
       };
     case "command_execution":
       return {
         ...common,
-        label: title ?? "Ran command",
+        label: title ?? t(($) => $.shared.projection.ranCommand),
         command: item.input,
         rawCommand: item.input,
-        toolTitle: title ?? "Command",
+        toolTitle: title ?? t(($) => $.shared.projection.command),
         toolData: item,
       };
     case "file_change": {
@@ -446,33 +453,34 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
         label:
           title ??
           (item.changes !== undefined && item.changes.length > 1
-            ? `Changed ${item.changes.length} files`
-            : `Changed ${item.fileName}`),
+            ? t(($) => $.shared.projection.changedFiles, { count: item.changes.length })
+            : t(($) => $.shared.projection.changedPath, { path: item.fileName })),
         changedFiles: item.changes?.map((change) => change.path) ?? [item.fileName],
-        toolTitle: title ?? "File change",
+        toolTitle: title ?? t(($) => $.shared.projection.fileChange),
         toolData: item,
       };
     }
     case "file_search":
       return {
         ...common,
-        label: title ?? formatSearchToolLabel(item) ?? "Searched files",
+        label:
+          title ?? formatSearchToolLabel(item, t) ?? t(($) => $.shared.projection.searchedFiles),
         ...(item.pattern ? { detail: item.pattern } : {}),
-        toolTitle: title ?? "File search",
+        toolTitle: title ?? t(($) => $.shared.projection.fileSearch),
         toolData: item,
       };
     case "web_search":
       return {
         ...common,
-        label: title ?? "Searched the web",
+        label: title ?? t(($) => $.shared.projection.searchedWeb),
         ...(item.patterns?.length ? { detail: item.patterns.join(", ") } : {}),
-        toolTitle: title ?? "Web search",
+        toolTitle: title ?? t(($) => $.shared.projection.webSearch),
         toolData: item,
       };
     case "checkpoint":
       return {
         ...common,
-        label: title ?? "Checkpoint captured",
+        label: title ?? t(($) => $.shared.projection.checkpoint),
         changedFiles: item.files.map((file) => file.path),
         toolData: item,
       };
@@ -483,7 +491,7 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
         sourceActivityKind: "runtime.warning",
       };
     case "error": {
-      const presentation = providerErrorPresentation(item);
+      const presentation = providerErrorPresentation(item, t);
       return {
         ...common,
         ...presentation,
@@ -504,13 +512,24 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
       return {
         ...common,
         label:
+          resolveWorkEntryToolPresentation(
+            {
+              ...common,
+              label: item.toolName ?? "",
+              toolTitle: item.toolName ?? "",
+              toolData: { input: item.input, output: item.output },
+            },
+            t,
+          )?.displayName ??
           title ??
           (classified === "read"
-            ? formatReadToolLabel(readPath ?? "")
+            ? formatReadToolLabel(readPath ?? "", t)
             : classified === "search"
-              ? (formatSearchToolLabel({ input: item.input }) ?? item.toolName ?? "Tool call")
-              : (item.toolName ?? "Tool call")),
-        toolTitle: title ?? item.toolName ?? "Tool",
+              ? (formatSearchToolLabel({ input: item.input }, t) ??
+                item.toolName ??
+                t(($) => $.shared.projection.toolCall))
+              : (item.toolName ?? t(($) => $.shared.projection.toolCall))),
+        toolTitle: title ?? item.toolName ?? t(($) => $.shared.projection.tool),
         toolData: { input: item.input, output: item.output },
       };
     }
@@ -522,27 +541,37 @@ function projectedWorkEntry(row: OrchestrationV2ProjectedTurnItem): WorkLogEntry
         item.steps.find((step) => step.status === "pending");
       return {
         ...common,
-        label: `Tasks ${done}/${item.steps.length}${current ? ` · ${current.text}` : ""}`,
+        label: current
+          ? t(($) => $.shared.projection.tasksCurrent, {
+              done,
+              total: item.steps.length,
+              task: current.text,
+            })
+          : t(($) => $.shared.projection.tasks, { done, total: item.steps.length }),
       };
     }
     case "approval_request":
       return {
         ...common,
-        label: title ?? "Approval requested",
+        label: title ?? t(($) => $.shared.projection.approval),
         detail: item.prompt ?? item.requestKind,
         toolData: item,
       };
     case "user_input_request":
       return {
         ...common,
-        label: title ?? (item.questionAnswer ? "Answered questions" : "Input requested"),
+        label:
+          title ??
+          (item.questionAnswer
+            ? t(($) => $.shared.projection.answered)
+            : t(($) => $.shared.projection.input)),
         ...(item.questionAnswer ? { questionAnswer: item.questionAnswer } : {}),
         toolData: item,
       };
     default:
       return {
         ...common,
-        label: title ?? item.type.replaceAll("_", " "),
+        label: title ?? t(($) => $.shared.projection.types[item.type]),
         toolData: item,
       };
   }
@@ -561,11 +590,13 @@ export interface TimelineEntriesInput {
 
 export interface TimelineEntriesProjection {
   readonly input: TimelineEntriesInput;
+  readonly translation: TFunction<"activity">;
   readonly entries: TimelineEntry[];
 }
 
 export function deriveTimelineEntriesFromVisibleTurnItems(
   input: TimelineEntriesInput,
+  t: TFunction<"activity">,
 ): TimelineEntry[] {
   const committedMessageIds = new Set<string>();
   const entries: TimelineEntry[] = [];
@@ -742,7 +773,7 @@ export function deriveTimelineEntriesFromVisibleTurnItems(
       id: item.id,
       kind: "work",
       createdAt,
-      entry: projectedWorkEntry(row),
+      entry: projectedWorkEntry(row, t),
       ...attemptMetadata,
     });
   }
@@ -924,7 +955,9 @@ function canRederiveInPlace(
 function reuseTimelineEntries(
   input: TimelineEntriesInput,
   previous: TimelineEntriesProjection,
+  t: TFunction<"activity">,
 ): TimelineEntry[] | null {
+  if (previous.translation !== t) return null;
   const before = previous.input;
   if (
     input.visibleTurnItems.length < before.visibleTurnItems.length ||
@@ -977,12 +1010,15 @@ function reuseTimelineEntries(
   const rederived =
     changedItems.length === 0
       ? []
-      : deriveTimelineEntriesFromVisibleTurnItems({
-          ...input,
-          visibleTurnItems: changedItems,
-          optimisticMessages: [],
-          anchoredMessages: [],
-        });
+      : deriveTimelineEntriesFromVisibleTurnItems(
+          {
+            ...input,
+            visibleTurnItems: changedItems,
+            optimisticMessages: [],
+            anchoredMessages: [],
+          },
+          t,
+        );
   if (
     rederived.length !== changedItems.length ||
     rederived.some((entry, index) => entry.id !== changedItems[index]!.item.id)
@@ -1018,10 +1054,13 @@ function reuseTimelineEntries(
   if (rederivedCount !== rederivedEntries.size) return null;
   if (appended) {
     entries.push(
-      ...deriveTimelineEntriesFromVisibleTurnItems({
-        ...input,
-        visibleTurnItems: input.visibleTurnItems.slice(before.visibleTurnItems.length),
-      }),
+      ...deriveTimelineEntriesFromVisibleTurnItems(
+        {
+          ...input,
+          visibleTurnItems: input.visibleTurnItems.slice(before.visibleTurnItems.length),
+        },
+        t,
+      ),
     );
   }
   return entries;
@@ -1029,13 +1068,14 @@ function reuseTimelineEntries(
 
 export function deriveTimelineEntriesFromVisibleTurnItemsWithState(
   input: TimelineEntriesInput,
+  t: TFunction<"activity">,
   previous: TimelineEntriesProjection | null = null,
 ): TimelineEntriesProjection {
-  const reused = previous === null ? null : reuseTimelineEntries(input, previous);
-  if (reused !== null) return { input, entries: reused };
-  const entries = deriveTimelineEntriesFromVisibleTurnItems(input);
+  const reused = previous === null ? null : reuseTimelineEntries(input, previous, t);
+  if (reused !== null) return { input, translation: t, entries: reused };
+  const entries = deriveTimelineEntriesFromVisibleTurnItems(input, t);
   if (previous === null || !shallow(input.attachmentUrlById, previous.input.attachmentUrlById)) {
-    return { input, entries };
+    return { input, translation: t, entries };
   }
   const previousMessages = new Map(
     previous.entries.flatMap((entry) =>
@@ -1044,6 +1084,7 @@ export function deriveTimelineEntriesFromVisibleTurnItemsWithState(
   );
   return {
     input,
+    translation: t,
     entries: entries.map((entry) => {
       if (entry.kind !== "message" || entry.projectedItem === undefined) return entry;
       const before = previousMessages.get(entry.id);

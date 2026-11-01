@@ -101,7 +101,7 @@ vi.mock(import("@t3tools/client-runtime/change-request-links"), async (original)
   findProjectForChangeRequest: ((projects: readonly { id: ProjectId }[]) => projects[0]) as never,
 }));
 
-import ChatMarkdown from "./ChatMarkdown";
+import { ChatMarkdown } from "./ChatMarkdown";
 
 const threadRef = {
   environmentId: EnvironmentId.make("selected"),

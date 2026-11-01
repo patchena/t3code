@@ -1,14 +1,16 @@
+import { useTranslation } from "react-i18next";
 import { useId, useRef, useState, type ComponentProps } from "react";
 
 import { cn } from "~/lib/utils";
-import { Button } from "../ui/button";
-import { PullRequestMarkdown } from "./PullRequestMarkdown";
+import { Button } from "~/components/ui/button";
+import { PullRequestMarkdown } from "~/components/pullRequest/PullRequestMarkdown";
 import { observeResize } from "~/lib/observeResize";
 
 export function PullRequestCommentBody({
   className,
   ...props
 }: ComponentProps<typeof PullRequestMarkdown>) {
+  const { t } = useTranslation("workspace");
   const [expanded, setExpanded] = useState(false);
   const [overflowing, setOverflowing] = useState(false);
   const clip = useRef<HTMLDivElement>(null);
@@ -51,7 +53,7 @@ export function PullRequestCommentBody({
             setExpanded(!expanded);
           }}
         >
-          {expanded ? "Show less" : "Show full comment"}
+          {expanded ? t(($) => $.git.showLess) : t(($) => $.git.showFullComment)}
         </Button>
       ) : null}
     </div>

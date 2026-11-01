@@ -1,3 +1,4 @@
+import { mobileI18n } from "~/i18n";
 import { Button } from "../../components/ui/Button";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
 import * as Dialog from "../../components/ui/Dialog";
@@ -35,6 +36,8 @@ import {
   previewStreamMessage,
   type PreviewStreamConfiguration,
 } from "./preview-stream-document";
+
+const tTools = mobileI18n.getFixedT("en", "tools");
 
 export interface PreviewStreamRef {
   readonly command: (input: PreviewStreamInput) => void;
@@ -326,7 +329,7 @@ function PreviewStreamDocumentView({
       {!compact ? (
         <View className="flex-row items-center justify-between gap-2 border-b border-secondary-border px-3 py-2">
           <AppText className="text-xs text-foreground-muted">
-            {previewStreamControlLabel(control)}
+            {previewStreamControlLabel(control, tTools)}
           </AppText>
           {control?.canOperate ? (
             <Button
@@ -387,7 +390,7 @@ function PreviewStreamDocumentView({
                 return;
               case "hostSetup":
                 setHostSetup({ need: message.need, command: message.command });
-                fail(previewStreamHostSetupMessage(message));
+                fail(previewStreamHostSetupMessage(message, tTools));
                 return;
               case "viewport":
                 onViewport?.(message);

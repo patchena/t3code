@@ -2,13 +2,13 @@ import { ChevronDownIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "~/lib/utils";
-import { Button } from "../ui/button";
-import { Menu, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "../ui/menu";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { Button } from "~/components/ui/button";
+import { Menu, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "~/components/ui/menu";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import {
   PullRequestFilterOptionIcon,
   type PullRequestFilterOption,
-} from "./PullRequestListFilters";
+} from "~/components/pullRequest/PullRequestListFilters";
 
 export function PullRequestCompactFilterMenu<Value extends string>({
   label,

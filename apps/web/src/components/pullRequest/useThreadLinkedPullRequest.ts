@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   type EnvironmentId,
   type ProjectId,
@@ -10,12 +11,12 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { useEffect, useRef } from "react";
-import { selectActiveRightPanelSurface, useRightPanelStore } from "../../rightPanelStore";
-import { threadEnvironment } from "../../state/threads";
-import { useOrchestrationCommand } from "../../state/use-orchestration-command";
-import { useLinkedThreadPullRequest } from "../ThreadStatusIndicators";
-import { stackedThreadToast, toastManager } from "../ui/toast";
+import { useEffect, useEffectEvent, useRef } from "react";
+import { selectActiveRightPanelSurface, useRightPanelStore } from "~/rightPanelStore";
+import { threadEnvironment } from "~/state/threads";
+import { useOrchestrationCommand } from "~/state/use-orchestration-command";
+import { useLinkedThreadPullRequest } from "~/components/ThreadStatusIndicators";
+import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 
 /** Relink replaced closed/merged requests to the newer open request on the same branch, moving its panel. */
 export function useThreadLinkedPullRequest(input: {
@@ -27,6 +28,7 @@ export function useThreadLinkedPullRequest(input: {
   readonly threadBranch: string | null;
   readonly gitStatus: VcsStatusResult | null;
 }) {
+  const { t } = useTranslation("workspace");
   const { serverThreadRef, persisted, projectId, projectRepository, threadBranch, gitStatus } =
     input;
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
@@ -48,6 +50,15 @@ export function useThreadLinkedPullRequest(input: {
       ? null
       : { projectId, repository: projectRepository, number: detected.number, url: detected.url };
 
+  const reportFailure = useEffectEvent((error: unknown) => {
+    toastManager.add(
+      stackedThreadToast({
+        type: "error",
+        title: t(($) => $.git.updateThreadPullRequestFailed),
+        description: error instanceof Error ? error.message : t(($) => $.git.errorOccurred),
+      }),
+    );
+  });
   const relinkKeysRef = useRef(new Map<string, string>());
   const relinkWriteRef = useRef(Promise.resolve());
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- persists the detected PR to the server thread once per change and retargets the open right panel store
@@ -86,13 +97,7 @@ export function useThreadLinkedPullRequest(input: {
       relinkKeysRef.current.delete(threadKey);
       if (isAtomCommandInterrupted(result)) return;
       const error = squashAtomCommandFailure(result);
-      toastManager.add(
-        stackedThreadToast({
-          type: "error",
-          title: "Unable to update the thread pull request",
-          description: error instanceof Error ? error.message : "An error occurred.",
-        }),
-      );
+      reportFailure(error);
     });
   }, [persisted, replacement, serverThreadRef, updateThreadMetadata]);
 

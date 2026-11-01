@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { useScopedSettingsWriteAllowed } from "./useScopedSettings";
 import { SettingsIcon } from "lucide-react";
 import { useState } from "react";
@@ -36,40 +38,48 @@ import { IntervalSecondsField } from "./IntervalSecondsField";
 import { PolicyTooltip, SettingResetButton, SettingsRow } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 
-const BACKGROUND_ACTIVITY_PROFILE_LABELS: Record<BackgroundActivityProfile, string> = {
-  balanced: "Balanced",
-  performance: "Performance",
-  "battery-saver": "Battery saver",
-};
-
 type BackgroundActivityProfileOption = BackgroundActivityProfile | "advanced";
 
-const BACKGROUND_ACTIVITY_PROFILE_OPTION_LABELS: Record<BackgroundActivityProfileOption, string> = {
-  ...BACKGROUND_ACTIVITY_PROFILE_LABELS,
-  advanced: "Advanced",
-};
+function backgroundActivityLabels(t: TFunction<"settings">) {
+  const BACKGROUND_ACTIVITY_PROFILE_LABELS: Record<BackgroundActivityProfile, string> = {
+    balanced: t(($) => $.extra.background.balanced),
+    performance: t(($) => $.extra.background.performance),
+    "battery-saver": t(($) => $.extra.background.batterySaver),
+  };
 
-const BACKGROUND_ACTIVITY_PROFILE_DESCRIPTIONS: Record<BackgroundActivityProfile, string> = {
-  balanced: "Pauses probes for idle clients, locked hosts, or low power mode.",
-  performance: "Allows scoped background probes while any subscribed client remains connected.",
-  "battery-saver": "Also pauses background probes when the host or client is on battery.",
-};
+  const BACKGROUND_ACTIVITY_PROFILE_OPTION_LABELS: Record<BackgroundActivityProfileOption, string> =
+    {
+      ...BACKGROUND_ACTIVITY_PROFILE_LABELS,
+      advanced: t(($) => $.extra.background.advanced),
+    };
 
-const ADVANCED_BACKGROUND_ACTIVITY_DESCRIPTION = "Uses custom intervals.";
+  const BACKGROUND_ACTIVITY_PROFILE_DESCRIPTIONS: Record<BackgroundActivityProfile, string> = {
+    balanced: t(($) => $.extra.background.balancedDescription),
+    performance: t(($) => $.extra.background.performanceDescription),
+    "battery-saver": t(($) => $.extra.background.batteryDescription),
+  };
 
-const BACKGROUND_ACTIVITY_BOOLEAN_OVERRIDES: ReadonlyArray<{
-  readonly key:
-    | "pauseWhenHostLocked"
-    | "pauseWhenHostLowPower"
-    | "pauseWhenClientLowPower"
-    | "pauseWhenOnBattery";
-  readonly label: string;
-}> = [
-  { key: "pauseWhenHostLocked", label: "Pause when host is locked" },
-  { key: "pauseWhenHostLowPower", label: "Pause on host low power" },
-  { key: "pauseWhenClientLowPower", label: "Pause on client low power" },
-  { key: "pauseWhenOnBattery", label: "Pause on battery" },
-];
+  const BACKGROUND_ACTIVITY_BOOLEAN_OVERRIDES: ReadonlyArray<{
+    readonly key:
+      | "pauseWhenHostLocked"
+      | "pauseWhenHostLowPower"
+      | "pauseWhenClientLowPower"
+      | "pauseWhenOnBattery";
+    readonly label: string;
+  }> = [
+    { key: "pauseWhenHostLocked", label: t(($) => $.extra.background.pauseLocked) },
+    { key: "pauseWhenHostLowPower", label: t(($) => $.extra.background.pauseHostPower) },
+    { key: "pauseWhenClientLowPower", label: t(($) => $.extra.background.pauseClientPower) },
+    { key: "pauseWhenOnBattery", label: t(($) => $.extra.background.pauseBattery) },
+  ];
+
+  return {
+    BACKGROUND_ACTIVITY_PROFILE_LABELS,
+    BACKGROUND_ACTIVITY_PROFILE_OPTION_LABELS,
+    BACKGROUND_ACTIVITY_PROFILE_DESCRIPTIONS,
+    BACKGROUND_ACTIVITY_BOOLEAN_OVERRIDES,
+  };
+}
 
 function resetBackgroundActivitySettings() {
   return {
@@ -94,6 +104,9 @@ function BackgroundActivityAdvancedDialog({
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation("settings");
+  const { BACKGROUND_ACTIVITY_PROFILE_LABELS, BACKGROUND_ACTIVITY_BOOLEAN_OVERRIDES } =
+    backgroundActivityLabels(t);
   const canWriteSettings = useScopedSettingsWriteAllowed();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
@@ -116,10 +129,8 @@ function BackgroundActivityAdvancedDialog({
     <Dialog open={open && canWriteSettings} onOpenChange={onOpenChange}>
       <DialogPopup className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Background Activity</DialogTitle>
-          <DialogDescription>
-            Tune the shared power policy and the background intervals that feed it.
-          </DialogDescription>
+          <DialogTitle>{t(($) => $.extra.background.title)}</DialogTitle>
+          <DialogDescription>{t(($) => $.extra.background.description)}</DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <fieldset
@@ -128,9 +139,9 @@ function BackgroundActivityAdvancedDialog({
           >
             <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-sm font-medium">Shared policy</div>
+                <div className="text-sm font-medium">{t(($) => $.extra.background.shared)}</div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Controls whether background work may run after a subscribed interval fires.
+                  {t(($) => $.extra.background.policyDescription)}
                 </p>
               </div>
               <Select
@@ -150,7 +161,7 @@ function BackgroundActivityAdvancedDialog({
                 <SelectTrigger
                   size="sm"
                   className="w-full sm:w-40"
-                  aria-label="Shared background policy"
+                  aria-label={t(($) => $.extra.background.sharedLabel)}
                 >
                   <SelectValue>{BACKGROUND_ACTIVITY_PROFILE_LABELS[activeProfile]}</SelectValue>
                 </SelectTrigger>
@@ -171,15 +182,19 @@ function BackgroundActivityAdvancedDialog({
             <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
                 <div className="text-sm font-medium">
-                  {searchableSetting("git-fetch-interval").title}
+                  {searchableSetting("git-fetch-interval", t).title}
                 </div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Refresh remote branch status in the background.
+                  {t(($) => $.extra.background.gitDescription)}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <IntervalSecondsField
-                  label="Git fetch interval"
+                  labels={{
+                    decrease: t(($) => $.extra.background.gitDecrease),
+                    seconds: t(($) => $.extra.background.gitSeconds),
+                    increase: t(($) => $.extra.background.gitIncrease),
+                  }}
                   value={automaticGitFetchIntervalSeconds}
                   min={0}
                   step={5}
@@ -194,21 +209,28 @@ function BackgroundActivityAdvancedDialog({
                     )
                   }
                 />
-                <span className="text-xs text-muted-foreground">seconds</span>
+                <span className="text-xs text-muted-foreground">
+                  {t(($) => $.extra.background.seconds)}
+                </span>
               </div>
             </div>
 
             <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-sm font-medium">Provider health interval</div>
+                <div className="text-sm font-medium">
+                  {t(($) => $.extra.background.providerInterval)}
+                </div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Refresh provider availability, versions, and auth state. Model catalog updates
-                  follow Provider update checks.
+                  {t(($) => $.extra.background.providerDescription)}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <IntervalSecondsField
-                  label="provider health interval"
+                  labels={{
+                    decrease: t(($) => $.extra.background.providerDecrease),
+                    seconds: t(($) => $.extra.background.providerSeconds),
+                    increase: t(($) => $.extra.background.providerIncrease),
+                  }}
                   value={providerHealthRefreshIntervalSeconds}
                   min={0}
                   step={PROVIDER_HEALTH_INTERVAL_STEP_SECONDS}
@@ -223,20 +245,28 @@ function BackgroundActivityAdvancedDialog({
                     )
                   }
                 />
-                <span className="text-xs text-muted-foreground">seconds</span>
+                <span className="text-xs text-muted-foreground">
+                  {t(($) => $.extra.background.seconds)}
+                </span>
               </div>
             </div>
 
             <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-sm font-medium">Host power monitor</div>
+                <div className="text-sm font-medium">
+                  {t(($) => $.extra.background.hostMonitor)}
+                </div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Poll host power state while clients are active.
+                  {t(($) => $.extra.background.hostDescription)}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <IntervalSecondsField
-                  label="active host power interval"
+                  labels={{
+                    decrease: t(($) => $.extra.background.hostDecrease),
+                    seconds: t(($) => $.extra.background.hostSeconds),
+                    increase: t(($) => $.extra.background.hostIncrease),
+                  }}
                   value={hostPowerMonitorActiveIntervalSeconds}
                   min={5}
                   step={5}
@@ -251,20 +281,28 @@ function BackgroundActivityAdvancedDialog({
                     )
                   }
                 />
-                <span className="text-xs text-muted-foreground">seconds</span>
+                <span className="text-xs text-muted-foreground">
+                  {t(($) => $.extra.background.seconds)}
+                </span>
               </div>
             </div>
 
             <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 space-y-1">
-                <div className="text-sm font-medium">Idle host monitor</div>
+                <div className="text-sm font-medium">
+                  {t(($) => $.extra.background.idleMonitor)}
+                </div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  Poll host power state when no foreground client is active.
+                  {t(($) => $.extra.background.idleDescription)}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <IntervalSecondsField
-                  label="idle host power interval"
+                  labels={{
+                    decrease: t(($) => $.extra.background.idleDecrease),
+                    seconds: t(($) => $.extra.background.idleSeconds),
+                    increase: t(($) => $.extra.background.idleIncrease),
+                  }}
                   value={hostPowerMonitorIdleIntervalSeconds}
                   min={5}
                   step={30}
@@ -279,7 +317,9 @@ function BackgroundActivityAdvancedDialog({
                     )
                   }
                 />
-                <span className="text-xs text-muted-foreground">seconds</span>
+                <span className="text-xs text-muted-foreground">
+                  {t(($) => $.extra.background.seconds)}
+                </span>
               </div>
             </div>
 
@@ -316,9 +356,9 @@ function BackgroundActivityAdvancedDialog({
             disabled={!canWriteSettings}
             onClick={() => updateSettings(resetBackgroundActivitySettings())}
           >
-            Reset all
+            {t(($) => $.extra.background.resetAll)}
           </Button>
-          <Button onClick={() => onOpenChange(false)}>Done</Button>
+          <Button onClick={() => onOpenChange(false)}>{t(($) => $.extra.background.done)}</Button>
         </DialogFooter>
       </DialogPopup>
     </Dialog>
@@ -326,6 +366,12 @@ function BackgroundActivityAdvancedDialog({
 }
 
 export function BackgroundActivitySettingsRow() {
+  const { t } = useTranslation("settings");
+  const {
+    BACKGROUND_ACTIVITY_PROFILE_LABELS,
+    BACKGROUND_ACTIVITY_PROFILE_OPTION_LABELS,
+    BACKGROUND_ACTIVITY_PROFILE_DESCRIPTIONS,
+  } = backgroundActivityLabels(t);
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const { scope, environment } = useSettingsScope();
@@ -338,9 +384,9 @@ export function BackgroundActivitySettingsRow() {
   const backgroundActivityProfileOption = resolveBackgroundActivityProfileOption(settings);
   const backgroundActivityDescription =
     backgroundActivityProfileOption === "advanced"
-      ? `${ADVANCED_BACKGROUND_ACTIVITY_DESCRIPTION} Shared policy: ${
-          BACKGROUND_ACTIVITY_PROFILE_LABELS[activeBackgroundActivityProfile]
-        }.`
+      ? t(($) => $.extra.background.advancedDescription, {
+          policy: BACKGROUND_ACTIVITY_PROFILE_LABELS[activeBackgroundActivityProfile],
+        })
       : BACKGROUND_ACTIVITY_PROFILE_DESCRIPTIONS[resolvedBackgroundActivity.profile];
   const canResetBackgroundActivity = !Equal.equals(
     settings.backgroundActivity,
@@ -351,21 +397,18 @@ export function BackgroundActivitySettingsRow() {
     <SettingsRow
       serverScoped
       settingKeys={["backgroundActivity"]}
-      id={searchableSetting("background-activity").id}
+      id={searchableSetting("background-activity", t).id}
       title={
         <span className="inline-flex items-center gap-1.5">
-          {searchableSetting("background-activity").title}
-          <PolicyTooltip>
-            This shared policy gates background work such as Git refreshes and provider health
-            probes after their individual intervals elapse.
-          </PolicyTooltip>
+          {searchableSetting("background-activity", t).title}
+          <PolicyTooltip>{t(($) => $.extra.background.policyTooltip)}</PolicyTooltip>
         </span>
       }
       description={backgroundActivityDescription}
       resetAction={
         canResetBackgroundActivity ? (
           <SettingResetButton
-            label="background activity"
+            label={t(($) => $.extra.background.reset)}
             onClick={() => updateSettings(resetBackgroundActivitySettings())}
           />
         ) : null
@@ -387,11 +430,13 @@ export function BackgroundActivitySettingsRow() {
             <SelectTrigger
               size="sm"
               className="w-full sm:w-40"
-              aria-label="Background activity profile"
+              aria-label={t(($) => $.extra.background.profile)}
             >
               <SelectValue>
                 {(value: BackgroundActivityProfileOption | null) =>
-                  value === null ? "Mixed" : BACKGROUND_ACTIVITY_PROFILE_OPTION_LABELS[value]
+                  value === null
+                    ? t(($) => $.extra.background.mixed)
+                    : BACKGROUND_ACTIVITY_PROFILE_OPTION_LABELS[value]
                 }
               </SelectValue>
             </SelectTrigger>
@@ -408,7 +453,7 @@ export function BackgroundActivitySettingsRow() {
               <SelectItem hideIndicator value="advanced" disabled={!isEnvironmentScope}>
                 {isEnvironmentScope
                   ? BACKGROUND_ACTIVITY_PROFILE_OPTION_LABELS.advanced
-                  : `${BACKGROUND_ACTIVITY_PROFILE_OPTION_LABELS.advanced} (one environment)`}
+                  : t(($) => $.extra.background.oneEnvironment)}
               </SelectItem>
             </SelectPopup>
           </Select>
@@ -419,14 +464,14 @@ export function BackgroundActivitySettingsRow() {
                   <Button
                     size="icon-sm"
                     variant="outline"
-                    aria-label="Configure advanced background activity"
+                    aria-label={t(($) => $.extra.background.configureAdvanced)}
                     onClick={() => setBackgroundActivityDialogOpen(true)}
                   >
                     <SettingsIcon className="size-4" />
                   </Button>
                 }
               />
-              <TooltipPopup side="top">Configure background activity</TooltipPopup>
+              <TooltipPopup side="top">{t(($) => $.extra.background.configure)}</TooltipPopup>
             </Tooltip>
           ) : null}
           <BackgroundActivityAdvancedDialog

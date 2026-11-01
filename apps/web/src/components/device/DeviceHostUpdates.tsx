@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { DeviceServiceState, EnvironmentId } from "@t3tools/contracts";
 import { useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -11,6 +12,7 @@ export function DeviceHostUpdates({
   state: DeviceServiceState;
   environmentId: EnvironmentId;
 }) {
+  const { t } = useTranslation("tools");
   const retry = useAtomCommand(deviceEnvironment.list);
   const [pending, setPending] = useState<string | null>(null);
   if (state.hostStatus === "disabled") return null;
@@ -31,15 +33,14 @@ export function DeviceHostUpdates({
               <p className="whitespace-pre-wrap break-words text-muted-foreground">
                 {status.detail ??
                   (failed
-                    ? "Device support could not start."
+                    ? t(($) => $.deviceStartFailed)
                     : status.status === "installing"
-                      ? "Installing device tools…"
-                      : "Starting device tools…")}
+                      ? t(($) => $.deviceInstallingTools)
+                      : t(($) => $.deviceStartingTools))}
               </p>
               {failed ? (
                 <p className="mt-1 text-muted-foreground">
-                  Check the host connection and network access, then retry. Your device settings are
-                  saved.
+                  {t(($) => $.deviceHostRetryDescription)}
                 </p>
               ) : null}
             </div>
@@ -55,7 +56,7 @@ export function DeviceHostUpdates({
                   );
                 }}
               >
-                {pending === host.id ? "Retrying…" : "Retry"}
+                {pending === host.id ? t(($) => $.retrying) : t(($) => $.retry)}
               </Button>
             ) : null}
           </div>

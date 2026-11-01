@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { appI18n } from "~/i18n";
 import type {
   EnvironmentId,
   ScopedProjectRef,
@@ -10,12 +12,6 @@ import {
   type ProjectGroupingSettings,
 } from "@t3tools/client-runtime/state/project-grouping";
 import type { Project } from "./types";
-
-export const PROJECT_GROUPING_MODE_LABELS: Record<SidebarProjectGroupingMode, string> = {
-  repository: "Group by repository",
-  repository_path: "Group by repository path",
-  separate: "Keep separate",
-};
 
 export function withProjectGroupingOverride(
   overrides: Readonly<Record<string, SidebarProjectGroupingMode>> | undefined,
@@ -124,11 +120,14 @@ export function buildPhysicalToLogicalProjectKeyMap(input: {
   primaryEnvironmentId: EnvironmentId | null;
 }): Map<string, string> {
   const mapping = new Map<string, string>();
-  const groups = buildProjectGroups({
-    projects: input.projects,
-    settings: input.settings,
-    preferredEnvironmentId: input.primaryEnvironmentId,
-  });
+  const groups = buildProjectGroups(
+    {
+      projects: input.projects,
+      settings: input.settings,
+      preferredEnvironmentId: input.primaryEnvironmentId,
+    },
+    appI18n.getFixedT(null, "common"),
+  );
   for (const group of groups) {
     for (const member of group.members) {
       mapping.set(member.physicalProjectKey, group.key);
@@ -137,21 +136,27 @@ export function buildPhysicalToLogicalProjectKeyMap(input: {
   return mapping;
 }
 
-export function buildSidebarProjectSnapshots(input: {
-  projects: ReadonlyArray<Project>;
-  settings: ProjectGroupingSettings;
-  groupScratchProjects?: boolean;
-  primaryEnvironmentId: EnvironmentId | null;
-  resolveEnvironmentLabel: (environmentId: EnvironmentId) => string | null;
-  isDesktopLocalEnvironment?: (environmentId: EnvironmentId) => boolean;
-  isWslEnvironment?: (environmentId: EnvironmentId) => boolean;
-}): SidebarProjectSnapshot[] {
-  return buildProjectGroups({
-    projects: input.projects,
-    groupScratchProjects: input.groupScratchProjects ?? false,
-    settings: input.settings,
-    preferredEnvironmentId: input.primaryEnvironmentId,
-  }).map((group): SidebarProjectSnapshot => {
+export function buildSidebarProjectSnapshots(
+  input: {
+    projects: ReadonlyArray<Project>;
+    settings: ProjectGroupingSettings;
+    groupScratchProjects?: boolean;
+    primaryEnvironmentId: EnvironmentId | null;
+    resolveEnvironmentLabel: (environmentId: EnvironmentId) => string | null;
+    isDesktopLocalEnvironment?: (environmentId: EnvironmentId) => boolean;
+    isWslEnvironment?: (environmentId: EnvironmentId) => boolean;
+  },
+  t: TFunction<"common">,
+): SidebarProjectSnapshot[] {
+  return buildProjectGroups(
+    {
+      projects: input.projects,
+      groupScratchProjects: input.groupScratchProjects ?? false,
+      settings: input.settings,
+      preferredEnvironmentId: input.primaryEnvironmentId,
+    },
+    t,
+  ).map((group): SidebarProjectSnapshot => {
     const members = group.members.map(
       ({ physicalProjectKey, project }): SidebarProjectGroupMember => ({
         ...project,

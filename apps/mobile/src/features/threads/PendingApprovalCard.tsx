@@ -5,7 +5,7 @@ import type {
   RuntimeRequestId,
 } from "@t3tools/contracts";
 import {
-  FULL_ACCESS_OVERRIDE_QUESTION,
+  fullAccessOverrideQuestion,
   fullAccessOverrideExplanation,
 } from "@t3tools/client-runtime/state/thread-requests";
 import { useState } from "react";
@@ -13,6 +13,7 @@ import { Pressable, View } from "react-native";
 
 import { AppText as Text } from "../../components/ui/AppText";
 import type { PendingApproval } from "../../lib/threadActivity";
+import { mobileI18n } from "~/i18n";
 
 export interface PendingApprovalCardProps {
   readonly canOperateThread: boolean;
@@ -31,6 +32,7 @@ const DEFAULT_APPROVAL_OPTIONS: ReadonlyArray<ProviderApprovalOption> = [
 ];
 
 export function PendingApprovalCard(props: PendingApprovalCardProps) {
+  const t = mobileI18n.getFixedT("en", "chat");
   const options: ReadonlyArray<ProviderApprovalOption> =
     props.approval.options ?? DEFAULT_APPROVAL_OPTIONS;
   const warning = options.find((option) => option.warning)?.warning;
@@ -62,11 +64,11 @@ export function PendingApprovalCard(props: PendingApprovalCardProps) {
           onPress={() => setExplanationOpen((open) => !open)}
         >
           <Text className="font-t3-bold text-xs text-foreground-secondary underline">
-            {FULL_ACCESS_OVERRIDE_QUESTION}
+            {fullAccessOverrideQuestion(t)}
           </Text>
           {explanationOpen ? (
             <Text className="mt-1 font-sans text-xs leading-normal text-foreground-muted">
-              {fullAccessOverrideExplanation(props.approval.fullAccessOverride)}
+              {fullAccessOverrideExplanation(props.approval.fullAccessOverride, t)}
             </Text>
           ) : null}
         </Pressable>

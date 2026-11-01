@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { EnvironmentId, ProjectId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -6,6 +7,8 @@ import type {
   SidebarProjectSnapshot,
 } from "../../sidebarProjectGrouping";
 import { resolveSettingsScope, validateSettingsScopeSearch } from "./settingsScope";
+
+const t = createI18n("en").getFixedT(null, "settings");
 
 const laptopId = EnvironmentId.make("laptop");
 const serverId = EnvironmentId.make("server");
@@ -65,7 +68,7 @@ describe("settings scope search", () => {
   it("retains an orphan checkout so it cannot turn into all environments", () => {
     const search = validateSettingsScopeSearch({ checkout: first.physicalProjectKey });
     expect(search).toEqual({ checkout: first.physicalProjectKey });
-    expect(resolveSettingsScope(search, groups, environments)).toMatchObject({
+    expect(resolveSettingsScope(search, groups, environments, t)).toMatchObject({
       kind: "unavailable",
       reason: "project-required",
       members: [],
@@ -76,7 +79,7 @@ describe("settings scope search", () => {
 
 describe("settings scope resolution", () => {
   it("keeps all physical members in a project aggregate, including several on one environment", () => {
-    expect(resolveSettingsScope({ project: "t3code" }, groups, environments)).toMatchObject({
+    expect(resolveSettingsScope({ project: "t3code" }, groups, environments, t)).toMatchObject({
       kind: "project",
       environmentId: null,
       members: [first, second, third],
@@ -90,6 +93,7 @@ describe("settings scope resolution", () => {
         { project: "t3code", checkout: second.physicalProjectKey },
         groups,
         environments,
+        t,
       ),
     ).toMatchObject({
       kind: "checkout",
@@ -110,7 +114,7 @@ describe("settings scope resolution", () => {
     { project: "other", checkout: first.physicalProjectKey },
     { project: "t3code", machine: serverId, checkout: first.physicalProjectKey },
   ])("never widens an invalid or stale target: %j", (search) => {
-    expect(resolveSettingsScope(search, groups, environments)).toMatchObject({
+    expect(resolveSettingsScope(search, groups, environments, t)).toMatchObject({
       kind: "unavailable",
       members: [],
       environmentIds: [],
@@ -123,26 +127,28 @@ describe("settings scope resolution", () => {
       machine: laptopId,
       checkout: first.physicalProjectKey,
     };
-    expect(resolveSettingsScope(search, groups, environments)).toMatchObject({
+    expect(resolveSettingsScope(search, groups, environments, t)).toMatchObject({
       kind: "checkout",
       members: [first],
     });
     expect(
-      resolveSettingsScope(search, [group("t3code", [second, third])], environments),
+      resolveSettingsScope(search, [group("t3code", [second, third])], environments, t),
     ).toMatchObject({ kind: "unavailable", members: [], environmentIds: [] });
   });
 
   it("does not select another environment after removing a project's last local checkout", () => {
     const search = { project: "t3code", machine: laptopId };
-    expect(resolveSettingsScope(search, groups, environments)).toMatchObject({
+    expect(resolveSettingsScope(search, groups, environments, t)).toMatchObject({
       kind: "project",
       members: [first, second],
     });
-    expect(resolveSettingsScope(search, [group("t3code", [third])], environments)).toMatchObject({
-      kind: "unavailable",
-      members: [],
-      environmentIds: [],
-    });
+    expect(resolveSettingsScope(search, [group("t3code", [third])], environments, t)).toMatchObject(
+      {
+        kind: "unavailable",
+        members: [],
+        environmentIds: [],
+      },
+    );
   });
 
   it("rejects a cached checkout whose environment was removed", () => {
@@ -151,6 +157,7 @@ describe("settings scope resolution", () => {
         { project: "t3code", checkout: third.physicalProjectKey },
         groups,
         environments.slice(0, 1),
+        t,
       ),
     ).toMatchObject({
       kind: "unavailable",

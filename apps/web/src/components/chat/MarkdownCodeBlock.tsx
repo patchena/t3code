@@ -2,6 +2,7 @@ import { Check, Copy } from "lucide";
 import { PlayIcon, WrapTextIcon } from "lucide-react";
 import { toHtml } from "hast-util-to-html";
 import React, { use, useEffect, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { getClientSettings } from "../../hooks/useSettings";
@@ -101,6 +102,7 @@ function MarkdownCodeBlockTitleContent({
   language: string;
   theme: "light" | "dark";
 }) {
+  const { t } = useTranslation("chat");
   if (fenceTitle) {
     return (
       <>
@@ -118,7 +120,10 @@ function MarkdownCodeBlockTitleContent({
     <Tooltip>
       <TooltipTrigger
         render={
-          <span className="inline-flex shrink-0 rounded-sm" aria-label={`Language: ${language}`} />
+          <span
+            className="inline-flex shrink-0 rounded-sm"
+            aria-label={t(($) => $.markdown.language, { language })}
+          />
         }
       >
         <PierreEntryIcon pathValue={fileName} kind="file" theme={theme} className="size-3.5" />
@@ -151,6 +156,7 @@ export function MarkdownCodeBlock({
   diagram?: boolean;
   children: ReactNode;
 }) {
+  const { t } = useTranslation("chat");
   const { copyToClipboard, isCopied: copied } = useCopyToClipboard({
     timeout: 1200,
     onError: (cause) =>
@@ -164,8 +170,8 @@ export function MarkdownCodeBlock({
       ),
   });
   const [wrapped, setWrapped] = useState(() => getClientSettings().wordWrap);
-  const wrapLabel = wrapped ? "Disable line wrap" : "Wrap lines";
-  const copyLabel = copied ? "Copied" : "Copy code";
+  const wrapLabel = wrapped ? t(($) => $.markdown.disableWrap) : t(($) => $.markdown.wrap);
+  const copyLabel = copied ? t(($) => $.ui.copied) : t(($) => $.markdown.copyCode);
   const command = code.trim();
   const canRun =
     onRunShellCommand !== undefined &&
@@ -219,7 +225,11 @@ export function MarkdownCodeBlock({
       wrapped={wrapped}
       headerProps={THREAD_FIND_IGNORE_PROPS}
       actions={
-        <span className="flex items-center gap-0.5" role="toolbar" aria-label="Code block actions">
+        <span
+          className="flex items-center gap-0.5"
+          role="toolbar"
+          aria-label={t(($) => $.markdown.codeActions)}
+        >
           {canWrap ? (
             <Tooltip>
               <TooltipTrigger
@@ -248,13 +258,13 @@ export function MarkdownCodeBlock({
                     variant="ghost-muted"
                     size="icon-xs"
                     onClick={() => onRunShellCommand(command)}
-                    aria-label="Run in terminal"
+                    aria-label={t(($) => $.markdown.run)}
                   />
                 }
               >
                 <PlayIcon className="size-3" />
               </TooltipTrigger>
-              <TooltipPopup side="top">Run in terminal</TooltipPopup>
+              <TooltipPopup side="top">{t(($) => $.markdown.run)}</TooltipPopup>
             </Tooltip>
           ) : null}
           {viewToggle}

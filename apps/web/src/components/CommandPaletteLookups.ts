@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   type ClientSettings,
   type EnvironmentId,
@@ -17,6 +18,7 @@ import { orderItemsByPreferredIds, sortLogicalProjectsForSidebar } from "./Sideb
 // source. Taking the source as an argument instead leaves the helper hook-free, and the
 // compiler then treats it as a plain function and caches nothing.
 export function useEnvironmentLookups() {
+  const { t } = useTranslation("workspace");
   const { environments } = useEnvironments();
   const environmentLabelById = new Map(
     environments.map((environment) => [environment.environmentId, environment.label] as const),
@@ -29,8 +31,13 @@ export function useEnvironmentLookups() {
         environment.environmentId,
         {
           kind: isLocal ? "local" : "remote",
-          label: isPrimary ? "Local" : isLocal ? `${environment.label} (Local)` : environment.label,
+          label: isPrimary
+            ? t(($) => $.palette.local)
+            : isLocal
+              ? t(($) => $.palette.localEnvironment, { environment: environment.label })
+              : environment.label,
           machine: resolveEnvironmentMachineKind(environment.serverConfig),
+          searchTerms: isLocal ? ["Local"] : [],
         },
       ] as const;
     }),
@@ -54,6 +61,7 @@ export const selectCommandPaletteClientSettings = (settings: ClientSettings) => 
 });
 
 export function useSortedProjectGroups(environmentLabelById: ReadonlyMap<EnvironmentId, string>) {
+  const { t: tCommon } = useTranslation("common");
   const projects = useProjects();
   const threads = useVisibleThreadShells();
   const projectOrder = useUiStateStore((store) => store.projectOrder);
@@ -72,12 +80,15 @@ export function useSortedProjectGroups(environmentLabelById: ReadonlyMap<Environ
       legacyProjectCwdPreferenceKey(project.workspaceRoot),
     ],
   });
-  const unsortedProjectGroups = buildSidebarProjectSnapshots({
-    projects: clientSettings.sidebarProjectSortOrder === "manual" ? orderedProjects : projects,
-    settings: projectGroupingSettings,
-    primaryEnvironmentId,
-    resolveEnvironmentLabel: (environmentId) => environmentLabelById.get(environmentId) ?? null,
-  });
+  const unsortedProjectGroups = buildSidebarProjectSnapshots(
+    {
+      projects: clientSettings.sidebarProjectSortOrder === "manual" ? orderedProjects : projects,
+      settings: projectGroupingSettings,
+      primaryEnvironmentId,
+      resolveEnvironmentLabel: (environmentId) => environmentLabelById.get(environmentId) ?? null,
+    },
+    tCommon,
+  );
   return sortLogicalProjectsForSidebar(
     unsortedProjectGroups,
     threads,

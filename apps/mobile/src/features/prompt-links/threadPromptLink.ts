@@ -2,6 +2,8 @@ import * as Dialog from "../../components/ui/Dialog";
 import type { NavigationState, PartialState } from "@react-navigation/native";
 import { EnvironmentId, ThreadId, type ScopedThreadRef } from "@t3tools/contracts";
 import { parseThreadLinkPrompt, type LinkedPrompt } from "@t3tools/shared/promptLinks";
+import { formatPromptLinkError } from "@t3tools/client-runtime/prompt-links";
+import { mobileI18n } from "~/i18n";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
 
@@ -57,7 +59,10 @@ export function takeThreadPromptLink(
   if (environmentId === null || threadId === null) return nextState;
   const parsed = parseThreadLinkPrompt(search);
   if (!parsed.ok) {
-    Dialog.alert("Could not open link", parsed.error);
+    Dialog.alert(
+      "Could not open link",
+      formatPromptLinkError(parsed.error, mobileI18n.getFixedT(null, "chat")),
+    );
     return nextState;
   }
   if (parsed.value !== null) {

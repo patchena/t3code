@@ -15,6 +15,8 @@ import { REASONING_EFFORT_OPTION_IDS } from "@t3tools/client-runtime/state/threa
 import { getModelSelectionStringOptionValue, resolveSelectableModel } from "@t3tools/shared/model";
 import { getTraitsSpeedDisplay, TraitsSpeedIcon } from "./TraitsSpeed";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { threadRelationshipStatusLabel } from "./ThreadRelationshipIcon";
 import {
   BotIcon,
   CheckIcon,
@@ -50,6 +52,8 @@ export function SubagentTooltipContent(props: {
   result?: string | null | undefined;
   progress?: string | null | undefined;
 }) {
+  const { t } = useTranslation("activity");
+  const { t: tChat } = useTranslation("chat");
   const childSelection =
     props.modelSelection ??
     (props.origin === "app_owned" ? props.childThread?.modelSelection : undefined);
@@ -57,7 +61,7 @@ export function SubagentTooltipContent(props: {
     modelLabel,
     modelSlug,
     workspace: metadata,
-  } = resolveSubagentMetadata({ ...props, modelSelection: childSelection });
+  } = resolveSubagentMetadata({ ...props, modelSelection: childSelection }, t);
   const preview = subagentDetailPreview(props);
   const providerModel = props.provider?.models.find((candidate) => candidate.slug === modelSlug);
   const childModel = props.provider
@@ -84,10 +88,14 @@ export function SubagentTooltipContent(props: {
             descriptor.type === "boolean" &&
             typeof saved?.value === "boolean"
           ) {
-            return getTraitsSpeedDisplay(provider.driver, {
-              ...descriptor,
-              currentValue: saved.value,
-            });
+            return getTraitsSpeedDisplay(
+              provider.driver,
+              {
+                ...descriptor,
+                currentValue: saved.value,
+              },
+              tChat,
+            );
           }
           if (
             provider.driver === "codex" &&
@@ -96,10 +104,14 @@ export function SubagentTooltipContent(props: {
             typeof saved?.value === "string" &&
             descriptor.options.some((option) => option.id === saved.value)
           ) {
-            return getTraitsSpeedDisplay(provider.driver, {
-              ...descriptor,
-              currentValue: saved.value,
-            });
+            return getTraitsSpeedDisplay(
+              provider.driver,
+              {
+                ...descriptor,
+                currentValue: saved.value,
+              },
+              tChat,
+            );
           }
           return null;
         })
@@ -164,14 +176,14 @@ export function SubagentTooltipContent(props: {
           )}
         >
           <StatusIcon aria-hidden className="size-3 shrink-0" />
-          {props.status.replaceAll("_", " ")}
+          {threadRelationshipStatusLabel(props.status, t)}
         </span>
         {props.elapsed}
       </div>
-      {metadata.map(({ label, value }) => {
-        const Icon = label === "Branch" ? GitBranchIcon : FolderIcon;
+      {metadata.map(({ kind, label, value }) => {
+        const Icon = kind === "branch" ? GitBranchIcon : FolderIcon;
         return (
-          <div key={label} className="flex min-w-0 items-center gap-2">
+          <div key={kind} className="flex min-w-0 items-center gap-2">
             <Icon aria-hidden className="size-3 shrink-0" />
             <span className="sr-only">{label}</span>
             <MiddleTruncate value={value} className="flex" showTitle={false} />

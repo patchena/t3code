@@ -1,15 +1,17 @@
+import { useTranslation } from "react-i18next";
+import {
+  formatDayShort,
+  formatHourShort,
+  formatRelativeHourShort,
+} from "~/components/usage/usagePresentation";
+import { interfaceDateLocale } from "~/timestampFormat";
+import { useClientSettings } from "~/hooks/useSettings";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import type { UsageProviderKind } from "@t3tools/contracts";
 import { useLayoutEffect, useRef, useState } from "react";
 
 import type { DailyTotals, HourlyTotals } from "@t3tools/shared/usageMerge";
-import {
-  formatDayShort,
-  formatHourShort,
-  formatRelativeHourShort,
-  formatTokens,
-  formatUsd,
-} from "@t3tools/shared/usageFormat";
+import { formatTokens, formatUsd } from "@t3tools/shared/usageFormat";
 import { cn } from "~/lib/utils";
 import { PROVIDER_ORDER, PROVIDER_PRESENTATION } from "./usageProviders";
 import { observeResize } from "~/lib/observeResize";
@@ -236,6 +238,7 @@ function UsageChartTooltip({
   readonly loadingProviders: ReadonlySet<UsageProviderKind>;
   readonly format: (value: number) => string;
 }) {
+  const { t } = useTranslation("files");
   const partial = providers.some((provider) => loadingProviders.has(provider));
   return (
     <div
@@ -271,7 +274,7 @@ function UsageChartTooltip({
         );
       })}
       <div className="mt-1 flex items-center justify-between gap-3 border-t border-border pt-1">
-        <span className="text-muted-foreground">Total</span>
+        <span className="text-muted-foreground">{t(($) => $.usage.total)}</span>
         <span className={cn("tabular-nums", partial ? "text-muted-foreground" : "text-foreground")}>
           {format(column?.total ?? 0)}
         </span>
@@ -418,6 +421,8 @@ export function UsageProviderChart({
   timeZone,
   hour12,
 }: UsageProviderChartProps) {
+  const { t } = useTranslation("files");
+  const locale = interfaceDateLocale(useClientSettings((settings) => settings.interfaceLanguage));
   const periods = resolution === "hour" ? hours : days;
   const totals: readonly (DailyTotals | HourlyTotals)[] = resolution === "hour" ? hourly : daily;
   const byPeriod = new Map(
@@ -436,10 +441,12 @@ export function UsageProviderChart({
     cn("transition-opacity", loading && "opacity-40 delay-150");
   const format = metric === "tokens" ? formatTokens : formatUsd;
   const formatPeriod = (period: string) =>
-    resolution === "hour" ? formatHourShort(period, timeZone, hour12) : formatDayShort(period);
+    resolution === "hour"
+      ? formatHourShort(period, timeZone, hour12, locale)
+      : formatDayShort(period, locale);
   const formatTooltipPeriod = (period: string) =>
     resolution === "hour" && referenceTime !== undefined
-      ? formatRelativeHourShort(period, referenceTime, timeZone, hour12)
+      ? formatRelativeHourShort(period, referenceTime, timeZone, hour12, locale, t)
       : formatPeriod(period);
 
   return (
@@ -467,7 +474,15 @@ export function UsageProviderChart({
           loadingProviders={loadingProviders}
           format={format}
           formatTooltipPeriod={formatTooltipPeriod}
-          ariaLabel={`${resolution === "hour" ? "Hourly" : "Daily"} ${metric === "tokens" ? "processed tokens" : "cost"} by provider`}
+          ariaLabel={
+            resolution === "hour"
+              ? metric === "tokens"
+                ? t(($) => $.usage.hourlyTokensByProvider)
+                : t(($) => $.usage.hourlyCostByProvider)
+              : metric === "tokens"
+                ? t(($) => $.usage.dailyTokensByProvider)
+                : t(($) => $.usage.dailyCostByProvider)
+          }
         >
           {scale.ticks.map((tick) => {
             const y = toY(tick);

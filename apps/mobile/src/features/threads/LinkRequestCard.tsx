@@ -39,6 +39,9 @@ import { SettingsSection } from "../settings/components/SettingsSection";
 import { Button } from "../../components/ui/Button";
 import { Sheet } from "../../components/ui/Sheet";
 import { RUNTIME_MODE_CHOICES } from "./thread-settings-options";
+import { mobileI18n } from "~/i18n";
+
+const t = mobileI18n.getFixedT("en", "chat");
 
 /** The same five levels as web's access picker: read-only, then the runtime modes. */
 const ACCESS_CHOICES: ReadonlyArray<{
@@ -77,7 +80,7 @@ export function LinkRequestCard(props: {
 }) {
   const { item, visibility } = props.projectedItem;
   if (item.type !== "link_request") return null;
-  const display = linkRequestDisplay(item, visibility, accessLabel);
+  const display = linkRequestDisplay(item, visibility, accessLabel, t);
   if (display.kind === "pending") {
     return <PendingLinkRequest environmentId={props.environmentId} item={item} />;
   }
@@ -115,7 +118,7 @@ function PendingLinkRequest(props: {
   const canAnswer = useAtomValue(
     peerLinkEnvironment.answerRequest.permissionAtom(props.environmentId),
   );
-  const target = linkRequestTargetName(item);
+  const target = linkRequestTargetName(item, t);
 
   const decline = async () => {
     const input = linkRequestAnswerInput(item, { type: "decline" });
@@ -126,7 +129,11 @@ function PendingLinkRequest(props: {
       setDeclining(false),
     );
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      pipe(squashAtomCommandFailure(result), linkRequestFailureMessage, setError);
+      pipe(
+        squashAtomCommandFailure(result),
+        (failure) => linkRequestFailureMessage(failure, t),
+        setError,
+      );
     }
   };
 
@@ -219,7 +226,7 @@ function resolveTarget(
   return {
     kind: "machine",
     environmentId: machine?.environmentId ?? (chosen as EnvironmentId),
-    label: machine?.label ?? linkRequestTargetName(item),
+    label: machine?.label ?? linkRequestTargetName(item, t),
     urls: [...new Set([...(machine?.urls ?? []), ...(item.url === undefined ? [] : [item.url])])],
     linked: machine?.linked ?? false,
   };
@@ -252,7 +259,7 @@ function LinkRequestSheet(props: {
   });
   const selected = choice ?? linkRequestInitialMachine(item, machines);
   const target = resolveTarget(item, machines, selected);
-  const targetName = target.kind === "machine" ? target.label : linkRequestTargetName(item);
+  const targetName = target.kind === "machine" ? target.label : linkRequestTargetName(item, t);
   // This phone can mint a code there when it is connected to that environment
   // with a session that may create pairing links.
   const targetId = target.kind === "machine" ? target.environmentId : null;
@@ -281,7 +288,7 @@ function LinkRequestSheet(props: {
       const minted = await mintPairingCodeOn(targetId, access);
       if (Result.isFailure(minted)) {
         setMintFailed((failed) => new Set(failed).add(targetId));
-        setError(linkRequestFailureMessage(minted.failure));
+        setError(linkRequestFailureMessage(minted.failure, t));
         return null;
       }
       code = minted.success;
@@ -312,7 +319,11 @@ function LinkRequestSheet(props: {
       setPairingCode("");
       props.onClose();
     } else if (!isAtomCommandInterrupted(result)) {
-      pipe(squashAtomCommandFailure(result), linkRequestFailureMessage, setError);
+      pipe(
+        squashAtomCommandFailure(result),
+        (failure) => linkRequestFailureMessage(failure, t),
+        setError,
+      );
     }
   };
 

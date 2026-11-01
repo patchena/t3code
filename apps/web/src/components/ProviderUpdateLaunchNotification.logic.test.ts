@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it } from "vite-plus/test";
 import {
   EnvironmentId,
@@ -17,6 +18,8 @@ import {
   isProviderSettingsUpdateCandidate,
   type ProviderUpdateCandidate,
 } from "./ProviderUpdateLaunchNotification.logic";
+
+const tWorkspace = createI18n("en").getFixedT(null, "workspace");
 
 const checkedAt = "2026-04-23T10:00:00.000Z";
 const sessionStartedAt = "2026-04-23T09:59:00.000Z";
@@ -147,20 +150,23 @@ describe("provider update launch notification logic", () => {
   });
 
   it("shows the active sidebar pill for an update on a non-default instance", () => {
-    const view = getProviderUpdateSidebarPillView([
-      provider({ driver: driver("claudeAgent") }),
-      provider({
-        driver: driver("claudeAgent"),
-        instanceId: instanceId("claude_work"),
-        updateState: {
-          status: "running",
-          startedAt: checkedAt,
-          finishedAt: null,
-          message: "Updating provider.",
-          output: null,
-        },
-      }),
-    ]);
+    const view = getProviderUpdateSidebarPillView(
+      [
+        provider({ driver: driver("claudeAgent") }),
+        provider({
+          driver: driver("claudeAgent"),
+          instanceId: instanceId("claude_work"),
+          updateState: {
+            status: "running",
+            startedAt: checkedAt,
+            finishedAt: null,
+            message: "Updating provider.",
+            output: null,
+          },
+        }),
+      ],
+      tWorkspace,
+    );
 
     expect(view).toMatchObject({
       key: "loading:claudeAgent:running",
@@ -198,6 +204,7 @@ describe("provider update launch notification logic", () => {
           },
         }),
       ],
+      tWorkspace,
       { visibleAfterIso: sessionStartedAt },
     );
 
@@ -223,6 +230,7 @@ describe("provider update launch notification logic", () => {
             },
           }),
         ],
+        tWorkspace,
         { visibleAfterIso: "2026-04-23T10:00:01.000Z" },
       ),
     ).toBeNull();
@@ -255,7 +263,7 @@ describe("provider update launch notification logic", () => {
       }),
     ] satisfies ReadonlyArray<ServerProvider>;
 
-    const successView = getProviderUpdateSidebarPillView(providers, {
+    const successView = getProviderUpdateSidebarPillView(providers, tWorkspace, {
       visibleAfterIso: sessionStartedAt,
     });
     expect(successView).toMatchObject({
@@ -264,7 +272,7 @@ describe("provider update launch notification logic", () => {
       title: "Codex updated: v1.2.0",
     });
 
-    const failureView = getProviderUpdateSidebarPillView(providers, {
+    const failureView = getProviderUpdateSidebarPillView(providers, tWorkspace, {
       visibleAfterIso: sessionStartedAt,
       dismissedKeys: new Set(["succeeded:codex:2026-04-23T10:01:00.000Z:Provider updated."]),
     });
@@ -319,34 +327,37 @@ describe("getProviderUpdateRunToastView", () => {
   });
 
   it("lists every failed update and ignores interrupted ones", () => {
-    const view = getProviderUpdateRunToastView([
-      run(
-        "Mac Studio",
-        "codex",
-        AsyncResult.success({
-          providers: [
-            provider({
-              driver: driver("codex"),
-              updateState: updateState("succeeded", "Provider updated."),
-            }),
-          ],
-        }),
-      ),
-      run(
-        "Mac Studio",
-        "claudeAgent",
-        AsyncResult.success({
-          providers: [
-            provider({
-              driver: driver("claudeAgent"),
-              updateState: updateState("failed", "npm exited with code 1."),
-            }),
-          ],
-        }),
-      ),
-      run("Laptop", "codex", AsyncResult.failure(Cause.die(new Error("WebSocket closed")))),
-      run("Server", "codex", AsyncResult.failure(Cause.interrupt())),
-    ]);
+    const view = getProviderUpdateRunToastView(
+      [
+        run(
+          "Mac Studio",
+          "codex",
+          AsyncResult.success({
+            providers: [
+              provider({
+                driver: driver("codex"),
+                updateState: updateState("succeeded", "Provider updated."),
+              }),
+            ],
+          }),
+        ),
+        run(
+          "Mac Studio",
+          "claudeAgent",
+          AsyncResult.success({
+            providers: [
+              provider({
+                driver: driver("claudeAgent"),
+                updateState: updateState("failed", "npm exited with code 1."),
+              }),
+            ],
+          }),
+        ),
+        run("Laptop", "codex", AsyncResult.failure(Cause.die(new Error("WebSocket closed")))),
+        run("Server", "codex", AsyncResult.failure(Cause.interrupt())),
+      ],
+      tWorkspace,
+    );
 
     expect(view).toEqual({
       type: "error",

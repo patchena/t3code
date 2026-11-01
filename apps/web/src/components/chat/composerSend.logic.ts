@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { EnvironmentId, ThreadContextRecord } from "@t3tools/contracts";
 import { collectInlineContextIds } from "../../lib/composerContextReferences";
 
@@ -12,15 +13,18 @@ export function referencedThreadContexts(draft: {
 }
 
 /** Why a send waits for the user to pick a machine when no machine was chosen automatically. */
-export function loadBalancingSendWarning(input: {
-  readonly pending: boolean;
-  readonly threadContexts: ReadonlyArray<ThreadContextRecord>;
-  readonly candidateEnvironmentIds: ReadonlyArray<EnvironmentId>;
-}) {
+export function loadBalancingSendWarning(
+  input: {
+    readonly pending: boolean;
+    readonly threadContexts: ReadonlyArray<ThreadContextRecord>;
+    readonly candidateEnvironmentIds: ReadonlyArray<EnvironmentId>;
+  },
+  t: TFunction<"chat">,
+) {
   if (input.pending) {
     return {
-      title: "Checking machine resources",
-      description: "Resource checks are still running. You can choose a machine in the composer.",
+      title: t(($) => $.composer.checkingResources),
+      description: t(($) => $.composer.resourceChecksRunning),
     };
   }
   const noMachineReadsEveryThread =
@@ -29,10 +33,10 @@ export function loadBalancingSendWarning(input: {
       input.threadContexts.every((record) => record.environmentId === environmentId),
     );
   return {
-    title: "Choose a machine to continue",
+    title: t(($) => $.composer.chooseMachineContinue),
     description: noMachineReadsEveryThread
-      ? "No machine can read every attached thread. Choose a machine in the composer or remove the threads."
-      : "No eligible machine has available resources. Choose a machine in the composer to override.",
+      ? t(($) => $.composer.noMachineReadsThreads)
+      : t(($) => $.composer.noMachineResources),
   };
 }
 
@@ -60,22 +64,25 @@ export function multipleModelSendBlock(input: {
 }
 
 /** Why a message sent over pending approvals did not go out, or null to stop quietly. */
-export function approvalRedirectNotice(input: {
-  readonly draftChanged: boolean;
-  readonly declined: boolean;
-  readonly approvalResponding: boolean;
-  readonly approvalArrived: boolean;
-}): string | null {
+export function approvalRedirectNotice(
+  input: {
+    readonly draftChanged: boolean;
+    readonly declined: boolean;
+    readonly approvalResponding: boolean;
+    readonly approvalArrived: boolean;
+  },
+  t: TFunction<"chat">,
+): string | null {
   if (input.draftChanged) {
     return input.declined
-      ? "Approval declined. Your message changed, so it wasn't sent."
-      : "Your message changed, so it wasn't sent.";
+      ? t(($) => $.composer.approvalDeclinedMessageChanged)
+      : t(($) => $.composer.messageChangedNotSent);
   }
   if (input.approvalResponding) {
-    return "An approval is already being answered, so your message wasn't sent.";
+    return t(($) => $.composer.approvalRespondingNotSent);
   }
   if (input.declined && input.approvalArrived) {
-    return "Another approval arrived, so your message wasn't sent.";
+    return t(($) => $.composer.anotherApprovalNotSent);
   }
   return null;
 }

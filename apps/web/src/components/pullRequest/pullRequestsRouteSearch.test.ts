@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { describe, expect, it } from "vite-plus/test";
 
-import { Route as PullRequestsRoute } from "../../routes/_chat.pull-requests";
+import { Route as PullRequestsRoute } from "~/routes/_chat.pull-requests";
 
 function matchedSearch(url: string) {
   const root = createRootRoute();

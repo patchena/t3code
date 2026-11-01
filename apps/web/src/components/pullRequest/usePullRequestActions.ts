@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import {
@@ -37,14 +39,17 @@ import { usePreparePullRequestThreadAction } from "~/state/sourceControlActions"
 import type { ReviewCommentContext } from "~/reviewCommentContext";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 
-import { toastManager } from "../ui/toast";
-import { offHeadPullRequestCheckoutToast } from "./pullRequestCheckoutToast";
+import { toastManager } from "~/components/ui/toast";
+import { offHeadPullRequestCheckoutToast } from "~/components/pullRequest/pullRequestCheckoutToast";
 import {
   checkoutFailureDescription,
   appendHandoff,
   readableFailure,
-} from "./pullRequestDetail.logic";
-import { pullRequestEntryKey, type EnvironmentPullRequestEntry } from "./pullRequestList.logic";
+} from "~/components/pullRequest/pullRequestDetail.logic";
+import {
+  pullRequestEntryKey,
+  type EnvironmentPullRequestEntry,
+} from "~/components/pullRequest/pullRequestList.logic";
 
 export function usePullRequestDefaultMergeMethodResolver(
   environmentId: EnvironmentId,
@@ -76,52 +81,55 @@ export function usePullRequestDefaultMergeMethodResolver(
   };
 }
 
-const actionSuccessLabels = (term: string): Record<PullRequestAction, string> => ({
-  merge: "Merge requested",
-  ready: "Marked ready for review",
-  draft: "Converted to draft",
-  close: `${capitalizeTerm(term)} closed`,
-  reopen: `${capitalizeTerm(term)} reopened`,
-  "update-branch": "Branch updated with the base branch",
-  "enable-auto-merge": "Auto-merge enabled",
-  "disable-auto-merge": "Auto-merge disabled",
-  revert: `Revert ${term} opened`,
-  "delete-branch": "Branch deleted",
-  "approve-workflows": "Workflows approved",
+const actionSuccessLabels = (
+  term: string,
+  t: TFunction<"workspace">,
+): Record<PullRequestAction, string> => ({
+  merge: t(($) => $.git.mergeRequested),
+  ready: t(($) => $.git.markedReady),
+  draft: t(($) => $.git.convertedToDraft),
+  close: t(($) => $.git.requestClosed, { term: capitalizeTerm(term) }),
+  reopen: t(($) => $.git.requestReopened, { term: capitalizeTerm(term) }),
+  "update-branch": t(($) => $.git.branchUpdated),
+  "enable-auto-merge": t(($) => $.git.autoMergeEnabled),
+  "disable-auto-merge": t(($) => $.git.autoMergeDisabled),
+  revert: t(($) => $.git.revertRequestOpened, { term: term }),
+  "delete-branch": t(($) => $.git.branchDeleted),
+  "approve-workflows": t(($) => $.git.workflowsApproved),
 });
 
-const actionFailureLabels = (term: string): Record<PullRequestAction, string> => ({
-  merge: `Could not merge this ${term}`,
-  ready: "Could not mark this ready for review",
-  draft: "Could not convert this to a draft",
-  close: `Could not close this ${term}`,
-  reopen: `Could not reopen this ${term}`,
-  "update-branch": "Could not update this branch",
-  "enable-auto-merge": "Could not enable auto-merge",
-  "disable-auto-merge": "Could not disable auto-merge",
-  revert: `Could not open a revert ${term}`,
-  "delete-branch": "Could not delete this branch",
-  "approve-workflows": "Could not approve workflows",
+const actionFailureLabels = (
+  term: string,
+  t: TFunction<"workspace">,
+): Record<PullRequestAction, string> => ({
+  merge: t(($) => $.git.mergeRequestFailed, { term: term }),
+  ready: t(($) => $.git.readyFailed),
+  draft: t(($) => $.git.draftConversionFailed),
+  close: t(($) => $.git.closeRequestFailed, { term: term }),
+  reopen: t(($) => $.git.reopenRequestFailed, { term: term }),
+  "update-branch": t(($) => $.git.branchUpdateFailed),
+  "enable-auto-merge": t(($) => $.git.enableAutoMergeFailed),
+  "disable-auto-merge": t(($) => $.git.disableAutoMergeFailed),
+  revert: t(($) => $.git.revertRequestFailed, { term: term }),
+  "delete-branch": t(($) => $.git.branchDeleteFailed),
+  "approve-workflows": t(($) => $.git.workflowApprovalFailed),
 });
 
-const actionFailureHints = (term: string): Record<PullRequestAction, string> => ({
-  merge:
-    "The host refused the merge. Check that you have write access, that the checks it requires have passed, and that the branch is not conflicting.",
-  ready: "The host refused it. Check that you have write access to this repository.",
-  draft: "The host refused it. Check that you have write access to this repository.",
-  close: "The host refused it. Check that you have write access, or that you opened it.",
-  reopen:
-    "The host refused it. Check that you have write access, and that the branch still exists.",
-  "update-branch":
-    "The host refused it. Check that you have write access, and that the base branch has not diverged in a way the host cannot merge.",
-  "enable-auto-merge":
-    "The host refused it. Check that auto-merge is enabled for this repository and that you have write access.",
-  "disable-auto-merge": "The host refused it. Check that you have write access to this repository.",
-  revert: `The host refused it. Check that you have write access and that this ${term} was merged on the host.`,
-  "delete-branch":
-    "The host refused it. Check that you have write access to the source repository and that the branch has not moved since this page loaded.",
-  "approve-workflows":
-    "The host refused it. Check that you have Actions write access and that these workflow runs are still awaiting approval.",
+const actionFailureHints = (
+  term: string,
+  t: TFunction<"workspace">,
+): Record<PullRequestAction, string> => ({
+  merge: t(($) => $.git.mergeRefused),
+  ready: t(($) => $.git.writeAccessRequired),
+  draft: t(($) => $.git.writeAccessRequired),
+  close: t(($) => $.git.writeOrAuthorRequired),
+  reopen: t(($) => $.git.branchAccessRequired),
+  "update-branch": t(($) => $.git.baseDivergedRefused),
+  "enable-auto-merge": t(($) => $.git.autoMergeAccessRequired),
+  "disable-auto-merge": t(($) => $.git.writeAccessRequired),
+  revert: t(($) => $.git.revertRefused, { term: term }),
+  "delete-branch": t(($) => $.git.branchMovedRefused),
+  "approve-workflows": t(($) => $.git.workflowApprovalRefused),
 });
 
 export function usePullRequestActionRunner({
@@ -138,6 +146,7 @@ export function usePullRequestActionRunner({
   /** Resolve repository settings on click to avoid per-row reads. */
   resolveMergeMethod?: (detail: PullRequestDetail) => PullRequestMergeMethod;
 }) {
+  const { t } = useTranslation("workspace");
   const runAction = useAtomCommand(pullRequestEnvironment.runAction, {
     reportFailure: false,
   });
@@ -171,15 +180,18 @@ export function usePullRequestActionRunner({
     if (result._tag === "Failure") {
       toastManager.add({
         type: "error",
-        title: actionFailureLabels(terminology.singular)[action],
+        title: actionFailureLabels(terminology.singular, t)[action],
         description: readableFailure(
           squashAtomCommandFailure(result),
-          actionFailureHints(terminology.singular)[action],
+          actionFailureHints(terminology.singular, t)[action],
         ),
       });
       return;
     }
-    toastManager.add({ type: "success", title: actionSuccessLabels(terminology.singular)[action] });
+    toastManager.add({
+      type: "success",
+      title: actionSuccessLabels(terminology.singular, t)[action],
+    });
     onSuccess?.(action, result.value);
   };
 
@@ -189,6 +201,7 @@ export function usePullRequestActionRunner({
 export function usePullRequestCloseBatch(
   onClosed: (entry: EnvironmentPullRequestEntry, reply: PullRequestSummary | undefined) => void,
 ) {
+  const { t } = useTranslation("workspace");
   const runAction = useAtomCommand(pullRequestEnvironment.runAction, { reportFailure: false });
   const pending = useRef(new Set<string>());
   const [closingKeys, setClosingKeys] = useState<ReadonlySet<string>>(() => new Set());
@@ -218,7 +231,7 @@ export function usePullRequestCloseBatch(
         setClosingKeys(new Set(pending.current));
         if (result._tag === "Failure") {
           failures.push(
-            `#${entry.number}: ${readableFailure(squashAtomCommandFailure(result), actionFailureHints(sourceControlClients.get(entry.provider).changeRequest.singular).close)}`,
+            `#${entry.number}: ${readableFailure(squashAtomCommandFailure(result), actionFailureHints(sourceControlClients.get(entry.provider).changeRequest.singular, t).close)}`,
           );
           return;
         }
@@ -231,8 +244,8 @@ export function usePullRequestCloseBatch(
       type: failures.length > 0 ? "error" : "success",
       title:
         failures.length > 0
-          ? `Closed ${closed} of ${batch.length} pull requests`
-          : `Closed ${closed} pull request${closed === 1 ? "" : "s"}`,
+          ? t(($) => $.git.closedBatch, { count: closed, total: batch.length })
+          : t(($) => $.git.closedRequestCount, { count: closed }),
       ...(failures.length > 0 ? { description: failures.slice(0, 3).join("\n") } : {}),
     });
   };
@@ -270,6 +283,7 @@ export function usePullRequestHandoffs({
   environmentId: EnvironmentId;
   detail: PullRequestHandoffDetail | null;
 }) {
+  const { t } = useTranslation("workspace");
   const newThread = useNewThreadHandler();
   const prepareThread = usePreparePullRequestThreadAction({
     environmentId,
@@ -310,18 +324,18 @@ export function usePullRequestHandoffs({
     if (opened === null) {
       toastManager.add({
         type: "error",
-        title: "Could not open a thread",
-        description: "Try again from the project, or open a thread first.",
+        title: t(($) => $.git.openThreadFailed),
+        description: t(($) => $.git.openThreadRetry),
       });
       return;
     }
     toastManager.add({
       type: "success",
-      title: "Asked in a thread",
+      title: t(($) => $.git.askedInThread),
       description:
         task.prompt.length > 0
-          ? "The question is in the composer. Read it over, then send."
-          : `The ${terminology.singular} is in the composer. Type your question, then send.`,
+          ? t(($) => $.git.questionInComposer)
+          : t(($) => $.git.requestInComposer, { term: terminology.singular }),
     });
   };
 
@@ -335,7 +349,7 @@ export function usePullRequestHandoffs({
     // Explicit timeouts survive toast updates and would pin the result after loading.
     const toastId = toastManager.add({
       type: "loading",
-      title: `Preparing the ${terminology.singular} checkout...`,
+      title: t(($) => $.git.preparingRequestCheckout, { term: terminology.singular }),
     });
     const projectRef = scopeProjectRef(environmentId, detail.projectId);
     // Checkout setup requires the thread to exist first.
@@ -347,8 +361,8 @@ export function usePullRequestHandoffs({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: "Could not open a thread for the checkout",
-        description: "Try again from the project, or open a thread first.",
+        title: t(($) => $.git.checkoutThreadFailed),
+        description: t(($) => $.git.openThreadRetry),
       });
       return;
     }
@@ -361,9 +375,10 @@ export function usePullRequestHandoffs({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: `Could not prepare the ${terminology.singular} checkout`,
+        title: t(($) => $.git.prepareRequestCheckoutFailed, { term: terminology.singular }),
         description: checkoutFailureDescription(
           isAtomCommandInterrupted(prepared) ? undefined : squashAtomCommandFailure(prepared),
+          t,
         ),
       });
       return;
@@ -380,8 +395,8 @@ export function usePullRequestHandoffs({
       setHandoff(null);
       toastManager.update(toastId, {
         type: "error",
-        title: "Checked out, but the thread stayed where it was",
-        description: `The checkout is ready on \`${prepared.value.branch}\`. Point a thread at it from the branch picker, then ask again.`,
+        title: t(($) => $.git.checkoutThreadUnchanged),
+        description: t(($) => $.git.checkoutReadyOnBranch, { branch: prepared.value.branch }),
       });
       return;
     }
@@ -392,13 +407,13 @@ export function usePullRequestHandoffs({
         prepared.value.isOnPullRequestHead
           ? {
               type: "success",
-              title: mode === "local" ? "Checked out here" : "Checked out",
+              title: mode === "local" ? t(($) => $.git.checkedOutHere) : t(($) => $.git.checkedOut),
               description:
                 mode === "local"
-                  ? `This repository is on the ${terminology.singular}'s branch, with a thread open on it.`
-                  : `The ${terminology.singular} is in its own worktree, with a thread open on it.`,
+                  ? t(($) => $.git.requestCheckedOutHere, { term: terminology.singular })
+                  : t(($) => $.git.requestCheckedOutWorktree, { term: terminology.singular }),
             }
-          : offHeadPullRequestCheckoutToast(terminology),
+          : offHeadPullRequestCheckoutToast(terminology, t),
       );
       return;
     }
@@ -408,10 +423,10 @@ export function usePullRequestHandoffs({
       prepared.value.isOnPullRequestHead
         ? {
             type: "success",
-            title: "Checkout ready",
-            description: "The task is in the composer. Read it over, then send.",
+            title: t(($) => $.git.checkoutReady),
+            description: t(($) => $.git.taskInComposer),
           }
-        : offHeadPullRequestCheckoutToast(terminology),
+        : offHeadPullRequestCheckoutToast(terminology, t),
     );
   };
 

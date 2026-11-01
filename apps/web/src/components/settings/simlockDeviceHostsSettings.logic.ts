@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   SimlockDeviceHostConfig,
   type EnvironmentId,
@@ -32,21 +33,26 @@ export function updateSimlockDeviceHosts(
 }
 
 /** Why the shared fields keep a draft from saving, or null; tokens are checked per environment. */
-export function simlockDeviceHostProblem(host: SimlockDeviceHostConfigType): string | null {
+export function simlockDeviceHostProblem(
+  host: SimlockDeviceHostConfigType,
+  t: TFunction<"settings">,
+): string | null {
   const withToken = { ...host, agentToken: "token" };
   if (Option.isSome(parseSimlockDeviceHostDraft(withToken))) return null;
-  if (!host.label.trim()) return "Give the host a label.";
+  if (!host.label.trim()) return t(($) => $.providers.hostLabelRequired);
   // With in-range limits, a draft that still fails has a bad gateway URL.
   return Option.isNone(
     parseSimlockDeviceHostDraft({ ...withToken, maxLeases: 1, maxLeaseMinutes: 60 }),
   )
-    ? "Enter the gateway's origin, such as https://gateway.example.ts.net:4700."
-    : "Keep the limits within the ranges shown.";
+    ? t(($) => $.providers.gatewayOrigin)
+    : t(($) => $.providers.limitsRanges);
 }
 
-export function simlockLeaseLimits(host: SimlockDeviceHostConfigType) {
-  const devices = host.maxLeases === 1 ? "1 device" : `${host.maxLeases} devices`;
-  return `Up to ${devices} at once, each released after ${host.maxLeaseMinutes} min`;
+export function simlockLeaseLimits(host: SimlockDeviceHostConfigType, t: TFunction<"settings">) {
+  return t(($) => $.providers.simlockLimits, {
+    count: host.maxLeases,
+    minutes: host.maxLeaseMinutes,
+  });
 }
 
 export interface SimlockHostEnvironment {
@@ -69,6 +75,7 @@ export function planSimlockDeviceHostSave(
   environments: ReadonlyArray<SimlockHostEnvironment>,
   draft: SimlockDeviceHostConfigType,
   tokens: ReadonlyMap<EnvironmentId, SimlockTokenEntry>,
+  t: TFunction<"settings">,
 ):
   | { readonly problem: string }
   | {
@@ -77,7 +84,7 @@ export function planSimlockDeviceHostSave(
         hosts: ReadonlyArray<SimlockDeviceHostConfigType>;
       }>;
     } {
-  const shared = simlockDeviceHostProblem(draft);
+  const shared = simlockDeviceHostProblem(draft, t);
   if (shared) return { problem: shared };
   const patches = [];
   for (const environment of environments) {

@@ -1,4 +1,5 @@
 import { buildProjectGroups } from "@t3tools/client-runtime/state/project-grouping";
+import { mobileI18n } from "~/i18n";
 import type {
   EnvironmentProject,
   EnvironmentThreadShell,
@@ -50,14 +51,17 @@ export function buildHomeProjectScopes(input: {
   const projects = input.projects.filter(
     (project) => input.environmentId === null || project.environmentId === input.environmentId,
   );
-  return buildProjectGroups({
-    projects,
-    groupScratchProjects: true,
-    settings: {
-      sidebarProjectGroupingMode: input.projectGroupingMode,
-      sidebarProjectGroupingOverrides: {},
+  return buildProjectGroups(
+    {
+      projects,
+      groupScratchProjects: true,
+      settings: {
+        sidebarProjectGroupingMode: input.projectGroupingMode,
+        sidebarProjectGroupingOverrides: {},
+      },
     },
-  }).map((group) => {
+    mobileI18n.getFixedT(null, "common"),
+  ).map((group) => {
     return {
       key: group.key,
       title: group.label,

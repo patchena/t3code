@@ -1,4 +1,20 @@
-# Appearance and themes
+# Language and appearance
+
+## Interface language
+
+On web and desktop, open **Settings → General → Sprache / Language** and choose **English** or
+**Deutsch**. English is the default regardless of your system language. Resetting this preference
+restores English.
+
+The choice is saved separately on each device or browser and stays the same when you switch
+environments. Switching language preserves your thread, draft, and sign-in session. Reopen an
+account dialog after switching to refresh its T3 navigation labels.
+
+Dates and numbers keep your regional preferences; translated time words follow the interface
+language. Agent output, terminal text, file contents, and saved names retain their original text.
+The mobile interface remains in English.
+
+## Appearance and themes
 
 On web and desktop, open **Settings → Appearance** to choose a theme and follow the system
 appearance or stay in light or dark mode. To use different themes for light and dark mode, select

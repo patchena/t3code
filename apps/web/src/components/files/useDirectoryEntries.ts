@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import { fileFailure, fileFailureText, type FileFailure } from "~/components/files/fileFailure";
 import type { EnvironmentId, ProjectEntry } from "@t3tools/contracts";
 import { useAtomMount, useAtomSubscribe } from "@effect/atom-react";
 import { executeAtomQuery } from "@t3tools/client-runtime/state/runtime";
@@ -9,8 +11,9 @@ import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { projectEnvironment } from "~/state/projects";
 
 export function useDirectoryEntries(environmentId: EnvironmentId, cwd: string) {
+  const { t } = useTranslation("files");
   const [directories, setDirectories] = useState(new Map<string, readonly ProjectEntry[]>());
-  const [errors, setErrors] = useState(new Map<string, string>());
+  const [errors, setErrors] = useState(new Map<string, FileFailure>());
   const [pending, setPending] = useState(1);
   const [loadingDirectories, setLoadingDirectories] = useState<ReadonlySet<string>>(
     () => new Set([""]),
@@ -65,7 +68,7 @@ export function useDirectoryEntries(environmentId: EnvironmentId, cwd: string) {
           setErrors((previous) =>
             new Map(previous).set(
               directoryPath,
-              cause instanceof Error ? cause.message : "Unable to load folder.",
+              fileFailure(cause, (t) => t(($) => $.query.folderLoad)),
             ),
           );
         }
@@ -145,6 +148,7 @@ export function useDirectoryEntries(environmentId: EnvironmentId, cwd: string) {
     }
   };
 
+  const failure = [...errors].find(([path]) => reachableDirectories.has(path))?.[1];
   return {
     entries,
     load,
@@ -152,6 +156,6 @@ export function useDirectoryEntries(environmentId: EnvironmentId, cwd: string) {
     isPending: pending > 0,
     loadingDirectories,
     ready: directories.has(""),
-    error: [...errors].find(([path]) => reachableDirectories.has(path))?.[1] ?? null,
+    error: failure === undefined ? null : fileFailureText(failure, t),
   };
 }

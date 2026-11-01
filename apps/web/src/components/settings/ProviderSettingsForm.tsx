@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import { TranslationError, type TFunction } from "@t3tools/client-runtime/i18n";
 import { useState, type ReactNode } from "react";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -27,6 +29,7 @@ import type { ProviderClientDefinition } from "@t3tools/provider-core/client";
 
 export type SettingsFormDefinition = Pick<ProviderClientDefinition, "settingsSchema"> & {
   readonly driverKind?: ProviderClientDefinition["driverKind"];
+  readonly sourceControlKind?: string;
 };
 import { SettingsRow } from "./settingsLayout";
 
@@ -150,6 +153,196 @@ export function deriveProviderSettingsFields(
     });
 }
 
+function translatedField(
+  field: ProviderSettingsFieldModel,
+  definition: SettingsFormDefinition,
+  value: unknown,
+  t: TFunction<"settings">,
+): ProviderSettingsFieldModel {
+  const driver = definition.driverKind;
+  switch (field.key) {
+    case "binaryPath": {
+      const descriptions = new Map<string, string>([
+        ["codex", t(($) => $.providers.binaryCodexHint)],
+        ["claudeAgent", t(($) => $.providers.binaryClaudeHint)],
+        ["pi", t(($) => $.providers.binaryPiHint)],
+        ["grok", t(($) => $.providers.binaryGrokHint)],
+        ["opencode", t(($) => $.providers.binaryOpenCodeHint)],
+        ["fx", t(($) => $.providers.binaryFxHint)],
+        ["muse", t(($) => $.providers.binaryMuseHint)],
+        ["antigravity", t(($) => $.providers.binaryAcpHint)],
+      ]);
+      const description = driver && descriptions.get(driver);
+      if (!description)
+        throw new TranslationError({ message: `Unknown provider binary field: ${String(driver)}` });
+      return {
+        ...field,
+        label: t(($) => $.providers.binaryPath),
+        description,
+        ...(driver === "antigravity" ? { placeholder: t(($) => $.providers.automatic) } : {}),
+      };
+    }
+    case "homePath":
+      return {
+        ...field,
+        label:
+          driver === "claudeAgent"
+            ? t(($) => $.providers.claudeConfigDir)
+            : t(($) => $.providers.codexHomePath),
+        description:
+          driver === "claudeAgent"
+            ? t(($) => $.providers.claudeConfigHint)
+            : t(($) => $.providers.customCodexHome),
+      };
+    case "shadowHomePath":
+      return {
+        ...field,
+        label: t(($) => $.providers.shadowHomePath),
+        description: t(($) => $.providers.accountCodexHome),
+      };
+    case "launchArgs":
+      return {
+        ...(driver === "claudeAgent"
+          ? { placeholder: t(($) => $.providers.launchArgsExample) }
+          : {}),
+        ...field,
+        label: t(($) => $.providers.launchArgs),
+        description:
+          driver === "codex"
+            ? t(($) => $.providers.launchCodexHint)
+            : driver === "pi"
+              ? t(($) => $.providers.launchPiHint)
+              : t(($) => $.providers.launchHint),
+      };
+    case "autoCompactWindow":
+      return {
+        placeholder: t(($) => $.providers.tokensExample),
+        ...field,
+        label: t(($) => $.providers.autoCompactAfter),
+        description: t(($) => $.providers.autoCompactHint),
+      };
+    case "idleCompaction":
+      return {
+        ...field,
+        label: t(($) => $.providers.compactIdle),
+        description: t(($) => $.providers.compactIdleHint),
+        options: [
+          { value: "default", label: t(($) => $.providers.useDefault) },
+          { value: "onReturn", label: t(($) => $.providers.onReturn) },
+          { value: "beforeCacheExpires", label: t(($) => $.providers.beforeCacheExpires) },
+          { value: "off", label: t(($) => $.providers.never) },
+        ],
+      };
+    case "authMethod":
+      return {
+        ...field,
+        label: t(($) => $.providers.signInMethod),
+        description: t(($) => $.providers.antigravityAuthHint),
+        options: [
+          { value: "oauth-personal", label: t(($) => $.providers.googleAccount) },
+          { value: "oauth-business", label: "Gemini Enterprise" },
+          { value: "gemini-api-key", label: t(($) => $.providers.geminiApiKey) },
+          { value: "agent-platform", label: "Agent Platform (Vertex AI)" },
+        ],
+      };
+    case "apiKey":
+      return {
+        ...field,
+        label: t(($) => $.providers.apiKey),
+        description: t(($) => $.providers.geminiKeyHint),
+        placeholder: t(($) => $.providers.optional),
+      };
+    case "gcpProject":
+      return {
+        ...field,
+        label: t(($) => $.providers.gcpProject),
+        description: t(($) => $.providers.gcpProjectHint),
+      };
+    case "gcpLocation":
+      return {
+        ...field,
+        label: t(($) => $.providers.gcpLocation),
+        description: t(($) => $.providers.gcpLocationHint),
+      };
+    case "source":
+      return {
+        ...field,
+        label: t(($) => $.providers.acpSource),
+        options: [
+          { value: "registry", label: "ACP Registry" },
+          { value: "local", label: t(($) => $.providers.localCommand) },
+        ],
+      };
+    case "agentId":
+      return {
+        ...field,
+        label: t(($) => $.providers.registryAgentId),
+        description: t(($) => $.providers.registryAgentHint),
+      };
+    case "commandPath":
+      return readProviderConfigString(value, "source") === "local"
+        ? {
+            ...field,
+            label: t(($) => $.providers.executable),
+            description: t(($) => $.providers.executableHint),
+            placeholder: t(($) => $.providers.executableExample),
+          }
+        : {
+            ...field,
+            label: t(($) => $.providers.executableOverride),
+            description: t(($) => $.providers.registryExecutableHint),
+            placeholder: t(($) => $.providers.registryDefault),
+          };
+    case "authMethodId":
+      return {
+        ...field,
+        label: t(($) => $.providers.authenticationMethod),
+        description: t(($) => $.providers.acpAuthMethodHint),
+      };
+    case "serverUrl":
+      return {
+        ...field,
+        label: t(($) => $.providers.serverUrl),
+        description: t(($) => $.providers.spawnServerHint),
+      };
+    case "serverPassword":
+      return {
+        ...field,
+        label: t(($) => $.providers.serverPassword),
+        description: t(($) => $.providers.storedHost),
+        placeholder: t(($) => $.providers.optional),
+      };
+    case "accessToken":
+      return {
+        ...field,
+        label: t(($) => $.providers.accessToken),
+        description: t(($) => $.providers.bitbucketAccessHint),
+      };
+    case "email":
+      return {
+        ...field,
+        label: t(($) => $.providers.atlassianEmail),
+        description: t(($) => $.providers.atlassianEmailHint),
+      };
+    case "apiToken":
+      return {
+        ...field,
+        label: t(($) => $.providers.apiToken),
+        description: t(($) => $.providers.bitbucketApiHint),
+      };
+    case "token":
+      return {
+        ...field,
+        label: t(($) => $.providers.token),
+        description: t(($) => $.providers.gitCafeTokenHint),
+      };
+    default:
+      throw new TranslationError({
+        message: `Unknown settings field: ${String(driver ?? definition.sourceControlKind)}.${field.key}`,
+      });
+  }
+}
+
 let commandArgumentDraftId = 0;
 /**
  * Editable rows seeded from a configured value. `seen` is the value the rows
@@ -210,6 +403,7 @@ function ProviderCommandArguments({
 }: Pick<ProviderSettingsFormProps, "value" | "onChange"> & {
   readonly managedReason: string | undefined;
 }) {
+  const { t } = useTranslation("settings");
   const args = configuredCommandArgs(value);
   const [storedDraft, setDraft] = useState(() => seedRowsDraft(args, toCommandArgumentRows));
   const draft = reconcileRowsDraft(storedDraft, args, commandArgumentsEqual, toCommandArgumentRows);
@@ -226,8 +420,8 @@ function ProviderCommandArguments({
 
   return (
     <SettingsRow
-      title="Arguments"
-      description="One literal argument per row, in launch order."
+      title={t(($) => $.providers.arguments)}
+      description={t(($) => $.providers.argumentsHint)}
       managed={managedReason}
       control={
         <Button
@@ -237,7 +431,7 @@ function ProviderCommandArguments({
           onClick={() => updateArguments([...rows, makeCommandArgumentDraftRow("")])}
         >
           <PlusIcon />
-          Add argument
+          {t(($) => $.providers.addArgument)}
         </Button>
       }
     >
@@ -261,7 +455,7 @@ function ProviderCommandArguments({
                       ),
                     )
                   }
-                  aria-label={`Argument ${index + 1}`}
+                  aria-label={t(($) => $.providers.argumentNumber, { index: index + 1 })}
                   spellCheck={false}
                 />
                 <Button
@@ -271,7 +465,7 @@ function ProviderCommandArguments({
                   onClick={() =>
                     updateArguments(rows.filter((current) => current.id !== argument.id))
                   }
-                  aria-label={`Remove argument ${index + 1}`}
+                  aria-label={t(($) => $.providers.removeArgument, { index: index + 1 })}
                 >
                   <XIcon />
                 </Button>
@@ -355,6 +549,7 @@ function SecretSettingsControl({
   readonly environmentId: EnvironmentId;
   readonly onChange: ProviderSettingsFormProps["onChange"];
 }) {
+  const { t } = useTranslation("settings");
   const sources = useSecretSources(environmentId);
   const saved =
     value !== null && typeof value === "object"
@@ -384,7 +579,7 @@ function SecretSettingsControl({
           size="icon-sm"
           variant="ghost-destructive"
           onClick={() => onChange(nextProviderConfigWithFieldValue(value, field, ""))}
-          aria-label={`Clear ${field.label}`}
+          aria-label={t(($) => $.providers.clearField, { label: field.label })}
         >
           <XIcon className="size-3.5" />
         </Button>
@@ -463,6 +658,7 @@ function ProviderSettingsFieldRow({
   managedReason,
   environmentId,
 }: ProviderSettingsFieldRowProps) {
+  const { t } = useTranslation("settings");
   const inputId = `${idPrefix}-${field.key}`;
   const descriptionClassName =
     variant === "dialog"
@@ -534,7 +730,7 @@ function ProviderSettingsFieldRow({
               size="icon-sm"
               variant="ghost-destructive"
               onClick={() => onChange(nextProviderConfigWithFieldValue(value, field, ""))}
-              aria-label={`Clear ${field.label}`}
+              aria-label={t(($) => $.providers.clearField, { label: field.label })}
             >
               <XIcon className="size-3.5" />
             </Button>
@@ -678,7 +874,10 @@ export function ProviderSettingsForm({
   managed,
   environmentId,
 }: ProviderSettingsFormProps) {
-  const fields = deriveProviderSettingsFields(definition, value);
+  const { t } = useTranslation("settings");
+  const fields = deriveProviderSettingsFields(definition, value).map((field) =>
+    translatedField(field, definition, value, t),
+  );
   const isLocalAcp =
     definition.driverKind === "acpRegistry" &&
     readProviderConfigString(value, "source") === "local";

@@ -1,8 +1,10 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import * as Option from "effect/Option";
 import { describe, expect, it } from "vite-plus/test";
 import { EnvironmentId, type DeviceHostSummary } from "@t3tools/contracts";
 import {
   checkDeviceHostConnections,
+  deviceHostCheckError,
   parseDeviceHostDraft,
   deviceHostConnectionKey,
   type DeviceHostCheck,
@@ -50,9 +52,14 @@ describe("device host connection checks", () => {
     expect([...results.values()]).toEqual([
       { status: "connected", platforms: summary.platforms },
       { status: "local" },
-      { status: "failed", error: "SSH key rejected" },
-      { status: "failed", error: "Environment disconnected" },
+      { status: "failed", error: { kind: "diagnostic", message: "SSH key rejected" } },
+      { status: "failed", error: { kind: "disconnected" } },
     ]);
+    const offline = results.get(ids[3]!);
+    if (offline?.status !== "failed") throw new Error("Expected the offline result.");
+    expect(deviceHostCheckError(offline.error, createI18n("de").getFixedT("de", "settings"))).toBe(
+      "Umgebung getrennt",
+    );
   });
 
   it("does not reuse results after editing a destination or SSH options", () => {

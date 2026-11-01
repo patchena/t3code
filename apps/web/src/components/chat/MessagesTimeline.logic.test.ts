@@ -13,8 +13,8 @@ import {
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import {
-  deriveTimelineEntriesFromVisibleTurnItems,
-  deriveTimelineEntriesFromVisibleTurnItemsWithState,
+  deriveTimelineEntriesFromVisibleTurnItems as deriveTranslatedEntries,
+  deriveTimelineEntriesFromVisibleTurnItemsWithState as deriveTranslatedProjection,
   workEntryDisplayIndicatesToolFailure,
   type TimelineEntry,
 } from "../../session-logic";
@@ -25,15 +25,37 @@ import { EnvironmentId, MessageId, RunId } from "@t3tools/contracts";
 import { serializeAssistantCitation } from "@t3tools/shared/assistantCitations";
 import {
   computeStableMessagesTimelineRows,
-  deriveMessagesTimelineRows,
+  deriveMessagesTimelineRows as deriveTranslatedRows,
   timelineTurnFoldRunIdsByEntryId,
   liveAnswerPreview,
-  deriveMessagesTimelineRowsWithState,
+  deriveMessagesTimelineRowsWithState as deriveTranslatedRowState,
   shouldCollapseUserMessage,
   resolveAssistantMessageCopyState,
   type MessagesTimelineRow,
-  workEntryDisplayLabel,
+  workEntryDisplayLabel as translatedWorkEntryLabel,
 } from "./MessagesTimeline.logic";
+
+import { createI18n } from "@t3tools/client-runtime/i18n";
+
+const projectionT = createI18n("en").getFixedT("en", "activity");
+const deriveTimelineEntriesFromVisibleTurnItems = (
+  input: Parameters<typeof deriveTranslatedEntries>[0],
+) => deriveTranslatedEntries(input, projectionT);
+const deriveTimelineEntriesFromVisibleTurnItemsWithState = (
+  input: Parameters<typeof deriveTranslatedProjection>[0],
+  previous?: Parameters<typeof deriveTranslatedProjection>[2],
+) => deriveTranslatedProjection(input, projectionT, previous);
+
+const deriveMessagesTimelineRows = (input: Parameters<typeof deriveTranslatedRows>[0]) =>
+  deriveTranslatedRows(input, projectionT, "en");
+const deriveMessagesTimelineRowsWithState = (
+  input: Parameters<typeof deriveTranslatedRowState>[0],
+  previous?: Parameters<typeof deriveTranslatedRowState>[3],
+) => deriveTranslatedRowState(input, projectionT, "en", previous);
+const workEntryDisplayLabel = (
+  entry: Parameters<typeof translatedWorkEntryLabel>[0],
+  workspaceRoot: Parameters<typeof translatedWorkEntryLabel>[1],
+) => translatedWorkEntryLabel(entry, workspaceRoot, projectionT);
 
 describe("resolveAssistantMessageCopyState", () => {
   it("copies the rendered representation of Codex directives", () => {

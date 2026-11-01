@@ -17,6 +17,7 @@ import {
   type OrchestrationV2ProjectedTurnItem,
   type OrchestrationV2TurnItem,
 } from "@t3tools/contracts";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { deriveThreadCheckpointSummaries } from "@t3tools/client-runtime/state/thread-checkpoints";
 import { summarizeToolGroup } from "@t3tools/client-runtime/work-log/presentation";
 import { getReviewSectionIdForCheckpoint } from "../features/review/reviewModel";
@@ -612,7 +613,10 @@ describe("buildThreadFeed", () => {
       entry.type === "activity-group" ? entry.activities : [],
     )[0]!;
     expect(workEntryRowLabel(activity.workEntry)).toBe("src/a.ts +2 more");
-    expect(summarizeToolGroup([activity.workEntry]).summary).toBe("Changed 3 files");
+    expect(
+      summarizeToolGroup([activity.workEntry], createI18n("en").getFixedT("en", "activity"), "en")
+        .summary,
+    ).toBe("Changed 3 files");
   });
 
   it("anchors feedback before later committed turns", () => {

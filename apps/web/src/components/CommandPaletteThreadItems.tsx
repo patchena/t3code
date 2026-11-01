@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { scopedThreadKey, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { findForMessageMatch, openThreadFindOnQuery } from "./chat/threadFindStore";
 import {
@@ -97,6 +98,8 @@ export function useCommandPaletteThreadItems(input: {
   readonly activeThread: { readonly environmentId: EnvironmentId; readonly id: ThreadId } | null;
   readonly threadSearchQuery: string;
 }) {
+  const { t } = useTranslation("workspace");
+  const { t: tCommon } = useTranslation("common");
   const { activeThread, threadSearchQuery } = input;
   const navigate = useNavigate();
   const threads = useVisibleThreadShells();
@@ -110,6 +113,8 @@ export function useCommandPaletteThreadItems(input: {
 
   const { environments } = useEnvironments();
   const threadItems = buildThreadActionItems({
+    t,
+    tCommon,
     threads,
     ...(environments.length > 1
       ? {
@@ -142,7 +147,7 @@ export function useCommandPaletteThreadItems(input: {
           project={projectByKey.get(`${thread.environmentId}:${thread.projectId}`) ?? null}
           projectTitle={projectTitle ?? null}
           environmentLabel={
-            projectEnvironmentLocationById.get(thread.environmentId)?.label ?? "Remote"
+            projectEnvironmentLocationById.get(thread.environmentId)?.label ?? t(($) => $.remote)
           }
           branch={thread.branch}
           worktreePath={thread.worktreePath}
@@ -209,7 +214,7 @@ export function useCommandPaletteThreadItems(input: {
         ...rest,
         // When the matching message was written, not when the thread last moved.
         ...(match.messageCreatedAt
-          ? { timestamp: formatRelativeTimeLabel(match.messageCreatedAt) }
+          ? { timestamp: formatRelativeTimeLabel(match.messageCreatedAt, tCommon) }
           : {}),
         threadContentMatch: {
           source: match.source,

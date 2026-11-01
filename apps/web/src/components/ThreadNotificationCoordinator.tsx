@@ -1,3 +1,4 @@
+import { appI18n } from "~/i18n";
 import {
   type EnvironmentThreadShell,
   type PendingSubagentRequest,
@@ -17,11 +18,11 @@ import {
   ShieldQuestionIcon,
 } from "lucide-react";
 
-import { getClientSettings, subscribeClientSettings } from "../hooks/useSettings";
-import { isWindowsPlatform } from "../lib/utils";
-import { environmentSummaries } from "../state/presentation";
-import { environmentShell } from "../state/shell";
-import { environmentThreadShells } from "../state/threads";
+import { getClientSettings, subscribeClientSettings } from "~/hooks/useSettings";
+import { isWindowsPlatform } from "~/lib/utils";
+import { environmentSummaries } from "~/state/presentation";
+import { environmentShell } from "~/state/shell";
+import { environmentThreadShells } from "~/state/threads";
 import {
   hasDesktopNotifications,
   hasNotificationSound,
@@ -29,14 +30,14 @@ import {
   setNotificationBadge,
   threadNotificationTag,
   unlockNotificationAudio,
-} from "../threadNotifications";
-import { resolveSidebarThreadStatus, type SidebarThreadStatus } from "./Sidebar.logic";
+} from "~/threadNotifications";
+import { resolveSidebarThreadStatus, type SidebarThreadStatus } from "~/components/Sidebar.logic";
 import {
   createThreadNotificationGate,
   type ThreadNotificationKind,
   type ThreadNotificationObservation,
-} from "./ThreadNotificationCoordinator.logic";
-import { toastManager } from "./ui/toast";
+} from "~/components/ThreadNotificationCoordinator.logic";
+import { toastManager } from "~/components/ui/toast";
 
 interface NotificationState extends ThreadNotificationObservation {
   readonly raw: OrchestrationV2ThreadShell;
@@ -62,6 +63,7 @@ export function startThreadNotifications(
   registry: AtomRegistry.AtomRegistry,
   router: AnyRouter,
 ): () => void {
+  const t = appI18n.getFixedT(null, "workspace");
   const pending = new Map<
     string,
     { environmentId: EnvironmentId; threadId: ThreadId; notification: Notification }
@@ -130,16 +132,16 @@ export function startThreadNotifications(
     };
     const title =
       kind === "completion"
-        ? "Thread completed"
+        ? t(($) => $.updates.threadCompleted)
         : status === "approval"
-          ? "Approval needed"
+          ? t(($) => $.updates.approvalNeeded)
           : status === "limited"
-            ? "Usage limit reached"
+            ? t(($) => $.updates.usageLimitReached)
             : status === "failed"
-              ? "Thread failed"
+              ? t(($) => $.updates.threadFailed)
               : status === "request"
-                ? "Guest request"
-                : "Input needed";
+                ? t(($) => $.updates.guestRequest)
+                : t(($) => $.updates.inputNeeded);
     if (hasNotificationSound(mode)) {
       void playNotificationSound(kind, () =>
         hasNotificationSound(getClientSettings().notificationMode),
@@ -173,7 +175,7 @@ export function startThreadNotifications(
             ),
         },
         actionProps: {
-          children: "Open thread",
+          children: t(($) => $.updates.openThread),
           onClick: () => {
             toastManager.close(toastId);
             void router.navigate({

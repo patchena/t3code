@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
 import type { EnvironmentId, EnvironmentMachineKind } from "@t3tools/contracts";
 
 import type { SidebarProjectSnapshot } from "../sidebarProjectGrouping";
@@ -17,15 +19,11 @@ export interface CommandPaletteProjectLocation {
   readonly kind: "local" | "remote";
   readonly label: string;
   readonly machine: EnvironmentMachineKind;
+  readonly searchTerms?: ReadonlyArray<string>;
 }
 
-const UNKNOWN_PROJECT_LOCATION: CommandPaletteProjectLocation = {
-  kind: "remote",
-  label: "Remote",
-  machine: "server",
-};
-
 interface ProjectItemsInput {
+  readonly t: TFunction<"workspace">;
   readonly projects: ReadonlyArray<CommandPaletteProject>;
   readonly projectGroupByTargetKey: ReadonlyMap<string, SidebarProjectSnapshot>;
   readonly locationByEnvironmentId: ReadonlyMap<EnvironmentId, CommandPaletteProjectLocation>;
@@ -48,12 +46,14 @@ export function buildProjectSearchItems(input: ProjectItemsInput) {
     valuePrefix: "project",
     searchTerms: (project) =>
       buildCommandPaletteProjectMetadata({
+        t: input.t,
         projects: membersOf(project),
         locationByEnvironmentId: input.locationByEnvironmentId,
       }).searchTerms,
     renderDescription: (project) => {
       const members = membersOf(project);
       const metadata = buildCommandPaletteProjectMetadata({
+        t: input.t,
         projects: members,
         locationByEnvironmentId: input.locationByEnvironmentId,
       });
@@ -73,7 +73,7 @@ export function buildProjectSearchItems(input: ProjectItemsInput) {
 }
 
 /** Projects as targets of the "New thread in..." submenu. */
-export function buildNewThreadInProjectItems(input: ProjectItemsInput) {
+export function buildNewThreadInProjectItems(input: Omit<ProjectItemsInput, "t">) {
   return buildProjectActionItems({
     projects: input.projects,
     valuePrefix: "new-thread-in",
@@ -83,6 +83,7 @@ export function buildNewThreadInProjectItems(input: ProjectItemsInput) {
       return [
         ...(group?.memberProjects.flatMap((member) => [member.title, member.workspaceRoot]) ?? []),
         ...(location ? [location.label] : []),
+        ...(location?.searchTerms ?? []),
       ];
     },
     renderDescription: (project) => (
@@ -101,7 +102,12 @@ function ProjectLocationDescription(props: {
   readonly location: CommandPaletteProjectLocation | undefined;
   readonly workspaceRoot: string;
 }) {
-  const location = props.location ?? UNKNOWN_PROJECT_LOCATION;
+  const { t } = useTranslation("workspace");
+  const location = props.location ?? {
+    kind: "remote",
+    label: t(($) => $.remote),
+    machine: "server" as const,
+  };
   return (
     <span className="flex min-w-0 items-center gap-1">
       <span className="inline-flex min-w-0 items-center gap-1">

@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import type { InterfaceLanguage } from "@t3tools/contracts/settings";
 import {
   isOrchestrationV2WorkActive,
   isToolLifecycleItemType,
@@ -13,6 +15,8 @@ import type { ToolCallVisibility } from "@t3tools/contracts/settings";
 import {
   resolveT3McpSummaryAction,
   resolveT3McpToolDefinition,
+  resolveT3McpToolId,
+  type T3McpToolId,
   type T3McpToolDefinition,
   type T3McpToolSummaryAction,
 } from "@t3tools/shared/t3McpToolPresentation";
@@ -21,7 +25,7 @@ import { resolveMediaSource } from "@t3tools/client-runtime/media-source";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { isWorkspaceImagePreviewPath } from "@t3tools/shared/mediaPreview";
 import { formatTokens } from "@t3tools/shared/usageFormat";
-import { classifyToolActivity } from "@t3tools/shared/toolActivity";
+import { classifyToolActivity, resolveSearchToolInput } from "@t3tools/shared/toolActivity";
 import { toolOutputIndicatesFailure } from "@t3tools/shared/toolOutput";
 
 import {
@@ -69,15 +73,18 @@ export function contextCompactionTokenCounts(
   return { before: formatTokens(item.beforeTokenCount), after: formatTokens(item.afterTokenCount) };
 }
 
-export function contextCompactionLabel(item: CompactionLabelItem): string {
-  if (item.status === "failed") return "Context compaction failed";
+export function contextCompactionLabel(
+  item: CompactionLabelItem,
+  t: TFunction<"activity">,
+): string {
+  if (item.status === "failed") return t(($) => $.shared.compaction.failed);
   if (item.status === "cancelled" || item.status === "interrupted")
-    return "Context compaction stopped";
-  if (isOrchestrationV2WorkActive(item.status)) return "Compacting context";
+    return t(($) => $.shared.compaction.stopped);
+  if (isOrchestrationV2WorkActive(item.status)) return t(($) => $.shared.compaction.running);
   const tokens = contextCompactionTokenCounts(item);
   return tokens
-    ? `Context compacted ${tokens.before} → ${tokens.after} tokens`
-    : "Context compacted";
+    ? t(($) => $.shared.compaction.tokens, tokens)
+    : t(($) => $.shared.compaction.completed);
 }
 
 export interface WorkLogPresentationEntry {
@@ -165,26 +172,29 @@ function workEntryToolOutput(
     : (data?.output ?? data?.result ?? data?.rawOutput ?? data?.content);
 }
 
+export function resolveWorkEntryToolDefinition(
+  entry: Pick<WorkLogPresentationEntry, "label" | "toolTitle" | "toolData" | "structuredPayload">,
+) {
+  return resolveT3McpToolDefinition(workEntryToolName(entry), workEntryToolInput(entry));
+}
+
 function resolveT3McpToolPresentation(
-  definition: T3McpToolDefinition | null,
+  definition: T3McpToolDefinition,
+  id: T3McpToolId,
   status: string | undefined,
+  t: TFunction<"activity">,
   data?: unknown,
 ) {
-  if (!definition) return null;
-  const [action, running, completed, detail] = definition.labels;
-  const verb =
-    status === "inProgress"
-      ? running
-      : status === "completed"
-        ? completed
-        : status === "failed"
-          ? `Failed to ${action.toLowerCase()}`
-          : status === "declined"
-            ? `Declined to ${action.toLowerCase()}`
-            : status === "stopped"
-              ? `Stopped ${running.toLowerCase()}`
-              : running;
-
+  const state =
+    status === "completed"
+      ? "completed"
+      : status === "failed"
+        ? "failed"
+        : status === "declined"
+          ? "declined"
+          : status === "stopped"
+            ? "stopped"
+            : "running";
   const actionKind =
     definition.summaryAction === "link-pr" ||
     definition.summaryAction === "unlink-pr" ||
@@ -201,16 +211,18 @@ function resolveT3McpToolPresentation(
   const number = urlTarget?.link.number ?? input?.number;
   const { shortLabel } = (urlTarget?.definition ?? sourceControlClients.get(undefined))
     .changeRequest;
-  const target =
+  const displayName =
     actionKind !== undefined &&
     actionKind !== "list-prs" &&
     typeof number === "number" &&
     Number.isSafeInteger(number) &&
     number > 0
-      ? `${shortLabel} #${number}`
-      : detail;
+      ? t(($) => $.shared.numberedRequests[actionKind][state], {
+          target: `${shortLabel} #${number}`,
+        })
+      : t(($) => $.shared.tools[id][state]);
   return {
-    displayName: `${verb} ${target}`,
+    displayName,
     icon: definition.icon,
     ...(actionKind === undefined ? {} : { action: actionKind }),
   };
@@ -229,16 +241,18 @@ export function resolveWorkEntryToolPresentation(
     WorkLogPresentationEntry,
     "label" | "toolTitle" | "toolData" | "toolLifecycleStatus" | "structuredPayload"
   >,
+  t: TFunction<"activity">,
   fallbackStatus?: "inProgress" | "completed",
 ) {
-  const definition = resolveT3McpToolDefinition(
-    workEntryToolName(entry),
-    workEntryToolInput(entry),
-  );
+  const definition = resolveWorkEntryToolDefinition(entry);
+  const id = resolveT3McpToolId(workEntryToolName(entry), workEntryToolInput(entry));
+  if (!definition || id === null) return null;
   const status = entry.toolLifecycleStatus ?? fallbackStatus;
   return resolveT3McpToolPresentation(
     definition,
-    definition && t3ToolResultIndicatesFailure(workEntryToolOutput(entry)) ? "failed" : status,
+    id,
+    t3ToolResultIndicatesFailure(workEntryToolOutput(entry)) ? "failed" : status,
+    t,
     entry.toolData,
   );
 }
@@ -350,10 +364,18 @@ export function toolGroupAction(entry: WorkLogPresentationEntry): ToolGroupActio
 
 function computeToolGroupAction(entry: WorkLogPresentationEntry): ToolGroupAction {
   if (entry.itemType === "thread_created") return "thread-create";
-  const presentation = resolveWorkEntryToolPresentation(entry);
-  if (presentation?.action !== undefined) return presentation.action;
-  if (presentation?.icon === "browser") return "browser";
-  if (presentation?.icon === "device") return "device";
+  const definition = resolveWorkEntryToolDefinition(entry);
+  const action = definition?.summaryAction;
+  if (
+    action === "link-pr" ||
+    action === "unlink-pr" ||
+    action === "list-prs" ||
+    action === "watch-pr" ||
+    action === "unwatch-pr"
+  )
+    return action;
+  if (definition?.icon === "browser") return "browser";
+  if (definition?.icon === "device") return "device";
   if (entry.requestKind === "file-read" || entry.viewedImagePath !== undefined) return "read";
   if (entry.itemType === "approval_request" || entry.itemType === "user_input_request") {
     return workLogEntryIsToolLike(entry) ? "other" : "update";
@@ -460,41 +482,12 @@ function toolGroupActionCount(
   return changedFiles.size + editsWithoutFileDetails;
 }
 
-function toolGroupActionLabel(action: ToolGroupAction, count: number): string {
-  switch (action) {
-    case "link-pr":
-      return `Linked ${count} ${count === 1 ? "pull request" : "pull requests"}`;
-    case "unlink-pr":
-      return `Unlinked ${count} ${count === 1 ? "pull request" : "pull requests"}`;
-    case "watch-pr":
-      return `Watching ${count} ${count === 1 ? "pull request" : "pull requests"}`;
-    case "unwatch-pr":
-      return `Stopped watching ${count} ${count === 1 ? "pull request" : "pull requests"}`;
-    case "list-prs":
-      return count === 1
-        ? "Checked linked pull requests"
-        : `Checked linked pull requests ${count} times`;
-    case "read":
-      return `Read ${count} ${count === 1 ? "file" : "files"}`;
-    case "edit":
-      return `Changed ${count} ${count === 1 ? "file" : "files"}`;
-    case "command":
-      return `Ran ${count} ${count === 1 ? "command" : "commands"}`;
-    case "thread-create":
-      return `Created ${count} ${count === 1 ? "thread" : "threads"}`;
-    case "device":
-      return `Used device controls ${count} ${count === 1 ? "time" : "times"}`;
-    case "browser":
-      return `Used browser ${count} ${count === 1 ? "time" : "times"}`;
-    case "search":
-      return `Searched the web ${count} ${count === 1 ? "time" : "times"}`;
-    case "code-search":
-      return `Searched code ${count} ${count === 1 ? "time" : "times"}`;
-    case "other":
-      return `Used ${count} ${count === 1 ? "tool" : "tools"}`;
-    case "update":
-      return `Received ${count} ${count === 1 ? "update" : "updates"}`;
-  }
+function toolGroupActionLabel(
+  action: ToolGroupAction,
+  count: number,
+  t: TFunction<"activity">,
+): string {
+  return t(($) => $.shared.groups[action], { count });
 }
 
 function t3ToolSummaryCall(entry: WorkLogPresentationEntry): T3ToolSummaryCall {
@@ -555,14 +548,28 @@ function summaryActionPriority(action: ToolGroupAction | T3McpToolSummaryAction)
   }
 }
 
-export function summarizeToolGroup(entries: ReadonlyArray<WorkLogPresentationEntry>): {
+const listFormatters = new Map<InterfaceLanguage, Intl.ListFormat>();
+
+function listFormatter(language: InterfaceLanguage): Intl.ListFormat {
+  const existing = listFormatters.get(language);
+  if (existing) return existing;
+  const formatter = new Intl.ListFormat(language, { style: "long", type: "conjunction" });
+  listFormatters.set(language, formatter);
+  return formatter;
+}
+
+export function summarizeToolGroup(
+  entries: ReadonlyArray<WorkLogPresentationEntry>,
+  t: TFunction<"activity">,
+  language: InterfaceLanguage,
+): {
   summary: string;
   hasFailure: boolean;
 } {
   const toolEntries = entries.filter((entry) => entry.itemType !== "reasoning");
   if (entries.length > 0 && toolEntries.length === 0) {
     return {
-      summary: entries.length === 1 ? "Thought" : `Thought (×${entries.length})`,
+      summary: t(($) => $.shared.group.thought, { count: entries.length }),
       hasFailure: false,
     };
   }
@@ -596,11 +603,12 @@ export function summarizeToolGroup(entries: ReadonlyArray<WorkLogPresentationEnt
     count: group.entries.length,
     priority: summaryActionPriority(action),
     ...(group.t3Action
-      ? summarizeT3ToolCalls(group.t3Action, group.entries.map(t3ToolSummaryCall))
+      ? summarizeT3ToolCalls(group.t3Action, group.entries.map(t3ToolSummaryCall), t)
       : {
           label: toolGroupActionLabel(
             group.action,
             toolGroupActionCount(group.action, group.entries),
+            t,
           ),
           failedCount: group.entries.filter(workEntryDisplayIndicatesToolFailure).length,
         }),
@@ -612,16 +620,25 @@ export function summarizeToolGroup(entries: ReadonlyArray<WorkLogPresentationEnt
   const labels = selected.map(({ label }) => label);
   if (sources.size > 0) {
     const sourceValues = [...sources.values()];
-    const sourceNames = [...new Set(sourceValues.map((source) => source.name))];
-    const formattedNames =
-      sourceNames.length < 2
-        ? sourceNames[0]!
-        : sourceNames.length === 2
-          ? sourceNames.join(" and ")
-          : `${sourceNames.slice(0, -1).join(", ")}, and ${sourceNames.at(-1)}`;
+    const sourceNames = [
+      ...new Set(
+        sourceValues.map((source) =>
+          source.key === "computer-use" ? t(($) => $.shared.group.computer) : source.name,
+        ),
+      ),
+    ];
+    const formattedNames = new Intl.ListFormat(language, {
+      style: "long",
+      type: "conjunction",
+    }).format(sourceNames);
     const allIntegrations = sourceValues.every((source) => source.kind === "integration");
     labels.unshift(
-      `Used ${formattedNames}${allIntegrations ? ` ${sourceNames.length === 1 ? "integration" : "integrations"}` : ""}`,
+      allIntegrations
+        ? t(($) => $.shared.group.integrations, {
+            names: formattedNames,
+            count: sourceNames.length,
+          })
+        : t(($) => $.shared.group.sources, { names: formattedNames }),
     );
   }
   const sourcedCount = entries.filter(
@@ -632,15 +649,12 @@ export function summarizeToolGroup(entries: ReadonlyArray<WorkLogPresentationEnt
   const remainingCount =
     entries.length - sourcedCount - selected.reduce((count, group) => count + group.count, 0);
   if (remainingCount > 0) {
-    labels.push(`Performed ${remainingCount} other ${remainingCount === 1 ? "action" : "actions"}`);
+    labels.push(t(($) => $.shared.group.other, { count: remainingCount }));
   }
   const sentenceLabels = labels.map((label, index) =>
-    index === 0 ? label : label.charAt(0).toLowerCase() + label.slice(1),
+    index === 0 ? label : t(($) => $.shared.group.continuation, { label }),
   );
-  const summary =
-    sentenceLabels.length < 3
-      ? sentenceLabels.join(" and ")
-      : `${sentenceLabels.slice(0, -1).join(", ")}, and ${sentenceLabels.at(-1)}`;
+  const summary = listFormatter(language).format(sentenceLabels);
   return { summary, hasFailure: summaries.some((group) => group.failedCount > 0) };
 }
 
@@ -652,7 +666,7 @@ export function toolGroupSummaryKind(
   entries = toolEntries;
   if (
     entries.length > 0 &&
-    entries.every((entry) => resolveWorkEntryToolPresentation(entry)?.icon === "pull-request")
+    entries.every((entry) => resolveWorkEntryToolDefinition(entry)?.icon === "pull-request")
   )
     return "pull-request";
   const actions = new Set(entries.map(toolGroupAction));
@@ -683,4 +697,33 @@ export function liveThoughtLine(markdown: string): string {
   if (heading !== undefined) return text;
   const end = /[.?!]["'”’)]?(?=\s)/.exec(text);
   return end ? text.slice(0, end.index + end[0].length) : text;
+}
+
+export function formatReadToolLabel(
+  path: string,
+  t: TFunction<"activity">,
+  extraCount = 0,
+): string {
+  const trimmed = path.trim();
+  return extraCount > 0
+    ? trimmed
+      ? t(($) => $.shared.projection.readPathMore, { path: trimmed, count: extraCount })
+      : t(($) => $.shared.projection.readFileMore, { count: extraCount })
+    : trimmed
+      ? t(($) => $.shared.projection.readPath, { path: trimmed })
+      : t(($) => $.shared.projection.readFile);
+}
+
+export function formatSearchToolLabel(
+  data: Record<string, unknown> | undefined,
+  t: TFunction<"activity">,
+): string | undefined {
+  const { query, glob, target } = resolveSearchToolInput(data);
+  if (query && target) return t(($) => $.shared.projection.searchQuery, { query, path: target });
+  if (glob && target)
+    return t(($) => $.shared.projection.searchFile, { pattern: glob, path: target });
+  if (glob) return t(($) => $.shared.projection.searchPattern, { pattern: glob });
+  if (query) return t(($) => $.shared.projection.searchQueryOnly, { query });
+  if (target) return t(($) => $.shared.projection.searchTarget, { path: target });
+  return undefined;
 }

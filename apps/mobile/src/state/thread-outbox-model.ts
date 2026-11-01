@@ -1,3 +1,4 @@
+import { mobileI18n } from "~/i18n";
 import { isTransportConnectionErrorMessage } from "@t3tools/client-runtime/errors";
 import {
   clampFileAttachmentUploadBytes,
@@ -232,7 +233,14 @@ export function resolveThreadOutboxDispatchStep(input: {
     (attachment) => attachment.sizeBytes > effectiveMaxBytes,
   );
   return oversized
-    ? { step: "restore", reason: fileAttachmentTooLargeMessage(oversized.name, effectiveMaxBytes) }
+    ? {
+        step: "restore",
+        reason: fileAttachmentTooLargeMessage(
+          oversized.name,
+          effectiveMaxBytes,
+          mobileI18n.getFixedT(null, "chat"),
+        ),
+      }
     : { step: "send" };
 }
 

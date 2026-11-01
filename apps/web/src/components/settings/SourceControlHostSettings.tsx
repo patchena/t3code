@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { EnvironmentId } from "@t3tools/contracts";
 import type { SourceControlDefinition } from "@t3tools/client-runtime/source-control-clients";
 import * as Equal from "effect/Equal";
@@ -20,15 +21,19 @@ export function SourceControlHostSettings({
   };
   readonly onSaved: () => void;
 }) {
+  const { t } = useTranslation("settings");
   const saved = useEnvironmentSettings(
     environmentId,
     (settings) => settings.sourceControlHosts[definition.kind],
   );
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, {
-    label: `save ${definition.label} settings`,
+    label: t(($) => $.providers.saveHostSettings, { provider: definition.label }),
   });
   const [saving, setSaving] = useState(false);
-  const formDefinition = { settingsSchema: definition.settings };
+  const formDefinition = {
+    settingsSchema: definition.settings,
+    sourceControlKind: definition.kind,
+  };
   const hasSaved = Object.values(saved ?? {}).some((value) => value !== "");
 
   const save = async (fields: Record<string, unknown>) => {
@@ -68,7 +73,7 @@ export function SourceControlHostSettings({
               void save(Object.fromEntries(Object.keys(saved ?? {}).map((key) => [key, ""])))
             }
           >
-            Remove
+            {t(($) => $.providers.remove)}
           </Button>
         </div>
       ) : null}

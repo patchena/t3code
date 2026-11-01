@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it } from "vite-plus/test";
 
 import { buildThreadActionMenuItems, type ThreadActionMenuState } from "./threadActionMenu.logic";
@@ -25,17 +26,22 @@ const baseState: ThreadActionMenuState = {
   ],
 };
 
+const t = createI18n("en").getFixedT(null, "workspace");
+
 describe("buildThreadActionMenuItems", () => {
   it.each([false, true])(
     "disables both lifecycle directions without permission (reversed: %s)",
     (reversed) => {
-      const items = buildThreadActionMenuItems({
-        ...baseState,
-        canOperate: false,
-        isPinned: reversed,
-        isSettled: reversed,
-        isSnoozed: reversed,
-      });
+      const items = buildThreadActionMenuItems(
+        {
+          ...baseState,
+          canOperate: false,
+          isPinned: reversed,
+          isSettled: reversed,
+          isSnoozed: reversed,
+        },
+        t,
+      );
       const expected = reversed
         ? [
             "unpin",
@@ -66,11 +72,14 @@ describe("buildThreadActionMenuItems", () => {
   );
 
   it("disables archive and turning into a project while the thread is running", () => {
-    const items = buildThreadActionMenuItems({
-      ...baseState,
-      isRunning: true,
-      canTurnIntoProject: true,
-    });
+    const items = buildThreadActionMenuItems(
+      {
+        ...baseState,
+        isRunning: true,
+        canTurnIntoProject: true,
+      },
+      t,
+    );
     expect(items.find((item) => item.id === "archive")?.disabled).toBe(true);
     expect(items.find((item) => item.id === "turn-into-project")?.disabled).toBe(true);
   });

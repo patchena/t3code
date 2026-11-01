@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { type OrchestrationV2ProviderTurn, type RunAttemptId } from "@t3tools/contracts";
 import {
   deriveLatestThreadRun,
@@ -560,26 +561,27 @@ export function getAntigravitySendBlockReason(
     | null
     | undefined,
   model: string,
+  t: TFunction<"chat">,
 ): string | null {
   if (provider?.driver !== "antigravity") return null;
   if (!provider.installed) {
-    return "Install Antigravity in provider settings before sending.";
+    return t(($) => $.composer.installAntigravity);
   }
   if (provider.auth.status === "unauthenticated") {
-    return "Sign in to Antigravity in provider settings before sending.";
+    return t(($) => $.composer.signInAntigravity);
   }
   const slug = model.trim();
-  if (slug.length === 0) return "Choose an Antigravity model before sending.";
+  if (slug.length === 0) return t(($) => $.composer.chooseAntigravityModel);
   if (provider.auth.status === "unknown") return null;
   if (provider.models.length === 0) {
-    return "Refresh Antigravity models in provider settings before sending.";
+    return t(($) => $.composer.refreshAntigravityModels);
   }
   if (
     provider.status === "ready" &&
     slug !== ANTIGRAVITY_DEFAULT_MODEL &&
     !provider.models.some((entry) => entry.slug === slug || entry.aliases?.includes(slug))
   ) {
-    return "That Antigravity model is no longer available. Choose another model.";
+    return t(($) => $.composer.antigravityModelGone);
   }
   return null;
 }
@@ -626,15 +628,18 @@ export function resolveTerminalWorktreePath(input: {
   return input.threadWorktreePath;
 }
 
-export async function resolveFileAttachmentUrl(input: {
-  attachment: ChatFileAttachment;
-  environmentId: EnvironmentId;
-  httpBaseUrl: string;
-  createAssetUrl: (input: {
+export async function resolveFileAttachmentUrl(
+  input: {
+    attachment: ChatFileAttachment;
     environmentId: EnvironmentId;
-    input: AssetCreateUrlInput;
-  }) => Promise<AtomCommandResult<AssetCreateUrlResult, unknown>>;
-}): Promise<string> {
+    httpBaseUrl: string;
+    createAssetUrl: (input: {
+      environmentId: EnvironmentId;
+      input: AssetCreateUrlInput;
+    }) => Promise<AtomCommandResult<AssetCreateUrlResult, unknown>>;
+  },
+  t: TFunction<"chat">,
+): Promise<string> {
   const { attachment } = input;
   const result = await input.createAssetUrl({
     environmentId: input.environmentId,
@@ -649,20 +654,23 @@ export async function resolveFileAttachmentUrl(input: {
   });
   if (result._tag === "Failure") throw squashAtomCommandFailure(result);
   const url = resolveAssetUrl(input.httpBaseUrl, result.value.relativeUrl);
-  if (url === null) throw new Error("The environment returned an invalid attachment URL.");
+  if (url === null) throw new Error(t(($) => $.composer.invalidAttachmentUrl));
   return url;
 }
 
-export async function prepareRevertedMessageAttachments(input: {
-  message: ChatMessage;
-  environmentId: EnvironmentId;
-  httpBaseUrl: string;
-  createAssetUrl: Parameters<typeof resolveFileAttachmentUrl>[0]["createAssetUrl"];
-}): Promise<File[]> {
+export async function prepareRevertedMessageAttachments(
+  input: {
+    message: ChatMessage;
+    environmentId: EnvironmentId;
+    httpBaseUrl: string;
+    createAssetUrl: Parameters<typeof resolveFileAttachmentUrl>[0]["createAssetUrl"];
+  },
+  t: TFunction<"chat">,
+): Promise<File[]> {
   return Promise.all(
     (input.message.attachments ?? []).map(async (attachment) => {
       if (attachment.type !== "image" && attachment.type !== "file") {
-        throw new Error("This message has an attachment that cannot be restored.");
+        throw new Error(t(($) => $.composer.unrestorableAttachment));
       }
       const result = await input.createAssetUrl({
         environmentId: input.environmentId,
@@ -677,9 +685,10 @@ export async function prepareRevertedMessageAttachments(input: {
       });
       if (result._tag === "Failure") throw squashAtomCommandFailure(result);
       const url = resolveAssetUrl(input.httpBaseUrl, result.value.relativeUrl);
-      if (url === null) throw new Error("The environment returned an invalid attachment URL.");
+      if (url === null) throw new Error(t(($) => $.composer.invalidAttachmentUrl));
       const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-      if (!response.ok) throw new Error(`Could not restore attachment: ${attachment.name}`);
+      if (!response.ok)
+        throw new Error(t(($) => $.composer.restoreAttachmentFailed, { name: attachment.name }));
       return new File([await response.blob()], attachment.name, { type: attachment.mimeType });
     }),
   );
@@ -780,20 +789,18 @@ export function deriveComposerSendState(options: {
 export function buildExpiredTerminalContextToastCopy(
   expiredTerminalContextCount: number,
   variant: "omitted" | "empty",
+  t: TFunction<"chat">,
 ): { title: string; description: string } {
   const count = Math.max(1, Math.floor(expiredTerminalContextCount));
-  const noun = count === 1 ? "Expired terminal context" : "Expired terminal contexts";
-  const pronoun = count === 1 ? "it" : "them";
-  if (variant === "empty") {
-    return {
-      title: `${noun} won't be sent`,
-      description: `Remove ${pronoun} or re-add ${pronoun} to include terminal output.`,
-    };
-  }
-  return {
-    title: `${noun} omitted from message`,
-    description: `Re-add ${pronoun} if you want that terminal output included.`,
-  };
+  return variant === "empty"
+    ? {
+        title: t(($) => $.composer.expiredTerminalEmpty, { count }),
+        description: t(($) => $.composer.expiredTerminalEmptyDescription, { count }),
+      }
+    : {
+        title: t(($) => $.composer.expiredTerminalOmitted, { count }),
+        description: t(($) => $.composer.expiredTerminalOmittedDescription, { count }),
+      };
 }
 
 export function branchMismatchKey(
@@ -913,13 +920,16 @@ export function deriveLockedProvider(input: {
   return narrowedThreadProvider ?? narrowedSelectedProvider ?? null;
 }
 
-export function getStartedThreadModelChangeBlockReason(input: {
-  hasStartedSession: boolean;
-  supportsProviderSwitchingViaHandoff?: boolean;
-  currentModelSelection: ModelSelection;
-  currentProviderInstanceId?: ModelSelection["instanceId"] | null | undefined;
-  nextModelSelection: ModelSelection;
-}): { title: string; description: string } | null {
+export function getStartedThreadModelChangeBlockReason(
+  input: {
+    hasStartedSession: boolean;
+    supportsProviderSwitchingViaHandoff?: boolean;
+    currentModelSelection: ModelSelection;
+    currentProviderInstanceId?: ModelSelection["instanceId"] | null | undefined;
+    nextModelSelection: ModelSelection;
+  },
+  t: TFunction<"chat">,
+): { title: string; description: string } | null {
   if (!input.hasStartedSession) {
     return null;
   }
@@ -934,8 +944,8 @@ export function getStartedThreadModelChangeBlockReason(input: {
     return null;
   }
   return {
-    title: "Start a new chat to switch providers",
-    description: "This thread does not support switching providers after it has started.",
+    title: t(($) => $.composer.switchProviderNewChat),
+    description: t(($) => $.composer.threadCannotSwitchProvider),
   };
 }
 
@@ -957,6 +967,7 @@ export async function waitForRevertedMessage(
   turnCount: number,
   requestId: CommandId,
   revert: () => Promise<void>,
+  t: TFunction<"chat">,
   timeoutMs = 120_000,
 ): Promise<void> {
   const threadAtom = environmentThreadDetails.stateAtom(threadRef);
@@ -980,7 +991,7 @@ export async function waitForRevertedMessage(
     return latest === undefined || run.ordinal > latest.ordinal ? run : latest;
   }, undefined);
   if (witness === undefined) {
-    throw new Error("The thread has changed. Select a message to rewind again.");
+    throw new Error(t(($) => $.composer.threadChangedRewind));
   }
   return new Promise<void>((resolve, reject) => {
     let settled = false;
@@ -1022,7 +1033,7 @@ export async function waitForRevertedMessage(
     };
     unsubscribe = appAtomRegistry.subscribe(threadAtom, inspect);
     timeout = globalThis.setTimeout(() => {
-      finish(new Error("Timed out waiting for the thread to rewind."));
+      finish(new Error(t(($) => $.composer.rewindTimeout)));
     }, timeoutMs);
     Promise.resolve()
       .then(revert)
@@ -1280,8 +1291,8 @@ export type LocalThreadErrorEntry = {
   readonly at: number;
 };
 
-export function chatActionErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "An error occurred.";
+export function chatActionErrorMessage(error: unknown, t: TFunction<"chat">): string {
+  return error instanceof Error ? error.message : t(($) => $.composer.errorOccurred);
 }
 
 export function releaseChatTimelineAnchor<T extends { readonly messageId: MessageId | null }>(
@@ -1343,14 +1354,18 @@ export function makeModelDisabledReason(
     Parameters<typeof getStartedThreadModelChangeBlockReason>[0],
     "nextModelSelection"
   > | null,
+  t: TFunction<"chat">,
 ) {
   return (instanceId: ProviderInstanceId, model: string): string | null => {
     if (!context) return null;
-    const reason = getStartedThreadModelChangeBlockReason({
-      ...context,
-      nextModelSelection: { instanceId, model },
-    });
-    return reason ? `${reason.description} Start a new thread to use this model.` : null;
+    const reason = getStartedThreadModelChangeBlockReason(
+      {
+        ...context,
+        nextModelSelection: { instanceId, model },
+      },
+      t,
+    );
+    return reason ? t(($) => $.composer.newThreadForModel) : null;
   };
 }
 

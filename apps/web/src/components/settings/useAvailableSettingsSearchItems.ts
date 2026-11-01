@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { AuthEnvironmentMaintainScope } from "@t3tools/contracts";
 
 import { usePrimaryCloudLinkState } from "~/cloud/cloudLinkState";
@@ -9,15 +10,16 @@ import { useEnvironments, usePrimaryEnvironmentId } from "~/state/environments";
 import { usePeerLinkHosts } from "~/state/peerLinks";
 import { useEnvironmentQuery } from "~/state/query";
 import { useEnvironmentScope } from "~/state/session";
-import { isWslSettingsRowVisible } from "./ConnectionsSettings.logic";
-import { isProviderSettingsEnvironmentAvailable } from "./ProviderSettingsPanel.logic";
-import type { SettingsScopeSearch } from "./settingsScope";
+import { isWslSettingsRowVisible } from "~/components/settings/ConnectionsSettings.logic";
+import { isProviderSettingsEnvironmentAvailable } from "~/components/settings/ProviderSettingsPanel.logic";
+import type { SettingsScopeSearch } from "~/components/settings/settingsScope";
 import {
   filterAvailableSettingsSearchItems,
   getThreadAutoSettlementSearchAvailability,
-} from "./settingsSearch";
+} from "~/components/settings/settingsSearch";
 
 export function useAvailableSettingsSearchItems(scopeSearch: SettingsScopeSearch = {}) {
+  const { t } = useTranslation("settings");
   const { environments } = useEnvironments();
   // Explicit booleans keep flags out of the filter cache so environment updates do not rebuild the list.
   const hasEnvironment =
@@ -58,16 +60,19 @@ export function useAvailableSettingsSearchItems(scopeSearch: SettingsScopeSearch
   const wslSettingsRowVisible =
     isWslSettingsRowVisible({ state: desktopWsl.data, error: desktopWsl.error }) === true;
 
-  return filterAvailableSettingsSearchItems({
-    localEnvironmentDisabled,
-    hasCloudPublicConfig: cloudPublicConfig,
-    hasEnvironment,
-    hasProviderSettingsEnvironment,
-    hasMacProviderSettingsEnvironment,
-    canManageLocalBackend,
-    isWslSettingsRowVisible: wslSettingsRowVisible,
-    hasThreadAutoSettlement,
-    managedTunnelActive,
-    hasPeerLinkHost,
-  });
+  return filterAvailableSettingsSearchItems(
+    {
+      localEnvironmentDisabled,
+      hasCloudPublicConfig: cloudPublicConfig,
+      hasEnvironment,
+      hasProviderSettingsEnvironment,
+      hasMacProviderSettingsEnvironment,
+      canManageLocalBackend,
+      isWslSettingsRowVisible: wslSettingsRowVisible,
+      hasThreadAutoSettlement,
+      managedTunnelActive,
+      hasPeerLinkHost,
+    },
+    t,
+  );
 }

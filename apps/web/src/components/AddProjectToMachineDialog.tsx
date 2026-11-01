@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useParams } from "@tanstack/react-router";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import {
@@ -91,6 +92,8 @@ export function AddProjectToMachineDialogHost() {
 }
 
 function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRequest }) {
+  const { t } = useTranslation("workspace");
+  const { t: tCommon } = useTranslation("common");
   const id = useId();
   const project = useProject(request.projectRef);
   const handleNewThread = useNewThreadHandler();
@@ -139,7 +142,9 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
     .reduce((total, file) => total + file.byteLength, 0);
 
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<
+    { readonly kind: "folder" } | { readonly kind: "clone"; readonly cause: unknown } | null
+  >(null);
 
   // The project or every target can vanish while the dialog is open. Submitting
   // before the file list loads would silently skip the default .env copies.
@@ -181,30 +186,34 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
   const submit = async () => {
     if (!project || !target || submitting) return;
     if (destinationPath.trim().length === 0) {
-      setError("Choose a folder on the other machine.");
+      setError({ kind: "folder" });
       return;
     }
     setSubmitting(true);
     setError(null);
     const projectId = newProjectId();
     try {
-      await addProjectToMachine({
-        source: { environmentId: project.environmentId, cwd: project.workspaceRoot },
-        subdirectory: projectSubdirectory(
-          project.repositoryIdentity?.rootPath,
-          project.workspaceRoot,
-        ),
-        target: { environmentId: target.environmentId, label: target.label },
-        projectId,
-        title: project.title,
-        remoteUrl,
-        destinationPath: destinationPath.trim(),
-        files: files.filter((file) => selectedFiles.has(file.path)).map((file) => file.path),
-      });
+      await addProjectToMachine(
+        {
+          source: { environmentId: project.environmentId, cwd: project.workspaceRoot },
+          subdirectory: projectSubdirectory(
+            project.repositoryIdentity?.rootPath,
+            project.workspaceRoot,
+          ),
+          target: { environmentId: target.environmentId, label: target.label },
+          projectId,
+          title: project.title,
+          remoteUrl,
+          destinationPath: destinationPath.trim(),
+          files: files.filter((file) => selectedFiles.has(file.path)).map((file) => file.path),
+        },
+        tCommon,
+        t,
+      );
       close();
       openClonedProject(scopeProjectRef(target.environmentId, projectId));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not start the clone.");
+      setError({ kind: "clone", cause });
       setSubmitting(false);
     }
   };
@@ -225,10 +234,13 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
           }}
         >
           <DialogHeader>
-            <DialogTitle>Add to another machine</DialogTitle>
+            <DialogTitle>{t(($) => $.clone.title)}</DialogTitle>
             <DialogDescription>
-              Clone {project?.repositoryIdentity?.displayName ?? project?.title} and bring the local
-              files git does not track.
+              {project
+                ? t(($) => $.clone.description, {
+                    project: project.repositoryIdentity?.displayName ?? project.title,
+                  })
+                : t(($) => $.clone.projectUnavailable)}
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
@@ -239,7 +251,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                     kind={resolveEnvironmentMachineKind(source?.serverConfig ?? null)}
                     className="size-3.5 shrink-0"
                   />
-                  <span className="truncate">{source?.label ?? "This machine"}</span>
+                  <span className="truncate">{source?.label ?? t(($) => $.clone.thisMachine)}</span>
                 </span>
                 <span className="flex min-w-0 font-mono text-muted-foreground text-xs">
                   <MiddleTruncate value={project?.workspaceRoot ?? ""} />
@@ -253,8 +265,8 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                 </span>
                 <span>
                   {selectedFiles.size === 0
-                    ? "no files"
-                    : `+ ${selectedFiles.size} ${selectedFiles.size === 1 ? "file" : "files"}`}
+                    ? t(($) => $.clone.noFiles)
+                    : t(($) => $.clone.addedFiles, { count: selectedFiles.size })}
                 </span>
               </div>
               <div className="flex min-w-0 flex-col gap-1">
@@ -266,7 +278,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                     }}
                     items={targets.map((t) => ({ value: t.environmentId, label: t.label }))}
                   >
-                    <SelectTrigger size="sm" aria-label="Machine to add the project to">
+                    <SelectTrigger size="sm" aria-label={t(($) => $.clone.targetMachine)}>
                       {target ? (
                         <EnvironmentMachineIcon kind={target.machine} className="size-3.5" />
                       ) : null}
@@ -288,7 +300,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                     {target ? (
                       <EnvironmentMachineIcon kind={target.machine} className="size-3.5 shrink-0" />
                     ) : null}
-                    <span className="truncate">{target?.label ?? "No machine available"}</span>
+                    <span className="truncate">{target?.label ?? t(($) => $.clone.noMachine)}</span>
                   </span>
                 )}
                 <span className="flex min-w-0 font-mono text-muted-foreground text-xs">
@@ -298,10 +310,10 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label>Clone over</Label>
+              <Label>{t(($) => $.clone.protocol)}</Label>
               {sshUrl && httpsUrl ? (
                 <ToggleGroup
-                  aria-label="Clone protocol"
+                  aria-label={t(($) => $.clone.protocolLabel)}
                   value={protocol ? [protocol] : []}
                   onValueChange={(next) => {
                     const value = next[0];
@@ -316,7 +328,11 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${id}-path`}>Folder on {target?.label ?? "the other machine"}</Label>
+              <Label htmlFor={`${id}-path`}>
+                {t(($) => $.clone.folderOn, {
+                  machine: target?.label ?? t(($) => $.clone.otherMachine),
+                })}
+              </Label>
               <Input
                 id={`${id}-path`}
                 value={destinationPath}
@@ -331,12 +347,20 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
             {canListFiles ? (
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
-                  <Label className="flex-1">Copy ignored files</Label>
+                  <Label className="flex-1">{t(($) => $.clone.copyIgnored)}</Label>
                   {copyable.length > 0 ? (
                     <>
                       <span className="text-muted-foreground text-xs">
-                        {selectedFiles.size} of {files.length}
-                        {selectedBytes > 0 ? ` · ${formatBytes(selectedBytes)}` : ""}
+                        {selectedBytes > 0
+                          ? t(($) => $.clone.selectedSize, {
+                              selected: selectedFiles.size,
+                              total: files.length,
+                              size: formatBytes(selectedBytes),
+                            })
+                          : t(($) => $.clone.selected, {
+                              selected: selectedFiles.size,
+                              total: files.length,
+                            })}
                       </span>
                       <Button
                         type="button"
@@ -350,7 +374,9 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                           )
                         }
                       >
-                        {selectedFiles.size === copyable.length ? "None" : "All"}
+                        {selectedFiles.size === copyable.length
+                          ? t(($) => $.clone.none)
+                          : t(($) => $.clone.all)}
                       </Button>
                     </>
                   ) : null}
@@ -360,8 +386,8 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                 ) : files.length === 0 ? (
                   <p className="text-muted-foreground text-xs">
                     {ignoredFiles.isSuccess
-                      ? "No ignored files to copy."
-                      : "Finding ignored files…"}
+                      ? t(($) => $.clone.noIgnored)
+                      : t(($) => $.clone.finding)}
                   </p>
                 ) : (
                   <div className="max-h-52 overflow-y-auto rounded-md border">
@@ -377,24 +403,33 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                 )}
                 {ignoredFiles.data?.truncated ? (
                   <p className="text-muted-foreground text-xs">
-                    Showing the first {files.length} files.
+                    {t(($) => $.clone.truncated, { count: files.length })}
                   </p>
                 ) : null}
-                <p className="text-muted-foreground text-xs">
-                  Files are copied after the clone finishes. Folders git ignores whole, like
-                  node_modules, are left out.
-                </p>
+                <p className="text-muted-foreground text-xs">{t(($) => $.clone.copyDescription)}</p>
               </div>
             ) : null}
 
-            {error ? <p className="text-destructive-foreground text-sm">{error}</p> : null}
+            {error ? (
+              <p className="text-destructive-foreground text-sm">
+                {error.kind === "folder"
+                  ? t(($) => $.clone.chooseFolder)
+                  : error.cause instanceof Error
+                    ? error.cause.message
+                    : t(($) => $.clone.startFailed)}
+              </p>
+            ) : null}
           </DialogPanel>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={close}>
-              Cancel
+              {t(($) => $.cancel)}
             </Button>
             <Button type="submit" disabled={unavailable || submitting}>
-              {submitting ? "Starting…" : `Clone to ${target?.label ?? "machine"}`}
+              {submitting
+                ? t(($) => $.clone.starting)
+                : t(($) => $.clone.cloneTo, {
+                    machine: target?.label ?? t(($) => $.clone.machine),
+                  })}
             </Button>
           </DialogFooter>
         </form>
@@ -435,13 +470,14 @@ function IgnoredFileRow({
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
 }) {
+  const { t } = useTranslation("workspace");
   const tooLarge = file.byteLength > COPYABLE_FILE_MAX_BYTES;
   return (
     <label className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-sm not-last:border-b has-disabled:cursor-not-allowed has-disabled:opacity-64">
       <Checkbox checked={checked} disabled={tooLarge} onCheckedChange={onCheckedChange} />
       <span className="min-w-0 flex-1 truncate font-mono text-xs">{file.path}</span>
       <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
-        {tooLarge ? "Over 1 MB" : formatBytes(file.byteLength)}
+        {tooLarge ? t(($) => $.clone.tooLarge) : formatBytes(file.byteLength)}
       </span>
     </label>
   );

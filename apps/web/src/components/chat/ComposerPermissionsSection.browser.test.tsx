@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import type { RuntimeMode } from "@t3tools/contracts";
 import { type ReactNode, useRef, useState } from "react";
 import { expect, it, vi } from "vite-plus/test";
@@ -13,8 +14,9 @@ import {
   useComposerMenuProps,
 } from "./composerEventScope";
 import { ComposerFooterModeControls, ComposerPermissionsSection } from "./ComposerFooterControls";
-import { runtimeModeConfig, runtimeModeOptions } from "./runtimeModeConfig";
+import { getRuntimeModeConfig, runtimeModeOptions } from "./runtimeModeConfig";
 
+const runtimeModeConfig = getRuntimeModeConfig(createI18n("en").getFixedT(null, "chat"));
 const options = runtimeModeOptions.map((mode) => ({ mode, ...runtimeModeConfig[mode] }));
 
 // Mirrors the overflow menu: mode radio items first, then the Permissions section.

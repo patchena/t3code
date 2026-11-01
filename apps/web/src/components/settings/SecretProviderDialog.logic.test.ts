@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { SecretProviderId } from "@t3tools/contracts";
 import * as Result from "effect/Result";
 import { describe, expect, it } from "vite-plus/test";
@@ -7,9 +8,14 @@ import { secretProviderFromDraft } from "./SecretProviderDialog.logic";
 describe("secretProviderFromDraft", () => {
   it("adds a provider keyed by its name and reports every field that blocks it", () => {
     expect(
-      secretProviderFromDraft({ name: "  1Password!  ", account: "my.1password.com" }, new Set(), {
-        mode: "add",
-      }),
+      secretProviderFromDraft(
+        { name: "  1Password!  ", account: "my.1password.com" },
+        new Set(),
+        {
+          mode: "add",
+        },
+        createI18n("en").getFixedT("en", "settings"),
+      ),
     ).toEqual(
       Result.succeed({
         id: "1password",
@@ -25,6 +31,7 @@ describe("secretProviderFromDraft", () => {
       { name: "1Password", account: "--help" },
       new Set(["1password"]),
       { mode: "add" },
+      createI18n("en").getFixedT("en", "settings"),
     );
     expect(Result.isFailure(blocked) && Object.keys(blocked.failure).toSorted()).toEqual([
       "account",
@@ -38,6 +45,7 @@ describe("secretProviderFromDraft", () => {
       { name: "Personal (team)", account: "team.1password.com" },
       new Set(["personal"]),
       { mode: "edit", id },
+      createI18n("en").getFixedT("en", "settings"),
     );
     expect(Result.isSuccess(result) && result.success).toEqual({
       id,

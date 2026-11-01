@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type {
   EnvironmentId,
   PullRequestDiffSide,
@@ -16,24 +17,24 @@ import { RelativeTime } from "~/components/RelativeTime";
 import { cn } from "~/lib/utils";
 import { SpeechTextField, TextFieldSpeechControls } from "~/speech/useTextFieldSpeech";
 
-import { Button } from "../ui/button";
+import { Button } from "~/components/ui/button";
 import { MorphIcon } from "~/components/MorphIcon";
-import { PullRequestEditButton } from "./PullRequestEditButton";
-import { isCommentSubmitShortcut } from "../diffs/commentSubmitShortcut";
+import { PullRequestEditButton } from "~/components/pullRequest/PullRequestEditButton";
+import { isCommentSubmitShortcut } from "~/components/diffs/commentSubmitShortcut";
 import {
   editPullRequestThreadComment,
   mergePullRequestThreadComments,
   visibleBody,
-} from "./pullRequestDetail.logic";
-import { PullRequestActorLabel } from "./pullRequestPresentation";
-import { PullRequestMarkdown } from "./PullRequestMarkdown";
-import { PullRequestMarkdownEditor } from "./PullRequestMarkdownEditor";
-import { PullRequestReactionBar } from "./PullRequestReactions";
-import type { PendingReviewComment } from "./pullRequestReviewStore";
+} from "~/components/pullRequest/pullRequestDetail.logic";
+import { PullRequestActorLabel } from "~/components/pullRequest/pullRequestPresentation";
+import { PullRequestMarkdown } from "~/components/pullRequest/PullRequestMarkdown";
+import { PullRequestMarkdownEditor } from "~/components/pullRequest/PullRequestMarkdownEditor";
+import { PullRequestReactionBar } from "~/components/pullRequest/PullRequestReactions";
+import type { PendingReviewComment } from "~/components/pullRequest/pullRequestReviewStore";
 import {
   PullRequestMarkdownTextarea,
   type PullRequestCompletionScope,
-} from "./PullRequestMarkdownTextarea";
+} from "~/components/pullRequest/PullRequestMarkdownTextarea";
 
 const CARD_CLASS =
   "mx-3 my-2 rounded-xl border border-border/70 bg-background p-3 text-sm shadow-sm";
@@ -85,6 +86,7 @@ export function PendingReviewCommentCard({
   comment: PendingReviewComment;
   onRemove: () => void;
 }) {
+  const { t } = useTranslation("workspace");
   return (
     <div
       className={cn(CARD_CLASS, "border-dashed")}
@@ -93,12 +95,12 @@ export function PendingReviewCommentCard({
     >
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <MessageSquareIcon className="size-3.5" />
-        <span>Pending. Sent when you submit the review</span>
+        <span>{t(($) => $.git.pendingReviewComment)}</span>
         <Button
           size="icon-xs"
           variant="ghost"
           className="ml-auto"
-          aria-label="Discard this comment"
+          aria-label={t(($) => $.git.discardComment)}
           onClick={onRemove}
         >
           <Trash2Icon className="size-3.5" />
@@ -120,7 +122,7 @@ export function ReviewThreadCard({
   completionScope,
   pending,
   fixPending,
-  fixLabel = "Fix in a thread",
+  fixLabel: fixLabelOverride,
   onFix,
   onAddToChat,
   onReply,
@@ -154,6 +156,8 @@ export function ReviewThreadCard({
   onToggleResolved: () => void;
   onReacted: () => void;
 }) {
+  const { t } = useTranslation("workspace");
+  const fixLabel = fixLabelOverride ?? t(($) => $.git.fixInThread);
   const [expanded, setExpanded] = useState(!thread.isResolved);
   const [replying, setReplying] = useState(false);
   const [reply, setReply] = useState("");
@@ -244,10 +248,10 @@ export function ReviewThreadCard({
           aria-expanded={expanded}
           onClick={() => setExpanded((current) => !current)}
         >
-          {thread.isResolved ? "Resolved" : "Open"} · {commentCount}{" "}
-          {commentCount === 1 ? "comment" : "comments"}
+          {thread.isResolved ? t(($) => $.git.resolved) : t(($) => $.git.open)} ·{" "}
+          {t(($) => $.git.commentCount, { count: commentCount, value: String(commentCount) })}
         </button>
-        {thread.isOutdated ? <span>outdated</span> : null}
+        {thread.isOutdated ? <span>{t(($) => $.git.outdatedLower)}</span> : null}
         {onFix ? (
           <Button
             size="xs"
@@ -257,7 +261,7 @@ export function ReviewThreadCard({
             onClick={onFix}
           >
             <HammerIcon className="size-3" />
-            {fixPending ? "Preparing..." : fixLabel}
+            {fixPending ? t(($) => $.git.preparing) : fixLabel}
           </Button>
         ) : null}
         {onAddToChat && comments.some((comment) => visibleBody(comment.body) !== null) ? (
@@ -268,7 +272,7 @@ export function ReviewThreadCard({
             onClick={() => onAddToChat({ ...thread, comments })}
           >
             <MessageSquarePlusIcon className="size-3" />
-            Add to chat
+            {t(($) => $.git.addToChat)}
           </Button>
         ) : null}
         {canResolve ? (
@@ -279,7 +283,7 @@ export function ReviewThreadCard({
             disabled={pending}
             onClick={onToggleResolved}
           >
-            {thread.isResolved ? "Unresolve" : "Resolve"}
+            {thread.isResolved ? t(($) => $.git.unresolve) : t(($) => $.git.resolve)}
           </Button>
         ) : null}
       </div>
@@ -311,7 +315,7 @@ export function ReviewThreadCard({
                     cwd={workspaceRoot}
                     environmentId={environmentId}
                     completionScope={completionScope}
-                    label="Edit comment"
+                    label={t(($) => $.git.editComment)}
                     saving={savingEdit}
                     onSave={(body) => void saveEdit(comment.id, body)}
                     onCancel={() => setEditingId(null)}
@@ -326,7 +330,7 @@ export function ReviewThreadCard({
                     />
                     {canEditComment(comment) ? (
                       <PullRequestEditButton
-                        aria-label="Edit comment"
+                        aria-label={t(($) => $.git.editComment)}
                         onClick={() => setEditingId(comment.id)}
                       />
                     ) : null}
@@ -343,7 +347,7 @@ export function ReviewThreadCard({
                 disabled={loadingMore}
                 onClick={() => void loadMore()}
               >
-                {loadingMore ? "Loading..." : "Load more comments"}
+                {loadingMore ? t(($) => $.git.loadingEllipsis) : t(($) => $.git.loadMoreComments)}
               </Button>
             </div>
           ) : null}
@@ -368,8 +372,8 @@ export function ReviewThreadCard({
                       size="sm"
                       completionScope={completionScope}
                       value={reply}
-                      placeholder="Reply"
-                      aria-label="Reply to this conversation"
+                      placeholder={t(($) => $.git.reply)}
+                      aria-label={t(($) => $.git.replyToConversation)}
                       onValueChange={setReply}
                       onKeyDown={submitKeys({
                         value: reply,
@@ -383,7 +387,7 @@ export function ReviewThreadCard({
                     <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
                       <TextFieldSpeechControls speech={speech} disabled={pending} />
                       <Button size="xs" variant="ghost" onClick={() => setReplying(false)}>
-                        Cancel
+                        {t(($) => $.git.cancel)}
                       </Button>
                       <Button
                         size="xs"
@@ -394,7 +398,7 @@ export function ReviewThreadCard({
                         }
                         onClick={() => speech.submitAfterDictation((text) => void send(text))}
                       >
-                        Reply
+                        {t(($) => $.git.reply)}
                       </Button>
                     </div>
                   </div>
@@ -402,7 +406,7 @@ export function ReviewThreadCard({
               </SpeechTextField>
             ) : (
               <Button size="xs" variant="ghost" className="mt-2" onClick={() => setReplying(true)}>
-                Reply
+                {t(($) => $.git.reply)}
               </Button>
             )
           ) : null}

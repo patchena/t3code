@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
 import {
   EDITORS,
   type ContextMenuItem,
@@ -59,11 +61,12 @@ export interface FileContextMenuCapabilities {
 function buildFileContextMenuItems(input: {
   readonly hasAbsolutePath: boolean;
   readonly capabilities: FileContextMenuCapabilities;
+  readonly t: TFunction<"files">;
 }): readonly ContextMenuItem<FileContextMenuAction>[] {
   if (!input.hasAbsolutePath) return [];
   const items: ContextMenuItem<FileContextMenuAction>[] = [];
   if (input.capabilities.canOpenDefault) {
-    items.push({ id: "open", label: "Open", icon: "pencil" });
+    items.push({ id: "open", label: input.t(($) => $.open), icon: "pencil" });
   }
   if (input.capabilities.revealLabel !== undefined) {
     items.push({
@@ -76,7 +79,7 @@ function buildFileContextMenuItems(input: {
   if (editorIds.length > 0) {
     items.push({
       id: "open-with",
-      label: "Open with",
+      label: input.t(($) => $.openWith),
       children: editorIds.map((editorId) => ({
         id: `editor:${editorId}` as FileContextMenuAction,
         label: EDITOR_LABEL_BY_ID.get(editorId) ?? editorId,
@@ -87,6 +90,8 @@ function buildFileContextMenuItems(input: {
 }
 
 export function useFileContextMenu(environmentId: EnvironmentId | null) {
+  const { t } = useTranslation("files");
+  const { t: tTools } = useTranslation("tools");
   const openInEditor = useAtomCommand(shellEnvironment.openInEditor, { reportFailure: false });
   const serverConfig = useAtomValue(serverEnvironment.configValueAtom(environmentId));
 
@@ -98,8 +103,8 @@ export function useFileContextMenu(environmentId: EnvironmentId | null) {
       serverConfig?.shellRevealInFileManager === true &&
       serverConfig.availableEditors.includes("file-manager")
         ? serverConfig.shellRevealInFileManagerKind === undefined
-          ? revealInFileExplorerLabelForOs(serverConfig.environment.platform.os)
-          : revealInFileExplorerLabelForKind(serverConfig.shellRevealInFileManagerKind)
+          ? revealInFileExplorerLabelForOs(serverConfig.environment.platform.os, tTools)
+          : revealInFileExplorerLabelForKind(serverConfig.shellRevealInFileManagerKind, tTools)
         : undefined,
     canOpenDefault: availableEditors.includes("file-manager"),
     editorIds: availableEditors,
@@ -128,10 +133,10 @@ export function useFileContextMenu(environmentId: EnvironmentId | null) {
       type: "error",
       title:
         action === "open"
-          ? "Could not open file"
+          ? t(($) => $.openFailed)
           : reveal
-            ? "Unable to reveal file"
-            : `Could not open in ${EDITOR_LABEL_BY_ID.get(editor) ?? editor}`,
+            ? t(($) => $.revealFailed)
+            : t(($) => $.openInFailed, { editor: EDITOR_LABEL_BY_ID.get(editor) ?? editor }),
       description: absolutePath,
     });
   };
@@ -144,6 +149,7 @@ export function useFileContextMenu(environmentId: EnvironmentId | null) {
     const items = buildFileContextMenuItems({
       hasAbsolutePath: resolveFileContextMenuAbsolutePath(target) !== null,
       capabilities,
+      t,
     });
     if (items.length === 0 || api === undefined) return;
     const clicked = await api.contextMenu.show(items, position);
@@ -156,6 +162,7 @@ export function useFileContextMenu(environmentId: EnvironmentId | null) {
       buildFileContextMenuItems({
         hasAbsolutePath: resolveFileContextMenuAbsolutePath(target) !== null,
         capabilities,
+        t,
       }),
     capabilities,
     activate,

@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { LineAnnotation, SelectedLineRange } from "@pierre/diffs";
 
 export interface FileCommentAnnotationEntry {
@@ -31,8 +32,14 @@ export function normalizeFileCommentRange(range: SelectedLineRange): {
   };
 }
 
-export function formatFileCommentRange(startLine: number, endLine: number): string {
-  return startLine === endLine ? `L${startLine}` : `L${startLine} to L${endLine}`;
+export function formatFileCommentRange(
+  startLine: number,
+  endLine: number,
+  t: TFunction<"files">,
+): string {
+  return startLine === endLine
+    ? t(($) => $.preview.line, { line: startLine })
+    : t(($) => $.preview.lineRange, { start: startLine, end: endLine });
 }
 
 export function remapFileCommentAnnotations(

@@ -4,12 +4,21 @@ import { ThreadId, TurnItemId, type OrchestrationV2TurnItem } from "@t3tools/con
 import * as DateTime from "effect/DateTime";
 
 import {
-  resolveWorkEntryToolPresentation,
+  resolveWorkEntryToolPresentation as resolveTranslatedPresentation,
   toolItemForDisplay,
+  summarizeToolGroup,
   type WorkLogPresentationEntry,
   workEntryIndicatesToolFailure,
   workEntryDisplayIndicatesToolFailure,
 } from "./presentation.js";
+
+import { createI18n } from "@t3tools/client-runtime/i18n";
+
+const t = createI18n("en").getFixedT("en", "activity");
+const resolveWorkEntryToolPresentation = (
+  entry: Parameters<typeof resolveTranslatedPresentation>[0],
+  status?: Parameters<typeof resolveTranslatedPresentation>[2],
+) => resolveTranslatedPresentation(entry, t, status);
 
 function commandItem(
   fields: Partial<Extract<OrchestrationV2TurnItem, { type: "command_execution" }>> = {},
@@ -185,6 +194,16 @@ describe("resolveWorkEntryToolPresentation", () => {
         toolData: { arguments: { url } },
       })?.displayName,
     ).toMatch(new RegExp(` ${target}$`));
+    expect(
+      resolveTranslatedPresentation(
+        {
+          label: "T3-code.link_pull_request",
+          toolLifecycleStatus: "completed",
+          toolData: { arguments: { url } },
+        },
+        createI18n("de").getFixedT("de", "activity"),
+      )?.displayName,
+    ).toBe(`${target} verknüpft`);
   });
 
   it("does not brand unknown tools or another server's matching tool name", () => {
@@ -202,5 +221,43 @@ describe("resolveWorkEntryToolPresentation", () => {
         toolData: { server: "another-server", tool: "preview_click" },
       }),
     ).toBeNull();
+  });
+});
+
+describe("summarizeToolGroup", () => {
+  it("joins complete translated actions while retaining raw command text", () => {
+    const entries: WorkLogPresentationEntry[] = [
+      {
+        id: "command",
+        createdAt: "2026-09-08T00:00:00Z",
+        label: "Command",
+        tone: "tool",
+        itemType: "command_execution",
+        command: "echo unchanged",
+      },
+      {
+        id: "file",
+        createdAt: "2026-09-08T00:00:01Z",
+        label: "File change",
+        tone: "tool",
+        itemType: "file_change",
+        changedFiles: ["src/original.ts"],
+      },
+      {
+        id: "browser",
+        createdAt: "2026-09-08T00:00:02Z",
+        label: "preview_click",
+        tone: "tool",
+        itemType: "dynamic_tool",
+      },
+    ];
+    expect(summarizeToolGroup(entries, t, "en").summary).toBe(
+      "Ran 1 command, changed 1 file, and performed 1 other action",
+    );
+    expect(
+      summarizeToolGroup(entries, createI18n("de").getFixedT("de", "activity"), "de").summary,
+    ).toBe("1 Befehl ausgeführt, 1 Datei geändert und 1 weitere Aktion ausgeführt");
+    expect(entries[0]?.command).toBe("echo unchanged");
+    expect(entries[1]?.changedFiles).toEqual(["src/original.ts"]);
   });
 });

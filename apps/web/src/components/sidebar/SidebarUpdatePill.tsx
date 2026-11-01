@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
 import {
   type DesktopBridge,
   type DesktopUpdateState,
@@ -7,13 +9,13 @@ import { TriangleAlertIcon } from "lucide-react";
 import { type ComponentProps, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import { isElectron } from "../../env";
-import { useMediaQuery } from "../../hooks/useMediaQuery";
-import { cn } from "../../lib/utils";
-import { ensureLocalApi } from "../../localApi";
-import { useDesktopUpdateState } from "../../state/desktopUpdate";
-import { usePrimaryManagedPolicy } from "../../state/managedPolicy";
-import { stackedThreadToast, toastManager } from "../ui/toast";
+import { isElectron } from "~/env";
+import { useMediaQuery } from "~/hooks/useMediaQuery";
+import { cn } from "~/lib/utils";
+import { ensureLocalApi } from "~/localApi";
+import { useDesktopUpdateState } from "~/state/desktopUpdate";
+import { usePrimaryManagedPolicy } from "~/state/managedPolicy";
+import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import {
   canCheckForUpdate,
   getArm64IntelBuildWarningDescription,
@@ -26,28 +28,39 @@ import {
   resolveDesktopUpdateButtonAction,
   shouldShowArm64IntelBuildWarning,
   shouldToastDesktopUpdateActionResult,
-} from "../desktopUpdate.logic";
-import { showDesktopUpdateDownloadedToast } from "../desktopUpdate.toast";
-import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
-import { Popover, PopoverCreateHandle, PopoverPopup, PopoverTrigger } from "../ui/popover";
-import { SidebarMenuItem } from "../ui/sidebar";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+} from "~/components/desktopUpdate.logic";
+import { showDesktopUpdateDownloadedToast } from "~/components/desktopUpdate.toast";
+import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
+import {
+  Popover,
+  PopoverCreateHandle,
+  PopoverPopup,
+  PopoverTrigger,
+} from "~/components/ui/popover";
+import { SidebarMenuItem } from "~/components/ui/sidebar";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import {
   DesktopUpdateStatusIcon,
   type DesktopUpdateStatusIconState,
   shouldContinueDesktopUpdateCheckAnimation,
   shouldShowDesktopUpdateCheckIcon,
-} from "./DesktopUpdateStatusIcon";
-import { SidebarUpdateReleaseNotes } from "./SidebarUpdateReleaseNotes";
-import { SidebarUpdateCapsule } from "./SidebarUpdateCapsule";
-import { UpdateEverythingDialog } from "./UpdateEverythingDialog";
-import type { UpdateEverythingRun, UpdateRunLocalState } from "./updateEverything.logic";
+} from "~/components/sidebar/DesktopUpdateStatusIcon";
+import { SidebarUpdateReleaseNotes } from "~/components/sidebar/SidebarUpdateReleaseNotes";
+import { SidebarUpdateCapsule } from "~/components/sidebar/SidebarUpdateCapsule";
+import { UpdateEverythingDialog } from "~/components/sidebar/UpdateEverythingDialog";
+import type {
+  UpdateEverythingRun,
+  UpdateRunLocalState,
+} from "~/components/sidebar/updateEverything.logic";
 import {
   clearSavedUpdateEverythingResult,
   saveUpdateEverythingResult,
   useUpdateEverythingRun,
-} from "./updateEverythingRun";
-import { type ReportLocalUpdateError, useUpdateEverything } from "./useUpdateEverything";
+} from "~/components/sidebar/updateEverythingRun";
+import {
+  type ReportLocalUpdateError,
+  useUpdateEverything,
+} from "~/components/sidebar/useUpdateEverything";
 
 type SidebarUpdatePopoverChangeDetails = Parameters<
   NonNullable<ComponentProps<typeof Popover>["onOpenChange"]>
@@ -120,16 +133,17 @@ export function SidebarUpdateArchitectureWarning() {
 }
 
 function SidebarUpdateArchitectureWarningContent() {
+  const { t } = useTranslation("workspace");
   const state = useDesktopUpdateState();
   const visible = shouldShowArm64IntelBuildWarning(state);
-  const description = state && visible ? getArm64IntelBuildWarningDescription(state) : null;
+  const description = state && visible ? getArm64IntelBuildWarningDescription(state, t) : null;
 
   if (!visible || !description) return null;
 
   return (
     <Alert variant="warning">
       <TriangleAlertIcon />
-      <AlertTitle>Intel build on Apple Silicon</AlertTitle>
+      <AlertTitle>{t(($) => $.updates.intelBuildOnAppleSilicon)}</AlertTitle>
       <AlertDescription>{description}</AlertDescription>
     </Alert>
   );
@@ -145,21 +159,26 @@ export async function downloadLocalUpdate(
     notifyDownloaded,
     reportError = toastUpdateError,
   }: { readonly notifyDownloaded: boolean; readonly reportError?: ReportLocalUpdateError },
+  t: TFunction<"workspace">,
 ): Promise<boolean> {
   try {
     const result = await bridge.downloadUpdate();
     if (result.completed && notifyDownloaded) {
-      showDesktopUpdateDownloadedToast(bridge, result.state);
+      showDesktopUpdateDownloadedToast(bridge, result.state, t);
     }
     const actionError = shouldToastDesktopUpdateActionResult(result)
       ? getDesktopUpdateActionError(result)
       : null;
-    if (actionError) reportError("Could not download update", actionError);
+    if (actionError)
+      reportError(
+        t(($) => $.updates.couldNotDownloadUpdate),
+        actionError,
+      );
     return result.completed;
   } catch (error) {
     reportError(
-      "Could not start update download",
-      error instanceof Error ? error.message : "An unexpected error occurred.",
+      t(($) => $.updates.couldNotStartUpdateDownload),
+      error instanceof Error ? error.message : t(($) => $.updates.anUnexpectedErrorOccurred),
     );
     return false;
   }
@@ -167,25 +186,29 @@ export async function downloadLocalUpdate(
 
 export async function installLocalUpdate(
   bridge: DesktopBridge,
+  t: TFunction<"workspace">,
   reportError: ReportLocalUpdateError = toastUpdateError,
   expectedVersion?: string,
 ): Promise<boolean> {
   try {
     const result = await bridge.installUpdate(expectedVersion);
     if (!result.accepted) {
-      showDesktopUpdateDownloadedToast(bridge, result.state);
+      showDesktopUpdateDownloadedToast(bridge, result.state, t);
       return false;
     }
     const actionError = shouldToastDesktopUpdateActionResult(result)
       ? getDesktopUpdateActionError(result)
       : null;
     if (!actionError) return true;
-    reportError("Could not install update", actionError);
+    reportError(
+      t(($) => $.updates.couldNotInstallUpdate),
+      actionError,
+    );
     return false;
   } catch (error) {
     reportError(
-      "Could not install update",
-      error instanceof Error ? error.message : "An unexpected error occurred.",
+      t(($) => $.updates.couldNotInstallUpdate),
+      error instanceof Error ? error.message : t(($) => $.updates.anUnexpectedErrorOccurred),
     );
     return false;
   }
@@ -196,6 +219,7 @@ export function SidebarUpdatePill() {
 }
 
 function SidebarUpdateControl() {
+  const { t } = useTranslation("workspace");
   const state = useDesktopUpdateState();
   // The desktop updates this machine, whose policy the primary environment reports.
   const updatesDenial = managedUpdatesDenial(usePrimaryManagedPolicy());
@@ -246,16 +270,18 @@ function SidebarUpdateControl() {
     showCheckIcon,
   });
   const idleTooltip =
-    !showUpdateDetails && !showCheckIcon ? getDesktopUpdateIdleTooltip(state, updatesDenial) : null;
+    !showUpdateDetails && !showCheckIcon
+      ? getDesktopUpdateIdleTooltip(state, t, updatesDenial)
+      : null;
   const tooltip = runsEverything
     ? everything.summary
     : showUpdateDetails
       ? state
-        ? getDesktopUpdateButtonTooltip(state)
-        : "Update available"
+        ? getDesktopUpdateButtonTooltip(state, t)
+        : t(($) => $.updates.updateAvailable)
       : showCheckIcon
-        ? "Checking for updates…"
-        : (idleTooltip?.title ?? "Check for updates");
+        ? t(($) => $.updates.checkingForUpdates)
+        : (idleTooltip?.title ?? t(($) => $.updates.checkForUpdates));
   const disabled = showCheckIcon
     ? true
     : runsEverything
@@ -290,7 +316,7 @@ function SidebarUpdateControl() {
     setIsActionPending(true);
 
     if (action === "download") {
-      void downloadLocalUpdate(bridge, { notifyDownloaded: true }).finally(() =>
+      void downloadLocalUpdate(bridge, { notifyDownloaded: true }, t).finally(() =>
         setIsActionPending(false),
       );
       return;
@@ -300,15 +326,16 @@ function SidebarUpdateControl() {
       let confirmed = false;
       try {
         confirmed = await ensureLocalApi().dialogs.confirm(
-          getDesktopUpdateInstallConfirmationMessage(state),
+          getDesktopUpdateInstallConfirmationMessage(state, t),
         );
       } catch (error) {
         setIsActionPending(false);
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not confirm update",
-            description: error instanceof Error ? error.message : "Update confirmation failed.",
+            title: t(($) => $.updates.couldNotConfirmUpdate),
+            description:
+              error instanceof Error ? error.message : t(($) => $.updates.updateConfirmationFailed),
           }),
         );
         return;
@@ -317,7 +344,7 @@ function SidebarUpdateControl() {
         setIsActionPending(false);
         return;
       }
-      void installLocalUpdate(bridge).finally(() => setIsActionPending(false));
+      void installLocalUpdate(bridge, t).finally(() => setIsActionPending(false));
       return;
     }
 
@@ -332,11 +359,11 @@ function SidebarUpdateControl() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not check for updates",
+            title: t(($) => $.updates.couldNotCheckForUpdates),
             description:
               updatesDenial ??
               result.state.message ??
-              "Automatic updates are not available in this build.",
+              t(($) => $.updates.automaticUpdatesAreNotAvailableInThisBuild),
           }),
         );
       })
@@ -344,8 +371,9 @@ function SidebarUpdateControl() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: "Could not check for updates",
-            description: error instanceof Error ? error.message : "Update check failed.",
+            title: t(($) => $.updates.couldNotCheckForUpdates),
+            description:
+              error instanceof Error ? error.message : t(($) => $.updates.updateCheckFailed),
           }),
         );
       })
@@ -361,11 +389,11 @@ function SidebarUpdateControl() {
         ...(bridge && action === "download"
           ? {
               downloadLocal: (reportError) =>
-                downloadLocalUpdate(bridge, { notifyDownloaded: false, reportError }),
+                downloadLocalUpdate(bridge, { notifyDownloaded: false, reportError }, t),
             }
           : {}),
         ...(bridge && action !== "none"
-          ? { installLocal: (reportError) => installLocalUpdate(bridge, reportError) }
+          ? { installLocal: (reportError) => installLocalUpdate(bridge, t, reportError) }
           : {}),
       }),
     );
@@ -374,8 +402,9 @@ function SidebarUpdateControl() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: "Could not update everything",
-          description: error instanceof Error ? error.message : "An unexpected error occurred.",
+          title: t(($) => $.updates.couldNotUpdateEverything),
+          description:
+            error instanceof Error ? error.message : t(($) => $.updates.anUnexpectedErrorOccurred),
         }),
       );
     }
@@ -437,7 +466,7 @@ function SidebarUpdateControl() {
                     failures: [],
                     restarting: [],
                   });
-                  if (!(await installLocalUpdate(window.desktopBridge!))) {
+                  if (!(await installLocalUpdate(window.desktopBridge!, t))) {
                     clearSavedUpdateEverythingResult();
                   }
                 },
@@ -551,7 +580,7 @@ function SidebarUpdateControl() {
         {showReleaseNotesPopover && state ? (
           <PopoverPopup
             align="center"
-            aria-label="Update release notes"
+            aria-label={t(($) => $.updates.updateReleaseNotes)}
             initialFocus={false}
             onKeyDownCapture={(event) => {
               if (

@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   DESKTOP_PREVIEW_RECORDING_CAPTURE_TRIGGER,
   PreviewCaptureFailure,
@@ -112,8 +113,48 @@ export class BrowserRecordingOperationError extends Schema.TaggedError<BrowserRe
 }
 
 const isBrowserRecordingOperationError = Schema.is(BrowserRecordingOperationError);
+const isBrowserRecordingUnavailableError = Schema.is(BrowserRecordingUnavailableError);
+const isBrowserRecordingConflictError = Schema.is(BrowserRecordingConflictError);
+const isBrowserRecordingFormatUnavailableError = Schema.is(BrowserRecordingFormatUnavailableError);
 const isBrowserRecordingCaptureTimeoutError = Schema.is(BrowserRecordingCaptureTimeoutError);
 export const isBrowserRecordingStartCancelledError = Schema.is(BrowserRecordingStartCancelledError);
+
+export function describeBrowserRecordingError(error: unknown, t: TFunction<"tools">): string {
+  if (isBrowserRecordingUnavailableError(error)) {
+    return t(($) => $.previewRecordingUnavailable, { tabId: error.tabId });
+  }
+  if (isBrowserRecordingConflictError(error)) {
+    return t(($) => $.previewRecordingConflict, {
+      requestedTabId: error.requestedTabId,
+      activeTabId: error.activeTabId,
+    });
+  }
+  if (isBrowserRecordingStartCancelledError(error)) {
+    return t(($) => $.previewRecordingCancelled, { tabId: error.tabId });
+  }
+  if (isBrowserRecordingFormatUnavailableError(error)) {
+    return t(($) => $.previewRecordingFormat, { tabId: error.tabId });
+  }
+  if (isBrowserRecordingCaptureTimeoutError(error)) {
+    return t(($) => $.previewRecordingTimeout, { tabId: error.tabId, timeoutMs: error.timeoutMs });
+  }
+  if (isBrowserRecordingOperationError(error)) {
+    if (isPreviewCaptureFailure(error.cause)) return error.cause.message;
+    const cause = error.cause instanceof AggregateError ? error.cause.cause : error.cause;
+    if (
+      error.operation === "capture-media-stream" &&
+      cause instanceof DOMException &&
+      cause.name === "NotReadableError"
+    ) {
+      return t(($) => $.previewRecordingSource, { diagnosis: `${cause.name}: ${cause.message}` });
+    }
+    return t(($) => $.previewRecordingOperation, {
+      operation: error.operation,
+      tabId: error.tabId,
+    });
+  }
+  return error instanceof Error ? error.message : t(($) => $.error);
+}
 
 interface StartingBrowserRecordingLifecycle {
   readonly phase: "starting";

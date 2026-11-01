@@ -1,6 +1,7 @@
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
@@ -48,6 +49,7 @@ export function ClerkUserProfileRefreshButton({
   readonly isPending: boolean;
   readonly onClick: () => void;
 }) {
+  const { t } = useTranslation("connect");
   return (
     <Button
       size="sm"
@@ -57,7 +59,7 @@ export function ClerkUserProfileRefreshButton({
       onClick={onClick}
     >
       <RefreshIcon aria-hidden="true" size="sm" refreshing={isPending} />
-      Refresh
+      {t(($) => $.actions.refresh)}
     </Button>
   );
 }

@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import {
   EnvironmentId,
   ProjectId,
@@ -204,7 +205,9 @@ describe("v2 thread shell lists", () => {
 
     withRequest("user_input");
     expect(registry.get(parent)?.pendingSubagentRequest).toBe("user_input");
-    expect(childThreadInputsTitle(registry.get(inputs))).toBe("Side chat needs input");
+    expect(
+      childThreadInputsTitle(registry.get(inputs), createI18n("en").getFixedT("en", "activity")),
+    ).toBe("Side chat needs input");
     expect(registry.get(threads.navigationThreadShellsAtom).map((thread) => thread.id)).toEqual([
       root.id,
     ]);
@@ -214,7 +217,9 @@ describe("v2 thread shell lists", () => {
 
     withRequest("command");
     expect(registry.get(parent)?.pendingSubagentRequest).toBe("approval");
-    expect(childThreadInputsTitle(registry.get(inputs))).toBe("Side chat needs approval");
+    expect(
+      childThreadInputsTitle(registry.get(inputs), createI18n("en").getFixedT("en", "activity")),
+    ).toBe("Side chat needs approval");
 
     const helper = {
       ...sideChat,
@@ -300,7 +305,9 @@ describe("v2 thread shell lists", () => {
     expect(isThreadWorking(registry.get(parent)!)).toBe(false);
     const asking = registry.get(inputs);
     expect(asking.map((thread) => thread.id)).toEqual([grandchild.id]);
-    expect(childThreadInputsTitle(asking)).toBe("Subagent needs approval");
+    expect(childThreadInputsTitle(asking, createI18n("en").getFixedT("en", "activity"))).toBe(
+      "Subagent needs approval",
+    );
 
     registry.set(snapshotAtom(environmentId), {
       ...v2ShellSnapshot,

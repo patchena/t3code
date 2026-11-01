@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { SourceControlProviderKind } from "@t3tools/contracts";
 import type {
   EnvironmentId,
@@ -37,11 +38,13 @@ import {
   pullRequestOverrideAfterAction,
   reusePullRequestEntries,
   settlePullRequestOverrides,
-} from "./pullRequestList.logic";
+} from "~/components/pullRequest/pullRequestList.logic";
 import {
   readPullRequestListPreferences,
   writePullRequestListPreferences,
-} from "./pullRequestListPreferences";
+} from "~/components/pullRequest/pullRequestListPreferences";
+
+const t = createI18n("en").getFixedT(null, "workspace");
 
 const VIEWERS = { "github.com": "Bilal" } as const;
 
@@ -325,7 +328,7 @@ describe("partitioning with the hosts' own priority reads", () => {
     const older = entry({ number: 1, updatedAt: "2026-07-05T00:00:00Z" });
     const newer = entry({ number: 2, updatedAt: "2026-07-06T00:00:00Z" });
     const mine = authoredRow(3, "2026-07-04T00:00:00Z");
-    const groups = partitionPullRequestsWithPriority([newer, older, mine], [mine], []);
+    const groups = partitionPullRequestsWithPriority([newer, older, mine], [mine], [], t);
     expect(groups.map((group) => group.key)).toEqual(["authored", "others"]);
     expect(groups[1]!.entries.map((item) => item.number)).toEqual([2, 1]);
     expect(groups[0]!.entries.map((item) => item.number)).toEqual([3]);
@@ -343,7 +346,12 @@ describe("partitioning with the hosts' own priority reads", () => {
       viewerReviewRequested: true,
       updatedAt: "2026-06-02T00:00:00Z",
     });
-    const groups = partitionPullRequestsWithPriority([], [both], [both, requestedOlder, requested]);
+    const groups = partitionPullRequestsWithPriority(
+      [],
+      [both],
+      [both, requestedOlder, requested],
+      t,
+    );
     expect(groups.map((group) => group.key)).toEqual(["authored", "reviewRequested"]);
     expect(groups[0]!.entries.map((item) => item.number)).toEqual([1]);
     expect(groups[1]!.entries.map((item) => item.number)).toEqual([2, 3]);
@@ -498,7 +506,7 @@ describe('who "I" am, per server', () => {
       [ENV_2, answer({ "github.com": "Octocat" }, [entry({ number: 2, author: byBilal })])],
     ])!;
 
-    const groups = groupPullRequestsByInvolvement(merged.entries, merged.viewers);
+    const groups = groupPullRequestsByInvolvement(merged.entries, merged.viewers, t);
     expect(
       groups.find((group) => group.key === "authored")?.entries.map((row) => row.number),
     ).toEqual([1]);
@@ -558,7 +566,7 @@ describe("the priority groups against a paginated feed", () => {
     ];
     const feed = [newest, entry({ number: 6123, updatedAt: "2026-08-11T09:00:00Z" })];
 
-    const groups = partitionPullRequestsWithPriority(feed, [newest, ...older], []);
+    const groups = partitionPullRequestsWithPriority(feed, [newest, ...older], [], t);
 
     expect(
       groups.find((group) => group.key === "authored")?.entries.map((row) => row.number),

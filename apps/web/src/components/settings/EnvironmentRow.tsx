@@ -1,12 +1,14 @@
 import {
   type ConnectionTarget,
   connectionRouteId,
-  connectionRouteLabel,
   connectionRoutes,
 } from "@t3tools/client-runtime/connection";
 import type { DesktopSshEnvironmentTarget, EnvironmentMachineKind } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { connectionRouteLabel } from "~/connection/presentation";
 
 import { cn } from "~/lib/utils";
 import type { EnvironmentPresentation } from "~/state/environments";
@@ -21,10 +23,11 @@ export function formatDesktopSshTarget(target: DesktopSshEnvironmentTarget): str
 
 export function environmentTransportLabel(
   environment: EnvironmentPresentation,
+  t: TFunction<"connect">,
   activeTarget: ConnectionTarget | null = null,
 ): string {
   const { entry } = environment;
-  if (entry.target._tag === "PrimaryConnectionTarget") return "This machine";
+  if (entry.target._tag === "PrimaryConnectionTarget") return t(($) => $.connection.thisMachine);
   const routes = connectionRoutes(entry);
   if (routes.length > 1) {
     const active =
@@ -34,8 +37,8 @@ export function environmentTransportLabel(
             (route) => connectionRouteId(route.target) === connectionRouteId(activeTarget),
           );
     return active === undefined
-      ? connectionRouteLabel(routes[0]!)
-      : `via ${connectionRouteLabel(active)}`;
+      ? connectionRouteLabel(routes[0]!, t)
+      : t(($) => $.connection.viaRoute, { route: connectionRouteLabel(active, t) });
   }
   if (environment.relayManaged) return "T3 Connect";
   if (isDesktopLocalConnectionTarget(entry.target)) return "WSL";
@@ -46,13 +49,15 @@ export function environmentTransportLabel(
   ) {
     return `SSH ${formatDesktopSshTarget(entry.profile.value.target)}`;
   }
-  return environment.displayUrl ?? "Remote link";
+  return environment.displayUrl ?? t(($) => $.connection.remoteLink);
 }
 
 export function useEnvironmentTransportLabel(environment: EnvironmentPresentation): string {
+  const { t } = useTranslation("connect");
   const prepared = usePreparedConnection(environment.environmentId);
   return environmentTransportLabel(
     environment,
+    t,
     environment.connection.phase === "connected" && prepared._tag === "Some"
       ? prepared.value.target
       : null,

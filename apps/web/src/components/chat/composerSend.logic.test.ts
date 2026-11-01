@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { describe, expect, it } from "vite-plus/test";
@@ -10,6 +11,8 @@ import {
   multipleModelSendBlock,
   referencedThreadContexts,
 } from "./composerSend.logic";
+
+const chatT = createI18n("en").getFixedT(null, "chat");
 
 const local = EnvironmentId.make("local");
 const remote = EnvironmentId.make("remote");
@@ -28,31 +31,40 @@ describe("referencedThreadContexts", () => {
 describe("loadBalancingSendWarning", () => {
   it("asks the user to wait while resource checks run", () => {
     expect(
-      loadBalancingSendWarning({
-        pending: true,
-        threadContexts: [localThread, remoteThread],
-        candidateEnvironmentIds: [],
-      }).title,
+      loadBalancingSendWarning(
+        {
+          pending: true,
+          threadContexts: [localThread, remoteThread],
+          candidateEnvironmentIds: [],
+        },
+        chatT,
+      ).title,
     ).toBe("Checking machine resources");
   });
 
   it("blames the attached threads when no machine can read all of them", () => {
     expect(
-      loadBalancingSendWarning({
-        pending: false,
-        threadContexts: [localThread, remoteThread],
-        candidateEnvironmentIds: [local, remote],
-      }).description,
+      loadBalancingSendWarning(
+        {
+          pending: false,
+          threadContexts: [localThread, remoteThread],
+          candidateEnvironmentIds: [local, remote],
+        },
+        chatT,
+      ).description,
     ).toMatch(/No machine can read every attached thread/);
   });
 
   it("blames resources when one machine can read every attached thread", () => {
     expect(
-      loadBalancingSendWarning({
-        pending: false,
-        threadContexts: [localThread],
-        candidateEnvironmentIds: [remote, local],
-      }).description,
+      loadBalancingSendWarning(
+        {
+          pending: false,
+          threadContexts: [localThread],
+          candidateEnvironmentIds: [remote, local],
+        },
+        chatT,
+      ).description,
     ).toMatch(/No eligible machine has available resources/);
   });
 });
@@ -99,28 +111,28 @@ describe("approvalRedirectNotice", () => {
   };
 
   it("says the decline went through when the draft changed after it", () => {
-    expect(approvalRedirectNotice({ ...settled, draftChanged: true })).toBe(
+    expect(approvalRedirectNotice({ ...settled, draftChanged: true }, chatT)).toBe(
       "Approval declined. Your message changed, so it wasn't sent.",
     );
-    expect(approvalRedirectNotice({ ...settled, draftChanged: true, declined: false })).toBe(
+    expect(approvalRedirectNotice({ ...settled, draftChanged: true, declined: false }, chatT)).toBe(
       "Your message changed, so it wasn't sent.",
     );
   });
 
   it("explains an approval already being answered", () => {
     expect(
-      approvalRedirectNotice({ ...settled, declined: false, approvalResponding: true }),
+      approvalRedirectNotice({ ...settled, declined: false, approvalResponding: true }, chatT),
     ).toMatch(/already being answered/);
   });
 
   it("explains an approval that arrived during the decline", () => {
-    expect(approvalRedirectNotice({ ...settled, approvalArrived: true })).toMatch(
+    expect(approvalRedirectNotice({ ...settled, approvalArrived: true }, chatT)).toMatch(
       /Another approval arrived/,
     );
   });
 
   it("stays quiet when the decline failed or the user left the thread", () => {
-    expect(approvalRedirectNotice({ ...settled, declined: false })).toBeNull();
-    expect(approvalRedirectNotice(settled)).toBeNull();
+    expect(approvalRedirectNotice({ ...settled, declined: false }, chatT)).toBeNull();
+    expect(approvalRedirectNotice(settled, chatT)).toBeNull();
   });
 });

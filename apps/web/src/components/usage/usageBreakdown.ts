@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { UsageTokenTotals } from "@t3tools/contracts";
 import {
   isModelCostUnknown,
@@ -45,31 +46,75 @@ const TYPE_COLORS = {
   other: ink(44),
 };
 
-export function costTypeSegments(cost: CategoryCost): readonly ShareSegment[] {
+export function costTypeSegments(
+  cost: CategoryCost,
+  t: TFunction<"files">,
+): readonly ShareSegment[] {
   return [
-    { label: "Input", value: cost.input, color: TYPE_COLORS.input },
-    { label: "Cache read", value: cost.cacheRead, color: TYPE_COLORS.cacheRead },
-    { label: "Cache write", value: cost.cacheWrite, color: TYPE_COLORS.cacheWrite },
-    { label: "Output", value: cost.output, color: TYPE_COLORS.output },
-    { label: "Other", value: cost.unsplit >= 0.005 ? cost.unsplit : 0, color: TYPE_COLORS.other },
+    { id: "input", label: t(($) => $.usage.input), value: cost.input, color: TYPE_COLORS.input },
+    {
+      id: "cacheRead",
+      label: t(($) => $.usage.cacheRead),
+      value: cost.cacheRead,
+      color: TYPE_COLORS.cacheRead,
+    },
+    {
+      id: "cacheWrite",
+      label: t(($) => $.usage.cacheWrite),
+      value: cost.cacheWrite,
+      color: TYPE_COLORS.cacheWrite,
+    },
+    {
+      id: "output",
+      label: t(($) => $.usage.output),
+      value: cost.output,
+      color: TYPE_COLORS.output,
+    },
+    {
+      id: "other",
+      label: t(($) => $.usage.other),
+      value: cost.unsplit >= 0.005 ? cost.unsplit : 0,
+      color: TYPE_COLORS.other,
+    },
   ];
 }
 
 export function tokenTypeSegments(
   tokens: Omit<UsageTokenTotals, "reasoningTokens">,
+  t: TFunction<"files">,
 ): readonly ShareSegment[] {
   return [
-    { label: "Input", value: tokens.uncachedInputTokens, color: TYPE_COLORS.input },
-    { label: "Cache read", value: tokens.cachedInputTokens, color: TYPE_COLORS.cacheRead },
-    { label: "Cache write", value: tokens.cacheCreationTokens, color: TYPE_COLORS.cacheWrite },
-    { label: "Output", value: tokens.outputTokens, color: TYPE_COLORS.output },
+    {
+      id: "input",
+      label: t(($) => $.usage.input),
+      value: tokens.uncachedInputTokens,
+      color: TYPE_COLORS.input,
+    },
+    {
+      id: "cacheRead",
+      label: t(($) => $.usage.cacheRead),
+      value: tokens.cachedInputTokens,
+      color: TYPE_COLORS.cacheRead,
+    },
+    {
+      id: "cacheWrite",
+      label: t(($) => $.usage.cacheWrite),
+      value: tokens.cacheCreationTokens,
+      color: TYPE_COLORS.cacheWrite,
+    },
+    {
+      id: "output",
+      label: t(($) => $.usage.output),
+      value: tokens.outputTokens,
+      color: TYPE_COLORS.output,
+    },
   ];
 }
 
-export function speedCostSegments(cost: SpeedCost): readonly ShareSegment[] {
+export function speedCostSegments(cost: SpeedCost, t: TFunction<"files">): readonly ShareSegment[] {
   return [
-    { label: "Standard", value: cost.standard, color: ink(34) },
-    { label: "Fast", value: cost.fast, color: ink(66) },
-    { label: "Ultrafast", value: cost.ultrafast, color: ink(100) },
+    { id: "standard", label: t(($) => $.usage.standard), value: cost.standard, color: ink(34) },
+    { id: "fast", label: t(($) => $.usage.fast), value: cost.fast, color: ink(66) },
+    { id: "ultrafast", label: t(($) => $.usage.ultrafast), value: cost.ultrafast, color: ink(100) },
   ];
 }

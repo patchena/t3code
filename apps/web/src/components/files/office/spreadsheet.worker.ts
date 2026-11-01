@@ -1,3 +1,4 @@
+import { FileWorkerError } from "~/components/files/fileWorkerError";
 // Adapted from opencode (MIT). Copyright (c) 2025 opencode. See LICENSE.opencode.
 import {
   initWasm,
@@ -35,7 +36,11 @@ const state: State = { opened: undefined };
 
 serveWorker<SheetMethods>({
   open: async (input) => {
-    if (state.opened) throw new Error("The worker already holds a workbook");
+    if (state.opened)
+      throw new FileWorkerError({
+        message: "The worker already holds a workbook",
+        code: "workerHasWorkbook",
+      });
 
     await initWasm();
 
@@ -62,7 +67,13 @@ serveWorker<SheetMethods>({
     // One sheet that fails to open leaves the others readable: go back to the sheet on show.
     attempt(() => show(opened, current));
 
-    throw new Error(`Sheet ${input.sheet} could not open`);
+    throw new FileWorkerError({
+      message: `Sheet ${input.sheet} could not open`,
+      detail: {
+        kind: "sheet",
+        sheet: input.sheet,
+      },
+    });
   },
   frame: (input) => {
     const opened = active(input.sheet);
@@ -143,7 +154,11 @@ serveWorker<SheetMethods>({
 });
 
 function required() {
-  if (!state.opened) throw new Error("The worker holds no workbook");
+  if (!state.opened)
+    throw new FileWorkerError({
+      message: "The worker holds no workbook",
+      code: "workerNoWorkbook",
+    });
 
   return state.opened;
 }

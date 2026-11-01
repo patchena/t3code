@@ -78,6 +78,14 @@ describe("parseNewThreadLink", () => {
     expect(parseThreadLinkPrompt("?prompt=%E2%80%8B").ok).toBe(false);
     expect(parseNewThreadLink("?prompt=x&repo=../etc").ok).toBe(false);
     expect(parseNewThreadLink(`?prompt=${"x".repeat(8_001)}`).ok).toBe(false);
+    expect(parseNewThreadLink(`?prompt=${"x".repeat(8_001)}`)).toEqual({
+      ok: false,
+      error: { kind: "too-long", limit: 8_000 },
+    });
+    expect(parseThreadLinkPrompt("?prompt=%E2%80%8B")).toEqual({
+      ok: false,
+      error: { kind: "hidden" },
+    });
   });
 });
 

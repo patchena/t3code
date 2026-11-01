@@ -5,7 +5,7 @@ import {
   buildDiffFileTreeUpdates,
   diffFileTreeEntries,
   orderDiffFilesLikeTree,
-} from "./diffFileTree.logic";
+} from "~/components/diffs/diffFileTree.logic";
 
 function file(type: FileDiffMetadata["type"], name: string, prevName = name): FileDiffMetadata {
   return { type, name, prevName } as FileDiffMetadata;

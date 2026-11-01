@@ -1,3 +1,4 @@
+import { appI18n } from "~/i18n";
 import { AuthPreviewOperateScope, type EnvironmentId } from "@t3tools/contracts";
 import type { AnyRouter } from "@tanstack/react-router";
 
@@ -36,6 +37,7 @@ const CHAT_ROUTE_ID = "/_chat";
 export function installChatRouteCommands(router: AnyRouter): () => void {
   const handleNewThread = createNewThreadHandler(router);
   const scratch = createScratchProjectActions({
+    t: appI18n.getFixedT(null, "common"),
     environments: () =>
       [...appAtomRegistry.get(environmentPresentations.presentationsAtom)].map(
         ([environmentId, presentation]) => ({ ...presentation, environmentId }),
@@ -79,13 +81,16 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
   };
   // Grouped like the sidebar, so the shortcut and the New thread button agree.
   const readProjectGroups = () =>
-    buildSidebarProjectSnapshots({
-      projects: readProjects(),
-      groupScratchProjects: true,
-      settings: selectProjectGroupingSettings(getClientSettings()),
-      primaryEnvironmentId: appAtomRegistry.get(primaryEnvironmentIdAtom),
-      resolveEnvironmentLabel: () => null,
-    });
+    buildSidebarProjectSnapshots(
+      {
+        projects: readProjects(),
+        groupScratchProjects: true,
+        settings: selectProjectGroupingSettings(getClientSettings()),
+        primaryEnvironmentId: appAtomRegistry.get(primaryEnvironmentIdAtom),
+        resolveEnvironmentLabel: () => null,
+      },
+      appI18n.getFixedT(null, "common"),
+    );
   const canOperatePreview = (environmentId: EnvironmentId) =>
     readEnvironmentScope(environmentId, AuthPreviewOperateScope);
 
@@ -149,8 +154,8 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
           toastManager.add(
             stackedThreadToast({
               type: "info",
-              title: "Preview is desktop-only",
-              description: "Open T3 Code in the desktop app to use the in-app preview.",
+              title: appI18n.t(($) => $.misc.desktopPreview),
+              description: appI18n.t(($) => $.misc.desktopPreviewDescription),
             }),
           );
           return;

@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   PROVIDER_SEND_TURN_MAX_FILE_BYTES,
   WS_METHODS,
@@ -199,12 +200,16 @@ export function formatAttachmentSize(sizeBytes: number): string {
   return kilobytes >= 1024 ? `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB` : `${kilobytes} KB`;
 }
 
-export function fileAttachmentTooLargeMessage(name: string, maxUploadBytes: number): string {
+export function fileAttachmentTooLargeMessage(
+  name: string,
+  maxUploadBytes: number,
+  t: TFunction<"chat">,
+): string {
   const maxUploadSize =
     maxUploadBytes >= 1024 * 1024 && maxUploadBytes % (1024 * 1024) === 0
       ? `${maxUploadBytes / (1024 * 1024)} MB`
       : maxUploadBytes >= 1024 && maxUploadBytes % 1024 === 0
         ? `${maxUploadBytes / 1024} KB`
-        : `${maxUploadBytes} ${maxUploadBytes === 1 ? "byte" : "bytes"}`;
-  return `'${name}' exceeds the ${maxUploadSize} attachment limit.`;
+        : t(($) => $.composer.bytes, { count: maxUploadBytes });
+  return t(($) => $.composer.attachmentTooLarge, { name, size: maxUploadSize });
 }

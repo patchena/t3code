@@ -1,4 +1,5 @@
 import type { ThreadStructure } from "@t3tools/client-runtime/state/shell";
+import { useTranslation } from "react-i18next";
 import {
   AuthOrchestrationOperateScope,
   type EnvironmentId,
@@ -123,6 +124,7 @@ export function usePendingThreadRequests(input: {
   readonly composerRef: RefObject<ChatComposerHandle | null>;
   readonly setThreadError: (threadId: ThreadId, error: string | null) => void;
 }) {
+  const { t } = useTranslation("chat");
   const {
     environmentId,
     activeThreadId,
@@ -288,7 +290,7 @@ export function usePendingThreadRequests(input: {
       const error = squashAtomCommandFailure(result);
       setThreadError(
         activeThreadId,
-        error instanceof Error ? error.message : "Failed to submit approval decision.",
+        error instanceof Error ? error.message : t(($) => $.approval.submitFailed),
       );
     }
     setRespondingRequestIds((existing) => existing.filter((id) => id !== requestId));
@@ -327,7 +329,7 @@ export function usePendingThreadRequests(input: {
       if (!uploaded) {
         setThreadError(
           activeThreadId,
-          "Wait for attachments to finish uploading, or remove failed uploads.",
+          t(($) => $.approval.waitUploads),
         );
         return;
       }
@@ -353,7 +355,7 @@ export function usePendingThreadRequests(input: {
       const error = squashAtomCommandFailure(result);
       setThreadError(
         activeThreadId,
-        error instanceof Error ? error.message : "Failed to submit user input.",
+        error instanceof Error ? error.message : t(($) => $.approval.inputFailed),
       );
     }
     userInputResponsesInFlight.current.delete(responseKey);
@@ -375,7 +377,7 @@ export function usePendingThreadRequests(input: {
       const error = squashAtomCommandFailure(result);
       setThreadError(
         activeThreadId,
-        error instanceof Error ? error.message : "Failed to dismiss the question.",
+        error instanceof Error ? error.message : t(($) => $.approval.dismissFailed),
       );
     }
     setRespondingUserInputRequestIds((existing) => existing.filter((id) => id !== requestId));
@@ -407,8 +409,8 @@ export function usePendingThreadRequests(input: {
       setComposerDraftPrompt(composerDraftTarget, nextPrompt);
       toastManager.add({
         type: "info",
-        title: "Your typed text was set aside",
-        description: "It will be back in the composer once the question is answered.",
+        title: t(($) => $.composer.draftSetAside),
+        description: t(($) => $.composer.draftRestoredLater),
         data: { threadRef: activeThreadId ? { environmentId, threadId: activeThreadId } : null },
       });
       if (activeThreadId) {

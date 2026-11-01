@@ -49,6 +49,7 @@ export interface VcsActionState {
   readonly actionId: string | null;
   readonly action: GitStackedAction | null;
   readonly currentLabel: string | null;
+  readonly currentPhase: GitActionProgressPhase | null;
   readonly currentPhaseLabel: string | null;
   readonly hookName: string | null;
   readonly lastOutputLine: string | null;
@@ -154,6 +155,7 @@ export const EMPTY_VCS_ACTION_STATE = Object.freeze<VcsActionState>({
   actionId: null,
   action: null,
   currentLabel: null,
+  currentPhase: null,
   currentPhaseLabel: null,
   hookName: null,
   lastOutputLine: null,
@@ -348,6 +350,7 @@ export function applyVcsActionProgressEvent(
         action: event.action,
         operation: "run_change_request",
         currentLabel: event.label,
+        currentPhase: event.phase,
         currentPhaseLabel: event.label,
         phaseStartedAtMs: now,
         hookStartedAtMs: null,

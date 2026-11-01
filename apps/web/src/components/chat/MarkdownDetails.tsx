@@ -1,4 +1,5 @@
 import { ChevronRightIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   Children,
   isValidElement,
@@ -15,6 +16,7 @@ export function MarkdownDetails({
   children,
   open = false,
 }: Pick<ComponentProps<"details">, "children" | "open">) {
+  const { t } = useTranslation("chat");
   const [isOpen, setIsOpen] = useState(open);
   const searching = use(MarkdownFindContext);
   const expanded = isOpen;
@@ -30,7 +32,7 @@ export function MarkdownDetails({
   const summary =
     isValidElement<{ children?: ReactNode }>(summaryNode) && summaryNode.props.children
       ? summaryNode.props.children
-      : "Details";
+      : t(($) => $.markdown.details);
   const content = childNodes.filter((_, index) => index !== summaryIndex);
 
   return (

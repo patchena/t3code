@@ -8,6 +8,7 @@ import {
 } from "@t3tools/contracts";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   CONNECT_ONBOARDING_OPT_OUT_STORAGE_KEY,
@@ -50,6 +51,7 @@ type OnboardingStep = "publish" | "devices";
 const EMPTY_SESSION_STATE_ATOM = Atom.make(AsyncResult.initial<AuthSessionState>());
 
 function ConfiguredConnectOnboardingDialog() {
+  const { t } = useTranslation("connect");
   // Pending Clerk sessions must not look signed out or activation would look like a new sign-in.
   const { isLoaded, isSignedIn, userId } = useAuth({ treatPendingAsSignedOut: false });
   const [optOutState, setOptOutState] = useLocalStorage(
@@ -188,10 +190,10 @@ function ConfiguredConnectOnboardingDialog() {
     if (!ok) return;
     toastManager.add({
       type: "success",
-      title: "T3 Connect enabled",
+      title: t(($) => $.onboarding.enabled),
       description: exposeEnvironment
-        ? "This environment is available to your other devices through T3 Connect."
-        : "This environment publishes agent activity to your mobile clients.",
+        ? t(($) => $.onboarding.environmentEnabled)
+        : t(($) => $.onboarding.activityEnabled),
     });
     setStep("devices");
   };
@@ -214,17 +216,18 @@ function ConfiguredConnectOnboardingDialog() {
     >
       <WizardPopup>
         <WizardHeader
-          title="Set up T3 Connect"
-          description={
-            <>
-              Mesh your devices together. Publish this environment and connect the rest, all in one
-              place.
-            </>
-          }
+          title={t(($) => $.onboarding.title)}
+          description={t(($) => $.onboarding.description)}
         >
           {steps.length > 1 ? (
             <WizardSteps
-              steps={steps.map((id) => STEP_LABELS[id])}
+              steps={steps.map((id) => ({
+                id,
+                label:
+                  id === "publish"
+                    ? t(($) => $.onboarding.publish)
+                    : t(($) => $.onboarding.devices),
+              }))}
               currentStep={steps.indexOf(step)}
               isStepDisabled={() => isApplying}
               onStepChange={(index) => {
@@ -278,25 +281,25 @@ function ConfiguredConnectOnboardingDialog() {
                 checked={dontShowAgain}
                 onCheckedChange={(checked) => setDontShowAgain(checked === true)}
               />
-              Don&apos;t show this again
+              {t(($) => $.onboarding.dontShow)}
             </label>
           }
         >
           {step === "publish" ? (
             <>
               <Button variant="ghost" disabled={isApplying} onClick={() => setStep("devices")}>
-                Not now
+                {t(($) => $.onboarding.notNow)}
               </Button>
               <Button
                 disabled={isApplying || !canManageRelay || linkStateData === null}
                 onClick={() => void applyPublishSelection()}
               >
-                {isApplying ? "Enabling…" : "Continue"}
+                {isApplying ? t(($) => $.onboarding.enabling) : t(($) => $.actions.continue)}
               </Button>
             </>
           ) : (
             <Button disabled={isApplying} onClick={complete}>
-              Done
+              {t(($) => $.onboarding.done)}
             </Button>
           )}
         </WizardFooter>
@@ -306,11 +309,6 @@ function ConfiguredConnectOnboardingDialog() {
     </Dialog>
   );
 }
-
-const STEP_LABELS: Record<OnboardingStep, string> = {
-  publish: "Publish",
-  devices: "Connect devices",
-};
 
 function PublishStep({
   exposeEnvironment,
@@ -331,19 +329,20 @@ function PublishStep({
   readonly onExposeEnvironmentChange: (enabled: boolean) => void;
   readonly onPublishAgentActivityChange: (enabled: boolean) => void;
 }) {
+  const { t } = useTranslation("connect");
   return (
     <div className="space-y-3">
       <div className="rounded-lg border">
         <OnboardingToggleRow
-          title="Publish this environment"
-          description="Make this environment available to your other devices through T3 Connect."
+          title={t(($) => $.onboarding.publishEnvironment)}
+          description={t(($) => $.onboarding.publishEnvironmentDescription)}
           checked={exposeEnvironment}
           disabled={disabled}
           onCheckedChange={onExposeEnvironmentChange}
         />
         <OnboardingToggleRow
-          title="Publish agent activity"
-          description="Send activity from this environment to your mobile clients for push notifications and Live Activities."
+          title={t(($) => $.onboarding.publishActivity)}
+          description={t(($) => $.onboarding.publishActivityDescription)}
           checked={publishAgentActivity}
           disabled={disabled}
           onCheckedChange={onPublishAgentActivityChange}
@@ -402,6 +401,7 @@ function OnboardingToggleRow({
 }
 
 function DevicesStep() {
+  const { t } = useTranslation("connect");
   const { environments } = useEnvironments();
   const primaryEnvironment = usePrimaryEnvironment();
   const savedEnvironments = environments.filter(
@@ -416,8 +416,7 @@ function DevicesStep() {
         showSavedEnvironments
         empty={
           <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-            No other environments are published to your account yet. Publish one from another device
-            and it will show up here.
+            {t(($) => $.onboarding.devicesEmpty)}
           </p>
         }
       />

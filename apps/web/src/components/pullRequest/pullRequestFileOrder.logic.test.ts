@@ -1,7 +1,7 @@
 import type { FileDiffMetadata } from "@pierre/diffs";
 import { describe, expect, it } from "vite-plus/test";
 
-import { orderDiffFiles } from "./pullRequestFileOrder.logic";
+import { orderDiffFiles } from "~/components/pullRequest/pullRequestFileOrder.logic";
 
 function file(name: string, additionLines: ReadonlyArray<string> = []): FileDiffMetadata {
   return { name, hunks: [], additionLines, deletionLines: [] } as unknown as FileDiffMetadata;

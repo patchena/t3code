@@ -1,4 +1,4 @@
-import { MISSING_FILE_ACCESS_MESSAGE } from "@t3tools/client-runtime/state/assets";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { mediaFileReference, mediaUrlReference } from "@t3tools/client-runtime/media-reference";
 import type { AssetResource, EnvironmentId, SOURCE_CONTROL_MEDIA_ASSET } from "@t3tools/contracts";
 import { TriangleAlertIcon } from "lucide-react";
@@ -12,6 +12,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useAssetUrlRefresh, useAssetUrlState } from "../../assets/assetUrls";
 import { cn } from "../../lib/utils";
@@ -78,9 +79,10 @@ export const WorkspaceMutationIdContext = createContext<string | null | undefine
 function expandableMarkdownImageProps(
   onImageExpand: ((preview: ExpandedImagePreview) => void) | undefined,
   alt: string,
+  t: TFunction<"chat">,
 ) {
   if (!onImageExpand) return {};
-  const previewName = alt.trim() || "image";
+  const previewName = alt.trim() || t(($) => $.media.image);
   const expand = (event: ReactMouseEvent | ReactKeyboardEvent) => {
     if (event.currentTarget.closest("a")) return;
     event.preventDefault();
@@ -91,7 +93,7 @@ function expandableMarkdownImageProps(
   return {
     role: "button" as const,
     tabIndex: 0,
-    "aria-label": `Preview ${previewName}`,
+    "aria-label": t(($) => $.media.previewName, { name: previewName }),
     onClick: expand,
     onKeyDown: (event: ReactKeyboardEvent) => {
       if (event.key === "Enter" || event.key === " ") expand(event);
@@ -104,12 +106,13 @@ function ChatMarkdownMediaUnavailableLabel(props: {
   readonly kind?: "image" | "video" | "audio" | undefined;
   readonly detail?: string | undefined;
 }) {
+  const { t } = useTranslation("chat");
   const label =
     props.kind === "audio"
-      ? "Audio unavailable"
+      ? t(($) => $.media.audioUnavailable)
       : props.kind === "video"
-        ? "Video unavailable"
-        : "Image unavailable";
+        ? t(($) => $.media.videoUnavailable)
+        : t(($) => $.media.imageUnavailable);
   return (
     <span data-thread-find-ignore className="inline-flex items-center gap-1.5">
       <TriangleAlertIcon aria-hidden className="size-3.5 shrink-0" />
@@ -170,6 +173,7 @@ export function ChatMarkdownImage(props: {
   readonly originalUrl?: string | undefined;
   readonly onImageExpand?: ((preview: ExpandedImagePreview) => void) | undefined;
 }) {
+  const { t } = useTranslation("chat");
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const src = props.src ?? loadedSrc;
@@ -181,7 +185,7 @@ export function ChatMarkdownImage(props: {
     if (image.complete && image.naturalWidth > 0) setLoadedSrc(image.currentSrc || image.src);
     markdownImageItems.set(image, {
       src,
-      name: props.alt.trim() || "image",
+      name: props.alt.trim() || t(($) => $.media.image),
       actionsSource: props.actionsSource,
       ...(props.originalUrl ? { originalUrl: props.originalUrl } : {}),
     });
@@ -215,7 +219,7 @@ export function ChatMarkdownImage(props: {
             props.onImageExpand && "cursor-zoom-in",
           )}
           style={props.style}
-          {...expandableMarkdownImageProps(props.onImageExpand, props.alt)}
+          {...expandableMarkdownImageProps(props.onImageExpand, props.alt, t)}
           {...imageEvents(src)}
         />
       </MediaActions>
@@ -234,7 +238,7 @@ export function ChatMarkdownImage(props: {
         id={props.imageProps?.id}
         data-markdown-copy={props.copyMarkdown}
         role="status"
-        aria-label="Loading image"
+        aria-label={t(($) => $.media.loadingImage)}
         className={CHAT_MARKDOWN_MEDIA_LAYOUT_CLASS_NAME}
       />
     );
@@ -252,7 +256,7 @@ export function ChatMarkdownImage(props: {
         style={props.style}
         {...(failed
           ? { role: "alert" as const }
-          : { role: "status" as const, "aria-label": "Loading image" })}
+          : { role: "status" as const, "aria-label": t(($) => $.media.loadingImage) })}
       >
         {failed ? (
           <span className="flex size-full items-center justify-center p-2 text-center text-xs text-muted-foreground">
@@ -341,6 +345,7 @@ export const ChatMarkdownAssetImage = memo(function ChatMarkdownAssetImage(props
   readonly workspaceMutationId?: string | null | undefined;
   readonly onImageExpand?: ((preview: ExpandedImagePreview) => void) | undefined;
 }) {
+  const { t } = useTranslation("chat");
   const resource = props.resource;
   const threadWorkspaceMutationId = use(WorkspaceMutationIdContext);
   const workspaceMutationId = props.workspaceMutationId ?? threadWorkspaceMutationId;
@@ -384,7 +389,7 @@ export const ChatMarkdownAssetImage = memo(function ChatMarkdownAssetImage(props
         : undefined);
   const actionsSource: MediaActionSource = {
     kind: props.kind ?? "image",
-    name: props.alt || (props.kind ?? "image"),
+    name: props.alt || (props.kind === "video" ? t(($) => $.media.video) : t(($) => $.media.image)),
     src,
     ...(fallbackSrc === undefined
       ? { asset: { environmentId: props.environmentId, resource } }
@@ -428,7 +433,7 @@ export const ChatMarkdownAssetImage = memo(function ChatMarkdownAssetImage(props
         assetUrl._tag === "Failure" &&
         assetUrl.reason === "missing-file-access" &&
         fallbackSrc === undefined
-          ? MISSING_FILE_ACCESS_MESSAGE
+          ? t(($) => $.media.pairForFileAccess)
           : undefined
       }
       alt={props.alt}

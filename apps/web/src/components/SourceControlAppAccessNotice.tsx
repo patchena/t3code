@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { EnvironmentId } from "@t3tools/contracts";
 import {
   readHostCredentialSettings,
@@ -5,12 +6,12 @@ import {
 } from "@t3tools/client-runtime/source-control-clients";
 import { ExternalLinkIcon } from "lucide-react";
 
-import { useEnvironmentSettings } from "../hooks/useSettings";
-import { cn } from "../lib/utils";
-import { useEnvironmentQuery } from "../state/query";
-import { sourceControlEnvironment } from "../state/sourceControl";
-import { T3AppIcon } from "./T3AppIcon";
-import { InlineButton } from "./ui/button";
+import { useEnvironmentSettings } from "~/hooks/useSettings";
+import { cn } from "~/lib/utils";
+import { useEnvironmentQuery } from "~/state/query";
+import { sourceControlEnvironment } from "~/state/sourceControl";
+import { T3AppIcon } from "~/components/T3AppIcon";
+import { InlineButton } from "~/components/ui/button";
 
 /**
  * Says when the server's forge app sign-in cannot reach `repository`, so requests there fall back
@@ -24,6 +25,7 @@ export function SourceControlAppAccessNotice(props: {
   readonly repository: string;
   readonly className?: string;
 }) {
+  const { t } = useTranslation("workspace");
   const definition = props.provider ? sourceControlClients.find(props.provider) : undefined;
   const appSignIn = definition?.credentials?.appSignIn;
   const host = (props.host ?? definition?.publicHost ?? "").toLowerCase();
@@ -53,14 +55,13 @@ export function SourceControlAppAccessNotice(props: {
     >
       <T3AppIcon className="size-4 shrink-0" />
       <p className="min-w-0 flex-1">
-        {appSignIn.appName} isn't installed on <span className="text-foreground">{owner}</span>, so
-        requests here use your own GitHub login and its lower rate limit.
+        {t(($) => $.git.appAccessNotice, { app: appSignIn.appName, owner })}
       </p>
       <InlineButton
         className="shrink-0"
         render={<a href={appSignIn.installUrl} target="_blank" rel="noreferrer noopener" />}
       >
-        Install on {owner}
+        {t(($) => $.git.installOnOwner, { owner })}
         <ExternalLinkIcon aria-hidden className="size-3" />
       </InlineButton>
     </div>

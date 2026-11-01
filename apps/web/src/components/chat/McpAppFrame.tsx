@@ -1,4 +1,5 @@
 import type { EnvironmentId, ThreadId, TurnItemId } from "@t3tools/contracts";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   makeMcpAppHost,
   McpAppHostRefusal,
@@ -21,6 +22,7 @@ import {
 import { Minimize2Icon } from "lucide-react";
 import { useEffect, useRef, useState, type FocusEvent, type ToggleEvent } from "react";
 import { flushSync } from "react-dom";
+import { useTranslation } from "react-i18next";
 
 import { useLongLivedAssetUrl } from "~/assets/longLivedAssetUrls";
 import { APP_VERSION } from "~/branding";
@@ -36,13 +38,18 @@ import { mcpAppEnvironment } from "~/state/mcpApps";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { observeResize } from "~/lib/observeResize";
 
-const commandFailure = (result: {
-  readonly cause: Parameters<typeof squashAtomCommandFailure>[0]["cause"];
-}) => {
+const commandFailure = (
+  result: {
+    readonly cause: Parameters<typeof squashAtomCommandFailure>[0]["cause"];
+  },
+  t: TFunction<"chat">,
+) => {
   const error = squashAtomCommandFailure(result);
   return new McpAppHostRefusal({
     message:
-      error instanceof Error && error.message.trim() !== "" ? error.message : "Request failed.",
+      error instanceof Error && error.message.trim() !== ""
+        ? error.message
+        : t(($) => $.mcp.requestFailed),
   });
 };
 
@@ -87,6 +94,7 @@ export function McpAppFrame(props: {
   readonly awaitingUser?: boolean;
   readonly onFullscreenChange?: (fullscreen: boolean) => void;
 }) {
+  const { t } = useTranslation("chat");
   const { app } = props;
   const theme = useHtmlRenderTheme();
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -160,6 +168,7 @@ export function McpAppFrame(props: {
 
   // Read live values without rebuilding the host and losing the app session.
   const readLive = useStableCallback(() => ({
+    t,
     theme,
     width,
     props,
@@ -254,7 +263,7 @@ export function McpAppFrame(props: {
       flushSync(() => setDisplayMode("inline"));
       const approved = await requestConfirmDialog(message);
       if (approved === undefined) {
-        throw new McpAppHostRefusal({ message: "T3 could not ask for approval here." });
+        throw new McpAppHostRefusal({ message: readLive().t(($) => $.mcp.approvalUnavailable) });
       }
       return approved;
     };
@@ -272,20 +281,25 @@ export function McpAppFrame(props: {
       callTool: async ({ name, arguments: args }) => {
         const { environmentId, input } = scope();
         const info = await readLive().toolInfo({ environmentId, input: { ...input, name } });
-        if (info._tag !== "Success") throw commandFailure(info);
+        if (info._tag !== "Success") throw commandFailure(info, readLive().t);
         if (!info.value.callable)
-          throw new McpAppHostRefusal({ message: "This app cannot call that tool." });
+          throw new McpAppHostRefusal({ message: readLive().t(($) => $.mcp.toolUnavailable) });
         if (!info.value.readOnly) {
           const approved = await ask(
-            `Allow ${app.server} to run ${info.value.title ?? name}?\n${JSON.stringify(args, null, 2)}`,
+            readLive().t(($) => $.mcp.allowTool, {
+              server: app.server,
+              tool: info.value.title ?? name,
+              args: JSON.stringify(args, null, 2),
+            }),
           );
-          if (approved !== true) throw new McpAppHostRefusal({ message: "Declined by the user." });
+          if (approved !== true)
+            throw new McpAppHostRefusal({ message: readLive().t(($) => $.mcp.declined) });
         }
         const result = await readLive().callTool({
           environmentId,
           input: { ...input, name, arguments: args },
         });
-        if (result._tag !== "Success") throw commandFailure(result);
+        if (result._tag !== "Success") throw commandFailure(result, readLive().t);
         return result.value;
       },
       readResource: async ({ uri }) => {
@@ -294,21 +308,24 @@ export function McpAppFrame(props: {
           environmentId,
           input: { ...input, uri },
         });
-        if (result._tag !== "Success") throw commandFailure(result);
+        if (result._tag !== "Success") throw commandFailure(result, readLive().t);
         return result.value;
       },
       openLink: async (url) => {
         if (document.activeElement !== frameRef.current || !navigator.userActivation?.isActive) {
-          throw new McpAppHostRefusal({ message: "Links open only from a click in the app." });
+          throw new McpAppHostRefusal({ message: readLive().t(($) => $.mcp.clickRequired) });
         }
         window.open(url, "_blank", "noopener,noreferrer");
       },
       sendMessage: async (text) => {
         const send = readLive().props.onSendMessage;
         if (send === undefined)
-          throw new McpAppHostRefusal({ message: "Messages are not available here." });
-        const approved = await ask(`Send this message from ${app.server}?\n${text}`);
-        if (approved !== true) throw new McpAppHostRefusal({ message: "Declined by the user." });
+          throw new McpAppHostRefusal({ message: readLive().t(($) => $.mcp.messagesUnavailable) });
+        const approved = await ask(
+          readLive().t(($) => $.mcp.sendMessage, { server: app.server, text }),
+        );
+        if (approved !== true)
+          throw new McpAppHostRefusal({ message: readLive().t(($) => $.mcp.declined) });
         await send(text);
       },
       updateModelContext: async (context) => {
@@ -321,7 +338,7 @@ export function McpAppFrame(props: {
             conversationThreadId: readLive().props.conversationThreadId,
           },
         });
-        if (result._tag !== "Success") throw commandFailure(result);
+        if (result._tag !== "Success") throw commandFailure(result, readLive().t);
       },
       requestDisplayMode: async (mode) => {
         const otherFullscreen = document.querySelector("[data-mcp-app-fullscreen]");
@@ -342,8 +359,11 @@ export function McpAppFrame(props: {
       },
       downloadFile: async (files) => {
         const names = files.map((file) => file.name).join(", ");
-        const approved = await ask(`Save ${names} from ${app.server}?`);
-        if (approved !== true) throw new McpAppHostRefusal({ message: "Declined by the user." });
+        const approved = await ask(
+          readLive().t(($) => $.mcp.saveFiles, { names, server: app.server }),
+        );
+        if (approved !== true)
+          throw new McpAppHostRefusal({ message: readLive().t(($) => $.mcp.declined) });
         for (const file of files) {
           let bytes: Uint8Array | undefined;
           let mimeType = file.mimeType ?? "application/octet-stream";
@@ -355,16 +375,20 @@ export function McpAppFrame(props: {
               environmentId,
               input: { ...input, uri: file.uri },
             });
-            if (read._tag !== "Success") throw commandFailure(read);
+            if (read._tag !== "Success") throw commandFailure(read, readLive().t);
             const content = read.value.contents[0];
             bytes = mcpResourceBytes(content);
             const declared = (content as { readonly mimeType?: unknown } | undefined)?.mimeType;
             if (typeof declared === "string") mimeType = declared;
           }
           if (bytes === undefined)
-            throw new McpAppHostRefusal({ message: `${file.name} has no contents.` });
+            throw new McpAppHostRefusal({
+              message: readLive().t(($) => $.mcp.emptyFile, { name: file.name }),
+            });
           if (bytes.byteLength > MAX_DOWNLOAD_BYTES) {
-            throw new McpAppHostRefusal({ message: `${file.name} is too large to save.` });
+            throw new McpAppHostRefusal({
+              message: readLive().t(($) => $.mcp.largeFile, { name: file.name }),
+            });
           }
           saveBlob(new Blob([bytes.slice()], { type: mimeType }), file.name);
         }
@@ -410,7 +434,7 @@ export function McpAppFrame(props: {
   if (closed) {
     return (
       <div className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-muted-foreground text-xs">
-        <span>The {app.server} app was closed</span>
+        <span>{t(($) => $.mcp.closed, { server: app.server })}</span>
         <Button
           size="xs"
           variant="ghost"
@@ -420,7 +444,7 @@ export function McpAppFrame(props: {
             setClosed(false);
           }}
         >
-          Show app
+          {t(($) => $.mcp.show)}
         </Button>
       </div>
     );
@@ -452,7 +476,7 @@ export function McpAppFrame(props: {
           >
             <span className="truncate">{app.server}</span>
             <Button
-              aria-label="Exit full screen"
+              aria-label={t(($) => $.media.exitFullScreen)}
               size="icon-sm"
               variant="ghost"
               onClick={() => setDisplayMode("inline")}
@@ -463,13 +487,13 @@ export function McpAppFrame(props: {
         ) : null}
         {navigatedAway ? (
           <p className="flex size-full items-center justify-center text-muted-foreground text-xs">
-            The {app.server} app left its page and was stopped
+            {t(($) => $.mcp.stopped, { server: app.server })}
           </p>
         ) : src !== null ? (
           <iframe
             ref={attachFrame}
             src={src}
-            title={`${app.server} app`}
+            title={t(($) => $.mcp.appTitle, { server: app.server })}
             // Omitting allow-same-origin isolates the app from the session.
             sandbox="allow-scripts allow-forms"
             allow={mcpAppAllowAttribute(app.permissions)}
@@ -479,7 +503,7 @@ export function McpAppFrame(props: {
           />
         ) : asset._tag === "Failure" ? (
           <p className="flex size-full items-center justify-center text-muted-foreground text-xs">
-            Unable to load the {app.server} app
+            {t(($) => $.mcp.loadFailed, { server: app.server })}
           </p>
         ) : null}
       </div>

@@ -7,7 +7,7 @@ import {
   settleFileViewedOverlay,
   toFileViewedStates,
   type FileViewedOverlay,
-} from "./pullRequestFilesViewed.logic";
+} from "~/components/pullRequest/pullRequestFilesViewed.logic";
 
 const NO_OVERLAY: FileViewedOverlay = new Map();
 const NOTHING_PENDING: ReadonlySet<string> = new Set();

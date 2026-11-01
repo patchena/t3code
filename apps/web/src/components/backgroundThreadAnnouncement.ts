@@ -1,7 +1,8 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { OrchestrationV2RunStatus, RunId } from "@t3tools/contracts";
 
 import type { SidebarThreadSummary } from "../types";
-import { runOutcomeText, THREAD_STATUS_TEXT } from "./chat/threadActivityAnnouncement";
+import { runOutcomeText, threadStatusText } from "./chat/threadActivityAnnouncement";
 
 export interface BackgroundThreadSnapshot {
   readonly key: string;
@@ -51,12 +52,13 @@ export function nextBackgroundThreadAnnouncement(
   previous: BackgroundThreadMemory,
   threads: ReadonlyArray<BackgroundThreadSnapshot>,
   openThreadKey: string | null,
+  t: TFunction<"activity">,
 ): { readonly memory: BackgroundThreadMemory; readonly announcement: string | null } {
   const memory = new Map<string, BackgroundThreadMemoryEntry>();
   const announcements: string[] = [];
   for (const thread of threads) {
     const before = previous.get(thread.key);
-    const outcome = runOutcomeText(thread.runStatus);
+    const outcome = runOutcomeText(thread.runStatus, t);
     const settled = outcome !== null || thread.runStatus === "rolled_back";
     memory.set(thread.key, {
       request: thread.request,
@@ -68,7 +70,7 @@ export function nextBackgroundThreadAnnouncement(
       thread.request !== null &&
       (thread.request !== before.request || thread.requestId !== before.requestId)
     ) {
-      announcements.push(`${THREAD_STATUS_TEXT[thread.request]}: ${thread.title}`);
+      announcements.push(`${threadStatusText(t)[thread.request]}: ${thread.title}`);
     }
     // While another run still works, the latest run's ending (a queued message
     // cancelled before it started) isn't the thread finishing. The shell then

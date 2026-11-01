@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { PullRequestRef, PullRequestStack, ThreadPullRequestLink } from "@t3tools/contracts";
 
 /** Saved membership supports navigation, never action head SHAs. */
@@ -55,6 +56,7 @@ export function pullRequestStackView(
     error: string | null;
   },
   saved: PullRequestStack | null,
+  t: TFunction<"workspace">,
 ) {
   const data = query.isSuccess ? query.data : (query.data ?? saved);
   return {
@@ -64,9 +66,9 @@ export function pullRequestStackView(
       data === null
         ? null
         : query.error
-          ? "Stack data may be stale. We couldn’t refresh it."
+          ? t(($) => $.git.stackRefreshFailed)
           : !query.isSuccess || query.isPending
-            ? "Refreshing stack… Showing saved data."
+            ? t(($) => $.git.stackRefreshing)
             : null,
   };
 }

@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type {
   StorageCleanupReport,
   StorageCleanupSettings,
@@ -50,6 +52,7 @@ import {
 import { settingsScopeEnvironmentLabel } from "./settingsScopeAxis";
 
 export function WorktreesDirectoryRow() {
+  const { t } = useTranslation("settings");
   const { connectedEnvironments, targets } = useSettingsScope();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
@@ -67,16 +70,14 @@ export function WorktreesDirectoryRow() {
 
   return (
     <SettingsRow
-      {...searchableSetting("storage-worktrees-location")}
-      description={
-        "Folder where new worktrees are created, on any drive, such as D:\\worktrees or ~/worktrees. Existing worktrees stay where they are. Leave empty to use the T3 home folder."
-      }
+      {...searchableSetting("storage-worktrees-location", t)}
+      description={t(($) => $.extra.storage.locationDescription)}
       serverScoped
       settingKeys={["worktreesDirectory"]}
       resetAction={
         mixed || settings.worktreesDirectory !== "" ? (
           <SettingResetButton
-            label="worktree location"
+            label={t(($) => $.extra.storage.locationReset)}
             onClick={() => updateSettings({ worktreesDirectory: "" })}
           />
         ) : null
@@ -84,10 +85,10 @@ export function WorktreesDirectoryRow() {
       control={
         <Input
           key={`${scopeKey}:${mixed}:${settings.worktreesDirectory}`}
-          aria-label="Worktree location"
+          aria-label={t(($) => $.extra.storage.location)}
           autoCapitalize="none"
           spellCheck={false}
-          placeholder={mixed ? "Mixed" : "Default"}
+          placeholder={mixed ? t(($) => $.extra.storage.mixed) : t(($) => $.extra.storage.default)}
           defaultValue={mixed ? "" : settings.worktreesDirectory}
           onFocus={(event) => {
             draft.current = event.target.value;
@@ -120,6 +121,7 @@ function RetentionControl({
   onChange: (value: number | null) => void;
   minimum?: number;
 }) {
+  const { t } = useTranslation("settings");
   const [draft, setDraft] = useState(value);
   const [savedValue, setSavedValue] = useState(value);
   if (savedValue !== value) {
@@ -148,20 +150,20 @@ function RetentionControl({
           }}
         >
           <NumberFieldGroup>
-            <NumberFieldDecrement aria-label={`Decrease ${label}`} />
+            <NumberFieldDecrement aria-label={t(($) => $.extra.storage.decrease, { label })} />
             <NumberFieldInput
-              aria-label={`${label} in days`}
+              aria-label={t(($) => $.extra.storage.retentionDays, { label })}
               size={5}
               className="w-auto grow-0 text-right"
             />
             <span aria-hidden="true" className="self-center pr-2 text-xs">
-              days
+              {t(($) => $.extra.storage.days)}
             </span>
-            <NumberFieldIncrement aria-label={`Increase ${label}`} />
+            <NumberFieldIncrement aria-label={t(($) => $.extra.storage.increase, { label })} />
           </NumberFieldGroup>
         </NumberField>
       ) : (
-        <span className="text-xs text-muted-foreground">Off</span>
+        <span className="text-xs text-muted-foreground">{t(($) => $.extra.storage.off)}</span>
       )}
       <Switch
         aria-label={label}
@@ -172,21 +174,16 @@ function RetentionControl({
   );
 }
 
-const KEEP_WHEN_LABELS = {
-  "any-local-files": "Any local files",
-  "uncommitted-changes": "Uncommitted changes",
-  "tracked-changes": "Edited tracked files",
-} as const;
-
 function lastRunSummary(
   entries: readonly { readonly label: string; readonly counts: string }[],
   machineCount: number,
+  t: TFunction<"settings">,
 ) {
   const first = entries[0];
   if (!first) return "";
   if (machineCount <= 1) return first.counts;
   if (entries.length === machineCount && entries.every((entry) => entry.counts === first.counts)) {
-    return `${first.counts} on every machine`;
+    return t(($) => $.extra.storage.everyMachine, { counts: first.counts });
   }
   return entries.map((entry) => `${entry.label}: ${entry.counts}`).join(" · ");
 }
@@ -198,6 +195,7 @@ function CleanupResults({
   report: StorageCleanupReport;
   environmentLabel: string;
 }) {
+  const { t } = useTranslation("settings");
   return (
     <>
       {report.entries.map((entry, index) => {
@@ -205,10 +203,11 @@ function CleanupResults({
           entry.kind === "worktree"
             ? ((entry.threadId === null
                 ? entry.path
-                : entry.path?.split(/[\\/]/).findLast(Boolean)) ?? "Worktrees")
+                : entry.path?.split(/[\\/]/).findLast(Boolean)) ??
+              t(($) => $.extra.storage.worktrees))
             : entry.kind === "logs"
-              ? "Rotated logs"
-              : "Browser artifacts";
+              ? t(($) => $.extra.storage.rotatedLogs)
+              : t(($) => $.extra.storage.browserArtifacts);
         return (
           <SettingsRow
             key={`${entry.path ?? entry.kind}:${entry.threadId ?? index}`}
@@ -219,23 +218,23 @@ function CleanupResults({
                   {entry.reason}
                 </span>
                 <span className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 border-l border-border/60 pl-3">
-                  <span>Machine</span>
+                  <span>{t(($) => $.extra.storage.machine)}</span>
                   <span className="text-foreground/80">{environmentLabel}</span>
                   {entry.projectPath && (
                     <>
-                      <span>Project</span>
+                      <span>{t(($) => $.extra.storage.project)}</span>
                       <code className="text-foreground/80">{entry.projectPath}</code>
                     </>
                   )}
                   {entry.path && (
                     <>
-                      <span>Folder</span>
+                      <span>{t(($) => $.extra.storage.folder)}</span>
                       <code className="text-foreground/80">{entry.path}</code>
                     </>
                   )}
                   {entry.threadTitle && (
                     <>
-                      <span>Thread</span>
+                      <span>{t(($) => $.extra.storage.thread)}</span>
                       <span>{entry.threadTitle}</span>
                     </>
                   )}
@@ -248,7 +247,7 @@ function CleanupResults({
                 <span className="text-xs text-muted-foreground">
                   {[
                     entry.kind !== "worktree" && entry.files !== null
-                      ? `${entry.files.toLocaleString()} ${entry.files === 1 ? "file" : "files"}`
+                      ? t(($) => $.extra.storage.fileCount, { count: entry.files })
                       : null,
                     entry.bytes !== null ? formatBytes(entry.bytes) : null,
                   ]
@@ -262,12 +261,15 @@ function CleanupResults({
       })}
       {report.omittedCount > 0 && (
         <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
-          {environmentLabel}: {report.omittedCount.toLocaleString()} more results.
+          {t(($) => $.extra.storage.moreResults, {
+            environment: environmentLabel,
+            count: report.omittedCount,
+          })}
         </p>
       )}
       {report.entries.length === 0 && report.omittedCount === 0 && (
         <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
-          {environmentLabel}: Nothing needed cleanup.
+          {t(($) => $.extra.storage.nothingNeeded, { environment: environmentLabel })}
         </p>
       )}
     </>
@@ -284,6 +286,8 @@ const storageCleanupPermissionsAtom = environmentAtomList(
 );
 
 function CleanupSection() {
+  const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
   const nowMinute = useNowMinute();
   const nowMs = Date.parse(`${nowMinute}:00.000Z`);
   const { connectedEnvironments } = useSettingsScope();
@@ -333,15 +337,26 @@ function CleanupSection() {
       report,
       label: settingsScopeEnvironmentLabel(environment, connectedEnvironments),
       counts: report
-        ? `${report.counts.removed} removed, ${report.counts.kept} kept${report.counts.failed > 0 ? `, ${report.counts.failed} failed` : ""}`
+        ? report.counts.failed > 0
+          ? t(($) => $.extra.storage.countsFailed, report.counts)
+          : t(($) => $.extra.storage.counts, report.counts)
         : "",
       description: report
-        ? `Last run ${formatRelativeTimeLabel(report.finishedAt, nowMs)}. ${formatBytes(report.bytesFreed)} recovered.${report.counts.failed > 0 ? ` ${report.counts.failed} ${report.counts.failed === 1 ? "item" : "items"} couldn't be removed.` : ""}`
+        ? report.counts.failed > 0
+          ? t(($) => $.extra.storage.summaryFailed, {
+              time: formatRelativeTimeLabel(report.finishedAt, tCommon, nowMs),
+              bytes: formatBytes(report.bytesFreed),
+              count: report.counts.failed,
+            })
+          : t(($) => $.extra.storage.summary, {
+              time: formatRelativeTimeLabel(report.finishedAt, tCommon, nowMs),
+              bytes: formatBytes(report.bytesFreed),
+            })
         : query?.failed
-          ? "Could not load the last run."
+          ? t(($) => $.extra.storage.loadFailed)
           : query?.loading
-            ? "Loading last run…"
-            : "Cleanup hasn't run yet.",
+            ? t(($) => $.extra.storage.loading)
+            : t(($) => $.extra.storage.neverRun),
     };
   });
   const deleteNow = async () => {
@@ -359,13 +374,13 @@ function CleanupSection() {
             if (failures.length > 0)
               toastManager.add({
                 type: "error",
-                title: `Cleanup failed on ${environment.label}`,
+                title: t(($) => $.extra.storage.cleanupFailed, { environment: environment.label }),
                 description: failures[0]!.reason,
               });
           } else if (!isAtomCommandInterrupted(result)) {
             toastManager.add({
               type: "error",
-              title: `Could not run cleanup on ${environment.label}`,
+              title: t(($) => $.extra.storage.runFailed, { environment: environment.label }),
               description: String(squashAtomCommandFailure(result)),
             });
           }
@@ -373,14 +388,14 @@ function CleanupSection() {
     ).finally(() => setPending(false));
   };
   return (
-    <SettingsSection id="storage-cleanup" title="Cleanup" variant="plain">
+    <SettingsSection id="storage-cleanup" title={t(($) => $.extra.storage.cleanup)} variant="plain">
       <SettingsGroup>
         <SettingsRow
-          {...searchableSetting("storage-delete-now")}
+          {...searchableSetting("storage-delete-now", t)}
           description={
             <span>
               {!hasRules
-                ? "Turn on a cleanup rule to use this."
+                ? t(($) => $.extra.storage.turnOn)
                 : summaries.map(({ environment, label, description }) => (
                     <span key={environment.environmentId} className="block">
                       {supported.length > 1 ? `${label}: ` : ""}
@@ -396,7 +411,7 @@ function CleanupSection() {
               disabled={pending || !hasRules || !state.some((entry) => entry.allowed)}
               onClick={() => void deleteNow()}
             >
-              {pending ? "Deleting…" : "Delete now"}
+              {pending ? t(($) => $.extra.storage.deleting) : t(($) => $.extra.storage.deleteNow)}
             </Button>
           }
         />
@@ -404,11 +419,12 @@ function CleanupSection() {
       {summaries.some(({ report }) => report !== null) && (
         <FoldedSettingsSection
           id="storage-cleanup-last-run"
-          title="Last run"
+          title={t(($) => $.extra.storage.lastRun)}
           headerPlacement="inside"
           summary={lastRunSummary(
             summaries.filter(({ report }) => report !== null),
             connectedEnvironments.length,
+            t,
           )}
         >
           {summaries.map(
@@ -441,6 +457,7 @@ function supportsStorageCleanup(
 
 /** Narrows a mixed selection to the machines that support cleanup. */
 function StorageCleanupScopeNotice() {
+  const { t } = useTranslation("settings");
   const { connectedEnvironments } = useSettingsScope();
   return (
     <SettingsScopeNotice
@@ -453,12 +470,18 @@ function StorageCleanupScopeNotice() {
         )
         .map((environment) => environment.environmentId)}
     >
-      Update the selected environments to use storage cleanup, or choose a machine that supports it.
+      {t(($) => $.extra.storage.unsupported)}
     </SettingsScopeNotice>
   );
 }
 
 export function WorktreeCleanupSection() {
+  const { t } = useTranslation("settings");
+  const KEEP_WHEN_LABELS = {
+    "any-local-files": t(($) => $.extra.storage.anyFiles),
+    "uncommitted-changes": t(($) => $.extra.storage.uncommitted),
+    "tracked-changes": t(($) => $.extra.storage.tracked),
+  };
   const { scope, environments, connectedEnvironments, targets, target } = useSettingsScope();
   const scopedSettings = useScopedSettings();
   const isProjectScope = scope.kind === "project" || scope.kind === "checkout";
@@ -481,7 +504,7 @@ export function WorktreeCleanupSection() {
           key
         ] !== settings[key],
     )
-      ? "Mixed across selected machines"
+      ? t(($) => $.extra.storage.mixedMachines)
       : undefined;
   // A policy locks these through worktreeCleanup, which also reaches each project's own rules.
   const lockablePath = (key: keyof WorktreeCleanupRules) =>
@@ -501,33 +524,41 @@ export function WorktreeCleanupSection() {
     )
   ) {
     return (
-      <SettingsSection id="storage-worktrees" title="Cleanup" variant="plain">
+      <SettingsSection
+        id="storage-worktrees"
+        title={t(($) => $.extra.storage.cleanup)}
+        variant="plain"
+      >
         <SettingsScopeNotice inline target="all">
-          Update the selected machines to configure project worktree cleanup.
+          {t(($) => $.extra.storage.updateMachines)}
         </SettingsScopeNotice>
       </SettingsSection>
     );
   }
   if (!supportsStorageCleanup(connectedEnvironments)) {
     return (
-      <SettingsSection id="storage-worktrees" title="Cleanup" variant="plain">
+      <SettingsSection
+        id="storage-worktrees"
+        title={t(($) => $.extra.storage.cleanup)}
+        variant="plain"
+      >
         <StorageCleanupScopeNotice />
       </SettingsSection>
     );
   }
 
   return (
-    <SettingsSection id="storage-worktrees" title="Cleanup">
+    <SettingsSection id="storage-worktrees" title={t(($) => $.extra.storage.cleanup)}>
       <>
         {isProjectScope && (
           <SettingsRow
-            title="Automatic worktree cleanup"
+            title={t(($) => $.extra.storage.automatic)}
             description={
               mode === "off"
-                ? "Keep this project's worktrees until you delete them manually."
+                ? t(($) => $.extra.storage.keepProject)
                 : mode === "custom"
-                  ? "Use these rules for this project."
-                  : "Use each machine's worktree cleanup settings."
+                  ? t(($) => $.extra.storage.customProject)
+                  : t(($) => $.extra.storage.inheritProject)
             }
             serverScoped
             settingKeys={["worktreeCleanup"]}
@@ -542,21 +573,21 @@ export function WorktreeCleanupSection() {
                     updateSettings({ worktreeCleanup: { mode: "custom", rules: {} } });
                 }}
               >
-                <SelectTrigger size="sm" aria-label="Automatic worktree cleanup">
+                <SelectTrigger size="sm" aria-label={t(($) => $.extra.storage.automatic)}>
                   <SelectValue>
                     {mixedModes
-                      ? "Mixed"
+                      ? t(($) => $.extra.storage.mixed)
                       : mode === "inherit"
-                        ? "Inherit"
+                        ? t(($) => $.extra.storage.inherit)
                         : mode === "off"
-                          ? "Off"
-                          : "Custom"}
+                          ? t(($) => $.extra.storage.off)
+                          : t(($) => $.extra.storage.custom)}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem value="inherit">Inherit</SelectItem>
-                  <SelectItem value="off">Off</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
+                  <SelectItem value="inherit">{t(($) => $.extra.storage.inherit)}</SelectItem>
+                  <SelectItem value="off">{t(($) => $.extra.storage.off)}</SelectItem>
+                  <SelectItem value="custom">{t(($) => $.extra.storage.custom)}</SelectItem>
                 </SelectPopup>
               </Select>
             }
@@ -565,42 +596,42 @@ export function WorktreeCleanupSection() {
         {(!isProjectScope || (!mixedModes && mode === "custom")) && (
           <>
             <SettingsRow
-              title="Delete worktrees with deleted threads"
+              title={t(($) => $.extra.storage.deletedThreads)}
               status={ruleStatus("worktreeOnDelete")}
               managedPaths={lockablePath("worktreeOnDelete")}
-              description="Remove unused worktrees when active or archived threads are deleted. Worktrees with local changes are kept."
+              description={t(($) => $.extra.storage.deletedThreadsDescription)}
               serverScoped={!isProjectScope}
               control={
                 <Switch
-                  aria-label="Delete worktrees with deleted threads"
+                  aria-label={t(($) => $.extra.storage.deletedThreads)}
                   checked={settings.worktreeOnDelete}
                   onCheckedChange={(worktreeOnDelete) => updateWorktree({ worktreeOnDelete })}
                 />
               }
             />
             <SettingsRow
-              title="Delete merged worktrees"
+              title={t(($) => $.extra.storage.merged)}
               status={ruleStatus("worktreeOnMerge")}
               managedPaths={lockablePath("worktreeOnMerge")}
-              description="Remove worktrees whose pull request is merged and whose commits are included in the default branch."
+              description={t(($) => $.extra.storage.mergedDescription)}
               serverScoped={!isProjectScope}
               control={
                 <Switch
-                  aria-label="Delete merged worktrees"
+                  aria-label={t(($) => $.extra.storage.merged)}
                   checked={settings.worktreeOnMerge}
                   onCheckedChange={(worktreeOnMerge) => updateWorktree({ worktreeOnMerge })}
                 />
               }
             />
             <SettingsRow
-              title="Delete inactive worktrees"
+              title={t(($) => $.extra.storage.inactive)}
               status={ruleStatus("worktreeAfterDays")}
               managedPaths={lockablePath("worktreeAfterDays")}
-              description="Remove worktrees after their threads have been inactive for this many days. Branches and thread history are kept."
+              description={t(($) => $.extra.storage.inactiveDescription)}
               serverScoped={!isProjectScope}
               control={
                 <RetentionControl
-                  label="Delete inactive worktrees"
+                  label={t(($) => $.extra.storage.inactive)}
                   value={settings.worktreeAfterDays}
                   onChange={(worktreeAfterDays) => updateWorktree({ worktreeAfterDays })}
                 />
@@ -608,7 +639,10 @@ export function WorktreeCleanupSection() {
             />
             <AdvancedSettings
               // The keep-when search result lands on this section, not its row.
-              targetIds={["storage-worktrees", searchableSetting("storage-worktree-keep-when").id]}
+              targetIds={[
+                "storage-worktrees",
+                searchableSetting("storage-worktree-keep-when", t).id,
+              ]}
             >
               {connectedEnvironments.length > 0 &&
                 connectedEnvironments.every(
@@ -617,21 +651,21 @@ export function WorktreeCleanupSection() {
                     true,
                 ) && (
                   <SettingsRow
-                    title="Delete settled worktrees"
+                    title={t(($) => $.extra.storage.settled)}
                     managedPaths={lockablePath("worktreeSettledAfterDays")}
                     status={[
                       ruleStatus("worktreeSettledAfterDays"),
                       environments.length > connectedEnvironments.length
-                        ? "Offline machines will not get this setting"
+                        ? t(($) => $.extra.storage.offline)
                         : undefined,
                     ]
                       .filter(Boolean)
                       .join(". ")}
-                    description="Remove worktrees this many days after their thread settles. Set 0 days to remove them at the next cleanup. Branches and thread history are kept."
+                    description={t(($) => $.extra.storage.settledDescription)}
                     serverScoped={!isProjectScope}
                     control={
                       <RetentionControl
-                        label="Delete settled worktrees"
+                        label={t(($) => $.extra.storage.settled)}
                         value={settings.worktreeSettledAfterDays}
                         minimum={0}
                         onChange={(worktreeSettledAfterDays) =>
@@ -642,14 +676,14 @@ export function WorktreeCleanupSection() {
                   />
                 )}
               <SettingsRow
-                title="Delete unchanged worktrees"
+                title={t(($) => $.extra.storage.unchanged)}
                 status={ruleStatus("worktreeUnchanged")}
                 managedPaths={lockablePath("worktreeUnchanged")}
-                description="Remove worktrees with no commits beyond the default branch."
+                description={t(($) => $.extra.storage.unchangedDescription)}
                 serverScoped={!isProjectScope}
                 control={
                   <Switch
-                    aria-label="Delete unchanged worktrees"
+                    aria-label={t(($) => $.extra.storage.unchanged)}
                     checked={settings.worktreeUnchanged}
                     onCheckedChange={(worktreeUnchanged) => updateWorktree({ worktreeUnchanged })}
                   />
@@ -660,15 +694,15 @@ export function WorktreeCleanupSection() {
                   environment.serverConfig?.environment.capabilities.storageCleanupRun === true,
               ) && (
                 <SettingsRow
-                  {...searchableSetting("storage-worktree-keep-when")}
+                  {...searchableSetting("storage-worktree-keep-when", t)}
                   status={ruleStatus("worktreeKeepWhen")}
                   managedPaths={lockablePath("worktreeKeepWhen")}
                   description={
                     settings.worktreeKeepWhen === "any-local-files"
-                      ? "Includes ignored files, except node_modules."
+                      ? t(($) => $.extra.storage.ignored)
                       : settings.worktreeKeepWhen === "tracked-changes"
-                        ? "Deletes untracked and ignored files, including .env."
-                        : "Keeps edits and untracked files. Deletes ignored files, including .env."
+                        ? t(($) => $.extra.storage.deleteUntracked)
+                        : t(($) => $.extra.storage.keepEdits)
                   }
                   serverScoped={!isProjectScope}
                   control={
@@ -683,17 +717,23 @@ export function WorktreeCleanupSection() {
                           updateWorktree({ worktreeKeepWhen: next });
                       }}
                     >
-                      <SelectTrigger size="sm" aria-label="Keep worktrees with local changes">
+                      <SelectTrigger size="sm" aria-label={t(($) => $.extra.storage.keepChanges)}>
                         <SelectValue>
                           {ruleStatus("worktreeKeepWhen")
-                            ? "Mixed"
+                            ? t(($) => $.extra.storage.mixed)
                             : KEEP_WHEN_LABELS[settings.worktreeKeepWhen]}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectPopup align="end" alignItemWithTrigger={false}>
-                        <SelectItem value="any-local-files">Any local files</SelectItem>
-                        <SelectItem value="uncommitted-changes">Uncommitted changes</SelectItem>
-                        <SelectItem value="tracked-changes">Edited tracked files</SelectItem>
+                        <SelectItem value="any-local-files">
+                          {t(($) => $.extra.storage.anyFiles)}
+                        </SelectItem>
+                        <SelectItem value="uncommitted-changes">
+                          {t(($) => $.extra.storage.uncommitted)}
+                        </SelectItem>
+                        <SelectItem value="tracked-changes">
+                          {t(($) => $.extra.storage.tracked)}
+                        </SelectItem>
                       </SelectPopup>
                     </Select>
                   }
@@ -709,6 +749,7 @@ export function WorktreeCleanupSection() {
 
 /** Retention for logs and captures, and the manual cleanup run, which covers worktrees too. */
 export function StorageCleanupSections() {
+  const { t } = useTranslation("settings");
   const { scope, connectedEnvironments, targets } = useSettingsScope();
   const scopedSettings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
@@ -730,11 +771,11 @@ export function StorageCleanupSections() {
   const settledLogsStatus = useDebouncedValue(`${targetIdsKey}:${logsMixed}`, 300);
   const artifactsStatus =
     targets.length > 1 && settledArtifactsStatus === `${targetIdsKey}:true`
-      ? "Mixed across selected machines"
+      ? t(($) => $.extra.storage.mixedMachines)
       : undefined;
   const logsStatus =
     targets.length > 1 && settledLogsStatus === `${targetIdsKey}:true`
-      ? "Mixed across selected machines"
+      ? t(($) => $.extra.storage.mixedMachines)
       : undefined;
   if (scope.kind === "project" || scope.kind === "checkout") return null;
   const update = (patch: Partial<StorageCleanupSettings>) =>
@@ -751,7 +792,11 @@ export function StorageCleanupSections() {
     return (
       <>
         {databaseStorageNotice}
-        <SettingsSection id="storage-artifacts" title="Artifacts and logs" variant="plain">
+        <SettingsSection
+          id="storage-artifacts"
+          title={t(($) => $.extra.storage.artifacts)}
+          variant="plain"
+        >
           <StorageCleanupScopeNotice />
         </SettingsSection>
       </>
@@ -761,17 +806,17 @@ export function StorageCleanupSections() {
   return (
     <>
       {databaseStorageNotice}
-      <SettingsSection id="storage-artifacts" title="Artifacts and logs">
+      <SettingsSection id="storage-artifacts" title={t(($) => $.extra.storage.artifacts)}>
         <AnimatedHeight>
           <SettingsRow
-            title="Delete old browser artifacts"
+            title={t(($) => $.extra.storage.oldArtifacts)}
             status={artifactsStatus}
             managedPaths={["storageCleanup.browserArtifactsAfterDays"]}
-            description="Delete saved browser captures after this many days. Older capture links will no longer open."
+            description={t(($) => $.extra.storage.oldArtifactsDescription)}
             serverScoped
             control={
               <RetentionControl
-                label="Delete old browser artifacts"
+                label={t(($) => $.extra.storage.oldArtifacts)}
                 value={settings.browserArtifactsAfterDays}
                 onChange={(browserArtifactsAfterDays) => update({ browserArtifactsAfterDays })}
               />
@@ -780,14 +825,14 @@ export function StorageCleanupSections() {
         </AnimatedHeight>
         <AnimatedHeight>
           <SettingsRow
-            title="Delete old rotated logs"
+            title={t(($) => $.extra.storage.oldLogs)}
             status={logsStatus}
             managedPaths={["storageCleanup.logsAfterDays"]}
-            description="Delete inactive rotated log files after this many days. Current logs are kept."
+            description={t(($) => $.extra.storage.oldLogsDescription)}
             serverScoped
             control={
               <RetentionControl
-                label="Delete old rotated logs"
+                label={t(($) => $.extra.storage.oldLogs)}
                 value={settings.logsAfterDays}
                 onChange={(logsAfterDays) => update({ logsAfterDays })}
               />

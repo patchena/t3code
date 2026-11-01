@@ -1,7 +1,9 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it } from "vite-plus/test";
 import type { BrowserImportSource } from "@t3tools/contracts";
 
 import {
+  formatSkippedDomains,
   initialWizardStep,
   initialTargetSelection,
   refreshedSourceProfileDirectory,
@@ -62,3 +64,28 @@ describe("refreshedSourceProfileDirectory", () => {
     expect(refreshedSourceProfileDirectory("Removed", source({ profiles: [] }))).toBe("");
   });
 });
+
+it.each(["en", "de"] as const)(
+  "formats skipped domains in %s without changing them",
+  (language) => {
+    const t = createI18n(language).getFixedT(language, "tools");
+    const format = new Intl.NumberFormat("en-US").format;
+    expect(formatSkippedDomains([], t, format)).toBe("");
+    expect(formatSkippedDomains(["a.test"], t, format)).toBe("a.test");
+    expect(formatSkippedDomains(["a.test", "b.test", "c.test"], t, format)).toBe(
+      language === "en" ? "a.test, b.test and c.test" : "a.test, b.test und c.test",
+    );
+    expect(formatSkippedDomains(["a.test", "b.test", "c.test", "d.test"], t, format)).toBe(
+      language === "en"
+        ? "a.test, b.test, c.test and 1 more"
+        : "a.test, b.test, c.test und 1 weitere",
+    );
+    expect(
+      formatSkippedDomains(["a.test", "b.test", "c.test", "d.test", "e.test"], t, format),
+    ).toBe(
+      language === "en"
+        ? "a.test, b.test, c.test and 2 more"
+        : "a.test, b.test, c.test und 2 weitere",
+    );
+  },
+);

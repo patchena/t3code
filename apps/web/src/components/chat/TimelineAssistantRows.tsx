@@ -2,8 +2,9 @@ import { shouldPreserveAssistantLineBreaks } from "@t3tools/shared/markdownPipel
 import { type RunId } from "@t3tools/contracts";
 import { canForkProjectedAssistantItem } from "@t3tools/client-runtime/state/thread-workflows";
 import { memo, use, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { type ChatMessage, type TurnDiffSummary } from "../../types";
-import ChatMarkdown from "../ChatMarkdown";
+import { ChatMarkdown } from "../ChatMarkdown";
 import { GitForkIcon } from "lucide-react";
 import { Button } from "../ui/button";
 import { ProposedPlanCard } from "./ProposedPlanCard";
@@ -87,6 +88,7 @@ function AssistantForkButton({
 }: {
   readonly projectedItem: NonNullable<Extract<TimelineRow, { kind: "message" }>["projectedItem"]>;
 }) {
+  const { t } = useTranslation("chat");
   const ctx = use(TimelineRowCtx);
   const [busy, setBusy] = useState(false);
   const support = useV2ItemSupport({
@@ -118,13 +120,13 @@ function AssistantForkButton({
                 () => setBusy(false),
               );
             }}
-            aria-label="Fork from this response"
+            aria-label={t(($) => $.thread.forkResponse)}
           />
         }
       >
         <GitForkIcon className={cn("size-3", busy && "animate-pulse")} />
       </TooltipTrigger>
-      <TooltipPopup side="top">Fork from this response</TooltipPopup>
+      <TooltipPopup side="top">{t(($) => $.thread.forkResponse)}</TooltipPopup>
     </Tooltip>
   );
 }
@@ -163,6 +165,8 @@ function AssistantMessageMeta({
   copyStreaming: boolean;
   alwaysVisible?: boolean;
 }) {
+  const { t: tCommon, i18n } = useTranslation("common");
+  const { t: tActivity } = useTranslation("activity");
   const ctx = use(TimelineRowCtx);
 
   return (
@@ -177,7 +181,7 @@ function AssistantMessageMeta({
     >
       {projectedItem && projectedItem.item.status !== "completed" ? (
         <span className="rounded-full border border-border/70 px-1.5 py-0.5 font-mono text-3xs text-muted-foreground">
-          {projectedItem.item.status}
+          {tActivity(($) => $.itemStatus[projectedItem.item.status])}
         </span>
       ) : null}
       <AssistantCopyButton
@@ -191,10 +195,15 @@ function AssistantMessageMeta({
       {!message.streaming && (
         <Tooltip>
           <TooltipTrigger render={<p className="text-muted-foreground text-xs tabular-nums" />}>
-            {formatDayAwareTimestamp(message.updatedAt, ctx.timestampFormat)}
+            {formatDayAwareTimestamp(message.updatedAt, ctx.timestampFormat, tCommon)}
           </TooltipTrigger>
           <TooltipPopup>
-            {formatChatTimestampTooltip(message.updatedAt, ctx.timestampFormat)}
+            {formatChatTimestampTooltip(
+              message.updatedAt,
+              ctx.timestampFormat,
+              tCommon,
+              i18n.language,
+            )}
           </TooltipPopup>
         </Tooltip>
       )}

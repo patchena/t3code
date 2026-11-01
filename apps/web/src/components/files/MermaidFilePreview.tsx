@@ -2,7 +2,9 @@ import { lazy, Suspense } from "react";
 
 import { FileSurfaceLoading } from "./fileSurfaceChrome";
 
-const MermaidViewer = lazy(() => import("./MermaidViewer"));
+const MermaidViewer = lazy(() =>
+  import("~/components/files/MermaidViewer").then((module) => ({ default: module.MermaidViewer })),
+);
 
 export function MermaidFilePreview(props: { readonly text: string }) {
   return (

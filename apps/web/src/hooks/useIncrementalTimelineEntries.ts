@@ -1,9 +1,10 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import {
   deriveTimelineEntriesFromVisibleTurnItemsWithState,
   type TimelineEntriesInput,
   type TimelineEntriesProjection,
-} from "../session-logic";
+} from "~/session-logic";
 
 function sameInput(left: TimelineEntriesInput, right: TimelineEntriesInput): boolean {
   return (
@@ -21,15 +22,21 @@ export function useIncrementalTimelineEntries(
   threadKey: string | null,
   input: TimelineEntriesInput,
 ): TimelineEntriesProjection["entries"] {
+  const { t } = useTranslation("activity");
   const [state, setState] = useState(() => ({
     threadKey,
-    projection: deriveTimelineEntriesFromVisibleTurnItemsWithState(input),
+    projection: deriveTimelineEntriesFromVisibleTurnItemsWithState(input, t),
   }));
-  if (state.threadKey === threadKey && sameInput(state.projection.input, input)) {
+  if (
+    state.threadKey === threadKey &&
+    state.projection.translation === t &&
+    sameInput(state.projection.input, input)
+  ) {
     return state.projection.entries;
   }
   const projection = deriveTimelineEntriesFromVisibleTurnItemsWithState(
     input,
+    t,
     state.threadKey === threadKey ? state.projection : null,
   );
   setState({ threadKey, projection });

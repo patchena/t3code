@@ -12,7 +12,7 @@ vi.mock(import("pdfjs-dist/build/pdf.worker.min.mjs?url"), async () => {
   };
 });
 
-import PdfViewer from "./PdfViewer";
+import { PdfViewer } from "~/components/files/PdfViewer";
 
 // Page 1 is a short banner whose title is drawn in two runs with a font change, so pdf.js
 // splits it into two text spans. Page 2 is a letter page rotated a quarter turn.

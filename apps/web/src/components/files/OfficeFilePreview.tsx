@@ -3,7 +3,9 @@ import { lazy, Suspense } from "react";
 
 import { FileSurfaceLoading } from "./fileSurfaceChrome";
 
-const OfficeViewer = lazy(() => import("./OfficeViewer"));
+const OfficeViewer = lazy(() =>
+  import("~/components/files/OfficeViewer").then((module) => ({ default: module.OfficeViewer })),
+);
 
 export function OfficeFilePreview(props: {
   readonly src: string;

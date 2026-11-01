@@ -32,12 +32,15 @@ import {
   type PullRequestDiffStats,
   type PullRequestGroup,
   type PullRequestListOverride,
-} from "./pullRequestList.logic";
-import type { PullRequestExpectedHost } from "./PullRequestListFilters";
-import type { PullRequestListPreferences, PullRequestListSort } from "./pullRequestListPreferences";
-import { assignProjectsToEnvironments } from "./pullRequestProjectAssignment.logic";
+} from "~/components/pullRequest/pullRequestList.logic";
+import type { PullRequestExpectedHost } from "~/components/pullRequest/PullRequestListFilters";
+import type {
+  PullRequestListPreferences,
+  PullRequestListSort,
+} from "~/components/pullRequest/pullRequestListPreferences";
+import { assignProjectsToEnvironments } from "~/components/pullRequest/pullRequestProjectAssignment.logic";
 import { pullRequestFilterProjects } from "@t3tools/client-runtime/pull-request-project-filter";
-import { pullRequestListEntryId } from "./pullRequestListGroups.logic";
+import { pullRequestListEntryId } from "~/components/pullRequest/pullRequestListGroups.logic";
 
 export interface PullRequestsSearch extends PullRequestListPreferences {
   readonly environmentId?: EnvironmentId;

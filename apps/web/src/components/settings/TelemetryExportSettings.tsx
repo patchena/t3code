@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { Trans, useTranslation } from "react-i18next";
 import { useAtomValue } from "@effect/atom-react";
 import type { OtlpEndpointCheckResult, OtlpSignal, ServerObservability } from "@t3tools/contracts";
 import { useEffect, useEffectEvent, useState } from "react";
@@ -18,21 +20,21 @@ const SIGNALS = [
     key: "otlpTracesUrl",
     sourceKey: "otlpTracesSource",
     variableKey: "otlpTracesVariable",
-    label: "Traces",
+    label: (t: TFunction<"settings">) => t(($) => $.diagnostics.exports.traces),
     signal: "traces",
   },
   {
     key: "otlpMetricsUrl",
     sourceKey: "otlpMetricsSource",
     variableKey: "otlpMetricsVariable",
-    label: "Metrics",
+    label: (t: TFunction<"settings">) => t(($) => $.diagnostics.exports.metrics),
     signal: "metrics",
   },
   {
     key: "otlpLogsUrl",
     sourceKey: "otlpLogsSource",
     variableKey: "otlpLogsVariable",
-    label: "Logs",
+    label: (t: TFunction<"settings">) => t(($) => $.diagnostics.exports.logs),
     signal: "logs",
   },
 ] as const;
@@ -40,44 +42,63 @@ const SIGNALS = [
 type SignalDescriptor = (typeof SIGNALS)[number];
 type SignalKey = SignalDescriptor["key"];
 
-const OVERRIDE_LABELS = { environment: "Set by environment", bootstrap: "Set by desktop" } as const;
+const OVERRIDE_LABELS = {
+  environment: (t: TFunction<"settings">) => t(($) => $.diagnostics.exports.byEnvironment),
+  bootstrap: (t: TFunction<"settings">) => t(($) => $.diagnostics.exports.byDesktop),
+} as const;
 
 function runningOverride(
   running: ServerObservability | undefined,
   { key, sourceKey, variableKey }: SignalDescriptor,
+  t: TFunction<"settings">,
 ) {
   const url = running?.[key];
   const source = running?.[sourceKey];
   if (url === undefined || (source !== "environment" && source !== "bootstrap")) return undefined;
-  return { url, label: OVERRIDE_LABELS[source], variable: running?.[variableKey] };
+  return { url, label: OVERRIDE_LABELS[source](t), variable: running?.[variableKey] };
 }
 
 type EndpointCheck = { readonly url: string; readonly result: OtlpEndpointCheckResult | null };
 
 const isHttpUrl = (url: string) => /^https?:\/\/./i.test(url);
 
-function endpointStatus(url: string, check: EndpointCheck | undefined) {
-  if (url === "") return { label: "Off", dot: "bg-muted-foreground/40" };
-  if (check?.url !== url) return { label: "Not checked", dot: "bg-muted-foreground/40" };
+function endpointStatus(url: string, check: EndpointCheck | undefined, t: TFunction<"settings">) {
+  if (url === "")
+    return { label: t(($) => $.diagnostics.exports.off), dot: "bg-muted-foreground/40" };
+  if (check?.url !== url)
+    return { label: t(($) => $.diagnostics.exports.notChecked), dot: "bg-muted-foreground/40" };
   const { result } = check;
-  if (result === null) return { label: "Checking…", dot: "bg-warning" };
+  if (result === null)
+    return { label: t(($) => $.diagnostics.exports.checking), dot: "bg-warning" };
   switch (result._tag) {
     case "Accepted":
-      return { label: `Connected · ${Math.round(result.latencyMs)} ms`, dot: "bg-success" };
+      return {
+        label: t(($) => $.diagnostics.exports.connected, { latency: Math.round(result.latencyMs) }),
+        dot: "bg-success",
+      };
     case "Rejected":
-      return { label: `Rejected · HTTP ${result.status}`, dot: "bg-destructive" };
-    case "Unreachable":
-      return { label: result.timedOut ? "Timed out" : "Unreachable", dot: "bg-destructive" };
+      return {
+        label: t(($) => $.diagnostics.exports.rejected, { status: result.status }),
+        dot: "bg-destructive",
+      };
+    case t(($) => $.diagnostics.exports.unreachable):
+      return {
+        label: result.timedOut
+          ? t(($) => $.diagnostics.exports.timedOut)
+          : t(($) => $.diagnostics.exports.unreachable),
+        dot: "bg-destructive",
+      };
   }
 }
 
 export function TelemetryExportSettings() {
+  const { t } = useTranslation("settings");
   const { environment, scope } = useSettingsScope();
   if (scope.kind !== "environment" || !environment) {
     return (
-      <SettingsSection title="OpenTelemetry export" id="telemetry-export">
+      <SettingsSection title={t(($) => $.diagnostics.exports.title)} id="telemetry-export">
         <SettingsScopeNotice target="environment">
-          Choose one environment to configure its telemetry exports.
+          {t(($) => $.diagnostics.exports.chooseEnvironment)}
         </SettingsScopeNotice>
       </SettingsSection>
     );
@@ -86,11 +107,12 @@ export function TelemetryExportSettings() {
 }
 
 function TelemetryExportForm() {
+  const { t } = useTranslation("settings");
   const { environment } = useSettingsScope();
   const saved = useScopedSettings((settings) => settings.observability);
   const [draft, setDraft] = useState<Partial<typeof saved>>({});
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [savedNotice, setSavedNotice] = useState(false);
   const environmentId = environment?.environmentId;
   const canEdit = useAtomValue(
     serverEnvironment.checkOtlpEndpoint.permissionAtom(environmentId ?? null),
@@ -101,7 +123,7 @@ function TelemetryExportForm() {
   const [checks, setChecks] = useState<Partial<Record<SignalKey, EndpointCheck>>>(() =>
     Object.fromEntries(
       SIGNALS.flatMap((descriptor) => {
-        const url = runningOverride(running, descriptor)?.url ?? saved[descriptor.key];
+        const url = runningOverride(running, descriptor, t)?.url ?? saved[descriptor.key];
         return isHttpUrl(url) ? [[descriptor.key, { url, result: null }]] : [];
       }),
     ),
@@ -143,14 +165,14 @@ function TelemetryExportForm() {
   }, [canCheck]);
 
   return (
-    <SettingsSection title="OpenTelemetry export" id="telemetry-export">
+    <SettingsSection title={t(($) => $.diagnostics.exports.title)} id="telemetry-export">
       <form
         className="grid gap-4 px-4 py-4 sm:px-5"
         onSubmit={async (event) => {
           event.preventDefault();
           if (!environment || saving) return;
           setSaving(true);
-          setMessage(null);
+          setSavedNotice(false);
           const result = await updateSettings({
             environmentId: environment.environmentId,
             input: {
@@ -164,25 +186,26 @@ function TelemetryExportForm() {
           setSaving(false);
           if (result._tag === "Success") {
             setDraft({});
-            setMessage("Saved. Restart the server to apply.");
+            setSavedNotice(true);
           }
         }}
       >
         <p className="text-xs text-muted-foreground">
-          Send traces, metrics, and logs to an OTLP HTTP receiver. Restart the server to apply.
-          Environment variables override these settings.
+          {t(($) => $.diagnostics.exports.description)}
         </p>
         {!canEdit && (
           <p className="text-xs text-muted-foreground">
-            This connection lacks permission to change settings on{" "}
-            {environment?.label ?? "the selected environment"}.
+            {t(($) => $.diagnostics.exports.permission, {
+              environment:
+                environment?.label ?? t(($) => $.diagnostics.exports.selectedEnvironment),
+            })}
           </p>
         )}
         {SIGNALS.map((descriptor) => {
           const { key, label, signal } = descriptor;
-          const override = runningOverride(running, descriptor);
+          const override = runningOverride(running, descriptor, t);
           const url = override?.url ?? values[key].trim();
-          const check = canCheck ? endpointStatus(url, checks[key]) : null;
+          const check = canCheck ? endpointStatus(url, checks[key], t) : null;
           const status = override
             ? {
                 label: check ? `${override.label} · ${check.label}` : override.label,
@@ -194,7 +217,9 @@ function TelemetryExportForm() {
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-1.5">
                   {status && <ConnectionStatusDot dotClassName={status.dot} />}
-                  <Label htmlFor={key}>{label} endpoint</Label>
+                  <Label htmlFor={key}>
+                    {t(($) => $.diagnostics.exports.endpoint, { signal: label(t) })}
+                  </Label>
                 </div>
                 {status && <span className="text-xs text-muted-foreground">{status.label}</span>}
               </div>
@@ -204,7 +229,7 @@ function TelemetryExportForm() {
                   size="sm"
                   type="url"
                   pattern="[Hh][Tt][Tt][Pp][Ss]?://.*"
-                  title="Enter an HTTP or HTTPS endpoint, or leave empty to disable export."
+                  title={t(($) => $.diagnostics.exports.endpointHint)}
                   placeholder={`http://localhost:4318/v1/${signal}`}
                   value={values[key]}
                   disabled={saving || !canEdit}
@@ -216,7 +241,7 @@ function TelemetryExportForm() {
                       if (value.trim() === saved[key]) delete next[key];
                       return next;
                     });
-                    setMessage(null);
+                    setSavedNotice(false);
                   }}
                 />
                 {canCheck && (
@@ -227,18 +252,27 @@ function TelemetryExportForm() {
                     disabled={!isHttpUrl(url) || checks[key]?.result === null}
                     onClick={() => void checkEndpoint(key, signal, url)}
                   >
-                    Test
+                    {t(($) => $.diagnostics.exports.test)}
                   </Button>
                 )}
               </div>
               {(saved[key] !== (running?.[key] ?? "") || override?.variable) && (
                 <p className="break-all text-xs text-muted-foreground">
-                  Running: {running?.[key] || "Disabled"}
-                  {override?.variable && (
-                    <>
-                      {" "}
-                      from <code className="font-mono">{override.variable}</code>
-                    </>
+                  {override?.variable ? (
+                    <Trans
+                      t={t}
+                      i18nKey={($) => $.diagnostics.exports.runningFrom}
+                      components={{
+                        url: (
+                          <span>{running?.[key] || t(($) => $.diagnostics.exports.disabled)}</span>
+                        ),
+                        variable: <code className="font-mono">{override.variable}</code>,
+                      }}
+                    />
+                  ) : (
+                    t(($) => $.diagnostics.exports.running, {
+                      url: running?.[key] || t(($) => $.diagnostics.exports.disabled),
+                    })
                   )}
                 </p>
               )}
@@ -247,7 +281,7 @@ function TelemetryExportForm() {
         })}
         <div className="flex items-center justify-between gap-3">
           <p role="status" className="text-xs text-muted-foreground">
-            {message}
+            {savedNotice ? t(($) => $.diagnostics.exports.savedRestart) : null}
           </p>
           <div className="flex shrink-0 gap-2">
             <Button
@@ -257,19 +291,21 @@ function TelemetryExportForm() {
               disabled={!changed || saving || !canEdit}
               onClick={() => {
                 setDraft({});
-                setMessage(null);
+                setSavedNotice(false);
                 if (!canCheck) return;
                 for (const descriptor of SIGNALS) {
                   const { key, signal } = descriptor;
-                  if (runningOverride(running, descriptor)) continue;
+                  if (runningOverride(running, descriptor, t)) continue;
                   if (checks[key]?.url !== saved[key]) checkEndpoint(key, signal, saved[key]);
                 }
               }}
             >
-              Discard
+              {t(($) => $.diagnostics.exports.discard)}
             </Button>
             <Button type="submit" size="xs" disabled={!changed || saving || !canEdit}>
-              {saving ? "Saving…" : "Save"}
+              {saving
+                ? t(($) => $.diagnostics.exports.saving)
+                : t(($) => $.diagnostics.exports.save)}
             </Button>
           </div>
         </div>

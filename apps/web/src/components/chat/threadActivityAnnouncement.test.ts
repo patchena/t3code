@@ -7,6 +7,7 @@ import {
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 
 import {
   announcedRun,
@@ -30,10 +31,11 @@ const busy = (
 ): ThreadActivitySnapshot => ({ status, requestId, runId, runStatus });
 
 function speak(snapshots: ReadonlyArray<ThreadActivitySnapshot>) {
+  const t = createI18n("en").getFixedT("en", "activity");
   let memory: ThreadAnnouncementMemory | null = null;
   const spoken: string[] = [];
   for (const snapshot of snapshots) {
-    const result = nextThreadAnnouncement(memory, snapshot);
+    const result = nextThreadAnnouncement(memory, snapshot, t);
     memory = result.memory;
     if (result.announcement !== null) spoken.push(result.announcement);
   }

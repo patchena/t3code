@@ -1,3 +1,4 @@
+import { mobileI18n } from "~/i18n";
 import {
   formatProviderSubagentStatus,
   type ProviderSubagentStatus,
@@ -24,7 +25,11 @@ export function ProviderSubagentBar(props: {
   const [inspecting, setInspecting] = useState(false);
   const live = props.status !== null && isOrchestrationV2WorkActive(props.status.status);
   const nowMs = useVisibleSecondClock(live);
-  const statusLabel = formatProviderSubagentStatus(props.status, nowMs);
+  const statusLabel = formatProviderSubagentStatus(
+    props.status,
+    nowMs,
+    mobileI18n.getFixedT("en", "activity"),
+  );
   const modelDescription =
     props.effortLabel === null ? props.modelLabel : `${props.modelLabel}, ${props.effortLabel}`;
 

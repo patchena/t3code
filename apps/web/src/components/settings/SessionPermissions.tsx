@@ -1,8 +1,6 @@
 import { type EnvironmentId, sessionGrantsScope } from "@t3tools/contracts";
-import {
-  AUTH_SCOPE_OPTIONS,
-  sessionPermissionsUnavailableMessage,
-} from "@t3tools/shared/authScopeOptions";
+import { useTranslation } from "react-i18next";
+import { authScopeOptions } from "~/connection/permissions";
 import { useEnvironmentSessionState } from "~/state/session";
 
 export function SessionPermissions({
@@ -14,20 +12,24 @@ export function SessionPermissions({
   readonly connected: boolean;
   readonly routeContext?: boolean;
 }) {
+  const { t } = useTranslation("connect");
   const session = useEnvironmentSessionState(environmentId);
+  const authenticated = session.data?.authenticated === true ? session.data : null;
   return connected && !session.hasError && !session.isPending && session.data?.authenticated ? (
     <div className="space-y-3 py-3 text-xs">
       <p className="text-muted-foreground">
         {routeContext
-          ? "These permissions apply to your active route. Other routes may have different permissions."
-          : "These permissions apply to this client’s current connection."}
+          ? t(($) => $.permissions.routeDescription)
+          : t(($) => $.permissions.clientDescription)}
       </p>
       <ul className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
-        {AUTH_SCOPE_OPTIONS.map(({ scope, title }) => (
+        {authScopeOptions(t).map(({ scope, title }) => (
           <li key={scope} className="flex items-start justify-between gap-3">
             <span>{title}</span>
             <span className="shrink-0 text-muted-foreground">
-              {sessionGrantsScope(session.data!, scope) ? "Allowed" : "Not granted"}
+              {authenticated && sessionGrantsScope(authenticated, scope)
+                ? t(($) => $.permissions.allowed)
+                : t(($) => $.permissions.notGranted)}
             </span>
           </li>
         ))}
@@ -35,11 +37,13 @@ export function SessionPermissions({
     </div>
   ) : (
     <p className="py-3 text-xs text-muted-foreground">
-      {sessionPermissionsUnavailableMessage({
-        connected,
-        failed: session.hasError,
-        rejected: !session.hasError && !session.isPending && session.data?.authenticated === false,
-      })}
+      {!connected
+        ? t(($) => $.permissions.connect)
+        : !session.hasError && !session.isPending && session.data?.authenticated === false
+          ? t(($) => $.permissions.rejected)
+          : session.hasError
+            ? t(($) => $.permissions.failed)
+            : t(($) => $.permissions.checking)}
     </p>
   );
 }

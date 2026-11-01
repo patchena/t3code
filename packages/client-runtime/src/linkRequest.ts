@@ -9,6 +9,7 @@ import {
   type ServerConfig,
 } from "@t3tools/contracts";
 import * as Option from "effect/Option";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 
 import type { EnvironmentPresentation } from "./connection/presentation.ts";
 import { connectionRoutes, routeHttpBaseUrl } from "./connection/routes.ts";
@@ -51,8 +52,10 @@ export const linkRequestDefaultAccess = (
 ): AuthMcpClientAccess => item.requestedAccess ?? "approval-required";
 
 /** What the card calls the other environment: its own name, else the address asked for. */
-export const linkRequestTargetName = (item: Pick<LinkRequestItem, "label" | "url">): string =>
-  item.label?.trim() || item.url || "a machine";
+export const linkRequestTargetName = (
+  item: Pick<LinkRequestItem, "label" | "url">,
+  t: TFunction<"chat">,
+): string => item.label?.trim() || item.url || t(($) => $.link.machine);
 
 /** A machine the user could link a thread's environment to. */
 export interface LinkableMachine {
@@ -214,30 +217,35 @@ export function linkRequestDisplay(
   >,
   visibility: "local" | "inherited" | "synthetic",
   accessLabel: (access: AuthMcpClientAccess) => string,
+  t: TFunction<"chat">,
 ): LinkRequestDisplay {
   switch (item.linkStatus) {
     case "pending":
       return visibility === "local"
         ? { kind: "pending" }
-        : { kind: "pending-elsewhere", label: "Waiting for an answer in the original thread" };
+        : { kind: "pending-elsewhere", label: t(($) => $.secret.waitingOriginal) };
     case "linked":
       return {
         kind: "answered",
         outcome: "linked",
-        label: `Linked ${item.linkedLabel ?? linkRequestTargetName(item)}${
-          item.linkedAccess === undefined ? "" : ` · ${accessLabel(item.linkedAccess)}`
-        }`,
+        label:
+          item.linkedAccess === undefined
+            ? t(($) => $.link.linked, { name: item.linkedLabel ?? linkRequestTargetName(item, t) })
+            : t(($) => $.link.linkedWithAccess, {
+                name: item.linkedLabel ?? linkRequestTargetName(item, t),
+                access: accessLabel(item.linkedAccess),
+              }),
       };
     case "declined":
-      return { kind: "answered", outcome: "declined", label: "Declined" };
+      return { kind: "answered", outcome: "declined", label: t(($) => $.secret.declined) };
     case "failed":
       return {
         kind: "answered",
         outcome: "failed",
-        label: `Could not link: ${item.failure ?? "the other environment refused"}`,
+        label: t(($) => $.link.failed, { reason: item.failure ?? t(($) => $.link.refused) }),
       };
     case "cancelled":
-      return { kind: "answered", outcome: "ended", label: "Request ended" };
+      return { kind: "answered", outcome: "ended", label: t(($) => $.secret.ended) };
   }
 }
 
@@ -292,12 +300,7 @@ const USER_FACING_FAILURE_TAGS = new Set([
   "PeerPairingCodeError",
 ]);
 
-/**
- * Inline error copy for a failed answer. Only known errors pass their message
- * through: anything else (transport or encoding failures) gets the generic
- * copy, so the pairing code can never surface in the UI.
- */
-export function linkRequestFailureMessage(failure: unknown): string {
+export function linkRequestFailureDetail(failure: unknown): string | null {
   if (
     typeof failure === "object" &&
     failure !== null &&
@@ -310,5 +313,9 @@ export function linkRequestFailureMessage(failure: unknown): string {
   ) {
     return failure.message;
   }
-  return "Could not answer the request. Try again.";
+  return null;
+}
+
+export function linkRequestFailureMessage(failure: unknown, t: TFunction<"chat">): string {
+  return linkRequestFailureDetail(failure) ?? t(($) => $.secret.answerFailed);
 }

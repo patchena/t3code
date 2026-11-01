@@ -1,3 +1,4 @@
+import { desktopI18n, desktopT } from "#desktop/i18n";
 // @effect-diagnostics globalTimers:off -- Poll TCC only while the native permission helper is open.
 import * as Electron from "electron";
 import { MAC_PERMISSION_HELPER_CHANNEL } from "../ipc/channels.ts";
@@ -8,7 +9,7 @@ import {
   type SettingsWindow,
 } from "./MacSettingsWindow.ts";
 
-import { MAC_PERMISSION_TITLES, type MacPermission } from "./MacPermission.ts";
+import { type MacPermission, type MacPermissionHelperLabels } from "./MacPermission.ts";
 
 const permissionGranted = (permission: MacPermission) => {
   if (permission === "screen-recording")
@@ -38,11 +39,22 @@ const escapeHtml = (value: string) =>
     }
   });
 
+function permissionTitle(permission: MacPermission) {
+  switch (permission) {
+    case "screen-recording":
+      return desktopT(($) => $.permissions.screenRecording);
+    case "accessibility":
+      return desktopT(($) => $.permissions.accessibility);
+    case "full-disk-access":
+      return desktopT(($) => $.permissions.fullDiskAccess);
+  }
+}
+
 function helperHtml(permission: MacPermission, icon: string) {
-  const title = MAC_PERMISSION_TITLES[permission];
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+  const title = permissionTitle(permission);
+  return `<!doctype html><html lang="${desktopI18n.language}"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">
-<title>Set up ${title}</title><style>
+<title>${escapeHtml(desktopT(($) => $.permissions.setup, { permission: title }))}</title><style>
 :root { color-scheme: light dark; --base: #fff; --row: #e7e7e7; --text: #292929; --line: #e3e3e3; }
 @media (prefers-color-scheme: dark) { :root { --base: #242424; --row: #383838; --text: #f5f5f5; --line: #484848; } }
 * { box-sizing: border-box; }
@@ -58,9 +70,9 @@ button:focus-visible { outline: 2px solid #007aff; outline-offset: -2px; }
 #app:active { cursor: grabbing; }
 img { width: 32px; height: 32px; pointer-events: none; }
 </style></head><body><main id="panel">
-<button id="close" aria-label="Close permission helper">×</button>
-<header>↑ Drag T3 Code into the list above</header>
-<button id="app" draggable="true" aria-label="Drag T3 Code to System Settings, or click to reveal in Finder"><img src="${escapeHtml(icon)}" alt="" draggable="false">T3 Code</button>
+<button id="close" aria-label="${escapeHtml(desktopT(($) => $.permissions.close))}">×</button>
+<header id="instruction">${escapeHtml(desktopT(($) => $.permissions.drag))}</header>
+<button id="app" draggable="true" aria-label="${escapeHtml(desktopT(($) => $.permissions.reveal))}"><img src="${escapeHtml(icon)}" alt="" draggable="false">T3 Code</button>
 </main></body></html>`;
 }
 
@@ -109,7 +121,7 @@ export class MacPermissionHelper {
       fullscreenable: false,
       alwaysOnTop: true,
       skipTaskbar: true,
-      title: `Set up ${MAC_PERMISSION_TITLES[permission]}`,
+      title: desktopT(($) => $.permissions.setup, { permission: permissionTitle(permission) }),
       webPreferences: { preload, sandbox: true, contextIsolation: true, nodeIntegration: false },
     });
     this.window = window;
@@ -146,6 +158,20 @@ export class MacPermissionHelper {
         finish();
       }
     };
+    const syncLanguage = () => {
+      if (window.isDestroyed()) return;
+      const labels: MacPermissionHelperLabels = {
+        language: desktopI18n.language,
+        title: desktopT(($) => $.permissions.setup, { permission: permissionTitle(permission) }),
+        close: desktopT(($) => $.permissions.close),
+        drag: desktopT(($) => $.permissions.drag),
+        reveal: desktopT(($) => $.permissions.reveal),
+      };
+      window.setTitle(labels.title);
+      window.webContents.send(MAC_PERMISSION_HELPER_CHANNEL, labels);
+    };
+    desktopI18n.on("languageChanged", syncLanguage);
+    window.webContents.on("did-finish-load", syncLanguage);
     let settingsWindow: SettingsWindow = null;
     let foundSettings = false;
     let trackingAvailable = true;
@@ -184,6 +210,8 @@ export class MacPermissionHelper {
     window.once("closed", () => {
       clearInterval(timer);
       stopTracking();
+      desktopI18n.off("languageChanged", syncLanguage);
+      window.webContents.off("did-finish-load", syncLanguage);
       Electron.ipcMain.removeListener(MAC_PERMISSION_HELPER_CHANNEL, onMessage);
       owner?.removeListener("closed", onOwnerClosed);
       if (this.window === window) this.window = undefined;

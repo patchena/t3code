@@ -101,7 +101,7 @@ vi.mock(import("../hooks/useSettings"), async (original) => {
   return { ...actual, useClientSettings };
 });
 
-import ChatMarkdown from "./ChatMarkdown";
+import { ChatMarkdown } from "./ChatMarkdown";
 import { AudioPreview } from "./files/AudioPreview";
 
 it("keeps compact audio playback loaded across signed URL renewals", async () => {

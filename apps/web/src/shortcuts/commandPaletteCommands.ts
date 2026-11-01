@@ -1,3 +1,4 @@
+import { appI18n } from "~/i18n";
 import type { AnyRouter } from "@tanstack/react-router";
 
 import {
@@ -6,7 +7,7 @@ import {
   useCommandPaletteStore,
 } from "../commandPaletteStore";
 import { overlayModeForCommand } from "../components/CommandPalette.logic";
-import { APPEARANCE_OPTIONS, notifyThemeSaveFailure } from "../components/CommandPaletteThemeItems";
+import { appearanceOptions, notifyThemeSaveFailure } from "../components/CommandPaletteThemeItems";
 import { toggleThemeEditorForTheme } from "../components/settings/themeEditorStore";
 import { toastManager } from "../components/ui/toast";
 import { getThemeSnapshot, setAppearanceMode } from "../hooks/useTheme";
@@ -64,16 +65,20 @@ export function installCommandPaletteCommands(
       "appearance.cycle": (event) => {
         consume(event);
         if (event.repeat) return;
+        const t = appI18n.getFixedT(null, "workspace");
         const { appearanceMode } = getThemeSnapshot();
         const nextMode =
           appearanceMode === "system" ? "light" : appearanceMode === "light" ? "dark" : "system";
         if (!setAppearanceMode(nextMode)) {
-          notifyThemeSaveFailure();
+          notifyThemeSaveFailure(t);
           return;
         }
         toastManager.add({
           id: "appearance-cycle",
-          title: `Appearance: ${APPEARANCE_OPTIONS.find((option) => option.mode === nextMode)?.label}`,
+          title: t(($) => $.palette.appearance, {
+            appearance:
+              appearanceOptions(t).find((option) => option.mode === nextMode)?.label ?? nextMode,
+          }),
           timeout: 1500,
         });
       },

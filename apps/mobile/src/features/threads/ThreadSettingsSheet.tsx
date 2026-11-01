@@ -1,3 +1,4 @@
+import { mobileI18n } from "~/i18n";
 import {
   getPromptControlledTraits,
   getTraitSelectChange,
@@ -763,7 +764,11 @@ function buildThreadSettingsCatalogItems(
     );
     const updateRequiredNotice =
       group.updateRequired && session.providerFilter !== FAVORITES_PROVIDER_FILTER
-        ? formatProviderUpdateRequiredNotice(group.updateRequired, session.searchQuery)
+        ? formatProviderUpdateRequiredNotice(
+            group.updateRequired,
+            session.searchQuery,
+            mobileI18n.getFixedT(null, "chat"),
+          )
         : null;
     if (visibleModels.length === 0 && !updateRequiredNotice) {
       return [];

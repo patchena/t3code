@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   createFilesystemEnvironmentAtoms,
   resolveFilesystemReadAccess,
@@ -12,14 +13,20 @@ import { environmentSession } from "./session";
 export const filesystemEnvironment = createFilesystemEnvironmentAtoms(connectionAtomRuntime);
 
 export function useFilesystemReadAccess(environmentId: EnvironmentId | null) {
+  const { t } = useTranslation("files");
   const session = useEnvironmentQuery(
     environmentId === null ? null : environmentSession.sessionStateAtom(environmentId),
   );
   const environment = useEnvironmentPresentation(environmentId);
-  return resolveFilesystemReadAccess({
+  const access = resolveFilesystemReadAccess({
     isCatalogReady: environment.isReady,
     connection: environment.presentation?.connection ?? null,
     session: session.data,
     sessionError: session.error,
   });
+  return {
+    canReadFiles: access.canReadFiles,
+    isPending: access.isPending,
+    error: access.failure === "disconnected" ? t(($) => $.query.disconnected) : access.error,
+  };
 }

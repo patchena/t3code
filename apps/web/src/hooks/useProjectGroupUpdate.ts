@@ -7,8 +7,10 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
 import * as Cause from "effect/Cause";
+import { useTranslation } from "react-i18next";
 
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
+import { appI18n } from "../i18n";
 import type { SidebarProjectGroupMember } from "../sidebarProjectGrouping";
 import { useProjects, useServerConfigs } from "../state/entities";
 import { readEnvironment } from "../state/environments";
@@ -34,6 +36,7 @@ type ProjectGroupMember = Pick<
  * reports the first failure as a toast. Every machine must be connected first.
  */
 export function useProjectGroupUpdate() {
+  const { t } = useTranslation("settings");
   const serverConfigs = useServerConfigs();
   const updateProject = useOrchestrationCommand(projectEnvironment.update, {
     reportFailure: false,
@@ -53,7 +56,10 @@ export function useProjectGroupUpdate() {
     if (unavailable) {
       return failWith(
         failureTitle,
-        `Connect ${unavailable.environmentLabel ?? "the selected environment"} and try again.`,
+        t(($) => $.extra.projects.connectEnvironment, {
+          environment:
+            unavailable.environmentLabel ?? t(($) => $.extra.projects.selectedEnvironment),
+        }),
       );
     }
     for (const member of members) {
@@ -73,7 +79,11 @@ export function useProjectGroupUpdate() {
       if (result._tag === "Failure") {
         reportProjectFailure(
           members.length > 1
-            ? `${failureTitle} on ${member.environmentLabel ?? "the current environment"}`
+            ? t(($) => $.extra.projects.failureEnvironment, {
+                failure: failureTitle,
+                environment:
+                  member.environmentLabel ?? t(($) => $.extra.projects.currentEnvironment),
+              })
             : failureTitle,
           result,
         );
@@ -96,6 +106,7 @@ export function useProjectGroupUpdate() {
 
 /** Pin state for a project group, shared by every list that can pin or unpin a project. */
 export function useProjectPin() {
+  const { t } = useTranslation("settings");
   const { updateProjectGroup, canOrganizeProjectGroup } = useProjectGroupUpdate();
   const environments = [...new Set(useProjects().map((project) => project.environmentId))].map(
     (environmentId) => ({ environmentId }),
@@ -115,7 +126,7 @@ export function useProjectPin() {
     void updateProjectGroup(
       group.memberProjects,
       { pinned },
-      pinned ? "Failed to pin project" : "Failed to unpin project",
+      pinned ? t(($) => $.extra.projects.pinFailed) : t(($) => $.extra.projects.unpinFailed),
     );
   };
   return {
@@ -133,12 +144,14 @@ export function checkProjectAccess(
   const denied = members.find(
     (member) => !readEnvironmentScope(member.environmentId, AuthOrchestrationOperateScope),
   );
-  return denied
-    ? failWith(
-        failureTitle,
-        `This connection cannot change projects in ${denied.environmentLabel ?? "this environment"}.`,
-      )
-    : null;
+  if (!denied) return null;
+  const t = appI18n.getFixedT(null, "settings");
+  return failWith(
+    failureTitle,
+    t(($) => $.extra.projects.permissionEnvironment, {
+      environment: denied.environmentLabel ?? t(($) => $.extra.projects.thisEnvironment),
+    }),
+  );
 }
 
 export function reportProjectFailure(title: string, result: AtomCommandResult<unknown, unknown>) {
@@ -148,7 +161,10 @@ export function reportProjectFailure(title: string, result: AtomCommandResult<un
     stackedThreadToast({
       type: "error",
       title,
-      description: error instanceof Error ? error.message : "An error occurred.",
+      description:
+        error instanceof Error
+          ? error.message
+          : appI18n.getFixedT(null, "settings")(($) => $.extra.projects.error),
     }),
   );
 }

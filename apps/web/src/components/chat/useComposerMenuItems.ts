@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   matchComposerEnvironmentItems,
   matchComposerThreadItems,
@@ -95,6 +96,7 @@ export function useComposerMenuItems({
   readonly workspaceSkillsScanning: boolean;
   readonly questionAttachmentTarget: DraftId | null;
 }) {
+  const { t } = useTranslation("chat");
   // Thread mentions rank by recency as of when the composer mounted.
   const [now] = useState(() => Date.now());
   const composerTriggerKind = composerTrigger?.kind ?? null;
@@ -224,7 +226,7 @@ export function useComposerMenuItems({
           type: "slash-command",
           command: "model",
           label: "/model",
-          description: "Switch response model for this thread",
+          description: t(($) => $.composer.switchResponseModel),
         },
         ...(planModeUiEnabled
           ? ([
@@ -233,14 +235,14 @@ export function useComposerMenuItems({
                 type: "slash-command",
                 command: "plan",
                 label: "/plan",
-                description: "Switch this thread into plan mode",
+                description: t(($) => $.composer.switchPlan),
               },
               {
                 id: "slash:default",
                 type: "slash-command",
                 command: "default",
                 label: "/default",
-                description: "Switch this thread back to normal build mode",
+                description: t(($) => $.composer.switchBuild),
               },
             ] as const)
           : []),
@@ -251,14 +253,14 @@ export function useComposerMenuItems({
                 type: "slash-command",
                 command: "side",
                 label: "/side",
-                description: sideChatDisabledReason ?? "Ask a side question in a new side chat",
+                description: sideChatDisabledReason ?? t(($) => $.composer.askSideQuestion),
               },
               {
                 id: "slash:btw",
                 type: "slash-command",
                 command: "btw",
                 label: "/btw",
-                description: sideChatDisabledReason ?? "Same as /side",
+                description: sideChatDisabledReason ?? t(($) => $.composer.sameSideCommand),
               },
             ] as const)
           : []),
@@ -269,7 +271,7 @@ export function useComposerMenuItems({
                 type: "slash-command",
                 command: "clear",
                 label: "/clear",
-                description: "Start a fresh session; earlier messages stay visible",
+                description: t(($) => $.composer.clearCommand),
               },
             ] as const)
           : []),
@@ -287,7 +289,8 @@ export function useComposerMenuItems({
         provider: selectedProvider,
         command,
         label: `/${command.name}`,
-        description: command.description ?? command.input?.hint ?? "Run provider command",
+        description:
+          command.description ?? command.input?.hint ?? t(($) => $.composer.runProviderCommand),
       }));
       const query = composerTrigger.query.trim().toLowerCase();
       const skillItems = slashMenuSkills.map((skill) => ({
@@ -299,7 +302,7 @@ export function useComposerMenuItems({
         description:
           skill.shortDescription ??
           skill.description ??
-          (skill.scope ? `${skill.scope} skill` : ""),
+          (skill.scope ? t(($) => $.composer.sourceSkill, { source: skill.scope }) : ""),
       }));
       // T3's `/clear` replaces the provider's, which would clear a session T3 still treats as live.
       const visibleProviderSlashCommandItems = providerSlashCommandItems.filter(
@@ -323,7 +326,9 @@ export function useComposerMenuItems({
         description:
           skill.shortDescription ??
           skill.description ??
-          (skill.scope ? `${skill.scope} skill` : "Run provider skill"),
+          (skill.scope
+            ? t(($) => $.composer.sourceSkill, { source: skill.scope })
+            : t(($) => $.composer.runProviderSkill)),
       }));
     }
     if (
@@ -402,25 +407,25 @@ export function useComposerMenuItems({
         exactPullRequestLookup.isPending));
   const emptyState = (() => {
     if (composerTriggerKind === "skill") {
-      return "No skills found. Try / to browse provider commands.";
+      return t(($) => $.composer.noSkills);
     }
     if (composerTriggerKind === "pull-request") {
       if (pullRequestProjectId === null || pullRequestRepository === null) {
-        return "Pull requests are not available for this project.";
+        return t(($) => $.composer.pullRequestsUnavailable);
       }
       if (
         pullRequestLookup.error !== null ||
         pullRequestLookup.data?.errors.some((error) => error.projectId === pullRequestProjectId)
       ) {
-        return "Pull requests could not be read for this project.";
+        return t(($) => $.composer.pullRequestsReadFailed);
       }
       return composerTrigger?.query
-        ? `No pull request matches ${composerTrigger.query}.`
-        : "No pull requests found in this repository.";
+        ? t(($) => $.composer.noMatchingPullRequest, { query: composerTrigger.query })
+        : t(($) => $.composer.noRepoPullRequests);
     }
     return composerTriggerKind === "path"
-      ? "No matching files or folders."
-      : "No matching command.";
+      ? t(($) => $.composer.noFiles)
+      : t(($) => $.composer.noCommands);
   })();
 
   return { items, isLoading, emptyState };

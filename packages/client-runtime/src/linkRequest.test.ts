@@ -2,6 +2,7 @@ import { EnvironmentId, type ServerConfig, ThreadId, TurnItemId } from "@t3tools
 import type { RelayEnvironmentStatusResponse } from "@t3tools/contracts/relay";
 import * as Option from "effect/Option";
 import { describe, expect, it } from "vite-plus/test";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 
 import { BearerConnectionProfile } from "./connection/catalog.ts";
 import { BearerConnectionTarget, RelayConnectionTarget } from "./connection/model.ts";
@@ -26,25 +27,29 @@ const accessLabel = (access: string) => `<${access}>`;
 
 describe("linkRequestDisplay", () => {
   it("names the environment linked and the access the user chose", () => {
+    const t = createI18n("en").getFixedT("en", "chat");
     expect(
       linkRequestDisplay(
         { ...asked, linkStatus: "linked", linkedLabel: "Box", linkedAccess: "auto" },
         "local",
         accessLabel,
+        t,
       ),
     ).toEqual({ kind: "answered", outcome: "linked", label: "Linked Box · <auto>" });
   });
 
   it("shows why a link failed, and never offers the actions outside the asking thread", () => {
+    const t = createI18n("en").getFixedT("en", "chat");
     expect(
       linkRequestDisplay(
         { ...asked, linkStatus: "failed", failure: "Pairing code expired." },
         "local",
         accessLabel,
+        t,
       ),
     ).toMatchObject({ outcome: "failed", label: "Could not link: Pairing code expired." });
     expect(
-      linkRequestDisplay({ ...asked, linkStatus: "pending" }, "inherited", accessLabel),
+      linkRequestDisplay({ ...asked, linkStatus: "pending" }, "inherited", accessLabel, t),
     ).toMatchObject({ kind: "pending-elsewhere" });
   });
 });
@@ -394,10 +399,11 @@ describe("rankMachinesByHint", () => {
 
 describe("linkRequestFailureMessage", () => {
   it("passes through only known user-facing errors", () => {
+    const t = createI18n("en").getFixedT("en", "chat");
     expect(
-      linkRequestFailureMessage({ _tag: "PeerLinkRequestError", message: "Already answered." }),
+      linkRequestFailureMessage({ _tag: "PeerLinkRequestError", message: "Already answered." }, t),
     ).toBe("Already answered.");
-    expect(linkRequestFailureMessage({ _tag: "SchemaError", message: "code=abc" })).toBe(
+    expect(linkRequestFailureMessage({ _tag: "SchemaError", message: "code=abc" }, t)).toBe(
       "Could not answer the request. Try again.",
     );
   });

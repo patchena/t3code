@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import * as Option from "effect/Option";
 import type { SshDeviceHostConfig } from "@t3tools/contracts";
@@ -19,6 +20,7 @@ import { DeviceHostAvailability } from "../device/DeviceHostAvailability";
 import { useHostConnectionChecks } from "./useHostConnectionChecks";
 import {
   deviceHostConnectionKey,
+  deviceHostCheckError,
   parseDeviceHostDraft,
   type DeviceHostCheckTarget,
 } from "./deviceHostConnectionChecks";
@@ -75,6 +77,7 @@ function DeviceHostEditorForm({
   onSave: (host: SshDeviceHostConfig) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation("settings");
   const [draft, setDraft] = useState(host);
   const [expandedChecks, setExpandedChecks] = useState<{ key: string; open: boolean } | null>(null);
   const { checks, testConnection } = useHostConnectionChecks(targets);
@@ -88,12 +91,12 @@ function DeviceHostEditorForm({
     targets.length === 1 ||
     (expandedChecks?.key === connectionKey ? expandedChecks.open : failed > 0);
   const checkSummary = checking
-    ? "Checking environments…"
+    ? t(($) => $.providers.checkingEnvironments)
     : results
       ? failed
-        ? `${failed} of ${targets.length} failed`
-        : "Connection checks passed"
-      : "Check access before saving";
+        ? t(($) => $.providers.checksFailed, { count: failed, total: targets.length })
+        : t(($) => $.providers.checksPassed)
+      : t(($) => $.providers.checkBeforeSaving);
   return (
     <form
       className="flex min-h-0 flex-col"
@@ -103,17 +106,18 @@ function DeviceHostEditorForm({
       }}
     >
       <DialogHeader>
-        <DialogTitle>{isNew ? "Add device host" : "Edit device host"}</DialogTitle>
+        <DialogTitle>
+          {isNew ? t(($) => $.providers.addDeviceHost) : t(($) => $.providers.editDeviceHost)}
+        </DialogTitle>
         <DialogDescription>
-          {targets.length === 1
-            ? `Connect from ${targets[0]?.label}.`
-            : `Connect from ${targets.length} selected environments.`}{" "}
-          Hosts on the same machine are skipped.
+          {targets.length === 1 && targets[0]
+            ? t(($) => $.providers.connectFromEnvironment, { environment: targets[0].label })
+            : t(($) => $.providers.connectFromEnvironments, { count: targets.length })}
         </DialogDescription>
       </DialogHeader>
       <DialogPanel>
         <label className="block space-y-1.5 text-sm">
-          <span>Name</span>
+          <span>{t(($) => $.providers.name)}</span>
           <Input
             autoFocus
             required
@@ -127,7 +131,7 @@ function DeviceHostEditorForm({
           />
         </label>
         <label className="block space-y-1.5 text-sm">
-          <span>SSH target</span>
+          <span>{t(($) => $.providers.sshTarget)}</span>
           <Input
             required
             value={draft.target}
@@ -136,17 +140,19 @@ function DeviceHostEditorForm({
               const target = event.target.value;
               setDraft((current) => ({ ...current, target }));
             }}
-            placeholder="user@host or SSH alias"
+            placeholder={t(($) => $.providers.sshTargetPlaceholder)}
           />
         </label>
         <details
           open={host.port !== undefined || host.identityFile !== undefined || undefined}
           className="text-sm"
         >
-          <summary className="cursor-pointer text-muted-foreground">SSH options</summary>
+          <summary className="cursor-pointer text-muted-foreground">
+            {t(($) => $.providers.sshOptions)}
+          </summary>
           <div className="mt-3 grid grid-cols-[minmax(0,1fr)_7rem] gap-3">
             <label className="block space-y-1.5">
-              <span>Identity file</span>
+              <span>{t(($) => $.providers.identityFile)}</span>
               <Input
                 value={draft.identityFile ?? ""}
                 disabled={busy}
@@ -157,11 +163,11 @@ function DeviceHostEditorForm({
                     return identityFile ? { ...rest, identityFile } : rest;
                   });
                 }}
-                placeholder="SSH config default"
+                placeholder={t(($) => $.providers.sshConfigDefault)}
               />
             </label>
             <label className="block space-y-1.5">
-              <span>Port</span>
+              <span>{t(($) => $.providers.port)}</span>
               <Input
                 type="number"
                 min={1}
@@ -175,12 +181,12 @@ function DeviceHostEditorForm({
                     return port ? { ...rest, port: Number(port) } : rest;
                   });
                 }}
-                placeholder="Default"
+                placeholder={t(($) => $.providers.default)}
               />
             </label>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Optional. Resolved separately on each environment.
+            {t(($) => $.providers.sshOptionsHint)}
           </p>
         </details>
         <Collapsible
@@ -197,7 +203,7 @@ function DeviceHostEditorForm({
               <div className="min-w-0 text-xs [--inline-button-white-space:normal]">
                 <CollapsibleTrigger
                   disabled={!results}
-                  aria-label={`${checkSummary}. Per-machine results`}
+                  aria-label={t(($) => $.providers.perMachineResults, { summary: checkSummary })}
                   render={<InlineButton tone="muted" />}
                 >
                   <span role="status" className="text-left">
@@ -220,7 +226,7 @@ function DeviceHostEditorForm({
                 if (Option.isSome(input)) void testConnection(input.value);
               }}
             >
-              {checking ? <Spinner size="xs" /> : null} Test connection
+              {checking ? <Spinner size="xs" /> : null} {t(($) => $.providers.testConnection)}
             </Button>
           </div>
           {results ? (
@@ -239,19 +245,19 @@ function DeviceHostEditorForm({
                       >
                         {result.status === "pending" ? (
                           <>
-                            <Spinner size="xs" /> Checking…
+                            <Spinner size="xs" /> {t(($) => $.providers.checking)}
                           </>
                         ) : result.status === "local" ? (
                           <>
-                            <MonitorIcon className="size-3" /> Already available locally
+                            <MonitorIcon className="size-3" /> {t(($) => $.providers.alreadyLocal)}
                           </>
                         ) : result.status === "failed" ? (
                           <>
-                            <XIcon className="size-3" /> Failed
+                            <XIcon className="size-3" /> {t(($) => $.providers.failed)}
                           </>
                         ) : (
                           <>
-                            <CheckIcon className="size-3" /> Connected
+                            <CheckIcon className="size-3" /> {t(($) => $.providers.connected)}
                           </>
                         )}
                       </span>
@@ -263,9 +269,11 @@ function DeviceHostEditorForm({
                     ) : null}
                     {result.status === "failed" ? (
                       <details className="mt-1.5 text-muted-foreground">
-                        <summary className="cursor-pointer">Show error</summary>
+                        <summary className="cursor-pointer">
+                          {t(($) => $.providers.showError)}
+                        </summary>
                         <p className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-words">
-                          {result.error}
+                          {deviceHostCheckError(result.error, t)}
                         </p>
                       </details>
                     ) : null}
@@ -278,10 +286,10 @@ function DeviceHostEditorForm({
       </DialogPanel>
       <DialogFooter>
         <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
-          Cancel
+          {t(($) => $.providers.cancel)}
         </Button>
         <Button type="submit" disabled={busy || checking || !valid || !draft.label.trim()}>
-          {busy ? <Spinner size="xs" /> : null} Save host
+          {busy ? <Spinner size="xs" /> : null} {t(($) => $.providers.saveHost)}
         </Button>
       </DialogFooter>
     </form>

@@ -1,7 +1,13 @@
+import { enUS, de } from "@daypicker/react/locale";
+import { useClientSettings } from "~/hooks/useSettings";
+import { interfaceDateLocale, weekStartsOn } from "~/timestampFormat";
+
 import { DayPicker } from "@daypicker/react";
 import { ChevronLeftIcon, ChevronRightIcon, ChevronsUpDownIcon } from "lucide-react";
 import type * as React from "react";
 import { cn } from "~/lib/utils";
+
+const calendarLocales = { en: enUS, de };
 
 const buttonClassNames =
   "relative flex size-(--cell-size) text-base sm:text-sm items-center justify-center rounded-lg text-foreground not-in-data-selected:hover:bg-accent disabled:pointer-events-none disabled:opacity-64 [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0";
@@ -47,6 +53,7 @@ export function Calendar({
   mode = "single",
   ...props
 }: React.ComponentProps<typeof DayPicker>): React.ReactElement {
+  const language = useClientSettings((settings) => settings.interfaceLanguage);
   const defaultClassNames = {
     button_next: buttonClassNames,
     button_previous: buttonClassNames,
@@ -99,10 +106,13 @@ export function Calendar({
     components: mergedComponents,
     "data-slot": "calendar",
     formatters: {
-      formatMonthDropdown: (date: Date) => date.toLocaleString("default", { month: "short" }),
+      formatMonthDropdown: (date: Date) =>
+        date.toLocaleString(interfaceDateLocale(language), { month: "short" }),
     } as React.ComponentProps<typeof DayPicker>["formatters"],
     mode,
     showOutsideDays,
+    locale: calendarLocales[language],
+    weekStartsOn,
     ...props,
   };
 

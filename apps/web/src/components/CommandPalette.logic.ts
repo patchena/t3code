@@ -1,3 +1,5 @@
+import * as Option from "effect/Option";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   foldSearchQuery,
   PALETTE_SECONDARY_LIMIT,
@@ -40,16 +42,21 @@ export const ADDON_ICON_CLASS = "size-4";
 
 export function buildLinkedThreadActionItems(
   input: CommandPaletteLinkedThreads & {
+    readonly t: TFunction<"workspace">;
     query: string;
     icon: ReactNode;
     runThread: (thread: Pick<SidebarThreadSummary, "environmentId" | "id">) => Promise<void>;
   },
 ): CommandPaletteActionItem[] {
+  const { t } = input;
   return input.threads.map((thread) => ({
     kind: "action",
     value: `thread:${input.environmentId}:${thread.id}`,
-    title: thread.title || "Untitled thread",
-    description: thread.archivedAt === null ? "Linked thread" : "Archived thread",
+    title: thread.title || t(($) => $.palette.untitledThread),
+    description:
+      thread.archivedAt === null
+        ? t(($) => $.palette.linkedThread)
+        : t(($) => $.palette.archivedThread),
     searchTerms: [input.query, thread.title],
     icon: input.icon,
     run: () => input.runThread({ environmentId: input.environmentId, id: thread.id }),
@@ -349,15 +356,21 @@ export type CommandPaletteMode = "root" | "root-browse" | "submenu" | "submenu-b
 export type CommandPaletteProject = Project & { readonly displayName: string };
 
 export function buildCommandPaletteProjectMetadata(input: {
+  readonly t: TFunction<"workspace">;
   readonly projects: ReadonlyArray<Pick<Project, "environmentId" | "title" | "workspaceRoot">>;
-  readonly locationByEnvironmentId: ReadonlyMap<EnvironmentId, { readonly label: string }>;
+  readonly locationByEnvironmentId: ReadonlyMap<
+    EnvironmentId,
+    { readonly label: string; readonly searchTerms?: ReadonlyArray<string> }
+  >;
 }) {
+  const { t } = input;
   const searchTerms: string[] = [];
   const environmentLabels = new Set<string>();
 
   for (const project of input.projects) {
-    const label = input.locationByEnvironmentId.get(project.environmentId)?.label ?? "Remote";
-    searchTerms.push(project.title, project.workspaceRoot, label);
+    const location = input.locationByEnvironmentId.get(project.environmentId);
+    const label = location?.label ?? t(($) => $.remote);
+    searchTerms.push(project.title, project.workspaceRoot, label, ...(location?.searchTerms ?? []));
     environmentLabels.add(label);
   }
 
@@ -421,6 +434,8 @@ export type BuildThreadActionItemsThread = Pick<
   };
 
 export function buildThreadActionItems<TThread extends BuildThreadActionItemsThread>(input: {
+  readonly t: TFunction<"workspace">;
+  readonly tCommon: TFunction<"common">;
   threads: ReadonlyArray<TThread>;
   activeThread?: Pick<Thread, "environmentId" | "id">;
   projectByKey: ReadonlyMap<string, Pick<Project, "title">>;
@@ -432,6 +447,7 @@ export function buildThreadActionItems<TThread extends BuildThreadActionItemsThr
   /** Makes the environment searchable; pass it only with two or more environments. */
   environmentLabelOf?: (thread: TThread) => string | null;
 }): CommandPaletteActionItem[] {
+  const { t } = input;
   // Callers order these: recents by last use, search results by rank.
   const visibleThreads = input.threads.filter(
     (thread) => thread.archivedAt === null && !isSidebarHiddenThread(thread),
@@ -453,7 +469,7 @@ export function buildThreadActionItems<TThread extends BuildThreadActionItemsThr
       thread.id === input.activeThread?.id &&
       thread.environmentId === input.activeThread.environmentId;
     if (isCurrent) {
-      descriptionParts.push("Current thread");
+      descriptionParts.push(t(($) => $.search.currentThread));
     }
 
     const leadingContent = input.renderLeadingContent?.(thread);
@@ -480,6 +496,7 @@ export function buildThreadActionItems<TThread extends BuildThreadActionItemsThr
         description,
         timestamp: formatRelativeTimeLabel(
           thread.latestUserMessageAt ?? thread.updatedAt ?? thread.createdAt,
+          input.tCommon,
         ),
         icon: input.icon,
       },
@@ -542,6 +559,7 @@ function scorePaletteItem(
  * Server message matches stay in a final group so late results cannot move earlier rows.
  */
 export function filterCommandPaletteGroups(input: {
+  readonly t: TFunction<"workspace">;
   activeGroups: ReadonlyArray<CommandPaletteGroup>;
   query: string;
   isInSubmenu: boolean;
@@ -557,6 +575,7 @@ export function filterCommandPaletteGroups(input: {
   threadMessageItems?: ReadonlyArray<CommandPaletteActionItem>;
   now?: number;
 }): CommandPaletteGroup[] {
+  const { t } = input;
   if (input.allOptions && input.isInSubmenu) {
     const { allOptions, ...submenuInput } = input;
     const scoped = filterCommandPaletteGroups(submenuInput);
@@ -594,28 +613,28 @@ export function filterCommandPaletteGroups(input: {
     if (input.allOptions && input.allOptions.nestedItems.length > 0) {
       searchableGroups.push({
         value: "nested-search",
-        label: "Suggestions",
+        label: t(($) => $.palette.suggestions),
         items: input.allOptions.nestedItems,
       });
     }
     if (input.threadSearchItems.length > 0) {
       searchableGroups.push({
         value: "threads-search",
-        label: "Threads",
+        label: t(($) => $.palette.threads),
         items: input.threadSearchItems,
       });
     }
     if (input.projectSearchItems.length > 0) {
       searchableGroups.push({
         value: "projects-search",
-        label: "Projects",
+        label: t(($) => $.palette.projects),
         items: input.projectSearchItems,
       });
     }
     if (input.settingsSearchItems && input.settingsSearchItems.length > 0) {
       searchableGroups.push({
         value: "settings-search",
-        label: "Settings",
+        label: t(($) => $.palette.settings),
         items: input.settingsSearchItems,
       });
     }
@@ -657,13 +676,17 @@ export function filterCommandPaletteGroups(input: {
   const messageItems = (input.threadMessageItems ?? []).filter((item) => !listed.has(item.value));
   return messageItems.length === 0
     ? groups
-    : [...groups, { value: "threads-messages", label: "In messages", items: messageItems }];
+    : [
+        ...groups,
+        { value: "threads-messages", label: t(($) => $.palette.inMessages), items: messageItems },
+      ];
 }
 
 /** Every option inside a submenu as one row, e.g. "New thread in t3code" or "Change theme: Dracula". */
 export function buildNestedSearchItems(
   items: ReadonlyArray<CommandPaletteActionItem | CommandPaletteSubmenuItem>,
   query: string,
+  t: TFunction<"workspace">,
 ): CommandPaletteActionItem[] {
   const nameOf = (item: CommandPaletteItem) =>
     typeof item.title === "string" ? item.title : item.searchTitle;
@@ -674,22 +697,31 @@ export function buildNestedSearchItems(
     const stem = parent.title.replace(/(\.\.\.|…)$/u, "");
     // A query that only names the submenu ("new thread in") wants the submenu row itself.
     if (foldSearchQuery(stem).startsWith(foldedQuery)) return [];
-    const prefix = stem === parent.title ? `${stem}: ` : `${stem.trimEnd()} `;
     return parent.groups.flatMap((group) =>
       group.items.flatMap((child) => {
         const name = nameOf(child);
         if (child.kind !== "action" || name === undefined) return [];
-        const title = `${prefix}${name}`;
+        const title =
+          stem === parent.title
+            ? t(($) => $.palette.submenuOption, { menu: stem, option: name })
+            : t(($) => $.palette.submenuTarget, { menu: stem.trimEnd(), option: name });
         if (topLevelNames.has(title)) return [];
         const { searchTitle: _searchTitle, ...rest } = child;
         // Only the combined title: child keywords like "theme" would list every theme.
-        return [{ ...rest, title, searchTerms: [title] }];
+        return [
+          {
+            ...rest,
+            title,
+            searchTerms: [title, ...parent.searchTerms.map((term) => `${term} ${name}`)],
+          },
+        ];
       }),
     );
   });
 }
 
 export function buildBrowseGroups(input: {
+  readonly t: TFunction<"workspace">;
   browseEntries: ReadonlyArray<FilesystemBrowseEntry>;
   browseQuery: string;
   canBrowseUp: boolean;
@@ -698,6 +730,7 @@ export function buildBrowseGroups(input: {
   browseUp: () => void | Promise<void>;
   browseTo: (name: string) => void | Promise<void>;
 }): CommandPaletteGroup[] {
+  const { t } = input;
   const items: CommandPaletteActionItem[] = [];
 
   if (input.canBrowseUp) {
@@ -728,7 +761,7 @@ export function buildBrowseGroups(input: {
     });
   }
 
-  return [{ value: "directories", label: "Directories", items }];
+  return [{ value: "directories", label: t(($) => $.palette.directories), items }];
 }
 
 export function filterPinnedBrowseEntries(input: {
@@ -761,33 +794,38 @@ export function getCommandPaletteMode(input: {
 }
 
 export function buildRootGroups(input: {
+  readonly t: TFunction<"workspace">;
   actionItems: ReadonlyArray<CommandPaletteActionItem | CommandPaletteSubmenuItem>;
   recentThreadItems: ReadonlyArray<CommandPaletteActionItem>;
 }): CommandPaletteGroup[] {
+  const { t } = input;
   const groups: CommandPaletteGroup[] = [];
   if (input.actionItems.length > 0) {
-    groups.push({ value: "actions", label: "Actions", items: input.actionItems });
+    groups.push({ value: "actions", label: t(($) => $.palette.actions), items: input.actionItems });
   }
   if (input.recentThreadItems.length > 0) {
     groups.push({
       value: "recent-threads",
-      label: "Recent Threads",
+      label: t(($) => $.palette.recentThreads),
       items: input.recentThreadItems,
     });
   }
   return groups;
 }
 
-export function getCommandPaletteInputPlaceholder(mode: CommandPaletteMode): string {
+export function getCommandPaletteInputPlaceholder(
+  mode: CommandPaletteMode,
+  t: TFunction<"workspace">,
+): string {
   switch (mode) {
     case "root":
-      return "Search commands, projects, and threads...";
+      return t(($) => $.palette.rootPlaceholder);
     case "root-browse":
-      return "Enter project path (e.g. ~/projects/my-app)";
+      return t(($) => $.palette.projectPath);
     case "submenu":
-      return "Search...";
+      return t(($) => $.palette.search);
     case "submenu-browse":
-      return "Enter path (e.g. ~/projects/my-app)";
+      return t(($) => $.palette.path);
   }
 }
 
@@ -828,38 +866,50 @@ export type AddProjectCloneFlow =
       readonly remoteUrl: string;
     };
 
-export function remoteProjectInputPlaceholder(flow: AddProjectCloneFlow | null): string | null {
+export function remoteProjectInputPlaceholder(
+  flow: AddProjectCloneFlow | null,
+  t: TFunction<"workspace">,
+): string | null {
   if (!flow) return null;
   if (flow.step === "confirm") return null;
   if (flow.source === "url") {
-    return "Enter Git clone URL";
+    return t(($) => $.palette.cloneUrl);
   }
-  return `Enter ${addProjectRemoteSourceLabel(flow.source)} repository (${addProjectRemoteSourcePathHint(flow.source)})`;
+  return t(($) => $.palette.repositoryPath, {
+    provider: addProjectRemoteSourceLabel(flow.source),
+    path: addProjectRemoteSourcePathHint(flow.source),
+  });
 }
 
 export function buildPaletteRemoteSourceReadiness(
   discovery: SourceControlDiscoveryResult | null,
+  t: TFunction<"workspace">,
 ): AddProjectRemoteSourceReadiness {
   const readiness = buildAddProjectRemoteSourceReadiness(discovery);
+  const providers = new Map(
+    (discovery?.sourceControlProviders ?? []).map((provider) => [provider.kind, provider]),
+  );
   return (source) => {
     const entry = readiness(source);
-    return entry.hint === null
-      ? entry
-      : {
-          ...entry,
-          hint: entry.hint.replace(
-            "Open source control settings",
-            "Open Settings -> Source control",
-          ),
-        };
+    if (entry.ready || source === "url") return entry;
+    const provider = providers.get(source);
+    if (!provider) return { ready: false, hint: t(($) => $.palette.providerUnavailable) };
+    if (provider.status !== "available") return entry;
+    if (provider.auth.status === "unauthenticated" && Option.isNone(provider.auth.detail)) {
+      return {
+        ready: false,
+        hint: t(($) => $.palette.notAuthenticated, { provider: provider.label }),
+      };
+    }
+    return entry;
   };
 }
 
-export function errorMessage(error: unknown): string {
+export function errorMessage(error: unknown, t: TFunction<"workspace">): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message;
   }
-  return "An error occurred.";
+  return t(($) => $.palette.error);
 }
 
 const OVERLAY_MODE_BY_COMMAND = {

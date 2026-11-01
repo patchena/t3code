@@ -1,6 +1,5 @@
 import { pipe } from "effect/Function";
 import {
-  SECRET_REQUEST_DEFAULT_PLACEHOLDER,
   secretRequestAnswerInput,
   secretRequestDisplay,
   secretRequestFailureMessage,
@@ -30,6 +29,9 @@ import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { Button } from "../../components/ui/Button";
 import { Chip } from "../../components/ui/Chip";
+import { mobileI18n } from "~/i18n";
+
+const t = mobileI18n.getFixedT("en", "chat");
 
 const LOCK_SYMBOL: AppSymbolName = { ios: "lock", android: "lock" };
 const PRIVATE_SYMBOL: AppSymbolName = { ios: "checkmark.shield", android: "lock" };
@@ -41,7 +43,7 @@ export function SecretRequestCard(props: {
 }) {
   const { item, visibility } = props.projectedItem;
   if (item.type !== "secret_request") return null;
-  const display = secretRequestDisplay(item, visibility);
+  const display = secretRequestDisplay(item, visibility, t);
   if (display.kind === "pending") {
     return (
       <PendingSecretRequestForm
@@ -106,7 +108,11 @@ function PendingSecretRequestForm(props: {
       return;
     }
     if (!isAtomCommandInterrupted(result)) {
-      pipe(squashAtomCommandFailure(result), secretRequestFailureMessage, setError);
+      pipe(
+        squashAtomCommandFailure(result),
+        (failure) => secretRequestFailureMessage(failure, t),
+        setError,
+      );
     }
   };
   const save = () => {
@@ -160,7 +166,7 @@ function PendingSecretRequestForm(props: {
       {source === null ? (
         <SecretTextInput
           accessibilityLabel={item.label}
-          placeholder={item.placeholder ?? SECRET_REQUEST_DEFAULT_PLACEHOLDER}
+          placeholder={item.placeholder ?? t(($) => $.secret.placeholder)}
           value={secret}
           onChangeText={setSecret}
           editable={!submitting}
@@ -212,7 +218,7 @@ function PendingSecretRequestForm(props: {
             type="monochrome"
           />
           <Text className="flex-1 font-sans text-xs text-foreground-muted">
-            {secretRequestPrivacyNote(item)}
+            {secretRequestPrivacyNote(item, t)}
           </Text>
         </View>
         <Button

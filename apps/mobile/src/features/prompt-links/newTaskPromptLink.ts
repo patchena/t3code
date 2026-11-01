@@ -10,7 +10,9 @@ import {
   findPromptLinkProjects,
   findPromptLinkPullRequestThread,
   resolvePromptLinkModelSelection,
+  formatPromptLinkError,
 } from "@t3tools/client-runtime/prompt-links";
+import { mobileI18n } from "~/i18n";
 import {
   executeAtomQuery,
   isAtomCommandInterrupted,
@@ -364,7 +366,10 @@ function resolveLink(linkSearch: string) {
   const threads = appAtomRegistry.get(environmentThreadShells.threadShellsAtom);
   const parsed = parseNewThreadLink(linkSearch);
   if (!parsed.ok) {
-    Dialog.alert("Could not open link", parsed.error);
+    Dialog.alert(
+      "Could not open link",
+      formatPromptLinkError(parsed.error, mobileI18n.getFixedT(null, "chat")),
+    );
     return;
   }
   const link = parsed.value;

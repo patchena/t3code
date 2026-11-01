@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   SecretProviderId,
   SecretProviderKind,
@@ -75,15 +76,20 @@ export function secretProviderFromDraft(
   draft: SecretProviderDraft,
   existingIds: ReadonlySet<string>,
   target: SecretProviderTarget,
+  t: TFunction<"settings">,
 ): Result.Result<
   { readonly id: SecretProviderId; readonly config: SecretProviderConfig },
   SecretProviderDraftIssues
 > {
-  const label = decodeField(SecretProviderLabel, draft.name, "Enter a name.");
+  const label = decodeField(
+    SecretProviderLabel,
+    draft.name,
+    t(($) => $.providers.enterSecretName),
+  );
   const account = decodeField(
     OnePasswordSecretProviderConfig.fields.account,
     draft.account,
-    "Enter the 1Password account.",
+    t(($) => $.providers.enterOnePasswordAccount),
   );
 
   let id: SecretProviderId | null = null;
@@ -92,9 +98,9 @@ export function secretProviderFromDraft(
     nameIssue = label.failure;
   } else {
     id = target.mode === "edit" ? target.id : secretProviderIdFromName(label.success);
-    if (id === null) nameIssue = "The name needs at least one letter or digit.";
+    if (id === null) nameIssue = t(($) => $.providers.secretNameCharacters);
     else if (target.mode === "add" && existingIds.has(id))
-      nameIssue = "A secret provider with this name exists.";
+      nameIssue = t(($) => $.providers.secretNameExists);
   }
 
   if (

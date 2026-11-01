@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it } from "vite-plus/test";
 import { ProviderDriverKind, ProviderInstanceId, type ServerProvider } from "@t3tools/contracts";
 import {
@@ -94,18 +95,22 @@ describe("compatibility banners", () => {
         getProviderStatusBannerKey(broken),
       ),
     ).toBe(true);
-    expect(getProviderStatusMessage(broken)).toBe(message);
+    const t = createI18n("en").getFixedT(null, "connect");
+    expect(getProviderStatusMessage(broken, t)).toBe(message);
     expect(
-      getProviderStatusMessage({
-        ...broken,
-        compatibilityAdvisory: {
-          ...broken.compatibilityAdvisory!,
-          status: "supported",
-          message: null,
+      getProviderStatusMessage(
+        {
+          ...broken,
+          compatibilityAdvisory: {
+            ...broken.compatibilityAdvisory!,
+            status: "supported",
+            message: null,
+          },
         },
-      }),
+        t,
+      ),
     ).toBe(broken.message);
-    expect(getProviderStatusMessage({ ...broken, auth: { status: "unauthenticated" } })).toBe(
+    expect(getProviderStatusMessage({ ...broken, auth: { status: "unauthenticated" } }, t)).toBe(
       broken.message,
     );
   });

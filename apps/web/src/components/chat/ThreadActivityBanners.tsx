@@ -26,6 +26,9 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 import { Fragment } from "react";
+import { Trans } from "react-i18next";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import type { InterfaceLanguage } from "@t3tools/contracts/settings";
 import { tickTextContent } from "~/lib/tickTextContent";
 import { Button, InlineButton } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -45,12 +48,15 @@ export function extensionStatusBannerItem(
 }
 
 /** Subagents and side chats waiting on the user, unless the parent is itself waiting on them. */
-export function childInputNowItem(input: {
-  readonly childThreadInputs: ReadonlyArray<EnvironmentThreadShell>;
-  readonly parentAwaitingUser: boolean;
-  // A task delegated to a linked environment lives there, not where the parent runs.
-  readonly onOpenThread: (threadId: ThreadId, environmentId: EnvironmentId) => void;
-}): (ThreadNowItem & { readonly waitingLabel: string }) | null {
+export function childInputNowItem(
+  input: {
+    readonly childThreadInputs: ReadonlyArray<EnvironmentThreadShell>;
+    readonly parentAwaitingUser: boolean;
+    // A task delegated to a linked environment lives there, not where the parent runs.
+    readonly onOpenThread: (threadId: ThreadId, environmentId: EnvironmentId) => void;
+  },
+  t: TFunction<"activity">,
+): (ThreadNowItem & { readonly waitingLabel: string }) | null {
   const { childThreadInputs, onOpenThread } = input;
   const first = childThreadInputs[0];
   if (!first || input.parentAwaitingUser) return null;
@@ -62,10 +68,10 @@ export function childInputNowItem(input: {
     ) : (
       <MessageCircleIcon className="text-info-foreground" />
     ),
-    title: childThreadInputsTitle(childThreadInputs),
+    title: childThreadInputsTitle(childThreadInputs, t),
     waitingLabel: childThreadInputs.every((child) => child.lineage.sideChat === true)
-      ? "Side chat waiting"
-      : "Subagent waiting",
+      ? t(($) => $.banners.sideWaiting)
+      : t(($) => $.banners.agentWaiting),
     description: childThreadInputs.map((child, index) => (
       <Fragment key={child.id}>
         {index > 0 ? " " : null}
@@ -79,21 +85,26 @@ export function childInputNowItem(input: {
     )),
     actions: (
       <InlineButton onClick={() => onOpenThread(first.id, first.environmentId)}>
-        {first.hasPendingApprovals ? "Open approval" : "Open question"}
+        {first.hasPendingApprovals
+          ? t(($) => $.banners.openApproval)
+          : t(($) => $.banners.openQuestion)}
       </InlineButton>
     ),
   };
 }
 
 /** The thread's goal, for the end of the timeline. */
-export function goalNowItem(input: {
-  readonly threadId: ThreadId;
-  readonly goal: OrchestrationV2ProviderGoal;
-  readonly isWorking: boolean;
-  readonly onSendCommand: (text: string, failureMessage: string) => Promise<void>;
-}): ThreadNowItem {
+export function goalNowItem(
+  input: {
+    readonly threadId: ThreadId;
+    readonly goal: OrchestrationV2ProviderGoal;
+    readonly isWorking: boolean;
+    readonly onSendCommand: (text: string, failureMessage: string) => Promise<void>;
+  },
+  t: TFunction<"activity">,
+): ThreadNowItem {
   const { isWorking, onSendCommand } = input;
-  const presentation = presentProviderGoal(input.goal, isWorking);
+  const presentation = presentProviderGoal(input.goal, isWorking, t);
   return {
     id: `goal:${input.threadId}`,
     icon: <TargetIcon />,
@@ -108,18 +119,28 @@ export function goalNowItem(input: {
         {presentation.canResume && !isWorking ? (
           <>
             <InlineButton
-              onClick={() => void onSendCommand("/goal resume", "Failed to resume goal.")}
+              onClick={() =>
+                void onSendCommand(
+                  "/goal resume",
+                  t(($) => $.banners.resumeFailed),
+                )
+              }
             >
-              Resume
+              {t(($) => $.banners.resume)}
             </InlineButton>
             <span aria-hidden>·</span>
           </>
         ) : null}
         <InlineButton
           tone="muted"
-          onClick={() => void onSendCommand("/goal clear", "Failed to clear goal.")}
+          onClick={() =>
+            void onSendCommand(
+              "/goal clear",
+              t(($) => $.banners.clearFailed),
+            )
+          }
         >
-          Clear
+          {t(($) => $.banners.clear)}
         </InlineButton>
       </>
     ),
@@ -127,13 +148,16 @@ export function goalNowItem(input: {
 }
 
 /** A Stop the provider has not finished; Force stop once it stops answering. */
-export function runStopNowItem(input: {
-  readonly threadId: ThreadId;
-  readonly stop: RunStopPresentation;
-  readonly canForceStop: boolean;
-  readonly forceStopping: boolean;
-  readonly onForceStop: () => void;
-}): ThreadNowItem {
+export function runStopNowItem(
+  input: {
+    readonly threadId: ThreadId;
+    readonly stop: RunStopPresentation;
+    readonly canForceStop: boolean;
+    readonly forceStopping: boolean;
+    readonly onForceStop: () => void;
+  },
+  t: TFunction<"activity">,
+): ThreadNowItem {
   const unresponsive = input.stop.state === "unresponsive";
   const requestedAtMs = Date.parse(input.stop.requestedAt);
   return {
@@ -143,10 +167,8 @@ export function runStopNowItem(input: {
     ) : (
       <CircleStopIcon />
     ),
-    title: unresponsive ? "Agent not responding to Stop" : "Stopping",
-    description: unresponsive
-      ? "It may be short on memory. Force stop kills its processes."
-      : undefined,
+    title: unresponsive ? t(($) => $.banners.stopUnresponsive) : t(($) => $.banners.stopping),
+    description: unresponsive ? t(($) => $.banners.forceStopDescription) : undefined,
     actions: (
       <>
         <span
@@ -158,7 +180,9 @@ export function runStopNowItem(input: {
         />
         {unresponsive && input.canForceStop ? (
           <InlineButton disabled={input.forceStopping} onClick={input.onForceStop}>
-            {input.forceStopping ? "Force stopping..." : "Force stop"}
+            {input.forceStopping
+              ? t(($) => $.banners.forceStopping)
+              : t(($) => $.banners.forceStop)}
           </InlineButton>
         ) : null}
       </>
@@ -167,17 +191,21 @@ export function runStopNowItem(input: {
 }
 
 /** Background commands and subagents, for the end of the timeline. */
-export function backgroundWorkNowItem(input: {
-  readonly threadId: ThreadId;
-  readonly tasks: ReadonlyArray<OrchestrationV2PendingBackgroundTask>;
-  readonly turnItems: ThreadStructure["turnItems"];
-  readonly stopDisabled: boolean;
-  readonly stopping: boolean;
-  readonly onStop: () => Promise<void>;
-  readonly onOpenThread: (threadId: ThreadId) => void;
-}): ThreadNowItem | null {
+export function backgroundWorkNowItem(
+  input: {
+    readonly threadId: ThreadId;
+    readonly tasks: ReadonlyArray<OrchestrationV2PendingBackgroundTask>;
+    readonly turnItems: ThreadStructure["turnItems"];
+    readonly stopDisabled: boolean;
+    readonly stopping: boolean;
+    readonly onStop: () => Promise<void>;
+    readonly onOpenThread: (threadId: ThreadId) => void;
+  },
+  t: TFunction<"activity">,
+  language: InterfaceLanguage,
+): ThreadNowItem | null {
   const { onOpenThread } = input;
-  const presentation = presentPendingBackgroundWork(input.tasks);
+  const presentation = presentPendingBackgroundWork(input.tasks, t, language);
   if (presentation === null) return null;
   const rows = presentation.items.map((task) => {
     // Same key derivePendingBackgroundWork gives turn-item tasks; subagent items carry progress.
@@ -215,9 +243,13 @@ export function backgroundWorkNowItem(input: {
     icon: rows.every(isCommand) ? <TerminalIcon /> : <CircleDashedIcon />,
     title:
       only && typeof only.label !== "string" && only.task.label !== only.task.kind ? (
-        <>
-          {presentation.waiting ? "Waiting" : "Running"} · {only.label}
-        </>
+        <Trans
+          t={t}
+          i18nKey={
+            presentation.waiting ? ($) => $.banners.waitingTask : ($) => $.banners.runningTask
+          }
+          components={{ task: only.label }}
+        />
       ) : (
         presentation.title
       ),
@@ -248,11 +280,11 @@ export function backgroundWorkNowItem(input: {
         )}
         {onlyThreadId === undefined ? null : (
           <InlineButton tone="muted" onClick={() => onOpenThread(onlyThreadId)}>
-            Open
+            {t(($) => $.banners.open)}
           </InlineButton>
         )}
         <InlineButton disabled={input.stopDisabled} onClick={() => void input.onStop()}>
-          {input.stopping ? "Stopping..." : "Stop"}
+          {input.stopping ? t(($) => $.banners.stoppingAction) : t(($) => $.banners.stop)}
         </InlineButton>
       </>
     ),
@@ -260,14 +292,17 @@ export function backgroundWorkNowItem(input: {
 }
 
 /** The local checkout moved off the branch this thread last ran on. */
-export function branchMismatchBannerItem(input: {
-  readonly mismatchKey: string;
-  readonly mismatch: { readonly threadBranch: string; readonly currentBranch: string };
-  readonly restoreDisabled: boolean;
-  readonly restoring: boolean;
-  readonly onRestore: () => void;
-  readonly onDismiss: () => void;
-}): ComposerBannerStackItem {
+export function branchMismatchBannerItem(
+  input: {
+    readonly mismatchKey: string;
+    readonly mismatch: { readonly threadBranch: string; readonly currentBranch: string };
+    readonly restoreDisabled: boolean;
+    readonly restoring: boolean;
+    readonly onRestore: () => void;
+    readonly onDismiss: () => void;
+  },
+  t: TFunction<"activity">,
+): ComposerBannerStackItem {
   const { mismatch } = input;
   return {
     id: `branch-mismatch:${input.mismatchKey}`,
@@ -275,28 +310,48 @@ export function branchMismatchBannerItem(input: {
     icon: <GitBranchIcon />,
     title: (
       <span className="flex min-w-0 items-baseline gap-1.5">
-        <span className="shrink-0 font-normal text-muted-foreground">Branch changed from</span>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <code className="min-w-0 truncate font-medium text-foreground">
-                {mismatch.threadBranch}
-              </code>
-            }
-          />
-          <TooltipPopup side="top">
-            This thread last ran on {mismatch.threadBranch}. Sending will continue on{" "}
-            {mismatch.currentBranch}.
-          </TooltipPopup>
-        </Tooltip>
+        <Trans
+          t={t}
+          i18nKey={($) => $.banners.branchChanged}
+          components={{
+            branch: (
+              <BranchMismatchName
+                previous={mismatch.threadBranch}
+                current={mismatch.currentBranch}
+                t={t}
+              />
+            ),
+          }}
+        />
       </span>
     ),
     actions: (
       <Button size="xs" variant="ghost" disabled={input.restoreDisabled} onClick={input.onRestore}>
-        {input.restoring ? "Restoring..." : "Restore branch"}
+        {input.restoring ? t(($) => $.banners.restoring) : t(($) => $.banners.restore)}
       </Button>
     ),
-    dismissLabel: "Dismiss branch change notice",
+    dismissLabel: t(($) => $.banners.dismissBranch),
     onDismiss: input.onDismiss,
   };
+}
+
+function BranchMismatchName({
+  previous,
+  current,
+  t,
+}: {
+  previous: string;
+  current: string;
+  t: TFunction<"activity">;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={<code className="min-w-0 truncate font-medium text-foreground">{previous}</code>}
+      />
+      <TooltipPopup side="top">
+        {t(($) => $.banners.branchDescription, { previous, current })}
+      </TooltipPopup>
+    </Tooltip>
+  );
 }

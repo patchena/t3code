@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import {
   AuthSourceControlWriteScope,
@@ -8,13 +9,13 @@ import {
 import { cn } from "~/lib/utils";
 import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
 
-import { Button } from "../ui/button";
-import { Toggle, ToggleGroup } from "../ui/toggle-group";
-import { PullRequestMarkdown } from "./PullRequestMarkdown";
+import { Button } from "~/components/ui/button";
+import { Toggle, ToggleGroup } from "~/components/ui/toggle-group";
+import { PullRequestMarkdown } from "~/components/pullRequest/PullRequestMarkdown";
 import {
   PullRequestMarkdownTextarea,
   type PullRequestCompletionScope,
-} from "./PullRequestMarkdownTextarea";
+} from "~/components/pullRequest/PullRequestMarkdownTextarea";
 
 export function PullRequestMarkdownEditor({
   value,
@@ -43,6 +44,7 @@ export function PullRequestMarkdownEditor({
   readonly onSave: (next: string) => void;
   readonly onCancel: () => void;
 }) {
+  const { t } = useTranslation("workspace");
   const canWriteSourceControl = useEnvironmentScope(environmentId, AuthSourceControlWriteScope);
   const [draft, setDraft] = useState(value);
   const [preview, setPreview] = useState(false);
@@ -81,7 +83,7 @@ export function PullRequestMarkdownEditor({
       }}
     >
       <ToggleGroup
-        aria-label="Markdown editor mode"
+        aria-label={t(($) => $.git.markdownEditorMode)}
         variant="segmented"
         value={[preview ? "preview" : "write"]}
         disabled={saving}
@@ -90,13 +92,13 @@ export function PullRequestMarkdownEditor({
           if (mode === "write" || mode === "preview") setPreview(mode === "preview");
         }}
       >
-        <Toggle value="write">Write</Toggle>
-        <Toggle value="preview">Preview</Toggle>
+        <Toggle value="write">{t(($) => $.git.write)}</Toggle>
+        <Toggle value="preview">{t(($) => $.git.preview)}</Toggle>
       </ToggleGroup>
       {preview ? (
         <div className="rounded-lg border border-border/60 px-3 py-2">
           {empty ? (
-            <p className="text-xs text-muted-foreground">Nothing to preview.</p>
+            <p className="text-xs text-muted-foreground">{t(($) => $.git.nothingToPreview)}</p>
           ) : (
             <PullRequestMarkdown
               text={draft}
@@ -120,7 +122,7 @@ export function PullRequestMarkdownEditor({
       )}
       <div className="flex justify-end gap-2">
         <Button size="xs" variant="ghost" disabled={saving} onClick={onCancel}>
-          Cancel
+          {t(($) => $.git.cancel)}
         </Button>
         <Button
           size="xs"
@@ -136,7 +138,7 @@ export function PullRequestMarkdownEditor({
             onSave(draft);
           }}
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? t(($) => $.git.saving) : t(($) => $.git.save)}
         </Button>
       </div>
     </div>

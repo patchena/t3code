@@ -4,6 +4,7 @@ import type {
   VoiceStreamingSession,
   VoiceTranscriptionOptions,
 } from "@t3tools/client-runtime/voice-input";
+import { appI18n } from "~/i18n";
 import workletUrl from "./pcmWorklet.ts?worker&url";
 
 type PreparedBrowserTranscription = PreparedVoiceTranscription & {
@@ -110,13 +111,16 @@ export function createBrowserPcmCapture(
           else chunks.push(data);
         };
         node.onprocessorerror = () => {
-          stopped?.reject(new Error("Microphone processing failed."));
-          input.onError("Microphone processing failed.");
+          const message = appI18n.t(($) => $.errors.processingFailed, { ns: "voice" });
+          stopped?.reject(new Error(message));
+          input.onError(message);
         };
         for (const track of captured.getTracks())
-          track.addEventListener("ended", () => input.onError("The microphone disconnected."), {
-            once: true,
-          });
+          track.addEventListener(
+            "ended",
+            () => input.onError(appI18n.t(($) => $.errors.disconnected, { ns: "voice" })),
+            { once: true },
+          );
         context.createMediaStreamSource(captured).connect(node);
         // The processor emits silence, keeping the graph active without microphone playback.
         node.connect(context.destination);

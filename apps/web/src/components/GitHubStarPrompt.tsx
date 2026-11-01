@@ -1,13 +1,14 @@
+import { appI18n } from "~/i18n";
 import { type EnvironmentId, SourceControlProviderKind } from "@t3tools/contracts";
 import { runAtomCommand } from "@t3tools/client-runtime/state/runtime";
 import * as Schema from "effect/Schema";
 import { StarIcon } from "lucide-react";
 
-import { getLocalStorageItem, setLocalStorageItem } from "../hooks/useLocalStorage";
-import { readLocalApi } from "../localApi";
-import { appAtomRegistry } from "../rpc/atomRegistry";
-import { sourceControlEnvironment } from "../state/sourceControl";
-import { toastManager } from "./ui/toast";
+import { getLocalStorageItem, setLocalStorageItem } from "~/hooks/useLocalStorage";
+import { readLocalApi } from "~/localApi";
+import { appAtomRegistry } from "~/rpc/atomRegistry";
+import { sourceControlEnvironment } from "~/state/sourceControl";
+import { toastManager } from "~/components/ui/toast";
 
 // Separate keys so a count written by another tab can never undo a dismissal.
 const SENT_KEY = "t3code:github-star-prompt:sent";
@@ -28,6 +29,7 @@ function dismiss() {
 
 // Every close path, including both buttons, runs `onClose`, which saves the dismissal.
 function showStarPrompt(environmentId: EnvironmentId) {
+  const t = appI18n.getFixedT(null, "workspace");
   const close = () => toastManager.close(id);
   const openInBrowser = () => {
     close();
@@ -36,14 +38,16 @@ function showStarPrompt(environmentId: EnvironmentId) {
       .catch(() => undefined);
   };
   const starInPlace = async () => {
-    toastManager.update(id, { actionProps: { children: "Starring…", disabled: true } });
+    toastManager.update(id, {
+      actionProps: { children: t(($) => $.updates.starring), disabled: true },
+    });
     if (await starRepository(environmentId)) {
       // Thank them in place: a closing and opening toast would slide under the confetti.
       dismiss();
       toastManager.update(id, {
         type: "success",
-        title: "Thanks for the star!",
-        description: "It really helps T3 Code grow.",
+        title: t(($) => $.updates.starThanksTitle),
+        description: t(($) => $.updates.starThanksDescription),
         timeout: 5_000,
         actionProps: undefined,
         data: {},
@@ -54,18 +58,23 @@ function showStarPrompt(environmentId: EnvironmentId) {
     // Browsers block new tabs once the click's activation expires; desktop opens through its bridge.
     if (window.desktopBridge || navigator.userActivation?.isActive !== false)
       return openInBrowser();
-    toastManager.update(id, { actionProps: { children: "Open GitHub", onClick: openInBrowser } });
+    toastManager.update(id, {
+      actionProps: { children: t(($) => $.updates.openGitHub), onClick: openInBrowser },
+    });
   };
   const id = toastManager.add({
-    title: "Enjoying T3 Code?",
-    description: "Give us a star on GitHub to let us know!",
+    title: t(($) => $.updates.enjoyingT3Code),
+    description: t(($) => $.updates.giveUsAStarOnGitHubToLetUs),
     timeout: 0,
     onClose: dismiss,
-    actionProps: { children: "Star on GitHub", onClick: () => void starInPlace() },
+    actionProps: {
+      children: t(($) => $.updates.starOnGitHub),
+      onClick: () => void starInPlace(),
+    },
     data: {
       actionLayout: "stacked-end",
       leadingIcon: <StarIcon aria-hidden className="size-4 text-warning-foreground" />,
-      secondaryActionProps: { children: "Dismiss", onClick: close },
+      secondaryActionProps: { children: t(($) => $.updates.dismiss), onClick: close },
       secondaryActionVariant: "ghost",
     },
   });

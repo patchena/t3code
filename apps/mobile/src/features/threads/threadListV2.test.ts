@@ -15,6 +15,7 @@ import {
 } from "./threadOrder";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
 import { canSnooze, resolveSnoozePresets } from "@t3tools/client-runtime/state/thread-settled";
+import { mobileI18n } from "~/i18n";
 import {
   CommandId,
   EnvironmentId,
@@ -65,7 +66,10 @@ const NOW = "2026-06-02T00:00:00.000Z";
 describe("resolveThreadListV2SnoozeMenuSelection", () => {
   it("recomputes the environment's presets instead of using old timestamps", () => {
     const presets = [{ kind: "after", minutes: 360 }] as const;
-    const displayedPresets = resolveSnoozePresets(new Date(2026, 4, 8, 10), { presets });
+    const displayedPresets = resolveSnoozePresets(new Date(2026, 4, 8, 10), {
+      presets,
+      t: mobileI18n.getFixedT(null, "common"),
+    });
     const selectedAt = new Date(2026, 4, 8, 10, 30);
     const selection = resolveThreadListV2SnoozeMenuSelection({
       event: "snooze:after:360",

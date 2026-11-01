@@ -55,6 +55,7 @@ import { installCommandPaletteCommands } from "./shortcuts/commandPaletteCommand
 import { registerOpenFavoriteEditorCommand } from "./components/chat/OpenInPickerShortcut";
 import { environmentThreadShells } from "./state/threads";
 import { resolveThreadRouteTarget } from "./threadRoutes";
+import { appI18n } from "~/i18n";
 
 /** Writes appearance settings onto the document, touching only the groups that changed. */
 function startClientAppearance(): void {
@@ -65,6 +66,12 @@ function startClientAppearance(): void {
     const settings = getClientSettings();
     const previous = applied;
     applied = settings;
+    if (previous?.interfaceLanguage !== settings.interfaceLanguage) {
+      document.documentElement.lang = settings.interfaceLanguage;
+      if (appI18n.language !== settings.interfaceLanguage) {
+        void appI18n.changeLanguage(settings.interfaceLanguage);
+      }
+    }
     const separateFonts = readLocalStorageValue(
       TYPOGRAPHY_ADVANCED_STORAGE_KEY,
       false,
@@ -216,7 +223,7 @@ export function startAppServices(): AppRouter {
   startLegacyThreadMigrationToast();
   startPermissionUpdateNotices(router);
   startThreadNotifications(appAtomRegistry, router);
-  startGuideRunNotifications(appAtomRegistry, router);
+  startGuideRunNotifications(appAtomRegistry, router, appI18n.getFixedT(null, "workspace"));
   if (isElectron) startDesktopUpdateLaunchNotice();
 
   return router;

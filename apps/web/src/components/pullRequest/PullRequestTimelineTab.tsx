@@ -1,3 +1,5 @@
+import { systemLocale } from "~/timestampFormat";
+import { useTranslation } from "react-i18next";
 import {
   capitalizeTerm,
   sourceControlClients,
@@ -27,11 +29,11 @@ import { readLocalApi } from "~/localApi";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { RelativeTime } from "~/components/RelativeTime";
 
-import { Button } from "../ui/button";
-import { PullRequestEditButton } from "./PullRequestEditButton";
-import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
-import { toastManager } from "../ui/toast";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { Button } from "~/components/ui/button";
+import { PullRequestEditButton } from "~/components/pullRequest/PullRequestEditButton";
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "~/components/ui/collapsible";
+import { toastManager } from "~/components/ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import {
   buildPullRequestTimeline,
   groupPullRequestTimelineConversations,
@@ -43,12 +45,12 @@ import {
   type PullRequestReviewOutcome,
   type PullRequestTimelineEvent,
   type PullRequestTimelineThread,
-} from "./pullRequestDetail.logic";
+} from "~/components/pullRequest/pullRequestDetail.logic";
 import { canEditPullRequestComment } from "@t3tools/client-runtime/pull-request-editing";
-import { PullRequestMarkdown } from "./PullRequestMarkdown";
-import { PullRequestMoreReplies } from "./PullRequestMoreReplies";
-import { PullRequestMarkdownEditor } from "./PullRequestMarkdownEditor";
-import { PullRequestReactionBar } from "./PullRequestReactions";
+import { PullRequestMarkdown } from "~/components/pullRequest/PullRequestMarkdown";
+import { PullRequestMoreReplies } from "~/components/pullRequest/PullRequestMoreReplies";
+import { PullRequestMarkdownEditor } from "~/components/pullRequest/PullRequestMarkdownEditor";
+import { PullRequestReactionBar } from "~/components/pullRequest/PullRequestReactions";
 import {
   PullRequestActorAvatar,
   PullRequestDiffStat,
@@ -57,12 +59,12 @@ import {
   pullRequestReviewOutcomeLabel,
   pullRequestReviewOutcomeStaleLabel,
   pullRequestReviewOutcomeToneClassName,
-} from "./pullRequestPresentation";
-import { PullRequestGlyph } from "./pullRequestIcons";
+} from "~/components/pullRequest/pullRequestPresentation";
+import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 import {
   type PullRequestCompletionScope,
   pullRequestCompletionScope,
-} from "./PullRequestMarkdownTextarea";
+} from "~/components/pullRequest/PullRequestMarkdownTextarea";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
 
 interface ReactionSurface {
@@ -183,6 +185,7 @@ function AddToChatButton({
   comment: PullRequestComment;
   reactions: ReactionSurface;
 }) {
+  const { t } = useTranslation("workspace");
   const onAddToChat = reactions.onAddToChat;
   return onAddToChat === undefined ? null : (
     <Tooltip>
@@ -192,25 +195,26 @@ function AddToChatButton({
             size="icon-xs"
             variant="ghost-muted"
             className="-mt-1 shrink-0"
-            aria-label="Add to chat"
+            aria-label={t(($) => $.git.addToChat)}
             onClick={() => onAddToChat(comment)}
           />
         }
       >
         <MessageSquarePlusIcon className="size-3" />
       </TooltipTrigger>
-      <TooltipPopup>Add to chat</TooltipPopup>
+      <TooltipPopup>{t(($) => $.git.addToChat)}</TooltipPopup>
     </Tooltip>
   );
 }
 
 function OpenOnHostButton({ url, onOpen }: { url: string | null; onOpen: (url: string) => void }) {
+  const { t } = useTranslation("workspace");
   return url === null ? null : (
     <Button
       size="icon-xs"
       variant="ghost-muted"
       className="-mr-1 shrink-0"
-      aria-label="Open activity on host"
+      aria-label={t(($) => $.git.openActivity)}
       onClick={() => onOpen(url)}
     >
       <ExternalLinkIcon className="size-3" />
@@ -236,6 +240,7 @@ function ConversationCard({
   /** A reply goes with its conversation, from the card that heads it. */
   reply?: boolean;
 }) {
+  const { t } = useTranslation("workspace");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const updateComment = useAtomCommand(pullRequestEnvironment.updateComment, {
@@ -251,7 +256,7 @@ function ConversationCard({
     });
     setSaving(false);
     if (result._tag === "Failure") {
-      toastManager.add({ type: "error", title: "Could not save the comment" });
+      toastManager.add({ type: "error", title: t(($) => $.git.commentSaveFailure) });
       return;
     }
     setEditing(false);
@@ -281,7 +286,10 @@ function ConversationCard({
             </PullRequestMetaLine>
           </div>
           {editable !== null && !editing ? (
-            <PullRequestEditButton aria-label="Edit comment" onClick={() => setEditing(true)} />
+            <PullRequestEditButton
+              aria-label={t(($) => $.git.editComment)}
+              onClick={() => setEditing(true)}
+            />
           ) : null}
           {event.body && event.comment && !reply ? (
             <AddToChatButton comment={event.comment} reactions={reactions} />
@@ -308,7 +316,7 @@ function ConversationCard({
             environmentId={reactions.environmentId}
             completionScope={reactions.completionScope}
             threadRef={reactions.threadRef}
-            label="Edit comment"
+            label={t(($) => $.git.editComment)}
             saving={saving}
             onSave={(body) => void save(body)}
             onCancel={() => setEditing(false)}
@@ -351,6 +359,7 @@ function ConversationGroup({
   onOpen: (url: string) => void;
   reactions: ReactionSurface;
 }) {
+  const { t } = useTranslation("workspace");
   const [open, setOpen] = useState(false);
   const actors = uniqueConversationActors(events);
   const first = events[0];
@@ -374,11 +383,17 @@ function ConversationGroup({
           >
             <span className="min-w-0 flex-1">
               <span className="block text-xs font-semibold">
-                {events.length.toLocaleString()} {events.length === 1 ? "comment" : "comments"}
+                {t(($) => $.git.commentCount, {
+                  count: events.length,
+                  value: events.length.toLocaleString(systemLocale),
+                })}
               </span>
               <span className="block truncate text-3xs text-muted-foreground">
-                {actors.length.toLocaleString()} {actors.length === 1 ? "author" : "authors"} ·{" "}
-                <RelativeTime timestamp={first.at} />
+                {t(($) => $.git.authorCount, {
+                  count: actors.length,
+                  value: actors.length.toLocaleString(systemLocale),
+                })}{" "}
+                · <RelativeTime timestamp={first.at} />
               </span>
             </span>
             <ChevronDownIcon
@@ -427,6 +442,7 @@ function ReviewThreadEvent({
   onOpen: (url: string) => void;
   reactions: ReactionSurface;
 }) {
+  const { t } = useTranslation("workspace");
   const dismissed = pullRequestReviewOutcome(event.reviewState) === "dismissed";
   const [expanded, setExpanded] = useState(!thread.isResolved && !dismissed);
   const replyCount = thread.replies.length + thread.moreReplies;
@@ -452,18 +468,26 @@ function ReviewThreadEvent({
         {thread.isResolved ? (
           <span className="inline-flex shrink-0 items-center gap-1 font-medium text-success-foreground">
             <CircleCheckIcon aria-hidden className="size-3" />
-            Resolved
+            {t(($) => $.git.resolved)}
           </span>
         ) : null}
-        {dismissed ? <span className="shrink-0 font-medium">Review dismissed</span> : null}
-        {thread.isOutdated ? <span className="shrink-0 font-medium">Outdated</span> : null}
+        {dismissed ? (
+          <span className="shrink-0 font-medium">{t(($) => $.git.reviewDismissed)}</span>
+        ) : null}
+        {thread.isOutdated ? (
+          <span className="shrink-0 font-medium">{t(($) => $.git.outdated)}</span>
+        ) : null}
         {expanded ? null : (
           <span className="shrink-0">
             · {event.actor?.login ?? "ghost"}
             {replyCount > 0 ? (
               <>
                 {" "}
-                · {replyCount.toLocaleString()} {replyCount === 1 ? "reply" : "replies"}
+                ·{" "}
+                {t(($) => $.git.replyCount, {
+                  count: replyCount,
+                  value: replyCount.toLocaleString(systemLocale),
+                })}
               </>
             ) : null}
           </span>
@@ -517,11 +541,12 @@ function CommitEvent({
   event: PullRequestTimelineEvent;
   onOpen: (oid: string) => void;
 }) {
+  const { t } = useTranslation("workspace");
   return (
     <button
       type="button"
       className="group relative mb-5 block w-full cursor-pointer rounded-sm pl-12 text-left outline-none [contain-intrinsic-block-size:48px] [content-visibility:auto] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-      aria-label={`View commit ${event.id}`}
+      aria-label={t(($) => $.git.viewCommit, { commit: event.id })}
       onClick={() => onOpen(event.id)}
     >
       <ActorTimelineMarker
@@ -531,7 +556,7 @@ function CommitEvent({
       <div className="flex min-w-0 items-center gap-2.5 py-1.5">
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-semibold text-foreground transition-colors group-hover:text-primary">
-            {event.body ?? "Untitled commit"}
+            {event.body ?? t(($) => $.git.untitledCommit)}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs text-muted-foreground">
             <code className="font-mono">{event.id.slice(0, 7)}</code>
@@ -553,21 +578,22 @@ function CommitEvent({
 }
 
 function LifecycleEvent({ event, term }: { event: PullRequestTimelineEvent; term: string }) {
+  const { t } = useTranslation("workspace");
   const title = capitalizeTerm(term);
   const presentation =
     event.kind === "opened"
       ? {
           icon: <PullRequestGlyph.pullRequest className="size-3.5" />,
-          label: `${title} opened`,
+          label: t(($) => $.git.requestOpened, { term: title }),
         }
       : event.kind === "merged"
         ? {
             icon: <PullRequestGlyph.merged className="size-3.5" />,
-            label: `${title} merged`,
+            label: t(($) => $.git.requestMerged, { term: title }),
           }
         : {
             icon: <PullRequestGlyph.closed className="size-3.5" />,
-            label: `${title} closed`,
+            label: t(($) => $.git.requestClosed, { term: title }),
           };
 
   return (
@@ -601,6 +627,7 @@ function ReviewVerdictEvent({
   onOpen: (url: string) => void;
   reactions: ReactionSurface;
 }) {
+  const { t } = useTranslation("workspace");
   return (
     <div className="group relative mb-5 pl-12 [contain-intrinsic-block-size:48px] [content-visibility:auto]">
       <ActorTimelineMarker
@@ -625,10 +652,12 @@ function ReviewVerdictEvent({
                   />
                 }
               >
-                {pullRequestReviewOutcomeLabel(outcome)}
-                {stale ? <span className="sr-only">, before the latest commits</span> : null}
+                {pullRequestReviewOutcomeLabel(outcome, t)}
+                {stale ? (
+                  <span className="sr-only">{t(($) => $.git.beforeLatestCommits)}</span>
+                ) : null}
               </TooltipTrigger>
-              <TooltipPopup>{pullRequestReviewOutcomeStaleLabel(outcome)}</TooltipPopup>
+              <TooltipPopup>{pullRequestReviewOutcomeStaleLabel(outcome, t)}</TooltipPopup>
             </Tooltip>
           </div>
           <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -695,7 +724,8 @@ export function PullRequestTimelineTab({
   onAddToChat?: (subject: PullRequestChatSubject) => void;
   onRefresh: () => void;
 }) {
-  const events = buildPullRequestTimeline(detail);
+  const { t } = useTranslation("workspace");
+  const events = buildPullRequestTimeline(detail, t);
   const term = sourceControlClients.get(detail.provider).changeRequest.singular;
   const newestCommitAt = newestPullRequestCommitAt(detail.commits);
   const reactions: ReactionSurface = {
@@ -775,7 +805,7 @@ export function PullRequestTimelineTab({
       <div ref={scrollerRef} className="scrollbar-gutter-both h-full overflow-y-auto px-4 py-5">
         <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
           <PullRequestGlyph.pullRequest className="mb-2 size-5" />
-          <p className="text-xs">No activity yet.</p>
+          <p className="text-xs">{t(($) => $.git.noActivity)}</p>
         </div>
       </div>
     );

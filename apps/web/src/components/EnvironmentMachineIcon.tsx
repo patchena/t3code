@@ -1,4 +1,5 @@
 import type { EnvironmentMachineKind } from "@t3tools/contracts";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { CloudIcon, LaptopIcon, MonitorIcon, ServerIcon, type LucideProps } from "lucide-react";
 import type { FunctionComponent, SVGProps } from "react";
 import { LinuxIcon } from "./Icons";
@@ -48,15 +49,17 @@ const ICON_BY_KIND: Record<EnvironmentMachineKind, FunctionComponent<LucideProps
   "mac-studio": MacStudioIcon,
 };
 
-export const ENVIRONMENT_MACHINE_KIND_LABELS: Record<EnvironmentMachineKind, string> = {
-  server: "Server",
-  cloud: "Cloud VM",
-  linux: "Linux/WSL",
-  desktop: "Desktop",
-  laptop: "Laptop",
-  "mac-mini": "Mini PC",
-  "mac-studio": "Workstation",
-};
+export const environmentMachineLabels = (
+  t: TFunction<"connect">,
+): Record<EnvironmentMachineKind, string> => ({
+  server: t(($) => $.icons.server),
+  cloud: t(($) => $.icons.cloud),
+  linux: t(($) => $.icons.linux),
+  desktop: t(($) => $.icons.desktop),
+  laptop: t(($) => $.icons.laptop),
+  "mac-mini": t(($) => $.icons.mini),
+  "mac-studio": t(($) => $.icons.workstation),
+});
 
 export function environmentMachineIcon(
   kind: EnvironmentMachineKind,

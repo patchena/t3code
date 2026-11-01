@@ -1,3 +1,4 @@
+import { mobileI18n } from "~/i18n";
 import * as Dialog from "../../components/ui/Dialog";
 import { ConnectionTraceId } from "./ConnectionTraceId";
 import { SymbolView } from "../../components/ui/AppSymbol";
@@ -68,7 +69,11 @@ export function ConnectionEnvironmentRow(props: {
   const statusTraceId = enabled ? props.environment.connectionErrorTraceId : null;
   const hasConnectionFailure = enabled && props.environment.connectionError !== null;
   const freeze = enabled
-    ? hostFreezeNotice(props.environment.environmentLabel, serverConfig?.lastEventLoopStall)
+    ? hostFreezeNotice(
+        props.environment.environmentLabel,
+        serverConfig?.lastEventLoopStall,
+        mobileI18n.getFixedT(null, "workspace"),
+      )
     : null;
   const isRetrying =
     enabled &&

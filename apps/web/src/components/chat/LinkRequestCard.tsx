@@ -1,11 +1,10 @@
-import { pipe } from "effect/Function";
 import { useAtomValue } from "@effect/atom-react";
 import {
   type LinkableMachine,
   linkRequestAnswerInput,
   linkRequestDefaultAccess,
   linkRequestDisplay,
-  linkRequestFailureMessage,
+  linkRequestFailureDetail,
   linkRequestInitialMachine,
   type LinkRequestItem,
   linkRequestTargetName,
@@ -30,7 +29,9 @@ import { useEnvironmentScope, usePreparedConnection } from "../../state/session"
 import { mintPairingCodeOn } from "../../state/peerPairingCode";
 import { peerLinkEnvironment, useLinkableMachines } from "../../state/peerLinks";
 import { useAtomCommand } from "../../state/use-atom-command";
-import { accessConfig } from "../auth/ConnectAgentSurface";
+import { getAccessConfig } from "../auth/ConnectAgentSurface";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { LinkAccessPicker } from "../settings/LinkAccessPicker";
 import { ANOTHER_ADDRESS, LinkMachineBadge } from "../settings/LinkMachineSelect";
@@ -40,8 +41,6 @@ import { Input } from "../ui/input";
 import { Radio, RadioGroup } from "../ui/radio-group";
 import { WizardFooter, WizardHeader, WizardPanel, WizardPopup, WizardSteps } from "../ui/wizard";
 import { WorkLogRow } from "./WorkLog";
-
-const accessLabel = (access: AuthMcpClientAccess) => accessConfig[access].label;
 
 /** Whether the agent left the machine for the user to pick. */
 const picksMachine = (item: LinkRequestItem) =>
@@ -57,8 +56,11 @@ export function LinkRequestCard(props: {
   readonly item: LinkRequestItem;
   readonly visibility: OrchestrationV2ProjectedTurnItem["visibility"];
 }) {
+  const { t } = useTranslation("chat");
+  const { t: tConnect } = useTranslation("connect");
+  const accessLabel = (access: AuthMcpClientAccess) => getAccessConfig(tConnect, t)[access].label;
   const { item } = props;
-  const display = linkRequestDisplay(item, props.visibility, accessLabel);
+  const display = linkRequestDisplay(item, props.visibility, accessLabel, t);
   if (display.kind === "answered" || display.kind === "pending-elsewhere") {
     const Icon =
       display.kind === "pending-elsewhere"
@@ -83,10 +85,12 @@ function PendingLinkRequest(props: {
   readonly environmentId: EnvironmentId;
   readonly item: LinkRequestItem;
 }) {
+  const { t } = useTranslation("chat");
   const { item } = props;
   const [open, setOpen] = useState(false);
   const [declining, setDeclining] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ readonly message: string | null } | null>(null);
+  const error = failure === null ? null : (failure.message ?? t(($) => $.secret.answerFailed));
   const answer = useAtomCommand(peerLinkEnvironment.answerRequest, {
     label: "decline link request",
     reportFailure: false,
@@ -95,18 +99,18 @@ function PendingLinkRequest(props: {
   const canAnswer = useAtomValue(
     peerLinkEnvironment.answerRequest.permissionAtom(props.environmentId),
   );
-  const target = linkRequestTargetName(item);
+  const target = linkRequestTargetName(item, t);
 
   const decline = async () => {
     const input = linkRequestAnswerInput(item, { type: "decline" });
     if (input === null) return;
     setDeclining(true);
-    setError(null);
+    setFailure(null);
     const result = await answer({ environmentId: props.environmentId, input }).finally(() =>
       setDeclining(false),
     );
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      pipe(squashAtomCommandFailure(result), linkRequestFailureMessage, setError);
+      setFailure({ message: linkRequestFailureDetail(squashAtomCommandFailure(result)) });
     }
   };
 
@@ -118,8 +122,8 @@ function PendingLinkRequest(props: {
       <div className="flex min-w-0 flex-col gap-1">
         <p className="text-sm font-medium text-foreground">
           {picksMachine(item)
-            ? "Link a machine to this environment"
-            : `Link ${target} to this environment`}
+            ? t(($) => $.link.linkMachineHere)
+            : t(($) => $.link.linkTargetHere, { target })}
         </p>
         {item.reason.trim() ? <p className="text-sm text-muted-foreground">{item.reason}</p> : null}
         {item.label !== undefined && item.url !== undefined ? (
@@ -140,16 +144,14 @@ function PendingLinkRequest(props: {
             disabled={declining}
             onClick={() => void decline()}
           >
-            Decline
+            {t(($) => $.secret.decline)}
           </Button>
           <Button type="button" size="xs" disabled={declining} onClick={() => setOpen(true)}>
-            {picksMachine(item) ? "Choose machine…" : "Review link…"}
+            {picksMachine(item) ? t(($) => $.link.chooseMachine) : t(($) => $.link.review)}
           </Button>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">
-          Only a session that manages access here can answer this.
-        </p>
+        <p className="text-xs text-muted-foreground">{t(($) => $.link.onlyManagers)}</p>
       )}
       <LinkRequestDialog
         environmentId={props.environmentId}
@@ -172,6 +174,7 @@ type DialogTarget =
       readonly kind: "machine";
       readonly environmentId: EnvironmentId;
       readonly label: string;
+      readonly displayName: string;
       readonly urls: ReadonlyArray<string>;
       readonly linked: boolean;
     }
@@ -181,6 +184,7 @@ function resolveTarget(
   item: LinkRequestItem,
   machines: ReadonlyArray<LinkableMachine>,
   choice: string | null,
+  t: TFunction<"chat">,
 ): DialogTarget {
   if (item.environmentId === undefined && item.url !== undefined) return { kind: "address" };
   const chosen = item.environmentId ?? choice;
@@ -190,7 +194,8 @@ function resolveTarget(
   return {
     kind: "machine",
     environmentId: machine?.environmentId ?? (chosen as EnvironmentId),
-    label: machine?.label ?? linkRequestTargetName(item),
+    label: machine?.label ?? (item.label?.trim() || item.url || "a machine"),
+    displayName: machine?.label ?? linkRequestTargetName(item, t),
     urls: [...new Set([...(machine?.urls ?? []), ...(item.url === undefined ? [] : [item.url])])],
     linked: machine?.linked ?? false,
   };
@@ -205,6 +210,7 @@ function LinkRequestDialog(props: {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation("chat");
   const { item } = props;
   const formId = useId();
   const pickMachine = picksMachine(item);
@@ -217,7 +223,8 @@ function LinkRequestDialog(props: {
   const [pairingCode, setPairingCode] = useState("");
   const [step, setStep] = useState<LinkStep>("machine");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ readonly message: string | null } | null>(null);
+  const error = failure === null ? null : (failure.message ?? t(($) => $.secret.answerFailed));
   // Machines whose minting already failed, so the dialog asks for a code instead.
   const [mintFailed, setMintFailed] = useState<ReadonlySet<EnvironmentId>>(new Set());
   // Enter then a click can both run before a re-render; this guard is synchronous.
@@ -229,8 +236,9 @@ function LinkRequestDialog(props: {
     reportDefect: false,
   });
   const selected = choice ?? linkRequestInitialMachine(item, machines);
-  const target = resolveTarget(item, machines, selected);
-  const targetName = target.kind === "machine" ? target.label : linkRequestTargetName(item);
+  const target = resolveTarget(item, machines, selected, t);
+  const targetName =
+    target.kind === "machine" ? target.displayName : linkRequestTargetName(item, t);
   // This client can mint a code there when it is connected to that
   // environment with a session that may create pairing links.
   const targetId = target.kind === "machine" ? target.environmentId : null;
@@ -257,7 +265,7 @@ function LinkRequestDialog(props: {
     setAccess(linkRequestDefaultAccess(item));
     setPairingCode("");
     setStep("machine");
-    setError(null);
+    setFailure(null);
   };
 
   // Every close resets, so a reopened dialog never shows the last answer or its pairing code.
@@ -280,7 +288,7 @@ function LinkRequestDialog(props: {
       const minted = await mintPairingCodeOn(targetId, access);
       if (Result.isFailure(minted)) {
         setMintFailed((failed) => new Set(failed).add(targetId));
-        setError(linkRequestFailureMessage(minted.failure));
+        setFailure({ message: linkRequestFailureDetail(minted.failure) });
         return null;
       }
       code = minted.success;
@@ -300,7 +308,7 @@ function LinkRequestDialog(props: {
     if (inFlight.current || target.kind === "none") return;
     inFlight.current = true;
     setBusy(true);
-    setError(null);
+    setFailure(null);
     const input = await prepareAnswer();
     const result =
       input === null ? null : await answer({ environmentId: props.environmentId, input });
@@ -311,7 +319,7 @@ function LinkRequestDialog(props: {
       // The card switches to its answered row once the item updates.
       close();
     } else if (!isAtomCommandInterrupted(result)) {
-      pipe(squashAtomCommandFailure(result), linkRequestFailureMessage, setError);
+      setFailure({ message: linkRequestFailureDetail(squashAtomCommandFailure(result)) });
     }
   };
 
@@ -330,12 +338,19 @@ function LinkRequestDialog(props: {
     >
       <WizardPopup>
         <WizardHeader
-          title={pickMachine ? "Link a machine" : `Link ${targetName}`}
-          description="Agents here can then launch, message and wait on threads there. Revoke it in that machine's Connections."
+          title={
+            pickMachine
+              ? t(($) => $.link.linkMachine)
+              : t(($) => $.link.linkTarget, { target: targetName })
+          }
+          description={t(($) => $.link.description)}
         >
           {steps.length > 1 && !useExisting ? (
             <WizardSteps
-              steps={["Machine", "Access"]}
+              steps={[
+                { id: "machine", label: t(($) => $.link.machineStep) },
+                { id: "access", label: t(($) => $.link.accessStep) },
+              ]}
               currentStep={steps.indexOf(current)}
               summaries={[target.kind === "none" ? null : targetName, null]}
               showSummaries
@@ -367,13 +382,15 @@ function LinkRequestDialog(props: {
                     disabled={busy}
                     onChange={(next) => {
                       setChoice(next);
-                      setError(null);
+                      setFailure(null);
                     }}
                   />
                 ) : null}
                 {asksAddress ? (
                   <label className="block space-y-1.5">
-                    <span className="block text-xs font-medium text-foreground">Address</span>
+                    <span className="block text-xs font-medium text-foreground">
+                      {t(($) => $.link.address)}
+                    </span>
                     <Input
                       value={address}
                       onChange={(event) => setAddress(event.target.value)}
@@ -384,8 +401,7 @@ function LinkRequestDialog(props: {
                     />
                     {target.kind === "machine" ? (
                       <span className="block text-xs text-muted-foreground">
-                        This app has no address for {target.label} that another machine can reach.
-                        Enter its https or Tailscale address.
+                        {t(($) => $.link.noAddress, { target: target.displayName })}
                       </span>
                     ) : null}
                   </label>
@@ -401,20 +417,19 @@ function LinkRequestDialog(props: {
                     {canMint ? null : (
                       <label className="block space-y-1.5">
                         <span className="block text-xs font-medium text-foreground">
-                          Pairing code
+                          {t(($) => $.link.pairingCode)}
                         </span>
                         <Input
                           value={pairingCode}
                           onChange={(event) => setPairingCode(event.target.value)}
-                          placeholder="Paste the code"
+                          placeholder={t(($) => $.link.pasteCode)}
                           disabled={busy}
                           autoComplete="one-time-code"
                           nativeInput
                           spellCheck={false}
                         />
                         <span className="block text-xs text-muted-foreground">
-                          Create a link on {targetName}: Settings → Connections → Create link, then
-                          paste its code here.
+                          {t(($) => $.link.createCode, { target: targetName })}
                         </span>
                       </label>
                     )}
@@ -425,8 +440,7 @@ function LinkRequestDialog(props: {
             )}
             {useExisting ? (
               <p className="text-xs text-muted-foreground">
-                This environment is already linked to {targetName}. The agent can use that link as
-                it is; change its access in Settings → Connections.
+                {t(($) => $.link.alreadyLinked, { target: targetName })}
               </p>
             ) : null}
             {error !== null ? (
@@ -444,14 +458,14 @@ function LinkRequestDialog(props: {
               disabled={busy}
               onClick={() => {
                 setStep("machine");
-                setError(null);
+                setFailure(null);
               }}
             >
-              Back
+              {t(($) => $.link.back)}
             </Button>
           ) : (
             <Button variant="outline" type="button" disabled={busy} onClick={close}>
-              Cancel
+              {t(($) => $.ui.cancel)}
             </Button>
           )}
           <Button
@@ -459,7 +473,13 @@ function LinkRequestDialog(props: {
             type="submit"
             disabled={busy || (finishesHere ? !ready : !machineReady)}
           >
-            {busy ? "Linking…" : useExisting ? "Use this link" : finishesHere ? "Link" : "Continue"}
+            {busy
+              ? t(($) => $.link.linking)
+              : useExisting
+                ? t(($) => $.link.useExisting)
+                : finishesHere
+                  ? t(($) => $.link.connect)
+                  : t(($) => $.link.continue)}
           </Button>
         </WizardFooter>
       </WizardPopup>
@@ -474,11 +494,12 @@ function MachinePicker(props: {
   readonly disabled: boolean;
   readonly onChange: (value: string) => void;
 }) {
+  const { t } = useTranslation("chat");
   const labelId = useId();
   return (
     <div className="space-y-2">
       <span id={labelId} className="block text-xs font-medium">
-        Machine
+        {t(($) => $.link.machineStep)}
       </span>
       <RadioGroup
         aria-labelledby={labelId}
@@ -502,7 +523,7 @@ function MachinePicker(props: {
         ))}
         <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm">
           <Radio value={ANOTHER_ADDRESS} />
-          <span className="min-w-0 flex-1 font-medium">Another address…</span>
+          <span className="min-w-0 flex-1 font-medium">{t(($) => $.link.anotherAddress)}</span>
         </label>
       </RadioGroup>
     </div>

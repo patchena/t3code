@@ -1,3 +1,5 @@
+import { pullRequestStatePresentation } from "~/components/pullRequest/pullRequestIcons";
+import { useTranslation } from "react-i18next";
 import {
   AuthOrchestrationOperateScope,
   type EnvironmentId,
@@ -21,8 +23,8 @@ import { getSourceControlPresentation } from "~/sourceControlPresentation";
 import { useEnvironmentQuery } from "~/state/query";
 import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
 import { vcsEnvironment } from "~/state/vcs";
-import { offHeadPullRequestCheckoutToast } from "./pullRequest/pullRequestCheckoutToast";
-import { Button } from "./ui/button";
+import { offHeadPullRequestCheckoutToast } from "~/components/pullRequest/pullRequestCheckoutToast";
+import { Button } from "~/components/ui/button";
 import {
   Dialog,
   DialogDescription,
@@ -31,10 +33,10 @@ import {
   DialogPanel,
   DialogPopup,
   DialogTitle,
-} from "./ui/dialog";
-import { Input } from "./ui/input";
-import { Spinner } from "./ui/spinner";
-import { toastManager } from "./ui/toast";
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { Spinner } from "~/components/ui/spinner";
+import { toastManager } from "~/components/ui/toast";
 
 interface PullRequestThreadDialogProps {
   open: boolean;
@@ -68,11 +70,12 @@ export function PullRequestThreadDialog({
   onOpenChange,
   onPrepared,
 }: PullRequestThreadDialogProps) {
+  const { t } = useTranslation("workspace");
   const referenceInputRef = useRef<HTMLInputElement>(null);
   const [reference, setReference] = useState(initialReference ?? "");
   const [referenceDirty, setReferenceDirty] = useState(false);
   const [preparingMode, setPreparingMode] = useState<"local" | "worktree" | null>(null);
-  const [prepareErrorMessage, setPrepareErrorMessage] = useState<string | null>(null);
+  const [prepareError, setPrepareError] = useState<{ readonly cause: unknown } | null>(null);
   const [debouncedReference, referenceDebouncer] = useDebouncedValue(
     reference,
     { wait: 450 },
@@ -136,7 +139,7 @@ export function PullRequestThreadDialog({
     if (!parsedReference || !resolvedPullRequest || !cwd) {
       return;
     }
-    setPrepareErrorMessage(null);
+    setPrepareError(null);
     setPreparingMode(mode);
     const result = await preparePullRequestThreadAction.run({
       reference: parsedReference,
@@ -149,11 +152,7 @@ export function PullRequestThreadDialog({
         preparePullRequestThreadAction.resetError();
       } else {
         const error = squashAtomCommandFailure(result);
-        setPrepareErrorMessage(
-          error instanceof Error
-            ? error.message
-            : `Failed to prepare ${terminology.singular} thread.`,
-        );
+        setPrepareError({ cause: error });
       }
       return;
     }
@@ -162,7 +161,7 @@ export function PullRequestThreadDialog({
       worktreePath: result.value.worktreePath,
     });
     if (!result.value.isOnPullRequestHead) {
-      toastManager.add(offHeadPullRequestCheckoutToast(terminology));
+      toastManager.add(offHeadPullRequestCheckoutToast(terminology, t));
     }
     onOpenChange(false);
   };
@@ -170,10 +169,16 @@ export function PullRequestThreadDialog({
   const validationMessage = !referenceDirty
     ? null
     : reference.trim().length === 0
-      ? `Paste a ${terminology.singular} URL, checkout command, or enter 123 / #123.`
+      ? t(($) => $.git.requestReferenceHelp, { term: terminology.singular })
       : parsedReference === null
-        ? `Use a ${terminology.singular} URL, checkout command, 123, or #123.`
+        ? t(($) => $.git.requestReferenceFormats, { term: terminology.singular })
         : null;
+  const prepareErrorMessage =
+    prepareError === null
+      ? null
+      : prepareError.cause instanceof Error
+        ? prepareError.cause.message
+        : t(($) => $.git.prepareRequestThreadFailed, { term: terminology.singular });
   const errorMessage =
     validationMessage ??
     prepareErrorMessage ??
@@ -182,7 +187,7 @@ export function PullRequestThreadDialog({
       : preparePullRequestThreadAction.error instanceof Error
         ? preparePullRequestThreadAction.error.message
         : preparePullRequestThreadAction.error
-          ? `Failed to prepare ${terminology.singular} thread.`
+          ? t(($) => $.git.prepareRequestThreadFailed, { term: terminology.singular })
           : null);
 
   return (
@@ -205,11 +210,12 @@ export function PullRequestThreadDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center">
             <SourceControlIcon className="me-2 size-4" />
-            Checkout {terminology.singular}
+            {t(($) => $.git.checkoutRequestTitle, { term: terminology.singular })}
           </DialogTitle>
           <DialogDescription>
-            Resolve a {sourceControlPresentation.providerName} {terminology.singular}, then create
-            the draft thread in the main repo or in a dedicated worktree.
+            {t(($) => $.git.resolveRequestDescription, {
+              term: `${sourceControlPresentation.providerName} ${terminology.singular}`,
+            })}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
@@ -219,7 +225,9 @@ export function PullRequestThreadDialog({
             </span>
             <Input
               ref={referenceInputRef}
-              placeholder={`${terminology.shortLabel} URL, checkout command, or #42`}
+              placeholder={t(($) => $.git.requestReferencePlaceholder, {
+                term: terminology.shortLabel,
+              })}
               value={reference}
               onChange={(event) => {
                 setReferenceDirty(true);
@@ -246,12 +254,15 @@ export function PullRequestThreadDialog({
                 <div className="min-w-0">
                   <p className="truncate font-medium text-sm">{resolvedPullRequest.title}</p>
                   <p className="truncate text-muted-foreground text-xs">
-                    #{resolvedPullRequest.number} · {resolvedPullRequest.headBranch} to{" "}
-                    {resolvedPullRequest.baseBranch}
+                    #{resolvedPullRequest.number} ·{" "}
+                    {t(($) => $.git.refDirection, {
+                      head: resolvedPullRequest.headBranch,
+                      base: resolvedPullRequest.baseBranch,
+                    })}
                   </p>
                 </div>
                 <span className={cn("shrink-0 text-xs capitalize", statusTone)}>
-                  {resolvedPullRequest.state}
+                  {pullRequestStatePresentation(t)[resolvedPullRequest.state].label}
                 </span>
               </div>
             </div>
@@ -260,7 +271,8 @@ export function PullRequestThreadDialog({
           {isResolving ? (
             <div className="flex items-center gap-2 text-muted-foreground text-xs">
               <Spinner size="sm" />
-              Resolving {terminology.singular}...
+              {t(($) => $.git.resolving)}
+              {terminology.singular}...
             </div>
           ) : null}
 
@@ -274,7 +286,7 @@ export function PullRequestThreadDialog({
             onClick={() => onOpenChange(false)}
             disabled={preparePullRequestThreadAction.isPending}
           >
-            Cancel
+            {t(($) => $.git.cancel)}
           </Button>
           <Button
             type="button"
@@ -289,7 +301,7 @@ export function PullRequestThreadDialog({
               preparePullRequestThreadAction.isPending
             }
           >
-            {preparingMode === "local" ? "Preparing local..." : "Local"}
+            {preparingMode === "local" ? t(($) => $.git.preparingLocal) : t(($) => $.git.local)}
           </Button>
           <Button
             type="button"
@@ -304,7 +316,9 @@ export function PullRequestThreadDialog({
               preparePullRequestThreadAction.isPending
             }
           >
-            {preparingMode === "worktree" ? "Preparing worktree..." : "Worktree"}
+            {preparingMode === "worktree"
+              ? t(($) => $.git.preparingWorktree)
+              : t(($) => $.git.worktree)}
           </Button>
         </DialogFooter>
       </DialogPopup>

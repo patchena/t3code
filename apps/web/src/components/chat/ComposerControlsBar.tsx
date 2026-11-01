@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { ChatComposerProps } from "./ChatComposer";
 import type { PromptUltrathink } from "./TraitsPicker";
 import type { ProviderInstanceEntry } from "../../providerInstances";
@@ -89,6 +90,7 @@ export function ComposerControlsBar(props: {
   modelPickerIconClassName: string | undefined;
   getModelDisabledReason: ChatComposerProps["getModelDisabledReason"];
 }) {
+  const { t } = useTranslation("chat");
   const {
     environmentId,
     routeKind,
@@ -165,7 +167,7 @@ export function ComposerControlsBar(props: {
     onPromptEdit,
     planModeEnabled,
   });
-  const effort = describeComposerEffort(traitsInput, props.effortDisplay, controlSize);
+  const effort = describeComposerEffort(traitsInput, props.effortDisplay, controlSize, t);
   const restingBlockDefs = showModeBlock
     ? [
         {
@@ -264,7 +266,9 @@ export function ComposerControlsBar(props: {
       className="shrink-0"
     >
       <CircleAlertIcon className="size-4" />
-      {providerSetupInstanceId ? "Open provider settings" : "No provider available"}
+      {providerSetupInstanceId
+        ? t(($) => $.composer.openProviderSettings)
+        : t(($) => $.composer.noProviderAvailable)}
     </ComposerControl>
   ) : (
     <>

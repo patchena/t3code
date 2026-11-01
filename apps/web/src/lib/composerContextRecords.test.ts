@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import {
   type ComposerContextId,
   EnvironmentId,
@@ -393,11 +394,14 @@ describe("pullRequestContextKindLabel", () => {
   });
 
   it("names the change request the way its host does", () => {
-    expect(pullRequestContextKindLabel(comment("https://github.com/acme/app/pull/7", false))).toBe(
-      "Open pull request",
-    );
     expect(
-      pullRequestContextKindLabel(comment("https://gitlab.com/acme/app/-/merge_requests/7", true)),
+      pullRequestContextKindLabel(comment("https://github.com/acme/app/pull/7", false), chatT),
+    ).toBe("Open pull request");
+    expect(
+      pullRequestContextKindLabel(
+        comment("https://gitlab.com/acme/app/-/merge_requests/7", true),
+        chatT,
+      ),
     ).toBe("Draft merge request");
   });
 });
@@ -483,3 +487,5 @@ describe("selectedMessageContextFragment", () => {
     expect(fragment).not.toContain(terminal.contextId);
   });
 });
+
+const chatT = createI18n("en").getFixedT(null, "chat");

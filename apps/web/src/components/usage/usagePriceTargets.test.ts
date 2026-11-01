@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { EnvironmentId } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 
@@ -6,6 +7,8 @@ import {
   type UsagePriceTarget,
   type UsagePriceWriteResult,
 } from "./usagePriceTargets";
+
+const t = createI18n("en").getFixedT(null, "files");
 
 const price = { inputCostPerMillionTokens: 2, outputCostPerMillionTokens: 8 };
 const target = (id: string, overrides: Partial<UsagePriceTarget> = {}): UsagePriceTarget => ({
@@ -22,6 +25,7 @@ describe("model price writes", () => {
     const write = vi.fn(async () => ({ _tag: "Success" as const }));
     const onResult = vi.fn();
     await writeUsagePrices({
+      t,
       targets: [target("edited"), target("unchanged")],
       changes: new Map([
         [
@@ -51,13 +55,14 @@ describe("model price writes", () => {
     const fastSaved = new Promise<void>((resolve) => {
       resolveFastSaved = resolve;
     });
-    const targets = [target("fast"), target("slow"), target("offline", { unavailable: "Offline" })];
+    const targets = [target("fast"), target("slow"), target("offline", { unavailable: "offline" })];
     const results = new Map<EnvironmentId, UsagePriceWriteResult>();
     const write = vi.fn(async ({ environmentId }: { environmentId: EnvironmentId }) =>
       environmentId === "slow" ? slow : { _tag: "Success" as const },
     );
     const change = { model: "example", price };
     const running = writeUsagePrices({
+      t,
       targets,
       changes: new Map(targets.map((target) => [target.environmentId, [change]])),
       write,
@@ -82,6 +87,7 @@ describe("model price writes", () => {
     });
     const retry = vi.fn(async () => ({ _tag: "Success" as const }));
     await writeUsagePrices({
+      t,
       targets: targets
         .filter((entry) => results.get(entry.environmentId)?.status === "failed")
         .map((entry) => ({ ...entry, unavailable: null })),
@@ -104,6 +110,7 @@ describe("model price writes", () => {
       { model: "example", price: null },
     ];
     await writeUsagePrices({
+      t,
       targets: [target("current"), target("old", { aliases: null })],
       changes: new Map([
         [EnvironmentId.make("current"), changes],

@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   type ModelCapabilities,
   ProviderDriverKind,
@@ -194,23 +195,25 @@ export function descriptorsFromCapabilities(
     .map(descriptorToEditor);
 }
 
-export function validateDraft(draft: CustomModelDraft): string | null {
+export function validateDraft(draft: CustomModelDraft, t: TFunction<"settings">): string | null {
   const seenIds = new Set<string>();
   for (const [index, descriptor] of draft.descriptors.entries()) {
-    const position = `Option ${index + 1}`;
+    const position = index + 1;
     const id = descriptor.id.trim();
-    if (!id) return `${position} needs an id.`;
-    if (seenIds.has(id)) return `${position}: id "${id}" is used twice.`;
+    if (!id) return t(($) => $.providers.optionNeedsId, { index: position });
+    if (seenIds.has(id)) return t(($) => $.providers.optionDuplicateId, { index: position, id });
     seenIds.add(id);
-    if (!descriptor.label.trim()) return `${position} needs a label.`;
+    if (!descriptor.label.trim())
+      return t(($) => $.providers.optionNeedsLabel, { index: position });
     if (descriptor.type !== "select") continue;
-    if (descriptor.choices.length === 0) return `${position} needs at least one choice.`;
+    if (descriptor.choices.length === 0)
+      return t(($) => $.providers.optionNeedsChoice, { index: position });
     const seenChoices = new Set<string>();
     for (const choice of descriptor.choices) {
       const choiceId = choice.id.trim();
-      if (!choiceId) return `${position} has a choice without a value.`;
+      if (!choiceId) return t(($) => $.providers.optionEmptyChoice, { index: position });
       if (seenChoices.has(choiceId)) {
-        return `${position}: choice "${choiceId}" is used twice.`;
+        return t(($) => $.providers.optionDuplicateChoice, { index: position, value: choiceId });
       }
       seenChoices.add(choiceId);
     }

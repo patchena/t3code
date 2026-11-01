@@ -1,15 +1,16 @@
+import { useTranslation } from "react-i18next";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { ChevronDownIcon, GitBranchIcon } from "lucide-react";
 import { useState } from "react";
 
-import { usePaginatedBranches } from "../state/queries";
-import { useEnvironmentQuery } from "../state/query";
-import { vcsEnvironment } from "../state/vcs";
-import { BranchPicker, BranchPickerRefItem } from "./BranchPicker";
-import { resolveBranchTriggerLabel, sanitizeNewRefName } from "./BranchToolbar.logic";
-import { MiddleTruncate } from "./ui/middle-truncate";
-import { Button } from "./ui/button";
-import { ComboboxTrigger } from "./ui/combobox";
+import { usePaginatedBranches } from "~/state/queries";
+import { useEnvironmentQuery } from "~/state/query";
+import { vcsEnvironment } from "~/state/vcs";
+import { BranchPicker, BranchPickerRefItem } from "~/components/BranchPicker";
+import { resolveBranchTriggerLabel, sanitizeNewRefName } from "~/components/BranchToolbar.logic";
+import { MiddleTruncate } from "~/components/ui/middle-truncate";
+import { Button } from "~/components/ui/button";
+import { ComboboxTrigger } from "~/components/ui/combobox";
 
 export function WorktreeBaseBranchPicker({
   environmentId,
@@ -30,6 +31,7 @@ export function WorktreeBaseBranchPicker({
   disabled?: boolean;
   id?: string;
 }) {
+  const { t } = useTranslation("workspace");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const branches = usePaginatedBranches({
@@ -48,24 +50,30 @@ export function WorktreeBaseBranchPicker({
   const selectedRef =
     branches.refs.find((branch) => branch.name === value) ??
     selectedRefQuery.data?.refs.find((branch) => branch.name === value);
-  const label = resolveBranchTriggerLabel({
-    activeWorktreePath: null,
-    effectiveEnvMode: "worktree",
-    resolvedActiveBranch: value || null,
-    resolvedActiveBranchIsRemote: selectedRef ? selectedRef.isRemote === true : null,
-    startFromOrigin,
-  });
+  const label = resolveBranchTriggerLabel(
+    {
+      activeWorktreePath: null,
+      effectiveEnvMode: "worktree",
+      resolvedActiveBranch: value || null,
+      resolvedActiveBranchIsRemote: selectedRef ? selectedRef.isRemote === true : null,
+      startFromOrigin,
+    },
+    t,
+  );
   const branchByName = new Map(branches.refs.map((branch) => [branch.name, branch]));
   const items = [...branchByName.keys()];
   const hasNextPage = branches.data?.nextCursor != null;
   const statusText =
     branches.error ??
     (branches.isPending && branches.data === null
-      ? "Loading refs..."
+      ? t(($) => $.git.loadingRefs)
       : branches.isFetchingNextPage
-        ? "Loading more refs..."
-        : hasNextPage
-          ? `Showing ${branches.refs.length} of ${branches.data?.totalCount} refs`
+        ? t(($) => $.git.loadingMoreRefs)
+        : hasNextPage && branches.data !== null
+          ? t(($) => $.git.showingRefs, {
+              count: branches.refs.length,
+              total: branches.data.totalCount,
+            })
           : null);
   const handleOpenChange = (next: boolean) => {
     setOpen(next);

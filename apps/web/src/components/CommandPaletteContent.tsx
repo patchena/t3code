@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { ArrowDownIcon, ArrowUpIcon } from "lucide-react";
 import { type ComponentProps, type ReactNode, type RefObject } from "react";
 
@@ -53,7 +54,7 @@ type CommandPaletteContentProps = Omit<ComponentProps<typeof Command>, "children
 
 export function CommandPaletteContent({
   children,
-  escapeLabel = "Close",
+  escapeLabel,
   footerActionLabel,
   footerTrailing,
   inputAccessory,
@@ -64,6 +65,7 @@ export function CommandPaletteContent({
   testId,
   ...commandProps
 }: CommandPaletteContentProps) {
+  const { t } = useTranslation("workspace");
   return (
     <div className="contents" data-testid={testId}>
       <Command {...commandProps}>
@@ -99,7 +101,7 @@ export function CommandPaletteContent({
               <Kbd>
                 <ArrowDownIcon />
               </Kbd>
-              <span>Navigate</span>
+              <span>{t(($) => $.palette.navigate)}</span>
             </KbdGroup>
             {footerActionLabel !== undefined ? (
               <KbdGroup>
@@ -110,12 +112,12 @@ export function CommandPaletteContent({
             {showBackHint ? (
               <KbdGroup>
                 <Kbd>Backspace</Kbd>
-                <span>Back</span>
+                <span>{t(($) => $.palette.back)}</span>
               </KbdGroup>
             ) : null}
             <KbdGroup>
               <Kbd>Esc</Kbd>
-              <span>{escapeLabel}</span>
+              <span>{escapeLabel ?? t(($) => $.close)}</span>
             </KbdGroup>
           </div>
           {footerTrailing}

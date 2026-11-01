@@ -1,11 +1,13 @@
+import { useTranslation } from "react-i18next";
+import { systemLocale } from "~/timestampFormat";
 import { resolvePullRequestDetailChecks } from "@t3tools/client-runtime/pull-request-checks";
 import {
   capitalizeTerm,
   sourceControlClients,
 } from "@t3tools/client-runtime/source-control-clients";
-import { PullRequestChangeBreakdownRows } from "../pullRequest/PullRequestChangeBreakdownStat";
-import { ThreadDetailsControl } from "./ThreadDetailsControl";
-import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
+import { PullRequestChangeBreakdownRows } from "~/components/pullRequest/PullRequestChangeBreakdownStat";
+import { ThreadDetailsControl } from "~/components/chat/ThreadDetailsControl";
+import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 import { selectEnvironmentQueryData } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId, ProjectId, PullRequestRef } from "@t3tools/contracts";
@@ -41,24 +43,24 @@ import {
   resolvePullRequestMergeMethod,
   allowedPullRequestMergeMethods,
   resolveThreadPanelPullRequestAction,
-} from "../pullRequest/pullRequestDetail.logic";
-import { PullRequestChecksPopover } from "../pullRequest/PullRequestChecksPopover";
+} from "~/components/pullRequest/pullRequestDetail.logic";
+import { PullRequestChecksPopover } from "~/components/pullRequest/PullRequestChecksPopover";
 import {
   pullRequestChecksState,
   PullRequestCheckStatusIcon,
   PullRequestDiffStat,
   resolvePullRequestState,
-} from "../pullRequest/pullRequestPresentation";
+} from "~/components/pullRequest/pullRequestPresentation";
 import {
   usePullRequestActionRunner,
   usePullRequestDefaultMergeMethodResolver,
   usePullRequestHandoffs,
-} from "../pullRequest/usePullRequestActions";
+} from "~/components/pullRequest/usePullRequestActions";
 import {
   ChangeRequestStatusIcon,
   type PrStatusIndicator,
   type ThreadPr,
-} from "../ThreadStatusIndicators";
+} from "~/components/ThreadStatusIndicators";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -67,15 +69,15 @@ import {
   AlertDialogHeader,
   AlertDialogPopup,
   AlertDialogTitle,
-} from "../ui/alert-dialog";
-import { Button } from "../ui/button";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+} from "~/components/ui/alert-dialog";
+import { Button } from "~/components/ui/button";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import {
   THREAD_DETAILS_PANEL_ICON_CLASS,
   THREAD_DETAILS_PANEL_LABEL_CLASS,
   THREAD_DETAILS_PANEL_SPLIT_GROUP_CLASS,
   THREAD_DETAILS_PANEL_SPLIT_SEPARATOR_CLASS,
-} from "./threadDetailsPanelStyles";
+} from "~/components/chat/threadDetailsPanelStyles";
 
 // A null checks response is settled; polling cannot find checks.
 const isSettledWithoutChecks = (result: AsyncResult.AsyncResult<unknown, unknown>) =>
@@ -106,6 +108,7 @@ export function ThreadDetailsPrRow({
   onActed?: () => void;
   onStopWatching?: (() => void) | undefined;
 }) {
+  const { t } = useTranslation("workspace");
   const serverConfigs = useServerConfigs();
   const supportsPullRequests = serverConfigs.get(environmentId) !== undefined;
   const repository = sourceControlClients.repositorySelector(project?.repositoryIdentity);
@@ -224,10 +227,13 @@ export function ThreadDetailsPrRow({
   const statePresentation =
     detail === null
       ? null
-      : resolvePullRequestState({
-          state: detail.state,
-          isDraft: detail.isDraft,
-        });
+      : resolvePullRequestState(
+          {
+            state: detail.state,
+            isDraft: detail.isDraft,
+          },
+          t,
+        );
   const icon = statePresentation ? (
     <statePresentation.Icon
       aria-hidden
@@ -286,7 +292,7 @@ export function ThreadDetailsPrRow({
                   }
                 />
                 <div className="min-w-0 truncate text-foreground/75">
-                  {describePullRequestChecks(detail.checks)}
+                  {describePullRequestChecks(detail.checks, t)}
                 </div>
               </div>
             ) : null}
@@ -294,15 +300,17 @@ export function ThreadDetailsPrRow({
               <div className="flex min-w-0 items-start gap-2 text-destructive">
                 <TriangleAlertIcon aria-hidden className="mt-0.5 size-3 shrink-0 stroke-current" />
                 <div className="min-w-0 flex-1 wrap-break-word">
-                  Merge conflicts with {detail.baseBranch}
+                  {t(($) => $.git.mergeConflicts, { branch: detail.baseBranch })}
                 </div>
               </div>
             ) : null}
             <div className="flex min-w-0 items-center gap-2">
               <FileDiffIcon className="size-3 shrink-0 stroke-muted-foreground" />
               <div className="min-w-0 flex items-baseline gap-1 truncate text-foreground/75">
-                {detail.changedFiles.toLocaleString()}{" "}
-                {detail.changedFiles === 1 ? "file" : "files"}
+                {t(($) => $.git.fileCountFormatted, {
+                  count: detail.changedFiles,
+                  value: detail.changedFiles.toLocaleString(systemLocale),
+                })}
                 <PullRequestDiffStat additions={detail.additions} deletions={detail.deletions} />
               </div>
             </div>
@@ -336,7 +344,7 @@ export function ThreadDetailsPrRow({
             pending: actionPending,
             destructive: false,
             suffix: null,
-            tooltip: `Mark this ${terminology.singular} as ready for review`,
+            tooltip: t(($) => $.git.markRequestReady, { term: terminology.singular }),
             onClick: () => void perform("ready"),
           }
         : rowAction === "fix"
@@ -356,7 +364,10 @@ export function ThreadDetailsPrRow({
                 pending: actionPending,
                 destructive: false,
                 suffix: null,
-                tooltip: `Merge this ${terminology.singular} (${selectedMergeMethod})`,
+                tooltip: t(($) => $.git.mergeRequestMethod, {
+                  term: terminology.singular,
+                  method: selectedMergeMethod,
+                }),
                 onClick: () => setConfirmingMerge(true),
               }
             : null;
@@ -374,7 +385,7 @@ export function ThreadDetailsPrRow({
               size="sm"
               part={part}
               className="group/watch"
-              aria-label={`Stop watching #${number}`}
+              aria-label={t(($) => $.git.stopWatchingNumber, { number: number })}
               onClick={onStopWatching}
             />
           }
@@ -391,10 +402,7 @@ export function ThreadDetailsPrRow({
             )}
           />
         </TooltipTrigger>
-        <TooltipPopup side="top">
-          Watching: the agent wakes when checks finish, someone comments, or the branch conflicts.
-          Click to stop.
-        </TooltipPopup>
+        <TooltipPopup side="top">{t(($) => $.git.watchingStopHint)}</TooltipPopup>
       </Tooltip>
     ) : null;
 
@@ -487,14 +495,16 @@ export function ThreadDetailsPrRow({
         <AlertDialog open={confirmingMerge} onOpenChange={(open) => setConfirmingMerge(open)}>
           <AlertDialogPopup>
             <AlertDialogHeader>
-              <AlertDialogTitle>Merge {terminology.singular}?</AlertDialogTitle>
+              <AlertDialogTitle>
+                {t(($) => $.git.confirmMergeRequest, { term: terminology.singular })}
+              </AlertDialogTitle>
               <AlertDialogDescription>
-                This merges #{number} using {selectedMergeMethod}.
+                {t(($) => $.git.mergeNumberMethod, { number, method: selectedMergeMethod })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogClose render={<Button variant="outline" size="sm" />}>
-                Cancel
+                {t(($) => $.git.cancel)}
               </AlertDialogClose>
               <Button
                 size="sm"
@@ -504,7 +514,7 @@ export function ThreadDetailsPrRow({
                   void perform("merge", selectedMergeMethod);
                 }}
               >
-                Merge
+                {t(($) => $.git.merge)}
               </Button>
             </AlertDialogFooter>
           </AlertDialogPopup>

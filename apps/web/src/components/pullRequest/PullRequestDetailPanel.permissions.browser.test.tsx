@@ -29,7 +29,7 @@ vi.mock(import("~/state/sourceControlActions"), async (original) => ({
     error: null,
   })) as never,
 }));
-vi.mock(import("./usePullRequestDetail"), async (original) => ({
+vi.mock(import("~/components/pullRequest/usePullRequestDetail"), async (original) => ({
   ...(await original()),
   usePullRequestDetail: (() => ({
     canWriteSourceControl: permissions.checkout,
@@ -56,7 +56,7 @@ vi.mock(import("~/state/use-atom-command"), async (original) => ({
   useAtomCommand: (() => vi.fn()) as never,
 }));
 
-import { PullRequestDetailPanel } from "./PullRequestDetailPanel";
+import { PullRequestDetailPanel } from "~/components/pullRequest/PullRequestDetailPanel";
 
 const detail: PullRequestDetailView = {
   provider: SourceControlProviderKind.make("github"),

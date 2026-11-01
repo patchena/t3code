@@ -1,12 +1,19 @@
+import { useTranslation } from "react-i18next";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { ExternalLinkIcon } from "lucide-react";
 
-import { Button } from "../ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
-import { PullRequestGlyph } from "./pullRequestIcons";
+import { Button } from "~/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "~/components/ui/empty";
+import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 
 export function PullRequestsUnavailableState({
-  title = "Could not load pull requests",
+  title: titleOverride,
   error,
   onRetry,
   refreshing = false,
@@ -18,6 +25,8 @@ export function PullRequestsUnavailableState({
   refreshing?: boolean;
   host?: { readonly url: string; readonly openLabel: string };
 }) {
+  const { t } = useTranslation("workspace");
+  const title = titleOverride ?? t(($) => $.git.loadPullRequestsFailed);
   return (
     <Empty className="scrollbar-gutter-both min-h-0 justify-center-safe overflow-y-auto [&>*]:shrink-0">
       <EmptyMedia variant="icon">
@@ -38,7 +47,7 @@ export function PullRequestsUnavailableState({
               aria-busy={refreshing}
             >
               <RefreshIcon size="sm" refreshing={refreshing} />
-              Retry
+              {t(($) => $.git.retry)}
             </Button>
           ) : null}
           {host ? (

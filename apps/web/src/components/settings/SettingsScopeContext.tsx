@@ -1,15 +1,25 @@
+import { useTranslation } from "react-i18next";
 import { type EnvironmentId, T3_PROJECT_FILE_NAME, type T3ProjectFile } from "@t3tools/contracts";
 import { parseT3ProjectFile } from "@t3tools/shared/t3ProjectFile";
 import { useAtomValue } from "@effect/atom-react";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { createContext, type ReactNode, useContext } from "react";
 
-import { useEnvironments, usePrimaryEnvironmentId } from "../../state/environments";
-import { getProjectFileQueryAtom, optimisticFileAtom } from "../files/projectFilesQueryState";
-import { useSettingsProjectGroups } from "./useSettingsProjectGroups";
-import { resolveScopedSettingsTargets, selectScopedSettingsEnvironments } from "./scopedSettings";
-import { resolveSettingsScope, type SettingsScopeSearch } from "./settingsScope";
-import { selectSingleEnvironmentScope } from "./settingsScopeAxis";
+import { useEnvironments, usePrimaryEnvironmentId } from "~/state/environments";
+import {
+  getProjectFileQueryAtom,
+  optimisticFileAtom,
+} from "~/components/files/projectFilesQueryState";
+import { useSettingsProjectGroups } from "~/components/settings/useSettingsProjectGroups";
+import {
+  resolveScopedSettingsTargets,
+  selectScopedSettingsEnvironments,
+} from "~/components/settings/scopedSettings";
+import {
+  resolveSettingsScope,
+  type SettingsScopeSearch,
+} from "~/components/settings/settingsScope";
+import { selectSingleEnvironmentScope } from "~/components/settings/settingsScopeAxis";
 
 type ProjectFileMember = readonly [
   environmentId: EnvironmentId,
@@ -56,18 +66,19 @@ function useMemberProjectFiles(scope: ReturnType<typeof resolveSettingsScope>) {
 }
 
 function useResolvedSettingsScope(rawSearch: SettingsScopeSearch, singleEnvironment: boolean) {
+  const { t } = useTranslation("settings");
   const groups = useSettingsProjectGroups();
   const { environments: availableEnvironments } = useEnvironments();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const search = singleEnvironment
     ? selectSingleEnvironmentScope(
         rawSearch,
-        resolveSettingsScope(rawSearch, groups, availableEnvironments),
+        resolveSettingsScope(rawSearch, groups, availableEnvironments, t),
         availableEnvironments,
         primaryEnvironmentId,
       )
     : rawSearch;
-  const scope = resolveSettingsScope(search, groups, availableEnvironments);
+  const scope = resolveSettingsScope(search, groups, availableEnvironments, t);
   const projectFiles = useMemberProjectFiles(scope);
   const selected = selectScopedSettingsEnvironments(
     scope,

@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it } from "vite-plus/test";
 import { ProviderDriverKind, type ModelCapabilities } from "@t3tools/contracts";
 
@@ -163,20 +164,35 @@ describe("customModelEditor.logic", () => {
       })),
     });
 
-    expect(validateDraft(draft({ descriptors: [select("", [{ id: "a" }])] }))).toBe(
-      "Option 1 needs an id.",
-    );
+    expect(
+      validateDraft(
+        draft({ descriptors: [select("", [{ id: "a" }])] }),
+        createI18n("en").getFixedT("en", "settings"),
+      ),
+    ).toBe("Option 1 needs an id.");
     expect(
       validateDraft(
         draft({ descriptors: [select("effort", [{ id: "a" }]), select("effort", [{ id: "b" }])] }),
+        createI18n("en").getFixedT("en", "settings"),
       ),
     ).toBe('Option 2: id "effort" is used twice.');
-    expect(validateDraft(draft({ descriptors: [select("effort", [])] }))).toBe(
-      "Option 1 needs at least one choice.",
-    );
     expect(
-      validateDraft(draft({ descriptors: [select("effort", [{ id: "a" }, { id: "a" }])] })),
+      validateDraft(
+        draft({ descriptors: [select("effort", [])] }),
+        createI18n("en").getFixedT("en", "settings"),
+      ),
+    ).toBe("Option 1 needs at least one choice.");
+    expect(
+      validateDraft(
+        draft({ descriptors: [select("effort", [{ id: "a" }, { id: "a" }])] }),
+        createI18n("en").getFixedT("en", "settings"),
+      ),
     ).toBe('Option 1: choice "a" is used twice.');
-    expect(validateDraft(draft({ descriptors: [select("effort", [{ id: "a" }])] }))).toBeNull();
+    expect(
+      validateDraft(
+        draft({ descriptors: [select("effort", [{ id: "a" }])] }),
+        createI18n("en").getFixedT("en", "settings"),
+      ),
+    ).toBeNull();
   });
 });

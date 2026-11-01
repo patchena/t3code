@@ -1,3 +1,10 @@
+import {
+  FileWorkerError,
+  decodeFileWorkerError,
+  encodeFileWorkerError,
+  type FileWorkerCode,
+  type FileWorkerDetail,
+} from "~/components/files/fileWorkerError";
 // Adapted from opencode (MIT). Copyright (c) 2025 opencode. See LICENSE.opencode.
 // The engines run in a worker per open file, so no layout, recalculation or painting holds the window. These are the
 // two ends of that worker's protocol: typed calls by method name, a key that lets a newer call replace a queued one
@@ -34,6 +41,8 @@ type Response =
       readonly ok: false;
       readonly superseded: boolean;
       readonly message: string;
+      readonly code?: FileWorkerCode;
+      readonly detail?: FileWorkerDetail;
     };
 
 /** A value a method returns with the buffers to move to the caller rather than copy. */
@@ -50,9 +59,7 @@ export class SupersededError extends Schema.TaggedError<SupersededError>()("Supe
 }) {}
 
 /** A call made after the worker failed or was closed, or pending when that happened. */
-class WorkerClosedError extends Schema.TaggedError<WorkerClosedError>()("WorkerClosedError", {
-  message: Schema.String,
-}) {}
+class WorkerClosedError extends FileWorkerError {}
 
 type CallOptions = {
   /** A newer call with the same key replaces this one while it waits to run. */
@@ -99,10 +106,20 @@ export function createWorkerClient<M extends Methods>(worker: Worker) {
   });
 
   worker.addEventListener("error", (event) =>
-    fail(new WorkerClosedError({ message: event.message || "The Office engine stopped" })),
+    fail(
+      new WorkerClosedError({
+        message: event.message || "The Office engine stopped",
+        code: event.message ? undefined : "officeEngineStopped",
+      }),
+    ),
   );
   worker.addEventListener("messageerror", () =>
-    fail(new WorkerClosedError({ message: "The Office engine sent an unreadable reply" })),
+    fail(
+      new WorkerClosedError({
+        message: "The Office engine sent an unreadable reply",
+        code: "officeEngineReply",
+      }),
+    ),
   );
 
   return {
@@ -114,7 +131,9 @@ export function createWorkerClient<M extends Methods>(worker: Worker) {
       if (state.failure) return Promise.reject(state.failure);
 
       if (options.signal?.aborted)
-        return Promise.reject(new WorkerClosedError({ message: "The call was aborted" }));
+        return Promise.reject(
+          new WorkerClosedError({ message: "The call was aborted", code: "officeCallAborted" }),
+        );
 
       const id = ++state.next;
 
@@ -124,6 +143,7 @@ export function createWorkerClient<M extends Methods>(worker: Worker) {
             fail(
               new WorkerClosedError({
                 message: "This document took too long to preview. Open it in another app.",
+                code: "officeTimeout",
               }),
             ),
           30_000,
@@ -131,7 +151,9 @@ export function createWorkerClient<M extends Methods>(worker: Worker) {
         const abort = () => {
           clearTimeout(timeout);
           pending.delete(id);
-          reject(new WorkerClosedError({ message: "The call was aborted" }));
+          reject(
+            new WorkerClosedError({ message: "The call was aborted", code: "officeCallAborted" }),
+          );
           worker.postMessage({ cancel: id } satisfies Cancel, []);
         };
 
@@ -145,7 +167,7 @@ export function createWorkerClient<M extends Methods>(worker: Worker) {
               return reject(
                 response.superseded
                   ? new SupersededError({ message: response.message })
-                  : new Error(response.message),
+                  : decodeFileWorkerError(response),
               );
 
             // SAFETY: the worker answers each id with the output of the method that id called (see `serveWorker`).
@@ -164,7 +186,12 @@ export function createWorkerClient<M extends Methods>(worker: Worker) {
     },
     /** Stops the worker, which frees its engine's memory, and fails every pending call. */
     close() {
-      fail(new WorkerClosedError({ message: "The Office engine was closed" }));
+      fail(
+        new WorkerClosedError({
+          message: "The Office engine was closed",
+          code: "officeEngineClosed",
+        }),
+      );
     },
   };
 }
@@ -219,6 +246,7 @@ export function serveWorker<M extends Methods>(handlers: {
           ok: false,
           superseded: false,
           message: `Unknown method ${request.method}`,
+          detail: { kind: "method", method: request.method },
         });
         continue;
       }
@@ -252,7 +280,7 @@ export function serveWorker<M extends Methods>(handlers: {
               id: request.id,
               ok: false,
               superseded: false,
-              message: cause instanceof Error ? cause.message : String(cause),
+              ...encodeFileWorkerError(cause),
             });
           },
         );

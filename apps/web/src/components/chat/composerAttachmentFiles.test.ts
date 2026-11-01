@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import {
   EnvironmentId,
   getProviderAttachmentLimitError,
@@ -16,6 +17,8 @@ import {
   normalizeComposerImageFileMimeType,
   shouldHandleComposerAttachmentPaste,
 } from "./composerAttachmentFiles";
+
+const chatT = createI18n("en").getFixedT(null, "chat");
 
 describe("composer attachment files", () => {
   it("keeps previewable images providers cannot accept on the file path", () => {
@@ -137,12 +140,15 @@ describe("composer attachment files", () => {
       }),
     ).toBe(PROVIDER_SEND_TURN_MAX_FILE_BYTES);
     expect(
-      fileAttachmentCapabilityBlockReason({
-        files: [{ name: "pending.zip", sizeBytes: PROVIDER_SEND_TURN_MAX_FILE_BYTES }],
-        attachmentUploadsCapabilityKnown: false,
-        supportsAttachmentUploads: false,
-        maxFileAttachmentBytes: null,
-      }),
+      fileAttachmentCapabilityBlockReason(
+        {
+          files: [{ name: "pending.zip", sizeBytes: PROVIDER_SEND_TURN_MAX_FILE_BYTES }],
+          attachmentUploadsCapabilityKnown: false,
+          supportsAttachmentUploads: false,
+          maxFileAttachmentBytes: null,
+        },
+        chatT,
+      ),
     ).toBe("Waiting for the server before file attachments can send");
   });
 

@@ -3,7 +3,7 @@ import { createContext, useContext } from "react";
 
 import { cn } from "~/lib/utils";
 
-import { PullRequestMarkdown } from "../PullRequestMarkdown";
+import { PullRequestMarkdown } from "~/components/pullRequest/PullRequestMarkdown";
 
 export const GuideProseContext = createContext<{
   readonly environmentId: EnvironmentId;

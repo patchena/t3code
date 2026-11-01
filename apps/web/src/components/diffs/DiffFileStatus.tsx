@@ -1,6 +1,7 @@
+import { useTranslation } from "react-i18next";
 import { InfoIcon, RotateCwIcon } from "lucide-react";
-import { Button } from "../ui/button";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { Button } from "~/components/ui/button";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 
 export function DiffFileStatus({
   error,
@@ -11,6 +12,7 @@ export function DiffFileStatus({
   truncated?: boolean | undefined;
   retry: () => void;
 }) {
+  const { t } = useTranslation("workspace");
   if (!error && !truncated) return null;
   return (
     <Tooltip>
@@ -19,7 +21,7 @@ export function DiffFileStatus({
           <Button
             size="icon-micro"
             variant="ghost-muted"
-            aria-label={error ? "Retry loading diff" : "Partial diff preview"}
+            aria-label={error ? t(($) => $.git.retryDiff) : t(($) => $.git.partialDiffPreview)}
             onClick={(event) => {
               event.stopPropagation();
               if (error) retry();
@@ -30,9 +32,7 @@ export function DiffFileStatus({
         {error ? <RotateCwIcon className="size-3" /> : <InfoIcon className="size-3" />}
       </TooltipTrigger>
       <TooltipPopup>
-        {error
-          ? "Retry loading diff"
-          : "This file is too large to show in full. Counts include all changes."}
+        {error ? t(($) => $.git.retryDiff) : t(($) => $.git.largeFileDescription)}
       </TooltipPopup>
     </Tooltip>
   );

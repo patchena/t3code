@@ -1,34 +1,41 @@
+import { useTranslation } from "react-i18next";
 import {
   WorkspaceBreadcrumb,
   WorkspaceBreadcrumbItem,
   WorkspaceBreadcrumbSeparator,
-} from "../WorkspaceBreadcrumb";
-import { SETTINGS_SECTION_LABELS } from "./settingsSearch";
+} from "~/components/WorkspaceBreadcrumb";
+import {
+  settingsSectionLabels,
+  type SettingsTranslation,
+} from "~/components/settings/settingsSearch";
 
-const SETTINGS_BREADCRUMB_LABELS: Readonly<Record<string, string>> = {
-  ...SETTINGS_SECTION_LABELS,
-  "/settings/diagnostics": "Diagnostics",
-  "/settings/open-source-licenses": "Open source licenses",
-};
+function settingsBreadcrumbLabels(t: SettingsTranslation): Readonly<Record<string, string>> {
+  return {
+    ...settingsSectionLabels(t),
+    "/settings/diagnostics": t(($) => $.navUi.diagnostics),
+    "/settings/open-source-licenses": t(($) => $.navUi.openSourceLicenses),
+  };
+}
 
-function settingsBreadcrumbLabel(pathname: string): string | null {
+function settingsBreadcrumbLabel(pathname: string, t: SettingsTranslation): string | null {
   const normalizedPathname = pathname.replace(/\/+$/, "") || "/";
-  return SETTINGS_BREADCRUMB_LABELS[normalizedPathname] ?? null;
+  return settingsBreadcrumbLabels(t)[normalizedPathname] ?? null;
 }
 
 export function SettingsBreadcrumb({ pathname }: { pathname: string }) {
-  const sectionLabel = settingsBreadcrumbLabel(pathname);
+  const { t } = useTranslation("settings");
+  const sectionLabel = settingsBreadcrumbLabel(pathname, t);
 
   return (
-    <WorkspaceBreadcrumb ariaLabel="Settings breadcrumb">
+    <WorkspaceBreadcrumb ariaLabel={t(($) => $.navUi.settingsBreadcrumb)}>
       {sectionLabel ? (
         <>
-          <WorkspaceBreadcrumbItem>Settings</WorkspaceBreadcrumbItem>
+          <WorkspaceBreadcrumbItem>{t(($) => $.navUi.settings)}</WorkspaceBreadcrumbItem>
           <WorkspaceBreadcrumbSeparator />
         </>
       ) : null}
       <WorkspaceBreadcrumbItem current className="truncate">
-        {sectionLabel ?? "Settings"}
+        {sectionLabel ?? t(($) => $.navUi.settings)}
       </WorkspaceBreadcrumbItem>
     </WorkspaceBreadcrumb>
   );

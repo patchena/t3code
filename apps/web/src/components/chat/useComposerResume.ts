@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   type EnvironmentId,
   type ProviderInteractionMode,
@@ -52,6 +53,7 @@ interface ComposerResumeInput {
  * in its queue. Shares the per-route send lock with the composer's send paths.
  */
 export function useComposerResume(input: ComposerResumeInput) {
+  const { t } = useTranslation("chat");
   const {
     environmentId,
     routeThreadKey,
@@ -147,7 +149,7 @@ export function useComposerResume(input: ComposerResumeInput) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           threadId,
-          error instanceof Error ? error.message : "Could not resume thread.",
+          error instanceof Error ? error.message : t(($) => $.composer.resumeFailed),
         );
       }
     } else {

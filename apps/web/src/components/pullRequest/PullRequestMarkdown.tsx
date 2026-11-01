@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { ExternalLinkIcon, PaperclipIcon } from "lucide-react";
 import { markdownImageSourceFragment } from "@t3tools/client-runtime/markdown-images";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
@@ -14,9 +15,12 @@ import { useAssetUrlRefresh, useAssetUrlState } from "~/assets/assetUrls";
 import { cn } from "~/lib/utils";
 import { PULL_REQUESTS_PANEL_REF } from "~/rightPanelStore";
 
-import ChatMarkdown from "../ChatMarkdown";
-import { MediaVideoPlayer } from "../media/MediaVideoPlayer";
-import { splitPullRequestBody, type PullRequestBodySegment } from "./pullRequestMarkdown.logic";
+import { ChatMarkdown } from "~/components/ChatMarkdown";
+import { MediaVideoPlayer } from "~/components/media/MediaVideoPlayer";
+import {
+  splitPullRequestBody,
+  type PullRequestBodySegment,
+} from "~/components/pullRequest/pullRequestMarkdown.logic";
 
 export const PullRequestMarkdownContext = createContext<{
   /** Stable per repository, so comments share one renderer and its parse cache. */
@@ -40,6 +44,7 @@ function PullRequestHostVideo({
   fetchUrl: string;
   repository: string | undefined;
 }) {
+  const { t } = useTranslation("workspace");
   const resource: AssetResource = {
     _tag: SOURCE_CONTROL_MEDIA_ASSET,
     cwd,
@@ -54,7 +59,7 @@ function PullRequestHostVideo({
     <MediaVideoPlayer
       src={src === null ? null : src + markdownImageSourceFragment(url)}
       originalUrl={url}
-      label="Pull request video"
+      label={t(($) => $.git.pullRequestVideo)}
       className="w-full"
       videoClassName="rounded-lg border border-border/60"
       onRetry={refreshAssetUrl}
@@ -77,6 +82,7 @@ function PullRequestBodySegmentView({
   lineBreaks: boolean;
   onTaskListChange: ((input: { markerOffset: number; checked: boolean }) => void) | undefined;
 }) {
+  const { t } = useTranslation("workspace");
   const context = useContext(PullRequestMarkdownContext);
   const repository = context?.repository ?? undefined;
   if (segment.kind === "table") {
@@ -156,7 +162,7 @@ function PullRequestBodySegmentView({
         key={`${segment.id}:${segment.url}`}
         src={segment.url}
         originalUrl={segment.url}
-        label="Pull request video"
+        label={t(($) => $.git.pullRequestVideo)}
         className="w-full"
         videoClassName="rounded-lg border border-border/60"
       />
@@ -172,7 +178,9 @@ function PullRequestBodySegmentView({
     >
       <PaperclipIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1 truncate">
-        Open attachment on {hostMedia?.definition.label ?? new URL(segment.url).hostname}
+        {t(($) => $.git.openAttachmentHost, {
+          host: hostMedia?.definition.label ?? new URL(segment.url).hostname,
+        })}
       </span>
       <ExternalLinkIcon aria-hidden className="size-3 shrink-0 text-muted-foreground" />
     </a>

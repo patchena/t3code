@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { ProviderAuthResponse } from "@t3tools/contracts";
 import { useEffect, useRef, useState } from "react";
 import { GhosttyTerminalSurface } from "../../terminal/ghostty/surface";
@@ -5,7 +6,7 @@ import { ensureLocalApi } from "../../localApi";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { terminalThemeFromApp } from "../ThreadTerminalDrawer";
 
-export default function ProviderAuthTerminal({
+export function ProviderAuthTerminal({
   output,
   outputOffset,
   onResponse,
@@ -14,9 +15,10 @@ export default function ProviderAuthTerminal({
   readonly outputOffset?: number | undefined;
   readonly onResponse: (response: Extract<ProviderAuthResponse, { type: "terminal" }>) => void;
 }) {
+  const { t } = useTranslation("settings");
   const [surface, setSurface] = useState<GhosttyTerminalSurface | null>(null);
   const written = useRef(0);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<"link" | "terminal" | null>(null);
   // The surface captures its callbacks once at creation.
   const respond = useStableCallback(onResponse);
   const offset = outputOffset ?? output.length;
@@ -28,7 +30,7 @@ export default function ProviderAuthTerminal({
     else if (delta !== 0) surface.resetAndWrite(output);
     written.current = offset;
   }, [surface, output, offset]);
-  const mountSurface = (element: HTMLDivElement) => {
+  const mountSurface = useStableCallback((element: HTMLDivElement) => {
     let disposed = false;
     let created: GhosttyTerminalSurface | null = null;
     void GhosttyTerminalSurface.create(element, {
@@ -42,7 +44,7 @@ export default function ProviderAuthTerminal({
         if (/^https?:\/\//i.test(url))
           void ensureLocalApi()
             .shell.openExternal(url)
-            .catch(() => setError("Could not open the provider link."));
+            .catch(() => setError("link"));
       },
     })
       .then((terminal) => {
@@ -54,23 +56,25 @@ export default function ProviderAuthTerminal({
         written.current = 0;
         setSurface(terminal);
       })
-      .catch(() => setError("Could not load the sign-in terminal. Cancel and retry sign-in."));
+      .catch(() => setError("terminal"));
     return () => {
       disposed = true;
       created?.dispose();
       setSurface(null);
     };
-  };
+  });
   return (
     <>
       <div
         ref={mountSurface}
-        aria-label="Provider sign-in terminal"
+        aria-label={t(($) => $.providers.signInTerminal)}
         className="relative h-64 overflow-hidden rounded-md border border-border"
       />
       {error ? (
         <p role="alert" className="text-destructive">
-          {error}
+          {error === "link"
+            ? t(($) => $.providers.providerLinkError)
+            : t(($) => $.providers.signInTerminalError)}
         </p>
       ) : null}
     </>

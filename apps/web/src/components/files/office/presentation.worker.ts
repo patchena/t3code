@@ -1,3 +1,4 @@
+import { FileWorkerError } from "~/components/files/fileWorkerError";
 // Adapted from opencode (MIT). Copyright (c) 2025 opencode. See LICENSE.opencode.
 import {
   initWasm,
@@ -71,7 +72,11 @@ const state: WorkerState = { deck: undefined };
 
 serveWorker<SlideMethods>({
   open: async (input) => {
-    if (state.deck) throw new Error("The worker already holds a deck");
+    if (state.deck)
+      throw new FileWorkerError({
+        message: "The worker already holds a deck",
+        code: "workerHasDeck",
+      });
 
     await initWasm();
 
@@ -106,14 +111,19 @@ serveWorker<SlideMethods>({
 });
 
 function required() {
-  if (!state.deck) throw new Error("The worker holds no deck");
+  if (!state.deck)
+    throw new FileWorkerError({ message: "The worker holds no deck", code: "workerNoDeck" });
 
   return state.deck;
 }
 
 /** The worker's own font set, which its canvases draw text with. */
 function workerFonts() {
-  if (!("fonts" in self)) throw new Error("This browser has no fonts in workers");
+  if (!("fonts" in self))
+    throw new FileWorkerError({
+      message: "This browser has no fonts in workers",
+      code: "workerNoFonts",
+    });
 
   // SAFETY: a worker's global scope is a FontFaceSource, whose `fonts` is a FontFaceSet (CSS Font Loading, exposed to
   // workers). The window's types declare it on documents only, and workers expose no FontFaceSet to check against.

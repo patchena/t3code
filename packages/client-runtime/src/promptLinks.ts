@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   repositoryGroupingKeyOf,
   type EnvironmentId,
@@ -11,7 +12,11 @@ import {
 } from "@t3tools/contracts";
 import { resolveSelectableModel, type SelectableModelOption } from "@t3tools/shared/model";
 import type { AsyncResult } from "effect/reactivity";
-import type { PromptLinkPullRequest, PromptLinkRepository } from "@t3tools/shared/promptLinks";
+import type {
+  PromptLinkError,
+  PromptLinkPullRequest,
+  PromptLinkRepository,
+} from "@t3tools/shared/promptLinks";
 import {
   threadPullRequestKeyOf,
   threadPullRequestsOf,
@@ -125,4 +130,19 @@ export function resolvePromptLinkModelSelection(
     selection: { instanceId: instance.instanceId, model },
     exact: request.model === null || requested !== null,
   };
+}
+
+export function formatPromptLinkError(error: PromptLinkError, t: TFunction<"chat">): string {
+  switch (error.kind) {
+    case "too-long":
+      return t(($) => $.links.parse.tooLong, { limit: error.limit });
+    case "hidden":
+      return t(($) => $.links.parse.hidden);
+    case "pull-request":
+      return t(($) => $.links.parse.pullRequest);
+    case "missing":
+      return t(($) => $.links.parse.missing);
+    case "repository":
+      return t(($) => $.links.parse.repository);
+  }
 }

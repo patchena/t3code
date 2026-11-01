@@ -1,24 +1,25 @@
+import { useTranslation } from "react-i18next";
 import { resolveEnvironmentMachineKind, type EnvironmentId } from "@t3tools/contracts";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { ChevronRightIcon, LayersIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { cn } from "../../lib/utils";
-import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
-import { useEnvironments, type EnvironmentPresentation } from "../../state/environments";
-import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
-import { ProjectFavicon } from "../ProjectFavicon";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { ITEM_ROW_CLASSNAME } from "./itemRows";
-import { SettingsGroup } from "./SettingsGroup";
-import { SettingsPageContainer, SettingsSection } from "./settingsLayout";
-import { useSettingsScope } from "./SettingsScopeContext";
-import type { SettingsScopeSearch } from "./settingsScope";
+import { cn } from "~/lib/utils";
+import type { SidebarProjectSnapshot } from "~/sidebarProjectGrouping";
+import { useEnvironments, type EnvironmentPresentation } from "~/state/environments";
+import { EnvironmentMachineIcon } from "~/components/EnvironmentMachineIcon";
+import { ProjectFavicon } from "~/components/ProjectFavicon";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { ITEM_ROW_CLASSNAME } from "~/components/settings/itemRows";
+import { SettingsGroup } from "~/components/settings/SettingsGroup";
+import { SettingsPageContainer, SettingsSection } from "~/components/settings/settingsLayout";
+import { useSettingsScope } from "~/components/settings/SettingsScopeContext";
+import type { SettingsScopeSearch } from "~/components/settings/settingsScope";
 import {
   settingsScopeEnvironmentAddress,
   settingsScopeEnvironmentLabels,
   settingsScopeProjectMachines,
-} from "./settingsScopeAxis";
+} from "~/components/settings/settingsScopeAxis";
 
 interface ScopeChoice {
   label: string;
@@ -41,6 +42,7 @@ export function SettingsScopeNotice({
   targetId?: string;
   eligibleEnvironmentIds?: readonly EnvironmentId[];
 }) {
+  const { t } = useTranslation("settings");
   const { selectScope, search, groups } = useSettingsScope();
   const navigate = useNavigate({ from: "/settings" });
   const pathname = useLocation({ select: (location) => location.pathname });
@@ -66,7 +68,7 @@ export function SettingsScopeNotice({
           const { primary, secondary } = environment
             ? settingsScopeEnvironmentLabels(environment, environments)
             : {
-                primary: member.environmentLabel ?? "Environment",
+                primary: member.environmentLabel ?? t(($) => $.scope.environment),
                 secondary: member.environmentId,
               };
           return {
@@ -114,7 +116,7 @@ export function SettingsScopeNotice({
               })
           : [
               {
-                label: "Open all environments",
+                label: t(($) => $.scope.openAllEnvironments),
                 icon: <LayersIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />,
                 search: {},
               },

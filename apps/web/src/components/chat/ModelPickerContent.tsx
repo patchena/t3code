@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   ANTIGRAVITY_DEFAULT_MODEL,
   type ProviderInstanceId,
@@ -205,6 +206,8 @@ function ModelPickerProviderNotices({
   onRequestClose: (() => void) | undefined;
   onOpenProviderSetup: ((instanceId: ProviderInstanceId) => void) | undefined;
 }) {
+  const { t } = useTranslation("chat");
+  const { t: tConnect } = useTranslation("connect");
   const navigate = useNavigate();
   return (
     <>
@@ -213,7 +216,7 @@ function ModelPickerProviderNotices({
           {setupEntries.map((entry) => (
             <div key={entry.instanceId} className="px-1 py-1.5 text-xs leading-snug">
               <p className="line-clamp-3 text-muted-foreground">
-                {getProviderStatusMessage(entry.snapshot)}
+                {getProviderStatusMessage(entry.snapshot, tConnect)}
               </p>
               <InlineButton
                 className="mt-1"
@@ -222,7 +225,9 @@ function ModelPickerProviderNotices({
                   onOpenProviderSetup?.(entry.instanceId);
                 }}
               >
-                {setupEntries.length > 1 ? `Set up ${entry.displayName}` : "Open provider setup"}
+                {setupEntries.length > 1
+                  ? t(($) => $.composer.setupProvider, { provider: entry.displayName })
+                  : t(($) => $.composer.openProviderSetup)}
               </InlineButton>
             </div>
           ))}
@@ -242,7 +247,7 @@ function ModelPickerProviderNotices({
               void navigate({ to: "/settings/providers" });
             }}
           >
-            Provider settings
+            {t(($) => $.composer.providerSettings)}
           </InlineButton>
         </p>
       ))}
@@ -369,6 +374,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
   /** Closes the list column, inside the popup's fixed height. */
   listFooter?: ReactNode;
 }) {
+  const { t } = useTranslation("chat");
   const {
     searchInputRef,
     keybindings: providedKeybindings,
@@ -729,7 +735,9 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     const shown = isSearching
       ? matchesLockedProvider(entry)
       : entry.instanceId === selectedEntry?.instanceId;
-    const notice = shown ? formatProviderUpdateRequiredNotice(entry.snapshot, searchQuery) : null;
+    const notice = shown
+      ? formatProviderUpdateRequiredNotice(entry.snapshot, searchQuery, t)
+      : null;
     return notice ? [{ instanceId: entry.instanceId, notice }] : [];
   });
 
@@ -805,7 +813,9 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
       setSearchQuery("");
       handleSelectInstance(next);
       announce(
-        next === "favorites" ? "Favorites" : (entryByInstanceId.get(next)?.displayName ?? next),
+        next === "favorites"
+          ? t(($) => $.composer.favorites)
+          : (entryByInstanceId.get(next)?.displayName ?? next),
         "model-picker",
       );
       return;
@@ -830,7 +840,10 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
     const name = flatModels.find(
       (item) => item.slug === selectedSlug && item.instanceId === model.instanceId,
     )?.name;
-    announce(`Model: ${name ?? selectedSlug}`, "model-picker");
+    announce(
+      t(($) => $.composer.modelAnnouncement, { model: name ?? selectedSlug }),
+      "model-picker",
+    );
   };
 
   return (
@@ -922,7 +935,7 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
           >
             <ComboboxSearchInput
               ref={searchInputRef}
-              placeholder="Search models..."
+              placeholder={t(($) => $.composer.searchModels)}
               value={searchQuery}
               onChange={(e) => {
                 if (!isSearching) setSearchHeight(pickerContentRef.current?.offsetHeight ?? 0);
@@ -1023,7 +1036,9 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
                       className="group w-full cursor-pointer"
                     >
                       <span className="text-sm leading-snug text-muted-foreground group-hover:text-foreground group-data-highlighted:text-foreground">
-                        {legacySection.isExpanded ? "Show less" : "Show more"}
+                        {legacySection.isExpanded
+                          ? t(($) => $.ui.showLess)
+                          : t(($) => $.ui.showMore)}
                       </span>
                     </ComboboxItem>
                   );
@@ -1069,8 +1084,8 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
               updateRequiredNotices={updateRequiredNotices}
               emptyLabel={
                 selectedInstanceId === "favorites" && !isSearching
-                  ? "No favorites yet"
-                  : "No models found"
+                  ? t(($) => $.composer.noFavorites)
+                  : t(($) => $.composer.noModels)
               }
               onRequestClose={onRequestClose}
               onOpenProviderSetup={onOpenProviderSetup}

@@ -1,3 +1,4 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import {
   EnvironmentId,
   ProjectId,
@@ -23,6 +24,8 @@ import {
   scheduleFromDraft,
   taskToDraft,
 } from "./scheduledTasksSettings.logic";
+
+const t = createI18n("en").getFixedT(null, "settings");
 
 const laptopId = EnvironmentId.make("laptop");
 const serverId = EnvironmentId.make("server");
@@ -96,7 +99,7 @@ describe("scheduled task settings scope", () => {
     { search: { project: "t3code", checkout: "removed" }, expected: [] },
     { search: { project: "other", machine: laptopId }, expected: [] },
   ])("lists only matching tasks for $search", ({ search, expected }) => {
-    const scope = resolveSettingsScope(search, groups, environments);
+    const scope = resolveSettingsScope(search, groups, environments, t);
     expect(
       tasks
         .filter((task) => matchesScheduledTaskScope(scope, task.environmentId, task.projectId))
@@ -111,8 +114,8 @@ describe("scheduled task settings scope", () => {
       pinnedAt,
       archivedAt,
     });
-    const all = resolveSettingsScope({}, groups, environments);
-    const scoped = resolveSettingsScope({ project: "t3code" }, groups, environments);
+    const all = resolveSettingsScope({}, groups, environments, t);
+    const scoped = resolveSettingsScope({ project: "t3code" }, groups, environments, t);
     expect(
       defaultScheduledTaskProjectId([project("a", null, null), project("b", at, null)], all),
     ).toBe("b");
@@ -124,14 +127,14 @@ describe("scheduled task settings scope", () => {
     const removedProject = ProjectId.make("removed");
     expect(
       matchesScheduledTaskScope(
-        resolveSettingsScope({}, groups, environments),
+        resolveSettingsScope({}, groups, environments, t),
         laptopId,
         removedProject,
       ),
     ).toBe(true);
     expect(
       matchesScheduledTaskScope(
-        resolveSettingsScope({ project: "t3code" }, groups, environments),
+        resolveSettingsScope({ project: "t3code" }, groups, environments, t),
         laptopId,
         removedProject,
       ),

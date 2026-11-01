@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { ServerUpdateState } from "@t3tools/client-runtime/state/server";
 import {
   type DesktopUpdateChannel,
@@ -15,7 +16,7 @@ import {
   resolveVersionMismatch,
   supportsDesktopAppUpdate,
 } from "~/versionSkew";
-import type { ServerUpdateOutcome, ServerUpdateTarget } from "../ServerUpdateAction";
+import type { ServerUpdateOutcome, ServerUpdateTarget } from "~/components/ServerUpdateAction";
 
 export interface UpdateEverythingMachine {
   readonly environmentId: EnvironmentId;
@@ -72,6 +73,7 @@ export interface SkippedMachine {
 export function collectServerUpdateTargets(
   machines: ReadonlyArray<UpdateEverythingMachine>,
   targetVersion: string,
+  t: TFunction<"workspace">,
 ): {
   readonly targets: ServerUpdateTarget[];
   readonly skipped: SkippedMachine[];
@@ -91,7 +93,13 @@ export function collectServerUpdateTargets(
       skipped.push({ environmentId: machine.environmentId, label: machine.label, reason });
     const unavailable = unavailableReason(machine);
     if (config === null || unavailable !== null) {
-      skip(unavailable ?? "not connected");
+      skip(
+        unavailable === "no-permission"
+          ? t(($) => $.updates.noPermission)
+          : unavailable === "already-updating"
+            ? t(($) => $.updates.alreadyUpdating)
+            : t(($) => $.updates.notConnected),
+      );
       continue;
     }
     const selfUpdate = resolveServerSelfUpdateCapability(config);
@@ -105,11 +113,11 @@ export function collectServerUpdateTargets(
     }
     const desktopAppUpdate = supportsDesktopAppUpdate(config);
     if (selfUpdate === null) {
-      skip("needs a manual update");
+      skip(t(($) => $.updates.needsAManualUpdate));
       continue;
     }
     if (selfUpdate === "desktop-managed" && !desktopAppUpdate) {
-      skip("needs a newer desktop app");
+      skip(t(($) => $.updates.needsANewerDesktopApp));
       continue;
     }
     const serverVersion = config.environment.serverVersion;
@@ -117,7 +125,7 @@ export function collectServerUpdateTargets(
       selfUpdate !== "desktop-managed" &&
       cliReleaseChannelOf(serverVersion) !== cliReleaseChannelOf(targetVersion)
     ) {
-      skip(`on the ${cliReleaseChannelOf(serverVersion)} channel`);
+      skip(t(($) => $.updates.channelMismatch, { channel: cliReleaseChannelOf(serverVersion) }));
       continue;
     }
     const target: ServerUpdateTarget = {
@@ -133,10 +141,10 @@ export function collectServerUpdateTargets(
   return { targets, skipped };
 }
 
-function unavailableReason(machine: UpdateEverythingMachine): string | null {
-  if (machine.serverConfig === null || !machine.connected) return "not connected";
-  if (!machine.canMaintain) return "no permission";
-  if (machine.updateState.status === "running") return "already updating";
+function unavailableReason(machine: UpdateEverythingMachine) {
+  if (machine.serverConfig === null || !machine.connected) return "not-connected" as const;
+  if (!machine.canMaintain) return "no-permission" as const;
+  if (machine.updateState.status === "running") return "already-updating" as const;
   return null;
 }
 
@@ -147,8 +155,8 @@ export interface ChannelSwitchRelease {
   readonly databaseMigration: number | undefined;
 }
 
-export const channelSwitchLabel = (channel: DesktopUpdateChannel) =>
-  channel === "nightly" ? "Nightly" : "Stable";
+export const channelSwitchLabel = (channel: DesktopUpdateChannel, t: TFunction<"workspace">) =>
+  channel === "nightly" ? t(($) => $.updates.nightly) : t(($) => $.updates.stable);
 
 /** Stable and Nightly each build their own commits, so either can hold migrations the other lacks.
  * Crossing tracks needs proof that the target release knows every migration the database holds. */
@@ -159,18 +167,26 @@ function channelSwitchBlockReason(
   fromVersion: string,
   release: ChannelSwitchRelease,
   currentMigration: number | undefined,
+  t: TFunction<"workspace">,
 ): string | null {
   if (!crossesTrack(fromVersion, release)) return null;
-  const from = channelSwitchLabel(desktopUpdateChannelOf(fromVersion));
+  const from = channelSwitchLabel(desktopUpdateChannelOf(fromVersion), t);
   // Servers and releases from before this check report no migration number.
   if (currentMigration === undefined) {
-    return `its server predates database checks; update it on ${from} first`;
+    return t(($) => $.updates.serverPredatesChecks, { channel: from });
   }
   if (release.databaseMigration === undefined) {
-    return `${release.version} predates database checks; wait for a newer ${channelSwitchLabel(release.channel)} release`;
+    return t(($) => $.updates.releasePredatesChecks, {
+      version: release.version,
+      channel: channelSwitchLabel(release.channel, t),
+    });
   }
   return currentMigration > release.databaseMigration
-    ? `its database has changes ${release.version} does not support yet; stay on ${from} until ${channelSwitchLabel(release.channel)} has them`
+    ? t(($) => $.updates.databaseUnsupported, {
+        version: release.version,
+        from,
+        to: channelSwitchLabel(release.channel, t),
+      })
     : null;
 }
 
@@ -185,6 +201,7 @@ export function localSwitchBlockReason(
     readonly databaseMigration: number | undefined;
   }>,
   backendCount: number,
+  t: TFunction<"workspace">,
 ): string | null {
   if (!crossesTrack(appVersion, release)) return null;
   if (
@@ -192,11 +209,11 @@ export function localSwitchBlockReason(
     hosted.length < backendCount ||
     hosted.some((server) => !server.connected)
   ) {
-    return "its server is not connected, so its database cannot be checked";
+    return t(($) => $.updates.itsServerIsNotConnectedSoItsDatabaseCannot);
   }
   return (
     hosted
-      .map((server) => channelSwitchBlockReason(appVersion, release, server.databaseMigration))
+      .map((server) => channelSwitchBlockReason(appVersion, release, server.databaseMigration, t))
       .find((reason) => reason !== null) ?? null
   );
 }
@@ -226,6 +243,7 @@ function managedMachineUpdateDenial(
 export function collectChannelSwitchTargets(
   machines: ReadonlyArray<UpdateEverythingMachine>,
   release: ChannelSwitchRelease,
+  t: TFunction<"workspace">,
 ): { readonly targets: ServerUpdateTarget[]; readonly skipped: SkippedMachine[] } {
   const targets: ServerUpdateTarget[] = [];
   const skipped: SkippedMachine[] = [];
@@ -269,7 +287,13 @@ export function collectChannelSwitchTargets(
     }
     const unavailable = unavailableReason(machine);
     if (config === null || serverVersion === undefined || unavailable !== null) {
-      skip(unavailable ?? "not connected");
+      skip(
+        unavailable === "no-permission"
+          ? t(($) => $.updates.noPermission)
+          : unavailable === "already-updating"
+            ? t(($) => $.updates.alreadyUpdating)
+            : t(($) => $.updates.notConnected),
+      );
       continue;
     }
     const managedDenial = managedMachineUpdateDenial(config, release.version);
@@ -279,13 +303,22 @@ export function collectChannelSwitchTargets(
     }
     const move = trackSwitchMove(config, sameTrack);
     if ("skip" in move) {
-      skip(move.skip);
+      skip(
+        move.skip === "preview"
+          ? t(($) => $.updates.runsAPreviewBuild)
+          : move.skip === "manual"
+            ? t(($) => $.updates.needsAManualUpdate)
+            : move.skip === "desktop"
+              ? t(($) => $.updates.needsANewerDesktopApp)
+              : t(($) => $.updates.switchTheMacAppOnThatMac),
+      );
       continue;
     }
     const blocked = channelSwitchBlockReason(
       serverVersion,
       release,
       config.environment.databaseMigration,
+      t,
     );
     if (blocked !== null) {
       skip(blocked);
@@ -297,7 +330,9 @@ export function collectChannelSwitchTargets(
       compareSemverVersions(release.version, serverVersion) <= 0
     ) {
       skip(
-        `run \`t3 update --channel ${release.channel === "nightly" ? "nightly" : "stable"} --allow-downgrade\` there`,
+        t(($) => $.updates.manualChannelCommand, {
+          command: `t3 update --channel ${release.channel === "nightly" ? "nightly" : "stable"} --allow-downgrade`,
+        }),
       );
       continue;
     }
@@ -328,19 +363,21 @@ function isOnTrack(version: string, channel: DesktopUpdateChannel): boolean {
 function trackSwitchMove(
   config: NonNullable<UpdateEverythingMachine["serverConfig"]>,
   sameTrack: boolean,
-): { readonly selfUpdate: ServerSelfUpdateCapability } | { readonly skip: string } {
+):
+  | { readonly selfUpdate: ServerSelfUpdateCapability }
+  | { readonly skip: "preview" | "manual" | "desktop" | "mac" } {
   if (cliReleaseChannelOf(config.environment.serverVersion) === "preview") {
-    return { skip: "runs a preview build" };
+    return { skip: "preview" as const };
   }
   const selfUpdate = resolveServerSelfUpdateCapability(config);
-  if (selfUpdate === null) return { skip: "needs a manual update" };
+  if (selfUpdate === null) return { skip: "manual" as const };
   if (selfUpdate !== "desktop-managed") return { selfUpdate };
   if (config.environment.capabilities.desktopAppChannelSwitch !== true) {
-    return { skip: "needs a newer desktop app" };
+    return { skip: "desktop" as const };
   }
   // Squirrel.Mac renames the bundle for the new track and then cannot relaunch it.
   if (!sameTrack && config.environment.platform.os === "darwin") {
-    return { skip: "switch the Mac app on that Mac" };
+    return { skip: "mac" as const };
   }
   return { selfUpdate };
 }
@@ -426,11 +463,14 @@ export function closeFinishedUpdateRun(run: UpdateEverythingRun): UpdateEverythi
 
 const UPDATE_SLOW_AFTER_MS = 3 * 60 * 1000;
 
-export function formatUpdateElapsed(ms: number): string {
+export function formatUpdateElapsed(ms: number, t: TFunction<"workspace">): string {
   const minutes = Math.floor(ms / 60_000);
-  if (minutes < 1) return "<1m";
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  if (minutes < 1) return t(($) => $.updates.elapsedLessMinute);
+  if (minutes < 60) return t(($) => $.updates.elapsedMinutes, { minutes });
+  return t(($) => $.updates.elapsedHoursMinutes, {
+    hours: Math.floor(minutes / 60),
+    minutes: minutes % 60,
+  });
 }
 
 export interface UpdateRunMachineView {
@@ -457,13 +497,14 @@ export function describeUpdateCapsule(
   machines: ReadonlyArray<UpdateRunMachineView>,
   local: UpdateRunLocalState,
   now: number,
+  t: TFunction<"workspace">,
 ): UpdateCapsuleView {
   if (run.phase === "countdown" && run.restartAt !== null) {
     const seconds = Math.max(0, Math.ceil((run.restartAt - now) / 1000));
-    return { tone: "default", label: `Restart in ${seconds}s`, action: "later" };
+    return { tone: "default", label: t(($) => $.updates.restartIn, { seconds }), action: "later" };
   }
   if (run.phase === "installing") {
-    return { tone: "default", label: "Restarting…", action: null };
+    return { tone: "default", label: t(($) => $.updates.restarting), action: null };
   }
   const active = machines.filter(({ status }) => isActive(status) && status !== "waiting");
   const slowest = active.toSorted((a, b) => a.machine.startedAt - b.machine.startedAt)[0];
@@ -472,20 +513,27 @@ export function describeUpdateCapsule(
       tone: "slow",
       label: slowest.machine.label,
       slow: {
-        status: RUN_STATUS_LABELS[slowest.status],
-        elapsed: formatUpdateElapsed(now - slowest.machine.startedAt),
+        status: runStatusLabels(t)[slowest.status],
+        elapsed: formatUpdateElapsed(now - slowest.machine.startedAt, t),
       },
       action: null,
     };
   }
   const done = machines.filter(({ status }) => status === "done").length;
   if (machines.some(({ status }) => isActive(status))) {
-    return { tone: "default", label: `${done} of ${machines.length} updated`, action: null };
+    return {
+      tone: "default",
+      label: t(($) => $.updates.doneMachines, { done, total: machines.length }),
+      action: null,
+    };
   }
   if (local?.status === "downloading") {
     return {
       tone: "default",
-      label: `Downloading${local.percent === null ? "" : ` ${Math.floor(local.percent)}%`}`,
+      label:
+        local.percent === null
+          ? t(($) => $.updates.downloadingNoPercent)
+          : t(($) => $.updates.downloadingPercent, { percent: Math.floor(local.percent) }),
       action: null,
     };
   }
@@ -493,24 +541,33 @@ export function describeUpdateCapsule(
   if (failed.length > 0) {
     return {
       tone: "failed",
-      label: failed.length === 1 ? `${failed[0]!.machine.label} failed` : `${failed.length} failed`,
+      label:
+        failed.length === 1
+          ? t(($) => $.updates.failedMachine, { machine: failed[0]!.machine.label })
+          : t(($) => $.updates.failedMachines, { count: failed.length }),
       action:
         !run.trackSwitch && failed.some(({ machine }) => machine.server !== null)
           ? "retry"
           : "dismiss",
     };
   }
-  return { tone: "default", label: `${done} of ${machines.length} updated`, action: null };
+  return {
+    tone: "default",
+    label: t(($) => $.updates.doneMachines, { done, total: machines.length }),
+    action: null,
+  };
 }
 
-export const RUN_STATUS_LABELS: Record<UpdateRunMachineStatus, string> = {
-  providers: "updating providers",
-  waiting: "waiting",
-  downloading: "downloading",
-  restarting: "restarting",
-  done: "done",
-  failed: "failed",
-};
+export function runStatusLabels(t: TFunction<"workspace">): Record<UpdateRunMachineStatus, string> {
+  return {
+    providers: t(($) => $.updates.statusProviders),
+    waiting: t(($) => $.updates.statusWaiting),
+    downloading: t(($) => $.updates.statusDownloading),
+    restarting: t(($) => $.updates.statusRestarting),
+    done: t(($) => $.updates.statusDone),
+    failed: t(($) => $.updates.statusFailed),
+  };
+}
 
 export interface UpdateEverythingResult {
   readonly localVersion: string | null;
@@ -520,25 +577,28 @@ export interface UpdateEverythingResult {
   readonly restarting: ReadonlyArray<string>;
 }
 
-export function collectUpdateEverythingResult(input: {
-  readonly localVersion: string | null;
-  readonly localFailures: ReadonlyArray<string>;
-  readonly servers: ReadonlyArray<{
-    readonly label: string;
-    readonly outcome: ServerUpdateOutcome;
-  }>;
-  readonly providers: ReadonlyArray<
-    | { readonly status: "interrupted" | "updated" }
-    | { readonly status: "failed"; readonly line: string }
-  >;
-}): UpdateEverythingResult {
+export function collectUpdateEverythingResult(
+  input: {
+    readonly localVersion: string | null;
+    readonly localFailures: ReadonlyArray<string>;
+    readonly servers: ReadonlyArray<{
+      readonly label: string;
+      readonly outcome: ServerUpdateOutcome;
+    }>;
+    readonly providers: ReadonlyArray<
+      | { readonly status: "interrupted" | "updated" }
+      | { readonly status: "failed"; readonly line: string }
+    >;
+  },
+  t: TFunction<"workspace">,
+): UpdateEverythingResult {
   return {
     localVersion: input.localVersion,
     updatedServers: input.servers.filter(({ outcome }) => outcome.status === "updated").length,
     updatedProviders: input.providers.filter((outcome) => outcome.status === "updated").length,
     restarting: [],
     failures: [
-      ...input.localFailures.map((failure) => `This app: ${failure}`),
+      ...input.localFailures.map((failure) => t(($) => $.updates.localFailure, { error: failure })),
       ...input.servers.flatMap(({ label, outcome }) =>
         outcome.status === "failed" ? [`${label}: ${outcome.message}`] : [],
       ),
@@ -550,33 +610,42 @@ export function collectUpdateEverythingResult(input: {
 export function getUpdateEverythingToastView(
   result: UpdateEverythingResult,
   appVersion: string,
+  t: TFunction<"workspace">,
 ): {
   readonly type: "success" | "error";
   readonly title: string;
   readonly description?: string;
 } | null {
   const parts = [
-    result.localVersion !== null && result.localVersion === appVersion ? "this app" : null,
-    countLabel(result.updatedServers, "server"),
-    countLabel(result.updatedProviders, "provider"),
+    result.localVersion !== null && result.localVersion === appVersion
+      ? t(($) => $.updates.thisAppLabel)
+      : null,
+    countLabel(result.updatedServers, "server", t),
+    countLabel(result.updatedProviders, "provider", t),
   ].filter((part) => part !== null);
   const restarting =
     result.restarting.length === 0
       ? []
       : [
-          `${joinList(result.restarting)} ${result.restarting.length === 1 ? "is" : "are"} still restarting.`,
+          t(($) => $.updates.stillRestarting, {
+            machines: joinList(result.restarting, t),
+            count: result.restarting.length,
+          }),
         ];
   if (result.failures.length === 0) {
     if (parts.length === 0) return null;
     return {
       type: "success",
-      title: `Updated ${joinList(parts)}`,
+      title: t(($) => $.updates.updatedParts, { parts: joinList(parts, t) }),
       ...(restarting.length === 0 ? {} : { description: restarting.join("\n") }),
     };
   }
   return {
     type: "error",
-    title: parts.length === 0 ? "Update failed" : `Updated ${joinList(parts)}`,
+    title:
+      parts.length === 0
+        ? t(($) => $.updates.updateFailed)
+        : t(($) => $.updates.updatedParts, { parts: joinList(parts, t) }),
     description: [...result.failures, ...restarting].join("\n"),
   };
 }
@@ -607,17 +676,34 @@ export interface UpdateEverythingRow {
   readonly providers: ReadonlyArray<string>;
 }
 
-function countLabel(count: number, noun: string): string | null {
-  return count === 0 ? null : `${count} ${noun}${count === 1 ? "" : "s"}`;
+function countLabel(
+  count: number,
+  noun: "server" | "provider",
+  t: TFunction<"workspace">,
+): string | null {
+  return count === 0
+    ? null
+    : noun === "server"
+      ? t(($) => $.updates.servers, { count })
+      : t(($) => $.updates.providers, { count });
 }
 
-function joinList(parts: ReadonlyArray<string>): string {
-  if (parts.length <= 2) return parts.join(" and ");
-  return `${parts.slice(0, -1).join(", ")}, and ${parts.at(-1)}`;
+function joinList(parts: ReadonlyArray<string>, t: TFunction<"workspace">): string {
+  const first = parts[0];
+  if (first === undefined) return "";
+  if (parts.length === 1) return first;
+  const last = parts.at(-1);
+  if (last === undefined) throw new Error("An update list requires a last item.");
+  return parts.length === 2
+    ? t(($) => $.updates.listTwo, { first, last })
+    : t(($) => $.updates.listMany, { head: parts.slice(0, -1).join(", "), last });
 }
 
 /** One row per machine: this app's machines first, then servers, provider-only, and skipped. */
-export function describeUpdateEverything(plan: UpdateEverythingPlan): {
+export function describeUpdateEverything(
+  plan: UpdateEverythingPlan,
+  t: TFunction<"workspace">,
+): {
   readonly summary: string;
   readonly version: string | null;
   readonly providerCount: number;
@@ -627,13 +713,16 @@ export function describeUpdateEverything(plan: UpdateEverythingPlan): {
     (count, machine) => count + machine.providers.length,
     0,
   );
-  const summary = `Update ${joinList(
-    [
-      plan.localVersion ? "this app" : null,
-      countLabel(plan.servers.length, "server"),
-      countLabel(providerCount, "provider"),
-    ].filter((part) => part !== null),
-  )}`;
+  const summary = t(($) => $.updates.updateParts, {
+    parts: joinList(
+      [
+        plan.localVersion ? t(($) => $.updates.thisAppLabel) : null,
+        countLabel(plan.servers.length, "server", t),
+        countLabel(providerCount, "provider", t),
+      ].filter((part) => part !== null),
+      t,
+    ),
+  });
 
   const rows = new Map<EnvironmentId | null, UpdateEverythingRow>();
   const update = (
@@ -651,7 +740,12 @@ export function describeUpdateEverything(plan: UpdateEverythingPlan): {
     rows.set(environmentId, { ...row, ...change });
   };
   if (plan.localVersion) {
-    if (plan.localMachines.length === 0) update(null, "This app", { app: "this-app" });
+    if (plan.localMachines.length === 0)
+      update(
+        null,
+        t(($) => $.updates.thisApp),
+        { app: "this-app" },
+      );
     for (const machine of plan.localMachines) {
       update(machine.environmentId, machine.label, { app: "this-app" });
     }

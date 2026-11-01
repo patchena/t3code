@@ -1,10 +1,11 @@
 import { EnvironmentId, ProjectId, SourceControlProviderKind } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 
 import type { EnvironmentProject } from "./models.ts";
 import { chooseLoadBalancedEnvironment } from "../load-balancing.ts";
 import {
-  buildProjectGroups,
+  buildProjectGroups as groupProjects,
   deriveLogicalProjectKeyFromSettings,
   pickableProjectGroups,
   derivePhysicalProjectKey,
@@ -14,6 +15,10 @@ import {
 } from "./projectGrouping.ts";
 
 const environmentId = EnvironmentId.make("environment");
+
+function buildProjectGroups(input: Parameters<typeof groupProjects>[0]) {
+  return groupProjects(input, createI18n("en").getFixedT(null, "common"));
+}
 
 describe("load balancing shared project machines", () => {
   const now = 100_000;

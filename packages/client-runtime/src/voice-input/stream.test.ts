@@ -1,6 +1,7 @@
 import { DEFAULT_SPEECH_TRANSCRIPTION_OPTIONS } from "@t3tools/contracts";
 import { expect, it, vi } from "vite-plus/test";
 import { SPEECH_STREAM_MAX_QUEUED_BYTES, type SpeechStreamEvent } from "@t3tools/contracts";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { openSpeechStream } from "./stream.ts";
 
 class TestSocket extends EventTarget {
@@ -30,6 +31,7 @@ function connect(bufferedAudio?: Float32Array, canSend = () => true) {
     canSend,
     onText,
     onError,
+    t: createI18n("en").getFixedT("en", "voice"),
     createSocket: () => socket as unknown as WebSocket,
   });
   socket.dispatchEvent(new Event("open"));

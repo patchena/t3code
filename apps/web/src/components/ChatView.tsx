@@ -1,5 +1,6 @@
 import { ChildThreadApprovals } from "./chat/ChildThreadApprovals";
 import { workspaceAreaProps } from "../lib/workspaceFocus";
+import { useTranslation } from "react-i18next";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { resolveNewThreadModelSelection } from "@t3tools/shared/usageLimits";
 import { queuedRunEditBlockedReason } from "@t3tools/client-runtime/queued-run-edit";
@@ -112,7 +113,7 @@ import { formatModelSlugName, resolveSelectableModel } from "@t3tools/shared/mod
 import { projectScriptCwd, resolveProjectScripts } from "@t3tools/shared/projectScripts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { resolveThreadReferenceCopyTarget } from "@t3tools/client-runtime/thread-reference";
-import { resolveTerminalSessionLabel } from "@t3tools/shared/terminalLabels";
+import { resolveTerminalSessionLabel } from "~/terminalLabels";
 import { useAtomValue } from "@effect/atom-react";
 import { type SetStateAction, use, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BackgroundThreadContext } from "./chat/backgroundThread";
@@ -415,7 +416,11 @@ type ChatViewProps =
 
 const DismissedFallbackWindowSchema = Schema.NullOr(Schema.String);
 
-export default function ChatView(props: ChatViewProps) {
+export function ChatView(props: ChatViewProps) {
+  const { t: tCommon } = useTranslation("common");
+  const { t: tChat } = useTranslation("chat");
+  const { t: tActivity } = useTranslation("activity");
+  const { t: tTools } = useTranslation("tools");
   const {
     environmentId,
     threadId,
@@ -629,8 +634,8 @@ export default function ChatView(props: ChatViewProps) {
     if (!inserted) {
       toastManager.add({
         type: "warning",
-        title: "The composer is not ready",
-        description: "Try citing the selection after the connection or pending input is resolved.",
+        title: tCommon(($) => $.chat.composerNotReady),
+        description: tCommon(($) => $.chat.selectionUnavailable),
       });
     }
     return inserted;
@@ -711,8 +716,16 @@ export default function ChatView(props: ChatViewProps) {
     setPendingServerThreadStartFromOriginByThreadId,
   ] = useState<Record<string, boolean>>({});
   const legendListRef = useRef<LegendListRef | null>(null);
-  const conversationArea = workspaceAreaProps("conversation", 1, "Conversation");
-  const composerArea = workspaceAreaProps("composer", 2, "Message input");
+  const conversationArea = workspaceAreaProps(
+    "conversation",
+    1,
+    tCommon(($) => $.chat.conversation),
+  );
+  const composerArea = workspaceAreaProps(
+    "composer",
+    2,
+    tCommon(($) => $.chat.messageInput),
+  );
   const [composerOverlayElement, setComposerOverlayElement] = useState<HTMLDivElement | null>(null);
   const [composerTimelineInset, setComposerTimelineInset] = useState(0);
   const composerTimelineInsetRef = useRef(0);
@@ -871,7 +884,7 @@ export default function ChatView(props: ChatViewProps) {
   const sideChatParent = useQuietThreadShell(sideChatParentRef);
   const parentThreadLink = (() => {
     if (sideChatParentRef !== null) {
-      const title = sideChatParent?.title ?? "Parent thread";
+      const title = sideChatParent?.title ?? tCommon(($) => $.chat.parentThread);
       // Embedded, the parent is the view around it.
       if (embedded) return { title, sideChat: true };
       return {
@@ -887,7 +900,7 @@ export default function ChatView(props: ChatViewProps) {
     }
     if (parentSubagentThreadRef !== null) {
       return {
-        title: parentSubagentThread?.title ?? "Parent thread",
+        title: parentSubagentThread?.title ?? tCommon(($) => $.chat.parentThread),
         open: (): void => {
           void navigate({
             to: "/$environmentId/$threadId",
@@ -920,7 +933,7 @@ export default function ChatView(props: ChatViewProps) {
       ? null
       : {
           threadId: parentSubagentThreadRef.threadId,
-          title: parentSubagentThread?.title ?? "Parent thread",
+          title: parentSubagentThread?.title ?? tCommon(($) => $.chat.parentThread),
         };
   const threadError = isServerThread
     ? (localServerError ?? serverRuntime?.lastError ?? null)
@@ -973,7 +986,7 @@ export default function ChatView(props: ChatViewProps) {
     for (const session of activeThreadKnownSessions) {
       labels.set(
         session.target.terminalId,
-        resolveTerminalSessionLabel(session.target.terminalId, session.state.summary),
+        resolveTerminalSessionLabel(session.target.terminalId, session.state.summary, tTools),
       );
     }
     return labels;
@@ -1478,17 +1491,20 @@ export default function ChatView(props: ChatViewProps) {
   const downloadFileAttachment = async (attachment: ChatFileAttachment) => {
     const connection = readPreparedConnection(environmentId);
     if (!connection) {
-      toastManager.add({ type: "error", title: "The environment is not connected." });
+      toastManager.add({ type: "error", title: tCommon(($) => $.chat.notConnected) });
       return;
     }
 
     try {
-      const url = await resolveFileAttachmentUrl({
-        attachment,
-        environmentId,
-        httpBaseUrl: connection.httpBaseUrl,
-        createAssetUrl: createAttachmentAssetUrl,
-      });
+      const url = await resolveFileAttachmentUrl(
+        {
+          attachment,
+          environmentId,
+          httpBaseUrl: connection.httpBaseUrl,
+          createAssetUrl: createAttachmentAssetUrl,
+        },
+        tChat,
+      );
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = attachment.name;
@@ -1496,8 +1512,9 @@ export default function ChatView(props: ChatViewProps) {
     } catch (error) {
       toastManager.add({
         type: "error",
-        title: "Could not download " + attachment.name,
-        description: error instanceof Error ? error.message : "The attachment is unavailable.",
+        title: tCommon(($) => $.chat.attachmentDownloadFailed, { name: attachment.name }),
+        description:
+          error instanceof Error ? error.message : tCommon(($) => $.chat.attachmentUnavailable),
       });
     }
   };
@@ -1857,8 +1874,8 @@ export default function ChatView(props: ChatViewProps) {
     if (prompt !== null && !composer.insertTextAtEnd(prompt, { ensureLeadingBoundary: true })) {
       toastManager.add({
         type: "error",
-        title: "Unable to add to chat",
-        description: "The composer is busy; try again once it is ready.",
+        title: tCommon(($) => $.chat.unableAdd),
+        description: tCommon(($) => $.chat.busy),
       });
       return;
     }
@@ -1867,7 +1884,7 @@ export default function ChatView(props: ChatViewProps) {
   const insertArtifactTemplateStable = useStableCallback(insertArtifactTemplate);
   const sendAppMessage = async (text: string) => {
     if (!isServerThread || activeThreadId === null) {
-      throw new Error("Messages from apps need a started thread.");
+      throw new Error(tCommon(($) => $.chat.threadRequired));
     }
     const result = await startThreadTurn({
       environmentId,
@@ -2337,7 +2354,7 @@ export default function ChatView(props: ChatViewProps) {
         });
   const copyActiveThreadReference = () => {
     if (activeThreadReferenceCopyTarget === null) return;
-    void copyThreadReference(activeThreadReferenceCopyTarget);
+    void copyThreadReference(activeThreadReferenceCopyTarget, tCommon);
   };
   const pullRequestPanelTarget = activeThread
     ? threadPullRequestPanelTarget({
@@ -2483,12 +2500,12 @@ export default function ChatView(props: ChatViewProps) {
   const compactDisabled = compactThreadUnavailable;
   const compactDisabledReason = compactDisabled
     ? !canOperateThread
-      ? "This connection cannot change threads."
+      ? tCommon(($) => $.chat.readOnly)
       : !activeProject
-        ? "Choose a project before compacting"
+        ? tCommon(($) => $.chat.chooseProjectCompacting)
         : !manualCompactionProviderAvailable
-          ? "Compaction is unavailable for this provider"
-          : "Compacting is unavailable right now"
+          ? tCommon(($) => $.chat.unsupportedCompacting)
+          : tCommon(($) => $.chat.compactingUnavailable)
     : null;
   const resumeCompactionTokens =
     activeContextWindow &&
@@ -2542,36 +2559,44 @@ export default function ChatView(props: ChatViewProps) {
   };
   const handleRestoreThreadBranchStable = useStableCallback(handleRestoreThreadBranch);
   const feedbackBannerItems = feedbackSubmissions.flatMap((submission) => {
-    const item = feedbackBannerItem(submission, () => {
-      setFeedbackSubmissionsByThreadKey((current) => ({
-        ...current,
-        [routeThreadKey]: (current[routeThreadKey] ?? []).filter(
-          (entry) => entry.id !== submission.id,
-        ),
-      }));
-    });
+    const item = feedbackBannerItem(
+      submission,
+      () => {
+        setFeedbackSubmissionsByThreadKey((current) => ({
+          ...current,
+          [routeThreadKey]: (current[routeThreadKey] ?? []).filter(
+            (entry) => entry.id !== submission.id,
+          ),
+        }));
+      },
+      tChat,
+    );
     return item ? [item] : [];
   });
   const limitRecoveryBanner =
     limitRecoveryRun !== null && activeThreadShell !== null
-      ? usageLimitRecoveryBannerItem({
-          runId: limitRecoveryRun.runId,
-          errorCode: serverRuntime?.lastErrorCode ?? null,
-          resetAt: serverRuntime?.usageLimitResetAt ?? null,
-          stoppedAt: limitRecoveryRun.completedAt ?? activeThreadShell.updatedAt,
-          settled: activeThreadShell.settledOverride === "settled",
-          requestPending: pendingApprovals.length > 0 || pendingUserInputs.length > 0,
-          recovery: activeThreadShell.limitRecovery ?? null,
-          snoozedUntil: activeThreadShell.snoozedUntil,
-          timestampFormat,
-          onChange: async (limitRecovery) => {
-            const result = await updateThreadMetadata({
-              environmentId,
-              input: { threadId: activeThreadShell.id, limitRecovery },
-            });
-            if (result._tag === "Failure") throw squashAtomCommandFailure(result);
+      ? usageLimitRecoveryBannerItem(
+          {
+            runId: limitRecoveryRun.runId,
+            errorCode: serverRuntime?.lastErrorCode ?? null,
+            resetAt: serverRuntime?.usageLimitResetAt ?? null,
+            stoppedAt: limitRecoveryRun.completedAt ?? activeThreadShell.updatedAt,
+            settled: activeThreadShell.settledOverride === "settled",
+            requestPending: pendingApprovals.length > 0 || pendingUserInputs.length > 0,
+            recovery: activeThreadShell.limitRecovery ?? null,
+            snoozedUntil: activeThreadShell.snoozedUntil,
+            timestampFormat,
+            onChange: async (limitRecovery) => {
+              const result = await updateThreadMetadata({
+                environmentId,
+                input: { threadId: activeThreadShell.id, limitRecovery },
+              });
+              if (result._tag === "Failure") throw squashAtomCommandFailure(result);
+            },
           },
-        })
+          tChat,
+          tCommon,
+        )
       : null;
   const composerBannerItems = (() => {
     const fallbackSelection = draftFallback?.selection;
@@ -2601,22 +2626,26 @@ export default function ChatView(props: ChatViewProps) {
       defaultSelection &&
       fallbackWindow !== dismissedFallbackWindow
         ? [
-            modelFallbackBannerItem({
-              fallbackModelName:
-                providerStatuses
-                  .find((provider) => provider.instanceId === fallbackSelection.instanceId)
-                  ?.models.find((model) => model.slug === fallbackSelection.model)?.name ??
-                fallbackSelection.model,
-              defaultProviderName: fallback.provider.displayName ?? fallback.provider.driver,
-              defaultModelName:
-                fallback.provider.models.find((model) => model.slug === defaultSelection.model)
-                  ?.name ?? defaultSelection.model,
-              resetsAt: fallback.resetsAt,
-              timestampFormat,
-              onUseDefault: () =>
-                onProviderModelSelectStable(defaultSelection.instanceId, defaultSelection.model),
-              onDismiss: () => setDismissedFallbackWindow(fallbackWindow),
-            }),
+            modelFallbackBannerItem(
+              {
+                fallbackModelName:
+                  providerStatuses
+                    .find((provider) => provider.instanceId === fallbackSelection.instanceId)
+                    ?.models.find((model) => model.slug === fallbackSelection.model)?.name ??
+                  fallbackSelection.model,
+                defaultProviderName: fallback.provider.displayName ?? fallback.provider.driver,
+                defaultModelName:
+                  fallback.provider.models.find((model) => model.slug === defaultSelection.model)
+                    ?.name ?? defaultSelection.model,
+                resetsAt: fallback.resetsAt,
+                timestampFormat,
+                onUseDefault: () =>
+                  onProviderModelSelectStable(defaultSelection.instanceId, defaultSelection.model),
+                onDismiss: () => setDismissedFallbackWindow(fallbackWindow),
+              },
+              tChat,
+              tCommon,
+            ),
           ]
         : [];
     const limitRecoveryItems = limitRecoveryBanner === null ? [] : [limitRecoveryBanner];
@@ -2629,7 +2658,7 @@ export default function ChatView(props: ChatViewProps) {
     // An approval's feedback goes to that approval; the armed session waits for the next message.
     const freshSessionItems =
       freshSessionAvailable && freshSessionArmed && activePendingApproval === null
-        ? [freshSessionBannerItem(() => disarmFreshSession(routeThreadKey))]
+        ? [freshSessionBannerItem(() => disarmFreshSession(routeThreadKey), tChat)]
         : [];
     if (!localCheckoutBranchMismatch || !showBranchMismatchBanner || !activeBranchMismatchKey) {
       return [
@@ -2652,17 +2681,20 @@ export default function ChatView(props: ChatViewProps) {
       ...projectCloneItems,
       ...freshSessionItems,
       ...systemComposerBannerItems,
-      branchMismatchBannerItem({
-        mismatchKey: activeBranchMismatchKey,
-        mismatch: localCheckoutBranchMismatch,
-        restoreDisabled: !canWriteSourceControl || isRestoringThreadBranch,
-        restoring: isRestoringThreadBranch,
-        onRestore: handleRestoreThreadBranchStable,
-        onDismiss: () => {
-          dismissBranchMismatchForSession(activeBranchMismatchKey);
-          setBranchMismatchDismissTick((tick) => tick + 1);
+      branchMismatchBannerItem(
+        {
+          mismatchKey: activeBranchMismatchKey,
+          mismatch: localCheckoutBranchMismatch,
+          restoreDisabled: !canWriteSourceControl || isRestoringThreadBranch,
+          restoring: isRestoringThreadBranch,
+          onRestore: handleRestoreThreadBranchStable,
+          onDismiss: () => {
+            dismissBranchMismatchForSession(activeBranchMismatchKey);
+            setBranchMismatchDismissTick((tick) => tick + 1);
+          },
         },
-      }),
+        tActivity,
+      ),
     ];
   })() as ComposerBannerStackItem[];
 
@@ -2806,21 +2838,21 @@ export default function ChatView(props: ChatViewProps) {
   // Main-thread surfaces show this reason; `/side` sent anyway gets it as a toast.
   const sideChatDisabledReason =
     activeThread?.lineage.sideChat === true
-      ? "Side chats cannot start side chats."
+      ? tCommon(($) => $.chat.noNestedSideChat)
       : isSubagentThread
-        ? "Subagent threads cannot start side chats."
+        ? tCommon(($) => $.chat.noSubagentSideChat)
         : serverConfig === null
-          ? "Side chats are not ready yet. Try again in a moment."
+          ? tCommon(($) => $.chat.sideChatPending)
           : serverConfig.environment.capabilities.sideChats !== true
-            ? "Update this environment's T3 Code server to use side chats."
+            ? tCommon(($) => $.chat.updateSideChatServer)
             : sideChatsOffered && !isServerThread
-              ? "Side chats start after the first message."
+              ? tCommon(($) => $.chat.firstMessageSideChat)
               : sideChat.available &&
                   orchestrationV2WorktreePending(
                     activeThread?.worktreePath ?? null,
                     serverProjection?.runs ?? [],
                   )
-                ? "Available once the thread's worktree is set up."
+                ? tCommon(($) => $.chat.worktreeSideChat)
                 : null;
   const openSideChatStable = useStableCallback(() => void sideChat.open());
   const sendSideChatStable = useStableCallback((prompt: string) => sideChat.open(prompt));
@@ -3652,17 +3684,17 @@ export default function ChatView(props: ChatViewProps) {
                                 isRevertingCheckpoint={isRevertingCheckpoint}
                                 sendDisabledReason={
                                   !canOperateThread
-                                    ? "This connection cannot change threads."
+                                    ? tCommon(($) => $.chat.readOnly)
                                     : isEnvironmentChanging
-                                      ? "Preparing machine"
+                                      ? tCommon(($) => $.chat.preparingMachine)
                                       : isRevertingCheckpoint
-                                        ? "Rewinding conversation"
+                                        ? tCommon(($) => $.chat.rewinding)
                                         : feedbackUploading
-                                          ? "Sending feedback"
+                                          ? tCommon(($) => $.chat.sendingFeedback)
                                           : threadDetailLoading
-                                            ? "Messages loading"
+                                            ? tCommon(($) => $.chat.messagesLoading)
                                             : worktreeSetupBlocksSend
-                                              ? "Preparing worktree"
+                                              ? tCommon(($) => $.chat.preparingWorktree)
                                               : projectCloneSendBlockReason
                                 }
                                 isPreparingWorktree={isPreparingWorktree && !sendQueuesBehindSetup}

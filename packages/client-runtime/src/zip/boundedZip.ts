@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { checkZipDirectory } from "./zipDirectory.ts";
+import { checkZipDirectory, ZipValidationError } from "./zipDirectory.ts";
 
 export const ARCHIVE_MAX_BYTES = 50 * 1024 * 1024;
 export const ARCHIVE_ENTRY_MAX_BYTES = 10 * 1024 * 1024;
@@ -17,12 +17,18 @@ export async function boundedZip(
   } = {},
 ) {
   if (bytes.byteLength > ARCHIVE_MAX_BYTES)
-    throw new Error("Preview limited to files under 50 MB.");
+    throw new ZipValidationError({
+      message: "Preview limited to files under 50 MB.",
+      kind: "file-limit",
+    });
   checkZipDirectory(bytes, ARCHIVE_MAX_ENTRIES);
   const zip = await JSZip.loadAsync(bytes);
   const entries = Object.values(zip.files);
   if (entries.length > ARCHIVE_MAX_ENTRIES)
-    throw new Error("This archive contains more than 2,048 entries.");
+    throw new ZipValidationError({
+      message: "This archive contains more than 2,048 entries.",
+      kind: "entry-limit",
+    });
   const files = new Map<
     string,
     { bytes: Uint8Array<ArrayBuffer>; date: Date; directory: boolean }
@@ -30,7 +36,11 @@ export async function boundedZip(
   let total = 0;
   let markup = 0;
   for (const entry of entries) {
-    if (entry.name.length > 1024) throw new Error("An archive path is too long to preview.");
+    if (entry.name.length > 1024)
+      throw new ZipValidationError({
+        message: "An archive path is too long to preview.",
+        kind: "path-limit",
+      });
     const chunks: Uint8Array<ArrayBuffer>[] = [];
     let length = 0;
     await new Promise<void>((resolve, reject) => {
@@ -56,9 +66,11 @@ export async function boundedZip(
           ) {
             stream.pause();
             reject(
-              new Error(
-                "The expanded archive exceeds the preview size or compression ratio limit.",
-              ),
+              new ZipValidationError({
+                message:
+                  "The expanded archive exceeds the preview size or compression ratio limit.",
+                kind: "expanded-limit",
+              }),
             );
           } else chunks.push(chunk);
         })

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import { render } from "../../../test/render";
-import { DiffFileLoadingBoundary } from "./DiffFileLoadingBoundary";
+import { DiffFileLoadingBoundary } from "~/components/diffs/DiffFileLoadingBoundary";
 
 function stubIntersectionObserver() {
   let observeCount = 0;

@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { EnvironmentId } from "@t3tools/contracts";
 
 export type ReadyAttachmentUpload = {
@@ -23,11 +24,14 @@ export type AttachmentUploadState =
       readonly previous?: ReadyAttachmentUpload;
     };
 
-export function attachmentUploadBlockReason(input: {
-  readonly imageIds: ReadonlyArray<string>;
-  readonly uploadsByImageId: Readonly<Record<string, AttachmentUploadState>>;
-  readonly environmentId: EnvironmentId;
-}): string | null {
+export function attachmentUploadBlockReason(
+  input: {
+    readonly imageIds: ReadonlyArray<string>;
+    readonly uploadsByImageId: Readonly<Record<string, AttachmentUploadState>>;
+    readonly environmentId: EnvironmentId;
+  },
+  t: TFunction<"chat">,
+): string | null {
   let pending = 0;
 
   for (const imageId of input.imageIds) {
@@ -40,7 +44,7 @@ export function attachmentUploadBlockReason(input: {
   }
 
   if (pending > 0) {
-    return pending === 1 ? "Attachment still uploading" : "Attachments still uploading";
+    return t(($) => $.composer.attachmentUploading, { count: pending });
   }
   return null;
 }

@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { readLocalApi } from "~/localApi";
 
 let pendingConfirmations = 0;
@@ -8,25 +9,17 @@ export function isTerminalCloseConfirmPending(): boolean {
 
 export async function confirmTerminalClose(
   labels: readonly [string, ...string[]],
+  t: TFunction<"tools">,
 ): Promise<boolean> {
   const localApi = readLocalApi();
   if (!localApi) return true;
+  const message = t(($) => $.terminalConfirm, {
+    count: labels.length,
+    names: labels.length === 1 ? labels[0] : labels.map((label) => `"${label}"`).join(", "),
+  });
   pendingConfirmations += 1;
   try {
-    return await localApi.dialogs.confirm(
-      labels.length === 1
-        ? [
-            `Close terminal "${labels[0]}"?`,
-            "This stops the running process and clears its history.",
-          ].join("\n")
-        : [
-            `Close ${labels.length} terminals?`,
-            `This stops their running processes and clears their histories: ${labels
-              .map((label) => `"${label}"`)
-              .join(", ")}.`,
-          ].join("\n"),
-      { variant: "destructive" },
-    );
+    return await localApi.dialogs.confirm(message, { variant: "destructive" });
   } catch {
     return false;
   } finally {

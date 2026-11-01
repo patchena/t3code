@@ -1,4 +1,5 @@
 import { Check, Copy } from "lucide";
+import { useTranslation } from "react-i18next";
 
 import { MorphIcon } from "~/components/MorphIcon";
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
@@ -15,6 +16,7 @@ export function CommandBlock({
   readonly className?: string;
   readonly prominent?: boolean;
 }) {
+  const { t } = useTranslation("chat");
   const { copyToClipboard, isCopied } = useCopyToClipboard({
     timeout: 1500,
     target: "command",
@@ -34,7 +36,7 @@ export function CommandBlock({
       <Button
         size="icon-xs"
         variant="ghost"
-        aria-label="Copy command"
+        aria-label={t(($) => $.terminal.copyCommand)}
         onClick={() => copyToClipboard(command, undefined)}
       >
         <MorphIcon className="size-3.5" icon={isCopied ? Check : Copy} />

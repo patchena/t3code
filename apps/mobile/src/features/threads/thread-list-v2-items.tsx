@@ -1,4 +1,5 @@
 import * as Dialog from "../../components/ui/Dialog";
+import { mobileI18n } from "~/i18n";
 import type { ThreadRowProviderInstance } from "./thread-provider-instance";
 import {
   THREAD_LIST_V2_MONO_FONT as MONO_FONT,
@@ -144,7 +145,7 @@ function ThreadListV2Duration(props: { readonly startedAt: string | null }) {
   const startedAtMs = Date.parse(props.startedAt ?? "");
   const nowMs = useVisibleSecondClock(Number.isFinite(startedAtMs));
   if (!Number.isFinite(startedAtMs)) return null;
-  return ` ${formatWorkingDurationLabel(nowMs - startedAtMs)}`;
+  return ` ${formatWorkingDurationLabel(nowMs - startedAtMs, mobileI18n.getFixedT(null, "common"))}`;
 }
 
 const CARD_MENU_ACTIONS: MenuAction[] = [

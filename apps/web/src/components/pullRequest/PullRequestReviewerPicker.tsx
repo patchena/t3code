@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
 import { useAtomCommand } from "~/state/use-atom-command";
 import type {
   EnvironmentId,
@@ -17,20 +19,19 @@ import { useEnvironmentQuery } from "~/state/query";
 import { useDebouncedValue } from "~/state/queries";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 
-import { toastManager } from "../ui/toast";
-import { PullRequestCandidatePicker } from "./PullRequestCandidatePicker";
-import { PullRequestActorLabel } from "./pullRequestPresentation";
-import { readableFailure } from "./pullRequestDetail.logic";
+import { toastManager } from "~/components/ui/toast";
+import { PullRequestCandidatePicker } from "~/components/pullRequest/PullRequestCandidatePicker";
+import { PullRequestActorLabel } from "~/components/pullRequest/pullRequestPresentation";
+import { readableFailure } from "~/components/pullRequest/pullRequestDetail.logic";
 
-const TRUNCATED_LABELS: Record<ReviewerTruncation, (error: string | null) => string> = {
-  unsearchable: () =>
-    "This repository has more people with access than are listed here. Ask for the rest on the host.",
-  searchable: () =>
-    "This repository has more people with access than are listed here. Search to find them.",
-  "search-failed": (error) =>
-    `Only the people already listed are matched: the host search failed. ${error ?? ""}`,
-  "search-truncated": () =>
-    "More people match than the host returned. Keep typing to narrow it down.",
+const TRUNCATED_LABELS: Record<
+  ReviewerTruncation,
+  (t: TFunction<"workspace">, error: string | null) => string
+> = {
+  unsearchable: (t) => t(($) => $.git.peopleTruncated),
+  searchable: (t) => t(($) => $.git.peopleTruncatedSearchable),
+  "search-failed": (t, error) => t(($) => $.git.peopleSearchFailed, { error: error ?? "" }),
+  "search-truncated": (t) => t(($) => $.git.peopleSearchTruncated),
 };
 
 export function PullRequestReviewerPicker({
@@ -44,6 +45,7 @@ export function PullRequestReviewerPicker({
   allowed: boolean;
   searchable: boolean;
 }) {
+  const { t } = useTranslation("workspace");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<string | null>(null);
@@ -88,11 +90,11 @@ export function PullRequestReviewerPicker({
       toastManager.add({
         type: "error",
         title: candidate.isRequested
-          ? `Could not take back the review request to ${candidate.login}`
-          : `Could not ask ${candidate.login} for a review`,
+          ? t(($) => $.git.withdrawReviewFailed, { login: candidate.login })
+          : t(($) => $.git.requestReviewFailed, { login: candidate.login }),
         description: readableFailure(
           squashAtomCommandFailure(result),
-          "The host refused it. Check that you have write access on this repository, and that they still have access to it.",
+          t(($) => $.git.reviewerAccessRequired),
         ),
       });
       return;
@@ -103,22 +105,22 @@ export function PullRequestReviewerPicker({
     toastManager.add({
       type: "success",
       title: candidate.isRequested
-        ? `Review request to ${candidate.login} taken back`
-        : `Review requested from ${candidate.login}`,
+        ? t(($) => $.git.reviewWithdrawn, { login: candidate.login })
+        : t(($) => $.git.reviewRequestedFrom, { login: candidate.login }),
     });
   };
 
   return (
     <PullRequestCandidatePicker
       icon={<UserPlusIcon className="size-3.5" />}
-      label="Request a review"
+      label={t(($) => $.git.requestReview)}
       allowed={allowed}
-      disabledReason="Asking someone to review needs write access on this repository"
+      disabledReason={t(($) => $.git.reviewerWriteRequired)}
       open={open}
       onOpenChange={setOpen}
       query={query}
       onQueryChange={setQuery}
-      searchLabel="Search people with access"
+      searchLabel={t(($) => $.git.searchPeopleAccess)}
       isPending={(candidatesQuery.isPending && candidatesQuery.data === null) || searchPending}
       error={
         candidatesQuery.data === null
@@ -128,11 +130,11 @@ export function PullRequestReviewerPicker({
             : null
       }
       candidates={candidates}
-      emptyLabel="Nobody else has access to this repository."
-      noMatchLabel="Nobody with access matches that."
-      errorLabel="The people with access could not be read."
+      emptyLabel={t(($) => $.git.noOtherPeopleAccess)}
+      noMatchLabel={t(($) => $.git.noMatchingPeople)}
+      errorLabel={t(($) => $.git.peopleReadFailed)}
       truncated={truncation !== null}
-      truncatedLabel={truncation === null ? "" : TRUNCATED_LABELS[truncation](searchError)}
+      truncatedLabel={truncation === null ? "" : TRUNCATED_LABELS[truncation](t, searchError)}
       candidateKey={(candidate) => `${candidate.kind}:${candidate.id}`}
       disabled={pending !== null}
       onSelect={(candidate) => void toggle(candidate)}
@@ -141,10 +143,10 @@ export function PullRequestReviewerPicker({
         <>
           <PullRequestActorLabel actor={candidate} className="flex-1" />
           {candidate.kind === "team" ? (
-            <span className="shrink-0 text-muted-foreground">team</span>
+            <span className="shrink-0 text-muted-foreground">{t(($) => $.git.team)}</span>
           ) : null}
           {candidate.isRequested ? (
-            <CheckIcon aria-label="Already asked" className="size-3.5 shrink-0" />
+            <CheckIcon aria-label={t(($) => $.git.alreadyAsked)} className="size-3.5 shrink-0" />
           ) : null}
         </>
       )}

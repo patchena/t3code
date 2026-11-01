@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 
 import {
   resetVoiceInputGlobalsForTests,
@@ -63,6 +64,7 @@ function createHarness(
   const commits: Array<{ text: string; selection: { start: number; end: number } }> = [];
   const deleted: string[] = [];
   const dependencies: VoiceInputControllerDependencies = {
+    t: createI18n("en").getFixedT("en", "voice"),
     recorder,
     getTranscriber: () => ({ prepare: async () => preparedTranscription() }),
     requestPermission: async () => ({ granted: true, canAskAgain: true }),

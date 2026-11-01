@@ -1,3 +1,5 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { useTranslation } from "react-i18next";
 import {
   type ProviderApprovalDecision,
   type ProviderApprovalOption,
@@ -23,12 +25,14 @@ interface ComposerPendingApprovalActionsProps {
   ) => Promise<unknown>;
 }
 
-const DEFAULT_APPROVAL_OPTIONS = [
-  { decision: "cancel", label: "Cancel" },
-  { decision: "decline", label: "Decline" },
-  { decision: "acceptForSession", label: "Always allow this session" },
-  { decision: "accept", label: "Approve" },
-] satisfies ReadonlyArray<ProviderApprovalOption>;
+function defaultApprovalOptions(t: TFunction<"chat">): ReadonlyArray<ProviderApprovalOption> {
+  return [
+    { decision: "cancel", label: t(($) => $.composer.cancel) },
+    { decision: "decline", label: t(($) => $.composer.decline) },
+    { decision: "acceptForSession", label: t(($) => $.composer.allowSession) },
+    { decision: "accept", label: t(($) => $.composer.approve) },
+  ] satisfies ReadonlyArray<ProviderApprovalOption>;
+}
 
 export const ComposerPendingApprovalActions = memo(function ComposerPendingApprovalActions({
   presentation = "composer",
@@ -36,9 +40,11 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
   isResponding,
   canRespond,
   disabled = false,
-  options = DEFAULT_APPROVAL_OPTIONS,
+  options: suppliedOptions,
   onRespondToApproval,
 }: ComposerPendingApprovalActionsProps) {
+  const { t } = useTranslation("chat");
+  const options = suppliedOptions ?? defaultApprovalOptions(t);
   const primaryOptions = options.filter(
     (option) => option.decision === "decline" || option.decision === "accept",
   );
@@ -100,13 +106,17 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
             disabled={disabled || isResponding || !canRespond}
             render={
               presentation === "inline" ? (
-                <InlineButton tone="muted" aria-label="More approval options" />
+                <InlineButton tone="muted" aria-label={t(($) => $.composer.moreApprovalOptions)} />
               ) : (
-                <Button size="icon-xs" variant="outline" aria-label="More approval options" />
+                <Button
+                  size="icon-xs"
+                  variant="outline"
+                  aria-label={t(($) => $.composer.moreApprovalOptions)}
+                />
               )
             }
           >
-            {presentation === "inline" ? "More" : <EllipsisIcon />}
+            {presentation === "inline" ? t(($) => $.composer.more) : <EllipsisIcon />}
           </MenuTrigger>
           <MenuPopup {...composerFloatingLayerProps} side="top" align="end" width="content">
             {moreOptions.map((option) => {

@@ -1,3 +1,4 @@
+import { FileWorkerError } from "~/components/files/fileWorkerError";
 import {
   IMAGE_DIMENSIONS_HEADER_BYTES,
   readImageDimensions,
@@ -15,6 +16,9 @@ export async function officeImageBitmap(blob: Blob) {
   }
   // Unknown dimensions cannot be decoded safely: compressed bytes do not bound pixel memory.
   if (!size || size.width <= 0 || size.height <= 0 || size.width > 16_777_216 / size.height)
-    throw new Error("This embedded image exceeds the preview pixel limit.");
+    throw new FileWorkerError({
+      message: "This embedded image exceeds the preview pixel limit.",
+      code: "embeddedImagePixels",
+    });
   return createImageBitmap(blob);
 }

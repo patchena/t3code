@@ -34,6 +34,11 @@ vi.mock("react", async (importOriginal) => ({
   useRef: <A,>(current: A) => ({ current }),
   useState: <A,>(initial: A) => [initial, () => {}],
 }));
+vi.mock("react-i18next", async () => {
+  const { createI18n } = await import("@t3tools/client-runtime/i18n");
+  const i18n = createI18n("en");
+  return { useTranslation: () => ({ t: i18n.getFixedT("en", "chat") }) };
+});
 vi.mock("../../hooks/useCopyToClipboard", () => ({ writeTextToClipboard: state.copyText }));
 vi.mock("../../localApi", () => ({
   readLocalApi: () => ({ contextMenu: { show: state.showMenu } }),

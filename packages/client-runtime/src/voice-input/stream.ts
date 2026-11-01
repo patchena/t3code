@@ -7,6 +7,7 @@ import {
   type SpeechTranscriptionOptions,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 
 const decodeEvent = Schema.decodeUnknownSync(Schema.fromJsonString(SpeechStreamEvent));
 
@@ -18,8 +19,10 @@ export function openSpeechStream(input: {
   readonly canSend: () => boolean;
   readonly onText: (text: SpeechStreamText) => void;
   readonly onError: (error: Error) => void;
+  readonly t: TFunction<"voice">;
   readonly createSocket?: (url: string) => WebSocket;
 }) {
+  const t = input.t;
   input.signal.throwIfAborted();
   const socket = (input.createSocket ?? ((url) => new WebSocket(url)))(input.url);
   let resolveFinal!: (text: string) => void;
@@ -56,12 +59,12 @@ export function openSpeechStream(input: {
   };
   const armTimeout = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => fail(new Error("Live transcription stopped responding.")), 120_000);
+    timer = setTimeout(() => fail(new Error(t(($) => $.errors.streamStalled))), 120_000);
   };
   const abort = () => fail(new Error("Voice transcription was cancelled."), false);
   const pump = () => {
     if (!isReady || closed || finishSent) return;
-    if (!input.canSend()) return fail(new Error("Voice consent was revoked."));
+    if (!input.canSend()) return fail(new Error(t(($) => $.errors.consentRevoked)));
     while (inFlight.length < 2 && queue.length) {
       const chunk = queue.shift()!;
       inFlight.push(chunk.byteLength);
@@ -77,24 +80,24 @@ export function openSpeechStream(input: {
     }
   };
   socket.addEventListener("open", () => {
-    if (!input.canSend()) return fail(new Error("Voice consent was revoked."));
+    if (!input.canSend()) return fail(new Error(t(($) => $.errors.consentRevoked)));
     if (!closed) socket.send(JSON.stringify({ type: "start", options: input.options }));
   });
   socket.addEventListener("message", (event) => {
     if (closed) return;
-    if (!input.canSend()) return fail(new Error("Voice consent was revoked."));
+    if (!input.canSend()) return fail(new Error(t(($) => $.errors.consentRevoked)));
     try {
       const message = decodeEvent(event.data);
       switch (message.type) {
         case "ready":
-          if (isReady) throw new Error("Unexpected speech stream response.");
+          if (isReady) throw new Error(t(($) => $.errors.streamUnexpected));
           isReady = true;
           clearTimeout(timer);
           pump();
           break;
         case "update":
           if (!inFlight.length || message.revision < revision)
-            throw new Error("Unexpected speech stream response.");
+            throw new Error(t(($) => $.errors.streamUnexpected));
           revision = message.revision;
           inFlightBytes -= inFlight.shift()!;
           clearTimeout(timer);
@@ -103,7 +106,7 @@ export function openSpeechStream(input: {
           if (inFlight.length) armTimeout();
           break;
         case "finished":
-          if (!finishSent) throw new Error("Unexpected speech stream response.");
+          if (!finishSent) throw new Error(t(($) => $.errors.streamUnexpected));
           closed = true;
           cleanup();
           resolveFinal(message.text);
@@ -113,15 +116,11 @@ export function openSpeechStream(input: {
           fail(new Error(message.message));
       }
     } catch (error) {
-      fail(error instanceof Error ? error : new Error("Invalid speech stream response."));
+      fail(error instanceof Error ? error : new Error(t(($) => $.errors.streamInvalid)));
     }
   });
-  socket.addEventListener("close", () =>
-    fail(new Error("The voice connection closed. Please record again.")),
-  );
-  socket.addEventListener("error", () =>
-    fail(new Error("Could not connect to live transcription.")),
-  );
+  socket.addEventListener("close", () => fail(new Error(t(($) => $.errors.connectionClosed))));
+  socket.addEventListener("error", () => fail(new Error(t(($) => $.errors.connectFailed))));
   input.signal.addEventListener("abort", abort, { once: true });
   armTimeout();
   if (input.signal.aborted) abort();
@@ -130,7 +129,7 @@ export function openSpeechStream(input: {
       if (closed || finishing) return;
       const bytes = new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength);
       if (queuedBytes + inFlightBytes + bytes.byteLength > SPEECH_STREAM_MAX_QUEUED_BYTES) {
-        fail(new Error("Voice recordings are limited to five minutes."));
+        fail(new Error(t(($) => $.errors.recordingLimit)));
         return;
       }
       let offset = 0;
@@ -155,7 +154,7 @@ export function openSpeechStream(input: {
       try {
         pump();
       } catch {
-        fail(new Error("Could not send microphone audio."));
+        fail(new Error(t(($) => $.errors.sendFailed)));
       }
     },
     finish: () => {
@@ -163,7 +162,7 @@ export function openSpeechStream(input: {
       try {
         pump();
       } catch {
-        fail(new Error("Could not finish live transcription."));
+        fail(new Error(t(($) => $.errors.streamFinishFailed)));
       }
       return final;
     },

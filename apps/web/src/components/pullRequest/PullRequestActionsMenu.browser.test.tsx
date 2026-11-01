@@ -19,19 +19,21 @@ vi.mock(
   () => ({ useAtomCommand: () => mocks.update }) as never,
 );
 
-vi.mock(import("../ui/toast"), () => ({ toastManager: { add: mocks.notify } }) as never);
+vi.mock(import("~/components/ui/toast"), () => ({ toastManager: { add: mocks.notify } }) as never);
 vi.mock(import("~/state/server"), async () => {
   const { Atom } = await import("effect/reactivity");
   return { primaryServerKeybindingsAtom: Atom.make([]) } as never;
 });
-vi.mock(import("./PullRequestThreadLinks"), () => ({ PullRequestThreadLinks: () => null }));
+vi.mock(import("~/components/pullRequest/PullRequestThreadLinks"), () => ({
+  PullRequestThreadLinks: () => null,
+}));
 vi.mock(
-  import("./PullRequestDetailActions"),
+  import("~/components/pullRequest/PullRequestDetailActions"),
   () => ({ ActOnEnvironmentPicker: () => null }) as never,
 );
 
 import { render } from "../../../test/render";
-import { PullRequestActionsMenu } from "./PullRequestActionsMenu";
+import { PullRequestActionsMenu } from "~/components/pullRequest/PullRequestActionsMenu";
 
 const reference = { projectId: ProjectId.make("project"), repository: "owner/repo", number: 7 };
 const environmentId = EnvironmentId.make("environment");

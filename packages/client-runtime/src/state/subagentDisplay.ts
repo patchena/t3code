@@ -9,15 +9,19 @@ import { formatModelSlugName, resolveSelectableModel } from "@t3tools/shared/mod
 import { fileBasename } from "@t3tools/shared/path";
 import { resolveModelShortName } from "../providerClients.ts";
 import { isTerminalSubagentStatus } from "./subagentRuntime.ts";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 
 export function subagentGroupSummary(
   members: ReadonlyArray<{ readonly status: OrchestrationV2TurnItemStatus }>,
+  t: TFunction<"activity">,
 ) {
   const active = members.some(
     ({ status }) => status === "pending" || status === "running" || status === "waiting",
   );
   return {
-    label: `${active ? "Kicked off" : "Ran"} ${members.length} ${members.length === 1 ? "subagent" : "subagents"}`,
+    label: active
+      ? t(($) => $.subagent.kickedOff, { count: members.length })
+      : t(($) => $.subagent.ran, { count: members.length }),
     active,
     failed: members.some(({ status }) => status === "failed"),
   };
@@ -25,6 +29,7 @@ export function subagentGroupSummary(
 
 export function summarizeSubagentStatuses(
   statuses: ReadonlyArray<OrchestrationV2TurnItemStatus>,
+  t: TFunction<"activity">,
 ): string {
   const counts = { working: 0, done: 0, failed: 0, stopped: 0, idle: 0 };
   for (const status of statuses) {
@@ -34,9 +39,9 @@ export function summarizeSubagentStatuses(
     else if (status === "idle") counts.idle += 1;
     else counts.stopped += 1;
   }
-  return (Object.keys(counts) as Array<keyof typeof counts>)
+  return (["working", "done", "failed", "stopped", "idle"] as const)
     .filter((key) => counts[key] > 0)
-    .map((key) => `${counts[key]} ${key}`)
+    .map((key) => t(($) => $.subagent.counts[key], { count: counts[key] }))
     .join(" · ");
 }
 
@@ -49,24 +54,27 @@ export function formatSubagentDisplayTitle(title: string): string {
   return name.replace(/(^|\s)\S/gu, (letter) => letter.toUpperCase()) || displayTitle;
 }
 
-export function resolveSubagentMetadata(input: {
-  readonly model: string | null;
-  readonly modelSelection?: Pick<ModelSelection, "model"> | undefined;
-  readonly provider?: Pick<ServerProvider, "driver" | "models"> | null | undefined;
-  readonly parentThread?:
-    | Pick<OrchestrationV2ThreadShell, "projectId" | "worktreePath">
-    | null
-    | undefined;
-  readonly childThread?:
-    | Pick<OrchestrationV2ThreadShell, "branch" | "worktreePath">
-    | null
-    | undefined;
-  readonly parentProject?: Pick<OrchestrationProjectShell, "workspaceRoot"> | null | undefined;
-  readonly childProject?:
-    | Pick<OrchestrationProjectShell, "id" | "title" | "workspaceRoot">
-    | null
-    | undefined;
-}) {
+export function resolveSubagentMetadata(
+  input: {
+    readonly model: string | null;
+    readonly modelSelection?: Pick<ModelSelection, "model"> | undefined;
+    readonly provider?: Pick<ServerProvider, "driver" | "models"> | null | undefined;
+    readonly parentThread?:
+      | Pick<OrchestrationV2ThreadShell, "projectId" | "worktreePath">
+      | null
+      | undefined;
+    readonly childThread?:
+      | Pick<OrchestrationV2ThreadShell, "branch" | "worktreePath">
+      | null
+      | undefined;
+    readonly parentProject?: Pick<OrchestrationProjectShell, "workspaceRoot"> | null | undefined;
+    readonly childProject?:
+      | Pick<OrchestrationProjectShell, "id" | "title" | "workspaceRoot">
+      | null
+      | undefined;
+  },
+  t: TFunction<"activity">,
+) {
   const model = input.model?.trim() || input.modelSelection?.model.trim();
   const slug = input.provider
     ? resolveSelectableModel(input.provider.driver, model, input.provider.models)
@@ -76,7 +84,7 @@ export function resolveSubagentMetadata(input: {
     ? (resolveModelShortName(catalogModel, input.provider?.driver) ?? catalogModel.name)
     : model
       ? formatModelSlugName(model)
-      : "Not reported";
+      : t(($) => $.subagent.notReported);
   const qualifier = catalogModel?.subProvider?.trim();
   const modelLabel = qualifier
     ? reportedLabel
@@ -95,16 +103,21 @@ export function resolveSubagentMetadata(input: {
     ...(input.parentThread &&
     input.childProject &&
     input.childProject.id !== input.parentThread.projectId
-      ? [{ label: "Project", value: input.childProject.title }]
+      ? [{ kind: "project", label: t(($) => $.subagent.project), value: input.childProject.title }]
       : []),
     ...(parentWorkspace && childWorkspace && parentWorkspace !== childWorkspace
       ? [
           {
-            label: input.childThread?.branch
-              ? "Branch"
+            kind: input.childThread?.branch
+              ? "branch"
               : input.childThread?.worktreePath
-                ? "Worktree"
-                : "Workspace",
+                ? "worktree"
+                : "workspace",
+            label: input.childThread?.branch
+              ? t(($) => $.subagent.branch)
+              : input.childThread?.worktreePath
+                ? t(($) => $.subagent.worktree)
+                : t(($) => $.subagent.workspace),
             value: input.childThread?.branch ?? fileBasename(childWorkspace),
           },
         ]

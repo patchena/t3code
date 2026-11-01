@@ -1,5 +1,6 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { SourceControlProviderKind } from "@t3tools/contracts";
-import { resolvePlanFollowUpSubmission } from "../../proposedPlan";
+import { resolvePlanFollowUpSubmission } from "~/proposedPlan";
 import {
   GitCommandError,
   ProjectId,
@@ -59,8 +60,44 @@ import {
   buildPullRequestTimeline,
   writePullRequestDetailSnapshot,
   readableFailure,
-} from "./pullRequestDetail.logic";
+} from "~/components/pullRequest/pullRequestDetail.logic";
 import type { ReviewCommentContext } from "~/reviewCommentContext";
+import { summarizePullRequestChecks } from "~/components/pullRequest/pullRequestPresentation";
+
+const t = createI18n("en").getFixedT(null, "workspace");
+
+it("localizes check summaries and workflow plurals across language changes", async () => {
+  const instance = createI18n("en");
+  const translate = instance.getFixedT(null, "workspace");
+  const workflow: PullRequestCheck = {
+    name: "CI",
+    status: "action-required",
+    description: null,
+    url: "https://github.com/example/repository/actions/runs/1",
+  };
+  const check: PullRequestCheck = { ...workflow, url: null };
+  expect(summarizePullRequestChecks([], translate)).toBe("No checks reported");
+  expect(summarizePullRequestChecks([workflow], translate)).toBe("1 workflow awaiting approval");
+  expect(summarizePullRequestChecks([workflow, workflow], translate)).toBe(
+    "2 workflows awaiting approval",
+  );
+  expect(summarizePullRequestChecks([workflow, check], translate)).toBe(
+    "1 workflow and 1 check awaiting action",
+  );
+  await instance.changeLanguage("de");
+  expect(summarizePullRequestChecks([], translate)).toBe("Keine Prüfungen gemeldet");
+  expect(summarizePullRequestChecks([workflow], translate)).toBe(
+    "1 Workflow wartet auf Genehmigung",
+  );
+  expect(summarizePullRequestChecks([workflow, workflow], translate)).toBe(
+    "2 Workflows warten auf Genehmigung",
+  );
+  expect(summarizePullRequestChecks([workflow, check, check], translate)).toBe(
+    "1 Workflow und 2 Prüfungen warten auf eine Aktion",
+  );
+  await instance.changeLanguage("en");
+  expect(summarizePullRequestChecks([workflow], translate)).toBe("1 workflow awaiting approval");
+});
 
 describe("pull request checkout commands", () => {
   it("quotes shell metacharacters in Forgejo repository URLs", () => {
@@ -321,31 +358,37 @@ describe("review verdicts", () => {
 
 describe("pull request timeline", () => {
   it("orders host timestamps by instant across offsets and fractional seconds", () => {
-    const events = buildPullRequestTimeline({
-      ...TIMELINE_SOURCE,
-      createdAt: "2026-07-05T01:00:00+02:00",
-      commits: [{ oid: "commit", messageHeadline: "", committedDate: "2026-07-05T00:30:00Z" }],
-      comments: [{ ...TIMELINE_SOURCE.comments[0]!, createdAt: "2026-07-05T00:30:00.5Z" }],
-      mergedAt: null,
-      closedAt: null,
-    });
+    const events = buildPullRequestTimeline(
+      {
+        ...TIMELINE_SOURCE,
+        createdAt: "2026-07-05T01:00:00+02:00",
+        commits: [{ oid: "commit", messageHeadline: "", committedDate: "2026-07-05T00:30:00Z" }],
+        comments: [{ ...TIMELINE_SOURCE.comments[0]!, createdAt: "2026-07-05T00:30:00.5Z" }],
+        mergedAt: null,
+        closedAt: null,
+      },
+      t,
+    );
 
     expect(events.map((event) => event.id)).toEqual(["c1", "commit", "created"]);
   });
 
   it("drops a body that is nothing but a bot's HTML comment, and keeps one that says more", () => {
-    const events = buildPullRequestTimeline({
-      ...TIMELINE_SOURCE,
-      comments: [
-        { ...TIMELINE_SOURCE.comments[0]!, body: "<!-- MURMUR_IGNORE -->" },
-        {
-          ...TIMELINE_SOURCE.comments[0]!,
-          id: "c2",
-          body: "<!-- summarize by coderabbit.ai -->\nNeeds a test.",
-          createdAt: "2026-07-04T00:00:00Z",
-        },
-      ],
-    });
+    const events = buildPullRequestTimeline(
+      {
+        ...TIMELINE_SOURCE,
+        comments: [
+          { ...TIMELINE_SOURCE.comments[0]!, body: "<!-- MURMUR_IGNORE -->" },
+          {
+            ...TIMELINE_SOURCE.comments[0]!,
+            id: "c2",
+            body: "<!-- summarize by coderabbit.ai -->\nNeeds a test.",
+            createdAt: "2026-07-04T00:00:00Z",
+          },
+        ],
+      },
+      t,
+    );
     expect(events.find((event) => event.id === "c1")?.body).toBeNull();
     expect(events.find((event) => event.id === "c2")?.body).toBe(
       "<!-- summarize by coderabbit.ai -->\nNeeds a test.",
@@ -353,22 +396,28 @@ describe("pull request timeline", () => {
   });
 
   it("reports a merge rather than the close GitHub records alongside it", () => {
-    const events = buildPullRequestTimeline({
-      ...TIMELINE_SOURCE,
-      mergedAt: "2026-07-04T00:00:00Z",
-      closedAt: "2026-07-04T00:00:00Z",
-    });
+    const events = buildPullRequestTimeline(
+      {
+        ...TIMELINE_SOURCE,
+        mergedAt: "2026-07-04T00:00:00Z",
+        closedAt: "2026-07-04T00:00:00Z",
+      },
+      t,
+    );
     expect(events[0]?.id).toBe("merged");
     expect(events.some((event) => event.id === "closed")).toBe(false);
   });
 
   it("names the change request in its host's own term", () => {
     const titles = (provider: string) =>
-      buildPullRequestTimeline({
-        ...TIMELINE_SOURCE,
-        provider: SourceControlProviderKind.make(provider),
-        closedAt: "2026-07-04T00:00:00Z",
-      })
+      buildPullRequestTimeline(
+        {
+          ...TIMELINE_SOURCE,
+          provider: SourceControlProviderKind.make(provider),
+          closedAt: "2026-07-04T00:00:00Z",
+        },
+        t,
+      )
         .filter((event) => event.kind === "opened" || event.kind === "closed")
         .map((event) => event.title);
     expect(titles("github")).toEqual(["Pull request closed", "opened this pull request"]);
@@ -376,32 +425,35 @@ describe("pull request timeline", () => {
   });
 
   it("groups conversation sections without crossing commits or PR updates", () => {
-    const events = buildPullRequestTimeline({
-      ...TIMELINE_SOURCE,
-      comments: [
-        {
-          ...TIMELINE_SOURCE.comments[0]!,
-          id: "new-comment-1",
-          createdAt: "2026-07-04T00:00:00Z",
-        },
-        {
-          ...TIMELINE_SOURCE.comments[0]!,
-          id: "new-comment-2",
-          createdAt: "2026-07-03T00:00:00Z",
-        },
-        {
-          ...TIMELINE_SOURCE.comments[0]!,
-          id: "old-comment-1",
-          createdAt: "2026-07-01T12:00:00Z",
-        },
-        {
-          ...TIMELINE_SOURCE.comments[0]!,
-          id: "old-comment-2",
-          createdAt: "2026-07-01T06:00:00Z",
-        },
-      ],
-      mergedAt: "2026-07-05T00:00:00Z",
-    });
+    const events = buildPullRequestTimeline(
+      {
+        ...TIMELINE_SOURCE,
+        comments: [
+          {
+            ...TIMELINE_SOURCE.comments[0]!,
+            id: "new-comment-1",
+            createdAt: "2026-07-04T00:00:00Z",
+          },
+          {
+            ...TIMELINE_SOURCE.comments[0]!,
+            id: "new-comment-2",
+            createdAt: "2026-07-03T00:00:00Z",
+          },
+          {
+            ...TIMELINE_SOURCE.comments[0]!,
+            id: "old-comment-1",
+            createdAt: "2026-07-01T12:00:00Z",
+          },
+          {
+            ...TIMELINE_SOURCE.comments[0]!,
+            id: "old-comment-2",
+            createdAt: "2026-07-01T06:00:00Z",
+          },
+        ],
+        mergedAt: "2026-07-05T00:00:00Z",
+      },
+      t,
+    );
 
     const rows = groupPullRequestTimelineConversations(events);
     expect(
@@ -420,28 +472,31 @@ describe("pull request timeline", () => {
   });
 
   it("keeps a verdict out of the collapsed conversation it was submitted in", () => {
-    const events = buildPullRequestTimeline({
-      ...TIMELINE_SOURCE,
-      comments: [
-        { ...TIMELINE_SOURCE.comments[0]!, id: "chatter-1", createdAt: "2026-07-05T00:00:00Z" },
-        {
-          ...TIMELINE_SOURCE.comments[0]!,
-          id: "approval",
-          kind: "review",
-          body: "",
-          reviewState: "APPROVED",
-          createdAt: "2026-07-04T00:00:00Z",
-        },
-        { ...TIMELINE_SOURCE.comments[0]!, id: "chatter-2", createdAt: "2026-07-03T00:00:00Z" },
-        {
-          ...TIMELINE_SOURCE.comments[0]!,
-          id: "remark",
-          kind: "review",
-          reviewState: "COMMENTED",
-          createdAt: "2026-07-02T12:00:00Z",
-        },
-      ],
-    });
+    const events = buildPullRequestTimeline(
+      {
+        ...TIMELINE_SOURCE,
+        comments: [
+          { ...TIMELINE_SOURCE.comments[0]!, id: "chatter-1", createdAt: "2026-07-05T00:00:00Z" },
+          {
+            ...TIMELINE_SOURCE.comments[0]!,
+            id: "approval",
+            kind: "review",
+            body: "",
+            reviewState: "APPROVED",
+            createdAt: "2026-07-04T00:00:00Z",
+          },
+          { ...TIMELINE_SOURCE.comments[0]!, id: "chatter-2", createdAt: "2026-07-03T00:00:00Z" },
+          {
+            ...TIMELINE_SOURCE.comments[0]!,
+            id: "remark",
+            kind: "review",
+            reviewState: "COMMENTED",
+            createdAt: "2026-07-02T12:00:00Z",
+          },
+        ],
+      },
+      t,
+    );
 
     const rows = groupPullRequestTimelineConversations(events);
     expect(
@@ -492,11 +547,14 @@ describe("review thread conversations", () => {
   };
 
   it("keeps a timeline finding and its replies in one row at the finding time", () => {
-    const events = buildPullRequestTimeline({
-      ...TIMELINE_SOURCE,
-      comments,
-      reviewThreads: [thread],
-    });
+    const events = buildPullRequestTimeline(
+      {
+        ...TIMELINE_SOURCE,
+        comments,
+        reviewThreads: [thread],
+      },
+      t,
+    );
     expect(events.map((event) => event.id)).toEqual(["c1", "finding", "1baf7bdcafe", "created"]);
     expect(events[1]).toMatchObject({
       id: finding.id,
@@ -519,7 +577,7 @@ describe("review thread conversations", () => {
       "event",
       "event",
     ]);
-    expect(events[0]).toEqual(buildPullRequestTimeline(TIMELINE_SOURCE)[0]);
+    expect(events[0]).toEqual(buildPullRequestTimeline(TIMELINE_SOURCE, t)[0]);
   });
 
   it("orders and pages whole Summary conversations while retaining editable comment copies", () => {
@@ -601,11 +659,14 @@ describe("review thread conversations", () => {
 
   it("distinguishes unloaded replies from complete threads, even when the host only supplies a cursor", () => {
     const timeline = (reviewThread: PullRequestReviewThread) =>
-      buildPullRequestTimeline({
-        ...TIMELINE_SOURCE,
-        comments,
-        reviewThreads: [reviewThread],
-      }).find((event) => event.id === finding.id)?.thread;
+      buildPullRequestTimeline(
+        {
+          ...TIMELINE_SOURCE,
+          comments,
+          reviewThreads: [reviewThread],
+        },
+        t,
+      ).find((event) => event.id === finding.id)?.thread;
     expect(timeline({ ...thread, commentCount: 5 })).toMatchObject({
       moreReplies: 2,
       hasMoreReplies: true,
@@ -896,13 +957,13 @@ describe("what to say when an action fails", () => {
         reason,
       });
     expect(
-      checkoutFailureDescription(diagnostic("git worktree add failed", "path_already_exists")),
+      checkoutFailureDescription(diagnostic("git worktree add failed", "path_already_exists"), t),
     ).toBe("git worktree add failed (path_already_exists)");
     const reason = "The worktree directory already exists. Choose another directory.";
-    expect(checkoutFailureDescription(diagnostic(reason))).toBe(reason);
-    expect(checkoutFailureDescription(diagnostic("x".repeat(900)))).toBe(`${"x".repeat(319)}…`);
+    expect(checkoutFailureDescription(diagnostic(reason), t)).toBe(reason);
+    expect(checkoutFailureDescription(diagnostic("x".repeat(900)), t)).toBe(`${"x".repeat(319)}…`);
     for (const failure of [undefined, diagnostic(""), diagnostic("exited with code 1")]) {
-      expect(checkoutFailureDescription(failure)).toBe(
+      expect(checkoutFailureDescription(failure, t)).toBe(
         "Check that the branch still exists and is not checked out elsewhere, then try again.",
       );
     }

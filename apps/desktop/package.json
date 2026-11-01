@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "main": "dist-electron/boot.cjs",
+  "imports": {
+    "#desktop/*": "./src/*.ts"
+  },
   "scripts": {
     "ensure:electron": "node scripts/ensure-electron-runtime.mjs",
     "start": "node scripts/start-electron.mjs",

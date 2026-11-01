@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { EnvironmentId, PullRequestRef } from "@t3tools/contracts";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { useAtomValue } from "@effect/atom-react";
@@ -7,9 +8,9 @@ import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
 import { useAtomCommand } from "~/state/use-atom-command";
 
-import { toastManager } from "../../ui/toast";
-import { readableFailure } from "../pullRequestDetail.logic";
-import { guideRunKey, useGuideRunStore } from "./guideRunStore";
+import { toastManager } from "~/components/ui/toast";
+import { readableFailure } from "~/components/pullRequest/pullRequestDetail.logic";
+import { guideRunKey, useGuideRunStore } from "~/components/pullRequest/guide/guideRunStore";
 
 export function useReviewGuideWriter({
   environmentId,
@@ -20,6 +21,7 @@ export function useReviewGuideWriter({
   reference: PullRequestRef;
   title: string | null;
 }) {
+  const { t } = useTranslation("workspace");
   const query = useEnvironmentQuery(
     pullRequestEnvironment.reviewGuide({ environmentId, input: reference }),
   );
@@ -51,10 +53,10 @@ export function useReviewGuideWriter({
       useGuideRunStore.getState().settle(guideRunKey(environmentId, reference));
       toastManager.add({
         type: "error",
-        title: "Could not start a review guide",
+        title: t(($) => $.git.startGuideFailed),
         description: readableFailure(
           squashAtomCommandFailure(result),
-          "Check the review guide model in Settings → Source control.",
+          t(($) => $.git.checkGuideModel),
         ),
       });
     }

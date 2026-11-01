@@ -73,7 +73,7 @@ vi.mock(import("./projectFilesQueryState"), async (original) => ({
   confirmProjectFileQueryData: () => true,
 }));
 
-import FilePreviewPanel from "./FilePreviewPanel";
+import { FilePreviewPanel } from "~/components/files/FilePreviewPanel";
 
 const environmentId = EnvironmentId.make("markdown-preview-test");
 const threadRef = { environmentId, threadId: ThreadId.make("thread") };

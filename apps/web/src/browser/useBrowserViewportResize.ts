@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { PreviewViewportSetting, PreviewViewportSize } from "@t3tools/contracts";
 import {
   useEffect,
@@ -34,6 +35,7 @@ export function useBrowserViewportResize(options: {
   readonly deviceToolbarVisible: boolean;
   readonly aspectRatio: number | null;
 }) {
+  const { t } = useTranslation("tools");
   const { target, viewport, zoomFactor, containerSize, deviceToolbarVisible, aspectRatio } =
     options;
   const dragCleanupRef = useRef<(() => void) | null>(null);
@@ -94,7 +96,7 @@ export function useBrowserViewportResize(options: {
     }
     keyboardViewportRef.current = null;
     setDragViewport(null);
-    return commitBrowserViewportChange(target, next);
+    return commitBrowserViewportChange(target, next, t);
   };
 
   const clearDrag = () => setDragViewport(null);
@@ -103,7 +105,7 @@ export function useBrowserViewportResize(options: {
     const clearIfCurrent = () => {
       if (dragVersionRef.current === version) clearDrag();
     };
-    void commitBrowserViewportChange(target, next).then(clearIfCurrent, clearIfCurrent);
+    void commitBrowserViewportChange(target, next, t).then(clearIfCurrent, clearIfCurrent);
   };
 
   const handleResizeKeyDown = (

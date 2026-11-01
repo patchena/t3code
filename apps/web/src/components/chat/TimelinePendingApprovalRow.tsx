@@ -1,9 +1,11 @@
 import {
-  FULL_ACCESS_OVERRIDE_QUESTION,
+  fullAccessOverrideQuestion,
   fullAccessOverrideExplanation,
 } from "@t3tools/client-runtime/state/thread-requests";
 import { ShieldIcon } from "lucide-react";
 import { memo, use } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { type PendingApproval } from "../../session-logic";
 import { InlineButton } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
@@ -12,32 +14,46 @@ import { ToolActivityIconView, type WorkEntryIconName } from "./TimelineToolActi
 import { TimelineRowCtx } from "./timelineRowContext";
 import { WorkLogRow } from "./WorkLog";
 
-const APPROVAL_PRESENTATION = {
-  command: { icon: "terminal", label: "Command approval", detailLabel: "Command" },
-  "file-change": { icon: "square-pen", label: "File change approval", detailLabel: "File change" },
-  "file-read": { icon: "eye", label: "File read approval", detailLabel: "File to read" },
-  permission: {
-    icon: "wrench",
-    label: "App permission approval",
-    detailLabel: "Permission request",
-  },
-  "mcp-elicitation": {
-    icon: "hammer",
-    label: "App access approval",
-    detailLabel: "App access request",
-  },
-} satisfies Record<
-  PendingApproval["requestKind"],
-  { icon: WorkEntryIconName; label: string; detailLabel: string }
->;
+const approvalPresentation = (t: TFunction<"chat">) =>
+  ({
+    command: {
+      icon: "terminal",
+      label: t(($) => $.approval.command),
+      detailLabel: t(($) => $.approval.commandDetail),
+    },
+    "file-change": {
+      icon: "square-pen",
+      label: t(($) => $.approval.fileChange),
+      detailLabel: t(($) => $.approval.fileChangeDetail),
+    },
+    "file-read": {
+      icon: "eye",
+      label: t(($) => $.approval.fileRead),
+      detailLabel: t(($) => $.approval.fileReadDetail),
+    },
+    permission: {
+      icon: "wrench",
+      label: t(($) => $.approval.permission),
+      detailLabel: t(($) => $.approval.permissionDetail),
+    },
+    "mcp-elicitation": {
+      icon: "hammer",
+      label: t(($) => $.approval.access),
+      detailLabel: t(($) => $.approval.accessDetail),
+    },
+  }) satisfies Record<
+    PendingApproval["requestKind"],
+    { icon: WorkEntryIconName; label: string; detailLabel: string }
+  >;
 
 export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalRow({
   approval,
 }: {
   approval: PendingApproval;
 }) {
+  const { t } = useTranslation("chat");
   const { respondingRequestIds, canOperateThread, onRespondToApproval } = use(TimelineRowCtx);
-  const presentation = APPROVAL_PRESENTATION[approval.requestKind];
+  const presentation = approvalPresentation(t)[approval.requestKind];
   const canRespond = approval.responseCapability === "live";
   return (
     <WorkLogRow
@@ -76,7 +92,7 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
             <>
               <span className="inline-flex items-center gap-1 text-warning">
                 <ShieldIcon aria-hidden className="size-3 shrink-0" />
-                Waiting for approval
+                {t(($) => $.approval.waiting)}
               </span>
               {onRespondToApproval ? (
                 <>
@@ -96,22 +112,20 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
               ) : null}
             </>
           ) : (
-            <span className="text-warning">
-              Provider process is gone. Interrupt or restart the run to respond.
-            </span>
+            <span className="text-warning">{t(($) => $.approval.processGone)}</span>
           )}
           {approval.fullAccessOverride ? (
             <Popover>
               <PopoverTrigger openOnHover render={<InlineButton tone="muted" />}>
-                {FULL_ACCESS_OVERRIDE_QUESTION}
+                {fullAccessOverrideQuestion(t)}
               </PopoverTrigger>
               <PopoverPopup
-                aria-label={FULL_ACCESS_OVERRIDE_QUESTION}
+                aria-label={fullAccessOverrideQuestion(t)}
                 tooltipStyle
                 side="top"
                 className="max-w-[min(22rem,calc(100vw-2rem))] whitespace-normal"
               >
-                {fullAccessOverrideExplanation(approval.fullAccessOverride)}
+                {fullAccessOverrideExplanation(approval.fullAccessOverride, t)}
               </PopoverPopup>
             </Popover>
           ) : null}

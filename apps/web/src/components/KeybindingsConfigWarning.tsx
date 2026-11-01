@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import {
   AuthOrchestrationOperateScope,
   type EditorId,
@@ -21,6 +22,7 @@ export function KeybindingsConfigWarning({
   configPath: string | null;
   availableEditors: readonly EditorId[];
 }) {
+  const { t } = useTranslation("workspace");
   const canOpenEditor = useEnvironmentScope(environmentId, AuthOrchestrationOperateScope);
   const openInEditor = useOpenInPreferredEditor(environmentId, availableEditors);
 
@@ -40,13 +42,14 @@ export function KeybindingsConfigWarning({
             toastManager.add(
               stackedThreadToast({
                 type: "error",
-                title: "Unable to open keybindings file",
-                description: error instanceof Error ? error.message : "Unknown error opening file.",
+                title: t(($) => $.keybindings.openFailed),
+                description:
+                  error instanceof Error ? error.message : t(($) => $.keybindings.unknownFileError),
               }),
             );
           }}
         >
-          Open keybindings.json
+          {t(($) => $.keybindings.openFile)}
         </Button>
       </span>
     </>

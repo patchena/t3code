@@ -1,6 +1,7 @@
+import { useTranslation } from "react-i18next";
 import type { PullRequestStack } from "@t3tools/contracts";
 import { cn } from "~/lib/utils";
-import { resolvePullRequestState } from "./pullRequestPresentation";
+import { resolvePullRequestState } from "~/components/pullRequest/pullRequestPresentation";
 
 export function PullRequestStackLayerContent({
   layer,
@@ -9,10 +10,14 @@ export function PullRequestStackLayerContent({
   layer: PullRequestStack["layers"][number];
   compact?: boolean;
 }) {
-  const state = resolvePullRequestState({
-    state: layer.state,
-    isDraft: layer.isDraft ?? false,
-  });
+  const { t } = useTranslation("workspace");
+  const state = resolvePullRequestState(
+    {
+      state: layer.state,
+      isDraft: layer.isDraft ?? false,
+    },
+    t,
+  );
   return (
     <>
       <state.Icon aria-hidden className={cn("size-4 shrink-0", state.toneClassName)} />

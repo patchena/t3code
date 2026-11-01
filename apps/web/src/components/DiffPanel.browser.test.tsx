@@ -89,7 +89,7 @@ vi.mock("./diffs/DiffCommentAnnotation", () => ({ DiffCommentAnnotation: () => n
 vi.mock("./diffs/DiffFileTree", () => ({ DiffFileTree: () => null }));
 vi.mock("./DiffFilePathCopyButton", () => ({ DiffFilePathCopyButton: () => null }));
 
-import DiffPanel from "./DiffPanel";
+import { DiffPanel } from "./DiffPanel";
 import { useDiffPanelSessionStore, useDiffPanelStore } from "~/diffPanelStore";
 
 const cwd = "/project-worktree";

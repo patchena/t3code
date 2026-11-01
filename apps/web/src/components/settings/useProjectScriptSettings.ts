@@ -1,5 +1,7 @@
+import type { SettingsTranslation } from "~/components/settings/settingsSearch";
+import { useTranslation } from "react-i18next";
 import { AuthSettingsWriteScope, EnvironmentAuthorizationError } from "@t3tools/contracts";
-import { readEnvironmentScope } from "../../state/session";
+import { readEnvironmentScope } from "~/state/session";
 import {
   isAtomCommandInterrupted,
   mapAtomCommandResult,
@@ -22,26 +24,26 @@ import { useRef, useState } from "react";
 import {
   decodeProjectScriptKeybindingRule,
   keybindingValueForCommand,
-} from "../../lib/projectScriptKeybindings";
+} from "~/lib/projectScriptKeybindings";
 import {
   buildProjectScript,
   commandForProjectScript,
   nextProjectScriptId,
   releaseClaimedRoles,
-} from "../../projectScripts";
-import { useProjects } from "../../state/entities";
-import { serverEnvironment } from "../../state/server";
-import { useAtomCommand } from "../../state/use-atom-command";
-import type { NewProjectScriptInput } from "../projectScriptEditor";
-import { toastManager } from "../ui/toast";
+} from "~/projectScripts";
+import { useProjects } from "~/state/entities";
+import { serverEnvironment } from "~/state/server";
+import { useAtomCommand } from "~/state/use-atom-command";
+import type { NewProjectScriptInput } from "~/components/projectScriptEditor";
+import { toastManager } from "~/components/ui/toast";
 
-function reportScriptFailure(result: AtomCommandResult<unknown, unknown>) {
+function reportScriptFailure(result: AtomCommandResult<unknown, unknown>, t: SettingsTranslation) {
   if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
     const error = squashAtomCommandFailure(result);
     toastManager.add({
       type: "error",
-      title: "Failed to save project actions",
-      description: error instanceof Error ? error.message : "An error occurred.",
+      title: t(($) => $.writes.scriptSaveFailed),
+      description: error instanceof Error ? error.message : t(($) => $.writes.genericError),
     });
   }
   return mapAtomCommandResult(result, () => undefined);
@@ -55,6 +57,7 @@ export function useProjectScriptSettings(
     project?: { id: ProjectId; scripts: readonly ProjectScript[] };
   }[],
 ) {
+  const { t } = useTranslation("settings");
   const projects = useProjects();
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
@@ -74,8 +77,12 @@ export function useProjectScriptSettings(
     keybinding?: string | null,
   ): Promise<AtomCommandResult<void, unknown>> {
     if (savingRef.current || targets.length === 0) {
-      const message = "No available machine, or another action change is saving.";
-      toastManager.add({ type: "error", title: "Actions not saved", description: message });
+      const message = t(($) => $.writes.scriptSaveUnavailable);
+      toastManager.add({
+        type: "error",
+        title: t(($) => $.writes.scriptsNotSaved),
+        description: message,
+      });
       return AsyncResult.failure(Cause.fail(new Error(message)));
     }
     if (
@@ -88,10 +95,11 @@ export function useProjectScriptSettings(
           Cause.fail(
             new EnvironmentAuthorizationError({
               requiredScope: AuthSettingsWriteScope,
-              message: "This connection cannot change environment settings.",
+              message: t(($) => $.writes.scriptPermissionDenied),
             }),
           ),
         ),
+        t,
       );
     }
     savingRef.current = true;
@@ -133,7 +141,7 @@ export function useProjectScriptSettings(
             : { defaultProjectScripts: nextScripts ?? [] },
         },
       });
-      if (result._tag === "Failure") return reportScriptFailure(result);
+      if (result._tag === "Failure") return reportScriptFailure(result, t);
       const changedIds = scriptId
         ? [scriptId]
         : current
@@ -173,7 +181,7 @@ export function useProjectScriptSettings(
           : previous && !retainedElsewhere
             ? await removeKeybinding({ environmentId, input: previous })
             : null;
-        if (bindingResult?._tag === "Failure") return reportScriptFailure(bindingResult);
+        if (bindingResult?._tag === "Failure") return reportScriptFailure(bindingResult, t);
       }
     }
     return AsyncResult.success(undefined);

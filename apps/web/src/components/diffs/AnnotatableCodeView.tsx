@@ -18,9 +18,12 @@ import {
   type ReviewCommentContext,
 } from "~/reviewCommentContext";
 
-import { nextFileCommentId } from "../files/fileCommentAnnotations";
-import { DiffCommentAnnotation } from "./DiffCommentAnnotation";
-import { StyledDiffCodeView, type StyledDiffCodeViewOptions } from "./StyledDiffCodeView";
+import { nextFileCommentId } from "~/components/files/fileCommentAnnotations";
+import { DiffCommentAnnotation } from "~/components/diffs/DiffCommentAnnotation";
+import {
+  StyledDiffCodeView,
+  type StyledDiffCodeViewOptions,
+} from "~/components/diffs/StyledDiffCodeView";
 
 interface DiffCommentAnnotationEntry {
   id: string;

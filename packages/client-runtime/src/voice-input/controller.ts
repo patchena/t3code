@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema";
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { replaceTextRange } from "@t3tools/shared/composerTrigger";
 
 import {
@@ -10,9 +11,6 @@ import {
 const isVoiceTranscriptionError = Schema.is(VoiceTranscriptionError);
 
 export const VOICE_RECORDING_LIMIT_SECONDS = 5 * 60;
-
-export const MICROPHONE_PERMISSION_ERROR =
-  "Microphone access is required for voice input. Allow access in your browser or system settings and try again.";
 
 function isMicrophonePermissionError(error: unknown): boolean {
   return (
@@ -68,6 +66,7 @@ export interface VoiceRecorder {
 }
 
 export type VoiceInputControllerDependencies = {
+  readonly t: TFunction<"voice">;
   readonly recorder: VoiceRecorder;
   readonly getTranscriber: () => VoiceTranscriber | null;
   readonly requestPermission: () => Promise<{
@@ -209,23 +208,23 @@ function errorCode(error: unknown): string | null {
   return typeof error.code === "string" ? error.code : null;
 }
 
-function preparationErrorMessage(error: unknown): string {
+function preparationErrorMessage(error: unknown, t: TFunction<"voice">): string {
   if (error instanceof Error && error.message === "voice-operation-busy") {
-    return "Voice transcription is still finishing. Try again shortly.";
+    return t(($) => $.errors.busy);
   }
   if (errorCode(error) === "unsupported-locale") {
-    return "Voice transcription is not available for this language.";
+    return t(($) => $.errors.unsupportedLanguage);
   }
   return isVoiceTranscriptionError(error) && error.message.trim()
     ? error.message
-    : "Could not prepare voice transcription.";
+    : t(($) => $.errors.prepareFailed);
 }
 
-function transcriptionErrorMessage(error: unknown): string {
+function transcriptionErrorMessage(error: unknown, t: TFunction<"voice">): string {
   if (error instanceof Error && error.message === "voice-operation-busy") {
-    return "Voice transcription is still finishing. Try again shortly.";
+    return t(($) => $.errors.busy);
   }
-  return isVoiceTranscriptionError(error) ? error.message : "Could not transcribe this recording.";
+  return isVoiceTranscriptionError(error) ? error.message : t(($) => $.errors.transcribeFailed);
 }
 
 const IDLE_STATE: VoiceInputState = { phase: "idle", error: null, errorAction: null };
@@ -263,7 +262,10 @@ export class VoiceInputController {
     if (this.state.phase !== "idle" && this.state.phase !== "error") return;
     const initiatingDraft = this.dependencies.readDraft();
     if (!initiatingDraft) {
-      this.setError("This draft is no longer available.", "retry");
+      this.setError(
+        this.dependencies.t(($) => $.errors.draftUnavailable),
+        "retry",
+      );
       return;
     }
     let sessionToken: VoiceInputSession | null = null;
@@ -281,7 +283,10 @@ export class VoiceInputController {
       }
       sessionToken = acquireSession();
       if (!sessionToken) {
-        this.setError("Another voice recording is already active.", "retry");
+        this.setError(
+          this.dependencies.t(($) => $.errors.anotherRecording),
+          "retry",
+        );
         return;
       }
       this.sessionToken = sessionToken;
@@ -302,7 +307,10 @@ export class VoiceInputController {
       }
       const transcriber = this.dependencies.getTranscriber();
       if (!transcriber) {
-        this.setError("Voice transcription is not available.", null);
+        this.setError(
+          this.dependencies.t(($) => $.errors.unavailable),
+          null,
+        );
         return;
       }
 
@@ -310,7 +318,7 @@ export class VoiceInputController {
       if (!this.isCurrent(operationToken)) return;
       if (!permission.granted) {
         this.setError(
-          "Microphone access is required for voice input.",
+          this.dependencies.t(($) => $.errors.microphoneRequired),
           permission.canAskAgain ? "retry" : "settings",
         );
         return;
@@ -321,7 +329,8 @@ export class VoiceInputController {
           transcriber.prepare({ signal: abortController.signal }),
         );
       } catch (error) {
-        if (this.isCurrent(operationToken)) this.setError(preparationErrorMessage(error), "retry");
+        if (this.isCurrent(operationToken))
+          this.setError(preparationErrorMessage(error, this.dependencies.t), "retry");
         return;
       }
       if (!this.isCurrent(operationToken)) return;
@@ -336,7 +345,10 @@ export class VoiceInputController {
 
       const capturedDraft = this.dependencies.readDraft();
       if (!capturedDraft || capturedDraft.ownerKey !== initiatingDraft.ownerKey) {
-        this.setError("This draft is no longer available.", "retry");
+        this.setError(
+          this.dependencies.t(($) => $.errors.draftUnavailable),
+          "retry",
+        );
         return;
       }
       this.capturedDraft = capturedDraft;
@@ -349,7 +361,7 @@ export class VoiceInputController {
           (text) => ({ text }),
           (error: unknown) => {
             if (this.isCurrent(operationToken) && this.state.phase === "recording") {
-              void this.discardRecording(transcriptionErrorMessage(error));
+              void this.discardRecording(transcriptionErrorMessage(error, this.dependencies.t));
             }
             return { error };
           },
@@ -361,8 +373,8 @@ export class VoiceInputController {
       if (this.isCurrent(operationToken))
         this.setError(
           isMicrophonePermissionError(error)
-            ? MICROPHONE_PERMISSION_ERROR
-            : "Could not start voice recording.",
+            ? this.dependencies.t(($) => $.errors.microphonePermission)
+            : this.dependencies.t(($) => $.errors.startFailed),
           "retry",
         );
     } finally {
@@ -412,7 +424,7 @@ export class VoiceInputController {
   }
 
   interruptRecording(
-    message = "Voice recording was interrupted.",
+    message: string = this.dependencies.t(($) => $.errors.interrupted),
     completedUri: string | null = null,
   ): Promise<void> | void {
     if (this.state.phase === "preparing") {
@@ -429,7 +441,7 @@ export class VoiceInputController {
   appMovedToBackground(): Promise<void> | void {
     return this.interruptRecording(
       this.state.phase === "preparing"
-        ? "Voice input stopped when the app moved to the background."
+        ? this.dependencies.t(($) => $.errors.backgrounded)
         : undefined,
     );
   }
@@ -439,7 +451,7 @@ export class VoiceInputController {
     if (status.url && this.recordingUri && status.url !== this.recordingUri) return;
     if (status.hasError) {
       return this.interruptRecording(
-        status.error ?? "Voice recording was interrupted.",
+        status.error ?? this.dependencies.t(($) => $.errors.interrupted),
         status.url,
       );
     }
@@ -496,7 +508,10 @@ export class VoiceInputController {
         !this.transcriptionAbortController ||
         !this.capturedDraft
       ) {
-        this.setError("Could not finish voice recording.", "retry");
+        this.setError(
+          this.dependencies.t(($) => $.errors.finishFailed),
+          "retry",
+        );
         return;
       }
 
@@ -527,7 +542,7 @@ export class VoiceInputController {
               transcription,
             };
           }
-          this.setError(transcriptionErrorMessage(error), "retry");
+          this.setError(transcriptionErrorMessage(error, this.dependencies.t), "retry");
         }
         return;
       }
@@ -575,13 +590,16 @@ export class VoiceInputController {
       );
       if (result.kind === "stale") {
         this.setError(
-          "The draft changed while voice input was running. The transcript was not added.",
+          this.dependencies.t(($) => $.errors.draftChanged),
           "retry",
         );
         return;
       }
       if (result.kind === "empty") {
-        this.setError("No speech was detected.", "retry");
+        this.setError(
+          this.dependencies.t(($) => $.errors.noSpeech),
+          "retry",
+        );
         return;
       }
 
@@ -589,7 +607,10 @@ export class VoiceInputController {
       this.setState(IDLE_STATE);
     } catch {
       if (this.isCurrent(operationToken)) {
-        this.setError("Could not finish voice recording.", "retry");
+        this.setError(
+          this.dependencies.t(($) => $.errors.finishFailed),
+          "retry",
+        );
       }
     } finally {
       this.finishing = false;

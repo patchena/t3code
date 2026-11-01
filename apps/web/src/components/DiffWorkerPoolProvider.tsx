@@ -1,11 +1,12 @@
+import { useTranslation } from "react-i18next";
 import { WorkerPoolContext, useWorkerPool } from "@pierre/diffs/react";
 import { WorkerPoolManager } from "@pierre/diffs/worker";
 import DiffsWorker from "@pierre/diffs/worker/worker.js?worker";
 import * as Schema from "effect/Schema";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { getRenderedAppearance, subscribeRenderedAppearance } from "../hooks/useTheme";
-import { resolveDiffThemeName } from "../lib/diffRendering";
-import { PREFERRED_HIGHLIGHTER } from "../lib/syntaxHighlighting";
+import { getRenderedAppearance, subscribeRenderedAppearance } from "~/hooks/useTheme";
+import { resolveDiffThemeName } from "~/lib/diffRendering";
+import { PREFERRED_HIGHLIGHTER } from "~/lib/syntaxHighlighting";
 
 export class DiffWorkerError extends Schema.TaggedError<DiffWorkerError>()("DiffWorkerError", {
   operation: Schema.Literals(["create-worker", "get-render-options", "set-render-options"]),
@@ -88,6 +89,7 @@ function acquireDiffWorkerPool(poolSize: number) {
 
 // Plain-text views do not queue a highlight task that could retry a blank first render.
 function DiffWorkerReady({ children }: { children?: ReactNode }) {
+  const { t } = useTranslation("workspace");
   const workerPool = useWorkerPool();
   const [readyPool, setReadyPool] = useState<WorkerPoolManager>();
   const ready = workerPool
@@ -115,7 +117,7 @@ function DiffWorkerReady({ children }: { children?: ReactNode }) {
       role="status"
       className="flex min-h-0 flex-1 items-center justify-center p-4 text-xs text-muted-foreground"
     >
-      Loading code...
+      {t(($) => $.git.loadingCode)}
     </div>
   );
 }

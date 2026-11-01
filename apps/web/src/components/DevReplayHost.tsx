@@ -1,4 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
+import { useTranslation } from "react-i18next";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { ProviderInstanceId, type ThreadId } from "@t3tools/contracts";
@@ -24,6 +25,7 @@ const DEV_REPLAY_INSTANCE_ID = ProviderInstanceId.make("devReplay");
  * opens a picker, and `window.t3dev.replay(scenario)` does the same from the console.
  */
 export function DevReplayHost() {
+  const { t } = useTranslation("common");
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const environmentId = usePrimaryEnvironmentId();
@@ -113,7 +115,7 @@ export function DevReplayHost() {
     replay(scenario).catch((error: unknown) =>
       toastManager.add({
         type: "error",
-        title: "Replay failed",
+        title: t(($) => $.replay.failed),
         description: error instanceof Error ? error.message : String(error),
       }),
     );
@@ -124,14 +126,14 @@ export function DevReplayHost() {
       <DialogPopup className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>
-            {project === undefined ? "Replay a recorded turn" : `Replay in ${project.title}`}
+            {project === undefined
+              ? t(($) => $.replay.recordedTurn)
+              : t(($) => $.replay.inProject, { project: project.title })}
           </DialogTitle>
         </DialogHeader>
         <DialogPanel>
           {scenarios.length === 0 || project === undefined ? (
-            <p className="text-sm text-muted-foreground">
-              Needs a project and the Replay (dev) provider, which dev servers start.
-            </p>
+            <p className="text-sm text-muted-foreground">{t(($) => $.replay.requirements)}</p>
           ) : (
             <div className="flex flex-col items-start gap-1">
               {scenarios.map((scenario) => (

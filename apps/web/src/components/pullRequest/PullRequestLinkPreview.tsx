@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from "react-i18next";
 import type { PreviewCard as PreviewCardPrimitive } from "@base-ui/react/preview-card";
 import { isAtomCommandInterrupted } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId, PullRequestRef } from "@t3tools/contracts";
@@ -16,9 +17,12 @@ import { pullRequestEnvironment, useSharedPullRequestSummary } from "~/state/pul
 import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
 import { useEnvironmentQuery } from "~/state/query";
 
-import { PreviewCard, PreviewCardPopup, PreviewCardTrigger } from "../ui/preview-card";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { PullRequestActorAvatar, resolvePullRequestState } from "./pullRequestPresentation";
+import { PreviewCard, PreviewCardPopup, PreviewCardTrigger } from "~/components/ui/preview-card";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import {
+  PullRequestActorAvatar,
+  resolvePullRequestState,
+} from "~/components/pullRequest/pullRequestPresentation";
 
 interface PullRequestLinkPreviewTarget {
   readonly environmentId: EnvironmentId;
@@ -46,6 +50,7 @@ export function PullRequestLinkPreview({
   onOpenFallback?: (url: string) => Promise<void>;
   fallback?: ReactNode;
 }) {
+  const { t } = useTranslation("workspace");
   const [open, setOpen] = useState(false);
   const previewActionsRef = useRef<PreviewCardPrimitive.Root.Actions | null>(null);
   const [resolvingClick, setResolvingClick] = useState(false);
@@ -95,7 +100,7 @@ export function PullRequestLinkPreview({
   const state =
     card === null
       ? null
-      : resolvePullRequestState({ state: card.state, isDraft: card.isDraft ?? false });
+      : resolvePullRequestState({ state: card.state, isDraft: card.isDraft ?? false }, t);
   const authorLabel =
     card?.author === null
       ? "ghost"
@@ -147,7 +152,11 @@ export function PullRequestLinkPreview({
                       <>
                         <span aria-hidden>·</span>
                         <span className="shrink-0">
-                          opened <RelativeTime timestamp={preview.createdAt} />
+                          <Trans
+                            t={t}
+                            i18nKey={($) => $.git.openedTime}
+                            components={{ time: <RelativeTime timestamp={preview.createdAt} /> }}
+                          />
                         </span>
                       </>
                     )}

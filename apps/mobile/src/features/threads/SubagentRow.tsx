@@ -6,6 +6,7 @@ import {
 } from "@t3tools/client-runtime/state/provider-instance-display";
 import { resolveSubagentMetadata } from "@t3tools/client-runtime/state/subagent-display";
 import { formatSubagentEffort } from "@t3tools/client-runtime/state/thread-execution";
+import { mobileI18n } from "~/i18n";
 import type { EnvironmentId, OrchestrationV2Subagent } from "@t3tools/contracts";
 import type { ReactNode } from "react";
 import { View } from "react-native";
@@ -135,15 +136,18 @@ function SubagentMetadata(props: {
   );
   const childProject = useProject(child ? scopeProjectRef(environmentId, child.projectId) : null);
   const selection = subagent.modelSelection;
-  const { modelLabel, modelSlug, workspace } = resolveSubagentMetadata({
-    model: subagent.model,
-    modelSelection: selection,
-    provider,
-    parentThread: parent,
-    childThread: child,
-    parentProject,
-    childProject,
-  });
+  const { modelLabel, modelSlug, workspace } = resolveSubagentMetadata(
+    {
+      model: subagent.model,
+      modelSelection: selection,
+      provider,
+      parentThread: parent,
+      childThread: child,
+      parentProject,
+      childProject,
+    },
+    mobileI18n.getFixedT("en", "activity"),
+  );
   const effort = formatSubagentEffort({ modelSlug, modelSelection: selection, provider });
   return (
     <View className="min-w-0 flex-row items-center gap-1.5">
@@ -168,7 +172,7 @@ function SubagentMetadata(props: {
         {modelLabel}
         {effort ? ` · ${effort}` : ""}
       </Text>
-      {workspace.map(({ label, value }) => (
+      {workspace.map(({ kind, label, value }) => (
         // Preserve the label against flattening without making it a separate accessibility stop.
         <View
           key={label}
@@ -178,7 +182,7 @@ function SubagentMetadata(props: {
         >
           <Text className="text-xs text-foreground-muted">·</Text>
           <SymbolView
-            name={label === "Branch" ? "arrow.triangle.branch" : "folder"}
+            name={kind === "branch" ? "arrow.triangle.branch" : "folder"}
             size={11}
             tintColorClassName="accent-icon-muted"
           />

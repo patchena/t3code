@@ -18,6 +18,12 @@ const authorizationMocks = vi.hoisted(() => ({
   phase: "connected" as "connected" | "offline",
 }));
 
+vi.mock("react-i18next", async () => {
+  const { createI18n } = await import("@t3tools/client-runtime/i18n");
+  const t = createI18n("en").getFixedT("en", "files");
+  return { useTranslation: () => ({ t }) };
+});
+
 vi.mock("~/state/session", () => ({
   environmentSession: { sessionStateAtom: () => authorizationMocks.sessionAtom },
 }));

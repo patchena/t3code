@@ -34,6 +34,14 @@ function recordEffect(action: string) {
   state.completed.resolve();
 }
 
+vi.mock("react-i18next", async () => {
+  const { createI18n } = await import("@t3tools/client-runtime/i18n");
+  const i18n = createI18n("en");
+  return {
+    useTranslation: (namespace: "workspace" | "common") => ({ t: i18n.getFixedT(null, namespace) }),
+  };
+});
+
 vi.mock("../components/CustomSnoozeDialog", () => ({ requestCustomSnooze: vi.fn() }));
 vi.mock("react", () => ({
   useCallback: (callback: unknown) => callback,

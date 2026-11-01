@@ -1,3 +1,4 @@
+import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 
 import { resolvePullRequestAuthorFilter } from "@t3tools/contracts";
@@ -22,7 +23,7 @@ import type {
 
 import { isStalePullRequestReply } from "@t3tools/client-runtime/pull-request-reply";
 import { toSortableTimestamp } from "@t3tools/client-runtime/state/thread-sort";
-import type { PullRequestListSort } from "./pullRequestListPreferences";
+import type { PullRequestListSort } from "~/components/pullRequest/pullRequestListPreferences";
 
 export interface EnvironmentPullRequestEntry extends PullRequestListEntry {
   readonly environmentId: EnvironmentId;
@@ -61,11 +62,11 @@ type ScopedEntry = PullRequestListEntry & { readonly environmentId?: string };
 const pullRequestViewerKey = (entry: ScopedEntry): string =>
   `${entry.environmentId ?? ""} ${entry.host}`;
 
-const GROUP_LABELS: Record<PullRequestGroupKey, string> = {
-  reviewRequested: "Review requested",
-  authored: "Authored",
-  others: "Others",
-};
+const GROUP_LABELS = (t: TFunction<"workspace">): Record<PullRequestGroupKey, string> => ({
+  reviewRequested: t(($) => $.git.reviewRequested),
+  authored: t(($) => $.git.authored),
+  others: t(($) => $.git.others),
+});
 
 function normalize(value: string | null | undefined): string | null {
   const trimmed = value?.trim().toLowerCase() ?? "";
@@ -277,6 +278,7 @@ export function matchesPullRequestFilters(
 export function groupPullRequestsByInvolvement<Entry extends ScopedEntry>(
   entries: ReadonlyArray<Entry>,
   viewers: PullRequestViewers,
+  t: TFunction<"workspace">,
 ): ReadonlyArray<PullRequestGroup<Entry>> {
   const buckets: Record<PullRequestGroupKey, Entry[]> = {
     reviewRequested: [],
@@ -294,7 +296,7 @@ export function groupPullRequestsByInvolvement<Entry extends ScopedEntry>(
   }
   return (["authored", "reviewRequested", "others"] as const)
     .filter((key) => buckets[key].length > 0)
-    .map((key) => ({ key, label: GROUP_LABELS[key], entries: buckets[key] }));
+    .map((key) => ({ key, label: GROUP_LABELS(t)[key], entries: buckets[key] }));
 }
 
 export function pullRequestEntryKey(entry: ScopedEntry): string {
@@ -452,6 +454,7 @@ export function partitionPullRequestsWithPriority<Entry extends PullRequestListE
   entries: ReadonlyArray<Entry>,
   authored: ReadonlyArray<Entry>,
   reviewRequested: ReadonlyArray<Entry>,
+  t: TFunction<"workspace">,
 ): ReadonlyArray<PullRequestGroup<Entry>> {
   const authoredByKey = new Map(authored.map((entry) => [pullRequestEntryKey(entry), entry]));
   const reviewByKey = new Map(
@@ -485,7 +488,7 @@ export function partitionPullRequestsWithPriority<Entry extends PullRequestListE
     ] as const
   )
     .filter((group) => group.entries.length > 0)
-    .map((group) => ({ ...group, label: GROUP_LABELS[group.key] }));
+    .map((group) => ({ ...group, label: GROUP_LABELS(t)[group.key] }));
 }
 
 export type PullRequestDiffStats = ReadonlyMap<

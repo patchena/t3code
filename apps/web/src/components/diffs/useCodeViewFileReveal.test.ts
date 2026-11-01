@@ -1,7 +1,7 @@
 import type { CodeViewScrollTarget } from "@pierre/diffs";
 import { describe, expect, it } from "vite-plus/test";
 
-import { createCodeViewFileReveal } from "./useCodeViewFileReveal";
+import { createCodeViewFileReveal } from "~/components/diffs/useCodeViewFileReveal";
 
 function viewer(initialItems: ReadonlyArray<string>) {
   const items = new Set(initialItems);

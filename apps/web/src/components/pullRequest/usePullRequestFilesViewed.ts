@@ -4,12 +4,12 @@ import { useSyncExternalStore } from "react";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
 
-import { filesViewedScope } from "./filesViewedStore";
+import { filesViewedScope } from "~/components/pullRequest/filesViewedStore";
 import {
   isFileViewed,
   isStaleViewedState,
   toFileViewedStates,
-} from "./pullRequestFilesViewed.logic";
+} from "~/components/pullRequest/pullRequestFilesViewed.logic";
 
 export interface PullRequestFilesViewedView {
   readonly enabled: boolean;

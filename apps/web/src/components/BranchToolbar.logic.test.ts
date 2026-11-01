@@ -10,7 +10,7 @@ import {
   resolveLocalCheckoutBranchMismatch,
   sanitizeNewRefName,
   shouldIncludeBranchPickerItem,
-} from "./BranchToolbar.logic";
+} from "~/components/BranchToolbar.logic";
 
 describe("resolveDraftEnvModeAfterBranchChange", () => {
   it("switches to local mode when returning from an existing worktree to the main worktree", () => {

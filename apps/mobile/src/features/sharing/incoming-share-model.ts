@@ -1,3 +1,4 @@
+import { mobileI18n } from "~/i18n";
 import {
   clampFileAttachmentUploadBytes,
   fileAttachmentTooLargeMessage,
@@ -117,7 +118,13 @@ export function selectIncomingShareAttachments(input: {
     }
     const maxFileAttachmentBytes = clampFileAttachmentUploadBytes(input.maxFileAttachmentBytes);
     if (attachment.sizeBytes > maxFileAttachmentBytes) {
-      warnings.push(fileAttachmentTooLargeMessage(attachment.name, maxFileAttachmentBytes));
+      warnings.push(
+        fileAttachmentTooLargeMessage(
+          attachment.name,
+          maxFileAttachmentBytes,
+          mobileI18n.getFixedT(null, "chat"),
+        ),
+      );
       continue;
     }
     attachments.push(attachment);
@@ -307,7 +314,13 @@ export async function buildIncomingShareDraft(input: {
           continue;
         }
         if (sizeBytes > PROVIDER_SEND_TURN_MAX_FILE_BYTES) {
-          warnings.push(fileAttachmentTooLargeMessage(name, PROVIDER_SEND_TURN_MAX_FILE_BYTES));
+          warnings.push(
+            fileAttachmentTooLargeMessage(
+              name,
+              PROVIDER_SEND_TURN_MAX_FILE_BYTES,
+              mobileI18n.getFixedT(null, "chat"),
+            ),
+          );
           if (persistedFileUri) {
             await releaseOwnedFiles(input.fileReader, [persistedFileUri]);
           }
@@ -326,7 +339,13 @@ export async function buildIncomingShareDraft(input: {
             continue;
           }
           if (sizeBytes > PROVIDER_SEND_TURN_MAX_FILE_BYTES) {
-            warnings.push(fileAttachmentTooLargeMessage(name, PROVIDER_SEND_TURN_MAX_FILE_BYTES));
+            warnings.push(
+              fileAttachmentTooLargeMessage(
+                name,
+                PROVIDER_SEND_TURN_MAX_FILE_BYTES,
+                mobileI18n.getFixedT(null, "chat"),
+              ),
+            );
             await releaseOwnedFiles(input.fileReader, [persistedFileUri]);
             continue;
           }

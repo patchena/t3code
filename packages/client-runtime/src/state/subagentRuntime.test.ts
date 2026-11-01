@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import {
   ProviderDriverKind,
   ProviderInstanceId,
@@ -17,6 +18,8 @@ import {
 } from "./subagentRuntime.ts";
 import { resolveSubagentMetadata } from "./subagentDisplay.ts";
 import { formatSubagentEffort } from "./threadExecution.ts";
+
+const t = createI18n("en").getFixedT("en", "activity");
 
 const at = (iso: string) => DateTime.makeUnsafe(iso);
 
@@ -104,23 +107,29 @@ describe("projectedSubagentsToRuntime workflow expansion", () => {
       ],
     };
     const modelSelection = workflowMemberModelSelection(settled!, instanceId);
-    const { modelSlug } = resolveSubagentMetadata({
-      model: settled!.model,
-      modelSelection,
-      provider,
-    });
+    const { modelSlug } = resolveSubagentMetadata(
+      {
+        model: settled!.model,
+        modelSelection,
+        provider,
+      },
+      t,
+    );
     expect(formatSubagentEffort({ modelSlug, modelSelection, provider })).toBe("xhigh");
   });
 
   it("names a workflow by the model it runs on when the provider reports none", () => {
     const [workflow] = projectedSubagentsToRuntime([subagent({ model: null })]);
     expect(
-      resolveSubagentMetadata({
-        model: workflow!.model,
-        modelSelection: { model: "claude-opus-5-5" },
-      }).modelLabel,
+      resolveSubagentMetadata(
+        {
+          model: workflow!.model,
+          modelSelection: { model: "claude-opus-5-5" },
+        },
+        t,
+      ).modelLabel,
     ).toBe("Claude Opus 5.5");
-    expect(resolveSubagentMetadata({ model: workflow!.model }).modelLabel).toBe("Not reported");
+    expect(resolveSubagentMetadata({ model: workflow!.model }, t).modelLabel).toBe("Not reported");
   });
 
   it.each(["completed", "cancelled", "failed"] as const)(

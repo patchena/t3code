@@ -1,4 +1,5 @@
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+import { useTranslation } from "react-i18next";
 import { XIcon } from "lucide-react";
 import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 
@@ -85,19 +86,20 @@ export function AppRouteModal({ label, children }: { label: string; children: Re
 }
 
 export function AppRouteModalClose() {
+  const { t } = useTranslation("common");
   return (
     <Tooltip>
       <TooltipTrigger
         render={
           <DialogPrimitive.Close
-            aria-label="Close"
+            aria-label={t(($) => $.actions.close)}
             render={<Button size="icon-sm" variant="ghost" />}
           />
         }
       >
         <XIcon />
       </TooltipTrigger>
-      <TooltipPopup side="bottom">Close (Esc)</TooltipPopup>
+      <TooltipPopup side="bottom">{t(($) => $.actions.closeEscape)}</TooltipPopup>
     </Tooltip>
   );
 }

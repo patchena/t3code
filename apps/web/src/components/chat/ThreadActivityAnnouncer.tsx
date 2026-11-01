@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useLiveRegion } from "../../hooks/useLiveRegion";
 
@@ -22,6 +23,7 @@ export const ThreadActivityAnnouncer = memo(function ThreadActivityAnnouncer({
   /** See isDetailBehindShell. */
   readonly detailBehind: boolean;
 }) {
+  const { t } = useTranslation("activity");
   const { regionRef, announce, clear } = useLiveRegion();
   const memoryRef = useRef<{ threadKey: string; memory: ThreadAnnouncementMemory } | null>(null);
 
@@ -34,16 +36,20 @@ export const ThreadActivityAnnouncer = memo(function ThreadActivityAnnouncer({
     }
     if (detailBehind) return;
     const previous = memoryRef.current?.threadKey === threadKey ? memoryRef.current.memory : null;
-    const { memory, announcement } = nextThreadAnnouncement(previous, {
-      status,
-      requestId,
-      runId,
-      runStatus,
-    });
+    const { memory, announcement } = nextThreadAnnouncement(
+      previous,
+      {
+        status,
+        requestId,
+        runId,
+        runStatus,
+      },
+      t,
+    );
     memoryRef.current = { threadKey, memory };
     if (previous === null) clear();
     else if (announcement !== null) announce(announcement);
-  }, [threadKey, status, requestId, runId, runStatus, detailBehind, announce, clear]);
+  }, [threadKey, status, requestId, runId, runStatus, detailBehind, announce, clear, t]);
 
   // No role="status": Orca 50 maps it to a status bar in Chromium and drops its updates.
   return <div ref={regionRef} aria-live="polite" className="sr-only" />;
