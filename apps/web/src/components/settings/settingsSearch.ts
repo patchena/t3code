@@ -913,6 +913,13 @@ const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["composer rich text tiptap bold italic markdown styled wysiwyg"],
   },
   {
+    id: "composer-spell-check",
+    title: (t) => t(($) => $.search.composerSpellCheck),
+    englishTitle: resources.en.settings.search.composerSpellCheck,
+    to: "/settings/chat",
+    searchTerms: ["spellcheck spelling typo misspelled underline red squiggle rechtschreibung"],
+  },
+  {
     id: "send-shortcut",
     title: (t) => t(($) => $.search.sendShortcut),
     englishTitle: resources.en.settings.search.sendShortcut,

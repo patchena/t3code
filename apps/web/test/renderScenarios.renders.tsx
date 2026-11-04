@@ -256,6 +256,7 @@ function Composer() {
       value={prompt.value}
       cursor={prompt.cursor}
       richTextEnabled
+      spellCheck
       contextRecords={new Map()}
       skills={[]}
       disabled={false}

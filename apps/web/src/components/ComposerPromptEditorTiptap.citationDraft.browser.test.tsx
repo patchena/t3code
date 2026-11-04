@@ -53,6 +53,7 @@ function Composer({
         editorRef={editorRef}
         value={question ? answer : prompt}
         cursor={0}
+        spellCheck
         contextRecords={new Map()}
         skills={[]}
         disabled={false}

@@ -34,11 +34,13 @@ const babysit: ServerProviderSkill = {
 function Composer({
   value,
   richTextEnabled,
+  spellCheck,
   skills,
   onChange,
 }: {
   value: string;
   richTextEnabled: boolean;
+  spellCheck: boolean;
   skills: ReadonlyArray<ServerProviderSkill>;
   onChange?: ComposerPromptEditorProps["onChange"] | undefined;
 }) {
@@ -49,6 +51,7 @@ function Composer({
       value={prompt.value}
       cursor={prompt.cursor}
       richTextEnabled={richTextEnabled}
+      spellCheck={spellCheck}
       contextRecords={new Map()}
       skills={skills}
       disabled={false}
@@ -67,9 +70,16 @@ function composer(
   richTextEnabled = true,
   skills: ReadonlyArray<ServerProviderSkill> = [],
   onChange?: ComposerPromptEditorProps["onChange"],
+  spellCheck = true,
 ) {
   return (
-    <Composer value={value} richTextEnabled={richTextEnabled} skills={skills} onChange={onChange} />
+    <Composer
+      value={value}
+      richTextEnabled={richTextEnabled}
+      spellCheck={spellCheck}
+      skills={skills}
+      onChange={onChange}
+    />
   );
 }
 
@@ -590,6 +600,30 @@ describe("Markdown markers around styled text", () => {
   });
 });
 
+it.each([false, true])(
+  "toggles spellcheck on the mounted editor without losing draft or selection (rich text: %s)",
+  async (richTextEnabled) => {
+    const value = "teh draft";
+    await using screen = await mountEditor(value, richTextEnabled);
+    const { editor } = screen;
+    const dom = editor.view.dom;
+    await act(async () => {
+      editor.commands.setTextSelection({ from: 2, to: 4 });
+    });
+    expect(dom.spellcheck).toBe(true);
+
+    for (const spellCheck of [false, true]) {
+      const next = await screen.update(value, richTextEnabled, [], undefined, spellCheck);
+      expect(next).toBe(editor);
+      expect(next.view.dom).toBe(dom);
+      expect(dom.spellcheck).toBe(spellCheck);
+      expect(serializeEditorDoc(editor.state.doc).value).toBe(value);
+      expect(editor.state.selection.from).toBe(2);
+      expect(editor.state.selection.to).toBe(4);
+    }
+  },
+);
+
 const file = {
   type: "file",
   id: "file-1",
@@ -624,6 +658,7 @@ describe("composer context undo lifetime", () => {
         editorRef,
         value: draft.value,
         cursor: 0,
+        spellCheck: true,
         contextRecords: new Map(
           draft.files.map((entry) => [
             fileContextReference(entry).contextId,

@@ -85,6 +85,7 @@ export const settingsDe = {
     proactivePanels: "Pull-Request- und Änderungs-Panels proaktiv öffnen",
     skillsInSlashMenu: "Skills im Slash-Menü anzeigen",
     composerRichText: "Rich-Text-Eingabe",
+    composerSpellCheck: "Rechtschreibprüfung",
     sendShortcut: "Tastenkürzel zum Senden",
     followUpBehavior: "Folgeverhalten",
     providerUpdateChecks: "Provider-Updateprüfungen",
@@ -256,6 +257,7 @@ export const settingsDe = {
     proactivePanels: "Pull-Request- und Änderungs-Panels proaktiv öffnen",
     showSkillsInSlashMenu: "Skills im Slash-Menü anzeigen",
     richTextComposer: "Rich-Text-Eingabe",
+    composerSpellCheck: "Rechtschreibprüfung",
     sendShortcut: "Tastenkürzel zum Senden",
     followUpBehavior: "Folgeverhalten",
     contextWindowIndicator: "Kontextfensteranzeige",
@@ -324,6 +326,9 @@ export const settingsDe = {
     composer: "Eingabe",
     showFormattedMarkdownAsYouType: "Zeigt Markdown bereits beim Schreiben formatiert an.",
     richTextComposerLabel: "Rich-Text-Eingabe",
+    composerSpellCheckLabel: "Rechtschreibprüfung",
+    underlineMisspelledWordsInTheComposer:
+      "Unterstreicht falsch geschriebene Wörter in der Eingabe.",
     chooseWhenEnterSendsAPromptOrInserts:
       "Wähle, wann Enter einen Prompt sendet oder eine neue Zeile einfügt",
     sendShortcutLabel: "Tastenkürzel zum Senden",

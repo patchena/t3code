@@ -151,6 +151,7 @@ export interface ComposerPromptEditorProps {
   value: string;
   cursor: number;
   richTextEnabled?: boolean;
+  spellCheck: boolean;
   literalText?: boolean;
   contextRecords: ComposerDraftContextRecords;
   buildContextClipboardFragment?:
@@ -864,6 +865,7 @@ function ComposerPromptEditorTiptapInner(
     value,
     cursor,
     richTextEnabled,
+    spellCheck,
     literalText = false,
     contextRecords,
     buildContextClipboardFragment,
@@ -1018,6 +1020,7 @@ function ComposerPromptEditorTiptapInner(
     "data-composer-rich-text": richText ? "true" : "false",
     role: "textbox",
     "aria-multiline": "true",
+    spellcheck: spellCheck ? "true" : "false",
     ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
     ...(disabled ? { "aria-readonly": "true" } : {}),
     ...(!disabled && suggestionListId

@@ -593,6 +593,9 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.composerRichTextEnabled !== DEFAULT_UNIFIED_SETTINGS.composerRichTextEnabled
       ? [t(($) => $.panels.richTextComposer)]
       : []),
+    ...(settings.composerSpellCheckEnabled !== DEFAULT_UNIFIED_SETTINGS.composerSpellCheckEnabled
+      ? [t(($) => $.panels.composerSpellCheck)]
+      : []),
     ...(settings.sendShortcut !== DEFAULT_UNIFIED_SETTINGS.sendShortcut
       ? [t(($) => $.panels.sendShortcut)]
       : []),
@@ -732,6 +735,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       proactivePanelsEnabled: DEFAULT_UNIFIED_SETTINGS.proactivePanelsEnabled,
       showSkillsInSlashMenu: DEFAULT_UNIFIED_SETTINGS.showSkillsInSlashMenu,
       composerRichTextEnabled: DEFAULT_UNIFIED_SETTINGS.composerRichTextEnabled,
+      composerSpellCheckEnabled: DEFAULT_UNIFIED_SETTINGS.composerSpellCheckEnabled,
       sendShortcut: DEFAULT_UNIFIED_SETTINGS.sendShortcut,
       followUpBehavior: DEFAULT_UNIFIED_SETTINGS.followUpBehavior,
       contextWindowMeterEnabled: DEFAULT_UNIFIED_SETTINGS.contextWindowMeterEnabled,
@@ -1283,6 +1287,32 @@ export function ChatSettingsPanel() {
                 updateSettings({ composerRichTextEnabled: Boolean(checked) })
               }
               aria-label={t(($) => $.panels.richTextComposer)}
+            />
+          }
+        />
+        <SettingsRow
+          {...searchableSetting("composer-spell-check", t)}
+          description={t(($) => $.panels.underlineMisspelledWordsInTheComposer)}
+          resetAction={
+            settings.composerSpellCheckEnabled !==
+            DEFAULT_UNIFIED_SETTINGS.composerSpellCheckEnabled ? (
+              <SettingResetButton
+                label={t(($) => $.panels.composerSpellCheckLabel)}
+                onClick={() =>
+                  updateSettings({
+                    composerSpellCheckEnabled: DEFAULT_UNIFIED_SETTINGS.composerSpellCheckEnabled,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.composerSpellCheckEnabled}
+              onCheckedChange={(checked) =>
+                updateSettings({ composerSpellCheckEnabled: Boolean(checked) })
+              }
+              aria-label={t(($) => $.panels.composerSpellCheck)}
             />
           }
         />
