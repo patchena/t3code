@@ -15,6 +15,7 @@ import { cn } from "~/lib/utils";
 import { ensureLocalApi } from "~/localApi";
 import { useDesktopUpdateState } from "~/state/desktopUpdate";
 import { usePrimaryManagedPolicy } from "~/state/managedPolicy";
+import { getPatcherBridge, usePatchState } from "~/state/patcher";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import {
   canCheckForUpdate,
@@ -47,6 +48,7 @@ import {
 } from "~/components/sidebar/DesktopUpdateStatusIcon";
 import { SidebarUpdateReleaseNotes } from "~/components/sidebar/SidebarUpdateReleaseNotes";
 import { SidebarUpdateCapsule } from "~/components/sidebar/SidebarUpdateCapsule";
+import { SidebarPatchCapsule } from "~/components/sidebar/SidebarPatchCapsule";
 import { UpdateEverythingDialog } from "~/components/sidebar/UpdateEverythingDialog";
 import type {
   UpdateEverythingRun,
@@ -164,7 +166,19 @@ export async function downloadLocalUpdate(
   try {
     const result = await bridge.downloadUpdate();
     if (result.completed && notifyDownloaded) {
-      showDesktopUpdateDownloadedToast(bridge, result.state, t);
+      const patcher = getPatcherBridge();
+      if (patcher) {
+        if (await patcher.waitReady()) {
+          await installLocalUpdate(
+            bridge,
+            t,
+            reportError,
+            result.state.downloadedVersion ?? undefined,
+          );
+        }
+      } else {
+        showDesktopUpdateDownloadedToast(bridge, result.state, t);
+      }
     }
     const actionError = shouldToastDesktopUpdateActionResult(result)
       ? getDesktopUpdateActionError(result)
@@ -223,6 +237,7 @@ function SidebarUpdateControl() {
   const state = useDesktopUpdateState();
   // The desktop updates this machine, whose policy the primary environment reports.
   const updatesDenial = managedUpdatesDenial(usePrimaryManagedPolicy());
+  const patch = usePatchState();
   const [isActionPending, setIsActionPending] = useState(false);
   const [isConfirmingEverything, setIsConfirmingEverything] = useState(false);
   const [checkAnimationKey, setCheckAnimationKey] = useState(0);
@@ -442,6 +457,22 @@ function SidebarUpdateControl() {
       onConfirm={() => void runEverything()}
     />
   );
+
+  if (patch && patch.phase !== "idle" && patch.phase !== "installed") {
+    return (
+      <SidebarMenuItem className="ml-auto flex min-w-0 flex-1">
+        <SidebarPatchCapsule
+          state={patch}
+          onInstall={async () => {
+            const bridge = window.desktopBridge;
+            if (!bridge) throw new Error(t(($) => $.updates.patchUnavailable));
+            await installLocalUpdate(bridge, t, toastUpdateError, patch.version ?? undefined);
+          }}
+        />
+        {confirmDialog}
+      </SidebarMenuItem>
+    );
+  }
 
   if (run !== null) {
     const local: UpdateRunLocalState =

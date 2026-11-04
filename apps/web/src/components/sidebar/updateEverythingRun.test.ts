@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { serverEnvironment } from "~/state/server";
-import { startDesktopUpdateLaunchNotice } from "./updateEverythingRun";
+import {
+  startDesktopUpdateLaunchNotice,
+  waitForUpdateRestart,
+} from "~/components/sidebar/updateEverythingRun";
 
 function relaunchWhileRestarting(environmentId: EnvironmentId) {
   const now = 1_800_000_000_000;
@@ -67,4 +70,28 @@ describe("startDesktopUpdateLaunchNotice", () => {
       stop();
     }
   });
+});
+
+describe("waitForUpdateRestart", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it.each([true, false])(
+    "waits for the patcher's %s decision without starting a countdown",
+    async (ready) => {
+      let decide: ((ready: boolean) => void) | undefined;
+      const decision = new Promise<boolean>((resolve) => {
+        decide = resolve;
+      });
+      vi.stubGlobal("window", { t3codePatcher: { waitReady: () => decision } });
+      const timer = vi.spyOn(globalThis, "setTimeout");
+      const restart = waitForUpdateRestart(5_000);
+      expect(timer).not.toHaveBeenCalled();
+      if (!decide) throw new Error("Patch decision is not initialized.");
+      decide(ready);
+      expect(await restart).toBe(ready);
+    },
+  );
 });

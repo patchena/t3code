@@ -1,9 +1,11 @@
 import type { DesktopUpdateState } from "@t3tools/contracts";
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
 import "~/index.css";
-import { act, render } from "../../../test/render";
+import { act, render, stubGlobal } from "../../../test/render";
+import type { PatcherBridge, PatchState } from "~/state/patcher";
 import { SidebarUpdatePill } from "./SidebarUpdatePill";
 
 const mocks = vi.hoisted(() => {
@@ -82,6 +84,62 @@ function publish(update: DesktopUpdateState | null) {
 }
 
 const releaseNotes = () => document.querySelector('[aria-label="Update release notes"]');
+
+describe("SidebarUpdatePill patcher", () => {
+  it.each([
+    ["en", "Patched update ready", "Install", "Open thread"],
+    ["de", "Gepatchtes Update bereit", "Installieren", "Thread öffnen"],
+  ] as const)(
+    "installs a ready patch before its thread is bound in %s",
+    async (language, label, install, openThread) => {
+      const update: DesktopUpdateState = {
+        ...nightlyUpdate([]),
+        status: "downloaded",
+        downloadedVersion: "0.0.50-nightly.2",
+      };
+      setup(update);
+      const state: PatchState = {
+        phase: "ready",
+        job: "patch-job",
+        version: update.downloadedVersion,
+        message: "",
+        threadLink: null,
+      };
+      const listeners = new Set<(state: PatchState) => void>();
+      const patcher: PatcherBridge = {
+        getState: async () => state,
+        onState: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        waitReady: async () => true,
+        cancel: async () => {},
+        retry: async () => true,
+      };
+      const installUpdate = vi.fn(async () => ({ accepted: true, state: update }));
+      using _patcher = stubGlobal("t3codePatcher", patcher);
+      using _desktop = stubGlobal("desktopBridge", { installUpdate });
+      await using screen = await render(<SidebarUpdatePill />, { i18n: createI18n(language) });
+      await using _reset = {
+        async [Symbol.asyncDispose]() {
+          await act(() => {
+            for (const listener of listeners) listener({ ...state, phase: "idle" });
+          });
+        },
+      };
+      await expect.element(screen.getByRole("button", { name: label, exact: true })).toBeVisible();
+      await expect
+        .element(screen.getByRole("button", { name: "Thread", exact: true }))
+        .not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: label, exact: true }));
+      await expect
+        .element(page.getByRole("button", { name: openThread, exact: true }))
+        .not.toBeInTheDocument();
+      await userEvent.click(page.getByRole("button", { name: install, exact: true }));
+      expect(installUpdate).toHaveBeenCalledExactlyOnceWith(update.downloadedVersion);
+    },
+  );
+});
 
 describe("SidebarUpdatePill release notes", () => {
   it("closes when the release notes stop applying", async () => {

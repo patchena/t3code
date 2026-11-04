@@ -9,6 +9,7 @@ import { AsyncResult, Atom } from "effect/reactivity";
 import { APP_VERSION } from "~/branding";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { desktopUpdateStateAtom } from "~/state/desktopUpdate";
+import { getPatcherBridge } from "~/state/patcher";
 import { serverEnvironment } from "~/state/server";
 import { resolveVersionMismatch } from "~/versionSkew";
 import type { ServerUpdateOutcome, ServerUpdateTarget } from "~/components/ServerUpdateAction";
@@ -137,6 +138,8 @@ export function waitForServerUpdateHandoff(
 let decideRestart: ((restart: boolean) => void) | null = null;
 
 export function waitForUpdateRestart(delayMs: number): Promise<boolean> {
+  const patcher = getPatcherBridge();
+  if (patcher) return patcher.waitReady();
   return new Promise((resolve) => {
     const decide = (restart: boolean) => {
       clearTimeout(timer);

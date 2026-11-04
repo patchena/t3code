@@ -36,6 +36,21 @@ The confirmation counts the running threads that the restarts will interrupt,
 and how many can resume afterwards. See **Continue threads after restarts**
 below.
 
+## Nightly-Updates mit Patcher
+
+Bei einer Linux-Nightly mit eingerichtetem T3-Code-Patcher bereitet der Patcher
+nach dem Download deine Anpassungen für die Zielversion vor. Währenddessen bleibt
+die App benutzbar. Der Neustart wartet auf die Patchfreigabe statt auf einen
+Countdown. Erst nach erfolgreicher Vorbereitung und Autorisierung der Installation
+wird die Desktop-App beendet und aktualisiert.
+
+Mit **Später** schiebst du die Vorbereitung oder Installation auf. Ein fertiges
+Update lässt sich über **Installieren** starten; nach einem Fehler oder Aufschieben
+startet **Erneut versuchen** die Vorbereitung erneut. Den zugehörigen Thread kannst
+du öffnen, sobald er mit dem Updateauftrag verknüpft ist. Ein Abbruch des
+Autorisierungsdialogs lässt das vorbereitete Update für einen erneuten
+Installationsversuch bereit.
+
 ## Switch between Stable and Nightly
 
 In the desktop app, change **Settings → About → Update track**. T3 Code shows each
