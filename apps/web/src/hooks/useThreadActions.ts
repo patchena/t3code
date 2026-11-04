@@ -827,7 +827,7 @@ export function useThreadActions() {
       markThreadVisited(scopedThreadKey(target), wokeAt);
     }
     showThreadUndoNotice({
-      action: t(($) => $.sidebar.settled),
+      action: "Settled",
       claim: action,
       undo: () => runUndoPlan(target, undoPlan),
     });
@@ -942,7 +942,7 @@ export function useThreadActions() {
       return result;
     }
     showThreadUndoNotice({
-      action: t(($) => $.sidebar.snoozed),
+      action: "Snoozed",
       claim: action,
       undo: () => runUndoPlan(target, ThreadUndo.planThreadUndo("snooze")),
     });

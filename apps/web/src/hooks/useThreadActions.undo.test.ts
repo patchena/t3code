@@ -1,6 +1,7 @@
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { appI18n } from "~/i18n";
 
 import { useThreadActions } from "./useThreadActions";
 import { threadEnvironment } from "../state/threads";
@@ -123,21 +124,29 @@ beforeEach(() => {
   threadShell.snoozedUntil = null;
   shellLoaded.current = true;
 });
-afterEach(() => {
+afterEach(async () => {
   vi.runAllTimers();
   vi.useRealTimers();
   vi.restoreAllMocks();
+  await appI18n.changeLanguage("en");
 });
 
 describe("concurrent thread action Undo", () => {
-  it.each([
-    ["settleThread", "settle", "unsettle", "Settled"],
-    ["snoozeThread", "snooze", "unsnooze", "Snoozed"],
-    ["unpinThread", "unpin", "pin", "Unpinned"],
-    ["archiveThread", "archive", "unarchive", "Archived"],
-  ] as const)(
-    "%s retains one undo for concurrent successful requests",
-    async (handler, action, inverse, notice) => {
+  it.each(
+    (
+      [
+        ["settleThread", "settle", "unsettle", "Settled"],
+        ["snoozeThread", "snooze", "unsnooze", "Snoozed"],
+        ["unpinThread", "unpin", "pin", "Unpinned"],
+        ["archiveThread", "archive", "unarchive", "Archived"],
+      ] as const
+    ).flatMap(([handler, action, inverse, notice]) =>
+      (["en", "de"] as const).map((language) => ({ handler, action, inverse, notice, language })),
+    ),
+  )(
+    "$handler retains one undo for concurrent successful requests ($language)",
+    async ({ handler, action, inverse, notice, language }) => {
+      await appI18n.changeLanguage(language);
       const actions = useThreadActions();
       const run = () =>
         handler === "snoozeThread"
