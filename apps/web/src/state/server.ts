@@ -173,10 +173,19 @@ export const primaryServerAvailableEditorsAtom = Atom.make(
 
 const EMPTY_ENVIRONMENT_THEMES: ReadonlyArray<EnvironmentTheme> = [];
 
-export const primaryServerEnvironmentThemesAtom = Atom.make(
-  (get): ReadonlyArray<EnvironmentTheme> =>
-    get(primaryServerConfigAtom)?.environmentThemes ?? EMPTY_ENVIRONMENT_THEMES,
-).pipe(Atom.withLabel("web-primary-server-environment-themes"));
+// Without a local environment, the first connected environment that publishes themes supplies them.
+export const environmentThemesAtom = Atom.make((get): ReadonlyArray<EnvironmentTheme> => {
+  if (get(primaryEnvironmentIdAtom) !== null) {
+    return get(primaryServerConfigAtom)?.environmentThemes ?? EMPTY_ENVIRONMENT_THEMES;
+  }
+  for (const environmentId of get(environmentCatalog.catalogValueAtom).entries.keys()) {
+    const themes = get(serverEnvironment.configValueAtom(environmentId))?.environmentThemes;
+    if (themes !== undefined && themes.length > 0) {
+      return themes;
+    }
+  }
+  return EMPTY_ENVIRONMENT_THEMES;
+}).pipe(Atom.withLabel("web-environment-themes"));
 
 export const providersIgnoringCheckedAtAtom = Atom.family((environmentId: EnvironmentId) =>
   Atom.make((get): ReadonlyArray<ServerProvider> =>
