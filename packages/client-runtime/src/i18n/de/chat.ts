@@ -423,6 +423,8 @@ export const chatDe = {
     scrollEnd: "Zum Ende scrollen",
     untitled: "Unbenannte Unterhaltung",
     chatGptPlan: "ChatGPT-Tarif wird verwendet",
+    chatGptSpeedNotice:
+      "Fast und Ultrafast sind mit dieser ChatGPT-Verbindung nicht verfügbar. Nutze eine bestehende Codex-CLI-Anmeldung für die Geschwindigkeitsoptionen, die dein Konto unterstützt.",
     jumpToMessage: "Zur Nachricht springen: {{text}}",
     userMessage: "Nutzernachricht",
     previousTurn: "Vorheriger Durchlauf",

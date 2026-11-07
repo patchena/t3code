@@ -58,7 +58,6 @@ import {
   type SettingsSearchItem,
 } from "~/components/settings/settingsSearch";
 import { useAvailableSettingsSearchItems } from "~/components/settings/useAvailableSettingsSearchItems";
-import { validateSettingsScopeSearch } from "~/components/settings/settingsScope";
 import { useSettingsSectionNavigation } from "~/components/settings/useSettingsSectionNavigation";
 import { workspaceAreaProps } from "~/lib/workspaceFocus";
 
@@ -140,8 +139,6 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   );
   const navigate = useNavigate();
   const currentHash = useLocation({ select: (location) => location.hash });
-  const currentSearch = useLocation({ select: (location) => location.search });
-  const scopeSearch = validateSettingsScopeSearch(currentSearch);
   const activePath = SETTINGS_DETAIL_PAGE_PARENTS[pathname] ?? pathname;
   const navPaths = navGroups.flatMap((group) => group.paths);
   const sectionNavigation = useSettingsSectionNavigation(
@@ -154,7 +151,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   // Below md the nav is an icon rail; searching expands it over the page.
   const [compactSearchOpen, setCompactSearchOpen] = useState(false);
   const [activeResultIndex, setActiveResultIndex] = useState(0);
-  const searchableItems = useAvailableSettingsSearchItems(scopeSearch);
+  const searchableItems = useAvailableSettingsSearchItems();
   const results = searchSettings(query, t, searchableItems);
   const isSearching = query.trim().length > 0;
   const hasResults = results.length > 0;

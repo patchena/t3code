@@ -601,5 +601,6 @@ export const composerEn = {
   sideChatStartFailed: "Could not start a side chat.",
   sideChatNotReached: "The side chat was created, but it did not reach this client.",
   sideChatUnavailable: "The side chat is no longer available.",
+  sideChatModeFailed: "Could not set the side chat's permission mode.",
   sideChatSendFailed: "Could not send the side chat message.",
 } as const;

@@ -1,4 +1,3 @@
-import { ThemeError } from "~/themeErrors";
 import { pipe } from "effect/Function";
 import type { EnvironmentTheme } from "@t3tools/contracts";
 import * as Equal from "effect/Equal";
@@ -31,7 +30,7 @@ import {
 } from "./lib/contextChipAccents";
 
 import { appAtomRegistry, subscribeAtomChanges } from "./rpc/atomRegistry";
-import { environmentThemesAtom } from "./state/server";
+import { themeServerEnvironmentThemesAtom } from "./state/server";
 
 export { EMBER_THEME, GROVE_THEME, IRIS_THEME, OCEAN_THEME, T3_CHAT_THEME, THEME_COLOR_ROLES };
 export type { ThemeAppearance, ThemeColorRole, ThemeColors, ThemeDefinition, ThemeVariants };
@@ -316,7 +315,7 @@ export function publishedThemeDefinitions(
 // Every reconnect snapshot delivers a fresh but usually identical array; keeping the
 // previous one skips regenerating palettes and repainting the document for it.
 const publishedThemesAtom = Atom.make((get): ReadonlyArray<EnvironmentTheme> => {
-  const next = get(environmentThemesAtom);
+  const next = get(themeServerEnvironmentThemesAtom);
   const previous = Option.getOrNull(get.self<ReadonlyArray<EnvironmentTheme>>());
   return previous !== null && Equal.equals(previous, next) ? previous : next;
 }).pipe(Atom.withLabel("web-published-environment-themes"));
@@ -510,10 +509,9 @@ function decodeThemeColors(colors: ThemeColors): ThemeColors {
     THEME_COLOR_ROLES.map((role) => {
       const color = toCanonicalThemeColor(colors[role]);
       if (!color) {
-        throw new ThemeError({
-          message: `The color for "${role}" must be a literal CSS color such as oklch(0.62 0.2 280).`,
-          detail: { kind: "invalidColor", role },
-        });
+        throw new Error(
+          `The color for "${role}" must be a literal CSS color such as oklch(0.62 0.2 280).`,
+        );
       }
       return [role, color];
     }),
@@ -1311,26 +1309,14 @@ function storedThemeHasCollectionId(storedTheme: unknown, collectionId: string):
 
 export function installCustomTheme(theme: ThemeDefinition): ThemeDefinition {
   if (RESERVED_THEME_IDS.has(theme.id)) {
-    throw new ThemeError({
-      message: `The theme id "${theme.id}" is reserved.`,
-      detail: {
-        kind: "reserved",
-        id: theme.id,
-      },
-    });
+    throw new Error(`The theme id "${theme.id}" is reserved.`);
   }
   const library = getWritableCustomThemeLibrary();
   if (
     BUILT_IN_THEME_DEFINITIONS.some((existing) => existing.id === theme.id) ||
     library.storedThemes.some((storedTheme) => storedThemeHasId(storedTheme, theme.id))
   ) {
-    throw new ThemeError({
-      message: `A theme named "${theme.label}" is already installed.`,
-      detail: {
-        kind: "alreadyInstalled",
-        name: theme.label,
-      },
-    });
+    throw new Error(`A theme named "${theme.label}" is already installed.`);
   }
   const canonicalTheme = canonicalizeThemeDefinition(theme);
   const themes = [...library.themes, canonicalTheme];
@@ -1340,26 +1326,14 @@ export function installCustomTheme(theme: ThemeDefinition): ThemeDefinition {
 
 export function updateCustomTheme(theme: ThemeDefinition): ThemeDefinition {
   if (RESERVED_THEME_IDS.has(theme.id)) {
-    throw new ThemeError({
-      message: `The theme id "${theme.id}" is reserved.`,
-      detail: {
-        kind: "reserved",
-        id: theme.id,
-      },
-    });
+    throw new Error(`The theme id "${theme.id}" is reserved.`);
   }
 
   const library = getWritableCustomThemeLibrary();
   const themes = library.themes;
   const themeIndex = themes.findIndex((existing) => existing.id === theme.id);
   if (themeIndex === -1) {
-    throw new ThemeError({
-      message: `The theme "${theme.label}" is not installed.`,
-      detail: {
-        kind: "notInstalled",
-        name: theme.label,
-      },
-    });
+    throw new Error(`The theme "${theme.label}" is not installed.`);
   }
 
   const canonicalTheme = canonicalizeThemeDefinition(theme);
@@ -1385,21 +1359,14 @@ export function replaceCustomThemeCollection(
   themes: ReadonlyArray<ThemeDefinition>,
   options?: { expectedCollection?: ReadonlyArray<ThemeDefinition> },
 ): ReadonlyArray<ThemeDefinition> {
-  if (themes.length === 0)
-    throw new ThemeError({
-      message: "A theme collection cannot be empty.",
-      detail: { kind: "collectionEmpty" },
-    });
+  if (themes.length === 0) throw new Error("A theme collection cannot be empty.");
 
   const validated = themes.map((theme) => parseStoredTheme(theme));
   if (
     validated.some((theme) => theme === null || theme.collection?.id !== collectionId) ||
     new Set(validated.map((theme) => theme?.id)).size !== validated.length
   ) {
-    throw new ThemeError({
-      message: "That theme collection is invalid.",
-      detail: { kind: "collectionInvalid" },
-    });
+    throw new Error("That theme collection is invalid.");
   }
   const replacement = validated as ThemeDefinition[];
   const library = readWritableCustomThemeLibrary();
@@ -1409,10 +1376,7 @@ export function replaceCustomThemeCollection(
     options?.expectedCollection &&
     JSON.stringify(currentCollection) !== JSON.stringify(options.expectedCollection)
   ) {
-    throw new ThemeError({
-      message: "Your installed themes changed while this package was downloading. Try again.",
-      detail: { kind: "libraryChanged" },
-    });
+    throw new Error("Your installed themes changed while this package was downloading. Try again.");
   }
   const occupiedIds = new Set(BUILT_IN_THEME_DEFINITIONS.map((theme) => theme.id));
   for (const storedTheme of library.storedThemes) {
@@ -1428,13 +1392,7 @@ export function replaceCustomThemeCollection(
     (theme) => RESERVED_THEME_IDS.has(theme.id) || occupiedIds.has(theme.id),
   );
   if (conflictingTheme) {
-    throw new ThemeError({
-      message: `A theme named "${conflictingTheme.label}" is already installed.`,
-      detail: {
-        kind: "alreadyInstalled",
-        name: conflictingTheme.label,
-      },
-    });
+    throw new Error(`A theme named "${conflictingTheme.label}" is already installed.`);
   }
 
   const nextStoredThemes: unknown[] = [];
@@ -1475,130 +1433,68 @@ export function removeCustomThemes(themeIds: ReadonlyArray<string>): void {
 }
 
 function parseThemeColorOverrides(value: unknown): ThemeColorOverrides {
-  if (!isRecord(value))
-    throw new ThemeError({
-      message: "Theme colors must be objects.",
-      detail: { kind: "colorsObject" },
-    });
+  if (!isRecord(value)) throw new Error("Theme colors must be objects.");
 
   const overrides: Partial<Record<ThemeColorRole, string>> = {};
   for (const [role, color] of Object.entries(value)) {
     if (!THEME_COLOR_ROLE_SET.has(role)) {
-      throw new ThemeError({
-        message: `"${role}" is not a supported theme color role.`,
-        detail: {
-          kind: "unsupportedRole",
-          role,
-        },
-      });
+      throw new Error(`"${role}" is not a supported theme color role.`);
     }
     const normalized = toCanonicalThemeColor(color);
     if (!normalized) {
-      throw new ThemeError({
-        message: `The color for "${role}" must be a literal CSS color such as oklch(0.62 0.2 280).`,
-        detail: { kind: "invalidColor", role },
-      });
+      throw new Error(
+        `The color for "${role}" must be a literal CSS color such as oklch(0.62 0.2 280).`,
+      );
     }
     overrides[role as ThemeColorRole] = normalized;
   }
   if (Object.keys(overrides).length === 0) {
-    throw new ThemeError({
-      message: "Add at least one color role to the theme file.",
-      detail: {
-        kind: "colorRequired",
-      },
-    });
+    throw new Error("Add at least one color role to the theme file.");
   }
   return overrides;
 }
 
 export function parseThemeFile(value: unknown): ThemeDefinition {
   if (!isRecord(value)) {
-    throw new ThemeError({
-      message: "Theme files must contain a JSON object.",
-      detail: { kind: "jsonObject" },
-    });
+    throw new Error("Theme files must contain a JSON object.");
   }
   if (value.version !== THEME_FILE_VERSION) {
-    throw new ThemeError({
-      message: `This theme file uses an unsupported version. Expected ${THEME_FILE_VERSION}.`,
-      detail: { kind: "unsupportedVersion", version: THEME_FILE_VERSION },
-    });
+    throw new Error(`This theme file uses an unsupported version. Expected ${THEME_FILE_VERSION}.`);
   }
 
   const name = value.name;
   const appearance = value.appearance;
   const rawColors = value.colors;
-  if (!isThemeLabel(name))
-    throw new ThemeError({
-      message: "Theme files need a name (48 characters or fewer).",
-      detail: {
-        kind: "nameRequired",
-      },
-    });
+  if (!isThemeLabel(name)) throw new Error("Theme files need a name (48 characters or fewer).");
   if (!isThemeAppearance(appearance)) {
-    throw new ThemeError({
-      message: 'Theme files need an appearance of "light" or "dark".',
-      detail: {
-        kind: "appearanceRequired",
-      },
-    });
+    throw new Error('Theme files need an appearance of "light" or "dark".');
   }
-  if (!isRecord(rawColors))
-    throw new ThemeError({
-      message: "Theme files need a colors object.",
-      detail: { kind: "colorsRequired" },
-    });
+  if (!isRecord(rawColors)) throw new Error("Theme files need a colors object.");
 
   const id = value.id === undefined ? themeIdFromName(name) : value.id;
   if (!isThemeId(id)) {
-    throw new ThemeError({
-      message: "Theme ids may only contain lowercase letters, numbers, and hyphens.",
-      detail: {
-        kind: "idInvalid",
-      },
-    });
+    throw new Error("Theme ids may only contain lowercase letters, numbers, and hyphens.");
   }
   if (RESERVED_THEME_IDS.has(id)) {
-    throw new ThemeError({
-      message: `The theme id "${id}" is reserved.`,
-      detail: { kind: "reserved", id },
-    });
+    throw new Error(`The theme id "${id}" is reserved.`);
   }
 
   const overrides = parseThemeColorOverrides(rawColors);
   const collection = parseThemeCollection(value.collection);
   if (value.collection !== undefined && !collection) {
-    throw new ThemeError({
-      message: "Theme collections need a valid id and label.",
-      detail: {
-        kind: "collectionRequired",
-      },
-    });
+    throw new Error("Theme collections need a valid id and label.");
   }
 
   const fallback = getDefaultThemeColors(appearance);
   const variants: Partial<Record<ThemeAppearance, ThemeColors>> = {};
   if (value.variants !== undefined) {
-    if (!isRecord(value.variants))
-      throw new ThemeError({
-        message: "Theme variants must be an object.",
-        detail: { kind: "variantsObject" },
-      });
+    if (!isRecord(value.variants)) throw new Error("Theme variants must be an object.");
     for (const [variantAppearance, variantColors] of Object.entries(value.variants)) {
       if (!isThemeAppearance(variantAppearance)) {
-        throw new ThemeError({
-          message: 'Theme variants may only be named "light" or "dark".',
-          detail: {
-            kind: "variantsNames",
-          },
-        });
+        throw new Error('Theme variants may only be named "light" or "dark".');
       }
       if (variantAppearance === appearance) {
-        throw new ThemeError({
-          message: `Theme variants must not repeat the base appearance "${appearance}".`,
-          detail: { kind: "baseAppearance", appearance },
-        });
+        throw new Error(`Theme variants must not repeat the base appearance "${appearance}".`);
       }
       const variantFallback = getDefaultThemeColors(variantAppearance);
       variants[variantAppearance] = {

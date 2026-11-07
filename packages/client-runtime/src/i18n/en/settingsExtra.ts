@@ -871,6 +871,8 @@ export const settingsExtraEn = {
     created: " · Created {{time}}",
     delete: "Delete",
     unarchiveFailed: "Failed to unarchive thread",
+    unarchiveNamed: "Unarchive {{title}}",
+    deleteNamed: "Delete {{title}}",
     deleteFailed: "Failed to delete thread",
     actionFailed: "Archived thread action failed",
     createdLabel: " · Created ",

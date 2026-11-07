@@ -15,7 +15,8 @@ export const voiceEn = {
     backgrounded: "Voice input stopped when the app moved to the background.",
     finishFailed: "Could not finish voice recording.",
     transcribeFailed: "Could not transcribe this recording.",
-    environmentFailed: "Voice transcription on this environment failed.",
+    environmentFailed: "Voice transcription failed. Check the destination in Settings → Voice.",
+    openRouterModelMissing: "Choose an OpenRouter model in Settings → Voice.",
     draftChanged: "The draft changed while voice input was running. The transcript was not added.",
     noSpeech: "No speech was detected.",
     processingFailed: "Microphone processing failed.",
@@ -70,6 +71,10 @@ export const voiceEn = {
     startToastFailed: "Could not start voice input",
     notAvailable: "Voice input is not available",
     modelNotReady: "The model is not ready. Try downloading it again.",
+    noMatchingModel:
+      "No model matches your language. Choose a model or change the language in Voice settings.",
+    modelsLoadFailed: "Could not load transcription models. Check the connection and try again.",
+    modelSelectFailed: "The model downloaded, but this environment could not select it. Try again.",
     modelDownloadFailed:
       "Could not download the model. Check this environment's connection and try again.",
     annotationUpdateFailed: "Could not update annotation voice input",
@@ -103,8 +108,7 @@ export const voiceEn = {
     fallbackEnvironment: "your transcription environment",
     stepModel: "Model",
     stepReady: "Ready to dictate",
-    fallbackModel: "English transcription model",
-    recommendedEnglish: "Recommended for English",
+    recommendedFor: "Recommended for {{language}}",
     downloadDescription:
       "Download the {{size}} MB model to {{environment}}. Microphone audio is sent there for transcription, as chosen in Voice settings.",
     sileroDescription:
@@ -113,15 +117,18 @@ export const voiceEn = {
     verifying: "Verifying download…",
     starting: "Starting download…",
     downloaded: "{{percent}}% downloaded",
+    loadingModels: "Loading transcription models…",
     listMicrophonesFailed: "Could not list microphones. You can still use the system default.",
     selectedMicrophoneUnavailable:
       "The selected microphone is unavailable. Choose another or use the system default.",
     features:
       "Speak and transcribe in multiple languages or translate into English, and get names and technical terms right with the dictionary in Voice settings.",
     chooseModel: "Choose another model or language",
+    chooseFirstModel: "Choose a model or language",
+    retryCatalog: "Retry loading models",
     cancelDownload: "Cancel download",
     downloading: "Downloading…",
-    retryDownload: "Retry download",
+    retryDownload: "Try again",
     downloadModel: "Download model",
     askAdmin: "Ask an environment admin to download",
     customize: "Customize in Voice settings",
@@ -231,7 +238,7 @@ export const voiceEn = {
     noProviders: "No providers available.",
     enable: "Clean up transcripts with a provider",
     enableDescription:
-      "Sends each transcript and the draft text around your cursor to the draft environment’s text generation provider to fix punctuation, numbers, and spoken corrections. Your audio is never sent.",
+      "Sends the transcript and nearby draft text to the text generation provider on the draft’s environment to fix punctuation, numbers, and spoken corrections. Sends text only; off by default.",
     instructions: "Cleanup instructions",
     instructionsDescription: "Use the built-in instructions or write your own.",
     builtIn: "Built-in",
@@ -276,14 +283,21 @@ export const voiceEn = {
       toggle: "Toggle: press to start, press again to stop",
     },
     transcriptionSection: "Transcription",
-    destination: "Send microphone audio to",
-    destinationDescription:
-      "Microphone audio is sent to this environment to transcribe, then discarded. Choose Off to turn voice input off on this device. This choice is saved on this device only.",
+    destination: "Transcribe with",
+    destinationShort: "Use",
     off: "Off",
+    onEnvironment: "On an environment",
+    cloudVia: "Cloud via {{environment}}",
+    providerVia: "{{provider}} via {{environment}}",
+    via: "via {{environment}}",
+    unavailableEnvironment: "unavailable environment",
+    manageOpenRouter: "Manage OpenRouter",
+    manageKey: "Manage key",
     chosenUnavailable: "Chosen environment (unavailable)",
     destinationUnsupported:
-      "{{environment}} can’t transcribe audio. Pick an environment that can to use voice input.",
+      "{{environment}} can’t transcribe audio locally. Choose a different destination.",
     language: "Language",
+    languageCloud: "The cloud provider can detect your language automatically.",
     languageDetects: "{{model}} detects the language automatically.",
     languageFixed: "{{model}} uses one fixed language.",
     languageEmpty:
@@ -292,6 +306,7 @@ export const voiceEn = {
     translateDescription: "Speak any language and get English text.",
     optionsSection: "Transcription options",
     silence: "Silence filtering",
+    silenceOpenAi: "OpenAI handles silence automatically.",
     silenceDescription:
       "Skip silence and other non-speech audio before transcription, keeping a short buffer so words aren’t cut off.",
     fillers: "Remove filler words",

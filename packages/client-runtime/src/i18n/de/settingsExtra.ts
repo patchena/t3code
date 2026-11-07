@@ -900,6 +900,8 @@ export const settingsExtraDe = {
     created: " · Erstellt {{time}}",
     delete: "Löschen",
     unarchiveFailed: "Thread konnte nicht aus dem Archiv geholt werden",
+    unarchiveNamed: "{{title}} aus Archiv holen",
+    deleteNamed: "{{title}} löschen",
     deleteFailed: "Thread konnte nicht gelöscht werden",
     actionFailed: "Aktion für archivierten Thread fehlgeschlagen",
     createdLabel: " · Erstellt ",

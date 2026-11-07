@@ -16,6 +16,7 @@ export const settingsProviderDe = {
   reconnectChatGpt: "ChatGPT erneut verbinden",
   reconnectChatGptHint: "Melde dich bei OpenAI mit dem hier ausgewählten Konto an.",
   chatGptAccount: "Zu verbindendes ChatGPT-Konto",
+  removeChatGptConnection: "Verbindung entfernen",
   differentAccount: "Anderes Konto verwenden",
   continueChatGpt: "Mit ChatGPT fortfahren",
   manageUsage: "Nutzung verwalten",
@@ -33,10 +34,6 @@ export const settingsProviderDe = {
   managementKey: "Verwaltungsschlüssel",
   optionalLabel: "Bezeichnung (optional)",
   hubLabelPlaceholder: "Standardmäßig der Hostname des Hubs",
-  updateCursorUsage: "Cursor-Kontonutzung aktualisieren",
-  cursorUsage: "Cursor-Kontonutzung",
-  cursorUsageHint:
-    "Lies deine vorhandene Cursor-CLI-Anmeldung aus dem macOS-Schlüsselbund, um den Kontoverlauf und monatliche Limits anzuzeigen. macOS fragt dich möglicherweise nach einer Zugriffsfreigabe.",
   noHubs: "Keine Hubs eingerichtet.",
   disabled: "Deaktiviert",
   cliProxyDisabled: "CLI Proxy · Deaktiviert",

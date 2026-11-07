@@ -635,5 +635,6 @@ export const composerDe = {
   sideChatStartFailed: "Nebenchat konnte nicht gestartet werden.",
   sideChatNotReached: "Der Nebenchat wurde erstellt, hat diesen Client aber nicht erreicht.",
   sideChatUnavailable: "Der Nebenchat ist nicht mehr verfügbar.",
+  sideChatModeFailed: "Der Berechtigungsmodus des Nebenchats konnte nicht festgelegt werden.",
   sideChatSendFailed: "Die Nachricht im Nebenchat konnte nicht gesendet werden.",
 } as const;

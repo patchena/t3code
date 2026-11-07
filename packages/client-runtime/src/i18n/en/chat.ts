@@ -411,6 +411,8 @@ export const chatEn = {
     scrollEnd: "Scroll to end",
     untitled: "Untitled thread",
     chatGptPlan: "Using ChatGPT plan",
+    chatGptSpeedNotice:
+      "Fast and Ultrafast are unavailable with this ChatGPT connection. Use an existing Codex CLI login for speed options your account supports.",
     jumpToMessage: "Jump to message: {{text}}",
     userMessage: "User message",
     previousTurn: "Previous turn",

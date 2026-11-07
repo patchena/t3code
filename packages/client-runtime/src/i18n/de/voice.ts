@@ -16,7 +16,9 @@ export const voiceDe = {
       "Die Spracheingabe wurde beendet, weil die App in den Hintergrund gewechselt ist.",
     finishFailed: "Sprachaufnahme konnte nicht abgeschlossen werden.",
     transcribeFailed: "Diese Aufnahme konnte nicht transkribiert werden.",
-    environmentFailed: "Die Sprachtranskription in diesem Environment ist fehlgeschlagen.",
+    environmentFailed:
+      "Die Sprachtranskription ist fehlgeschlagen. Prüfe das Ziel unter Einstellungen → Spracheingabe.",
+    openRouterModelMissing: "Wähle ein OpenRouter-Modell unter Einstellungen → Spracheingabe.",
     draftChanged:
       "Der Entwurf hat sich während der Spracheingabe geändert. Das Transkript wurde nicht eingefügt.",
     noSpeech: "Es wurde keine Sprache erkannt.",
@@ -72,6 +74,12 @@ export const voiceDe = {
     startToastFailed: "Spracheingabe konnte nicht gestartet werden",
     notAvailable: "Spracheingabe ist nicht verfügbar",
     modelNotReady: "Das Modell ist nicht bereit. Lade es erneut herunter.",
+    noMatchingModel:
+      "Kein Modell passt zu deiner Sprache. Wähle ein Modell oder ändere die Sprache in den Spracheinstellungen.",
+    modelsLoadFailed:
+      "Transkriptionsmodelle konnten nicht geladen werden. Prüfe die Verbindung und versuche es erneut.",
+    modelSelectFailed:
+      "Das Modell wurde heruntergeladen, aber dieses Environment konnte es nicht auswählen. Versuche es erneut.",
     modelDownloadFailed:
       "Das Modell konnte nicht heruntergeladen werden. Prüfe die Verbindung dieses Environments und versuche es erneut.",
     annotationUpdateFailed: "Spracheingabe für die Anmerkung konnte nicht aktualisiert werden",
@@ -106,8 +114,7 @@ export const voiceDe = {
     fallbackEnvironment: "deinem Transkriptions-Environment",
     stepModel: "Modell",
     stepReady: "Bereit zum Diktieren",
-    fallbackModel: "Englisches Transkriptionsmodell",
-    recommendedEnglish: "Empfohlen für Englisch",
+    recommendedFor: "Empfohlen für {{language}}",
     downloadDescription:
       "Lade das {{size}}-MB-Modell auf {{environment}} herunter. Mikrofonaudio wird zur Transkription dorthin gesendet, wie in den Spracheinstellungen gewählt.",
     sileroDescription:
@@ -116,6 +123,7 @@ export const voiceDe = {
     verifying: "Download wird geprüft…",
     starting: "Download wird gestartet…",
     downloaded: "{{percent}} % heruntergeladen",
+    loadingModels: "Transkriptionsmodelle werden geladen…",
     listMicrophonesFailed:
       "Mikrofone konnten nicht aufgelistet werden. Du kannst weiterhin den Systemstandard verwenden.",
     selectedMicrophoneUnavailable:
@@ -123,9 +131,11 @@ export const voiceDe = {
     features:
       "Sprich und transkribiere in mehreren Sprachen oder übersetze ins Englische, und schreibe Namen und Fachbegriffe mit dem Wörterbuch in den Spracheinstellungen richtig.",
     chooseModel: "Anderes Modell oder andere Sprache wählen",
+    chooseFirstModel: "Modell oder Sprache wählen",
+    retryCatalog: "Modelle erneut laden",
     cancelDownload: "Download abbrechen",
     downloading: "Wird heruntergeladen…",
-    retryDownload: "Download wiederholen",
+    retryDownload: "Erneut versuchen",
     downloadModel: "Modell herunterladen",
     askAdmin: "Bitte einen Environment-Admin um den Download",
     customize: "In den Spracheinstellungen anpassen",
@@ -236,7 +246,7 @@ export const voiceDe = {
     noProviders: "Keine Provider verfügbar.",
     enable: "Transkripte mit einem Provider bereinigen",
     enableDescription:
-      "Sendet jedes Transkript und den Entwurfstext um deinen Cursor an den Textgenerierungs-Provider des Entwurfs-Environments, um Zeichensetzung, Zahlen und gesprochene Korrekturen zu verbessern. Dein Audio wird nie gesendet.",
+      "Sendet das Transkript und den umgebenden Entwurfstext an den Textgenerierungs-Provider des Entwurfs-Environments, um Zeichensetzung, Zahlen und gesprochene Korrekturen zu verbessern. Sendet nur Text; standardmäßig aus.",
     instructions: "Bereinigungsanweisungen",
     instructionsDescription: "Verwende die integrierten Anweisungen oder schreibe eigene.",
     builtIn: "Integriert",
@@ -281,14 +291,21 @@ export const voiceDe = {
       toggle: "Umschalten: drücken zum Starten, erneut drücken zum Beenden",
     },
     transcriptionSection: "Transkription",
-    destination: "Mikrofonaudio senden an",
-    destinationDescription:
-      "Mikrofonaudio wird zur Transkription an dieses Environment gesendet und danach verworfen. Wähle „Aus“, um die Spracheingabe auf diesem Gerät zu deaktivieren. Diese Auswahl wird nur auf diesem Gerät gespeichert.",
+    destination: "Transkribieren mit",
+    destinationShort: "Nutzen",
     off: "Aus",
+    onEnvironment: "Auf einem Environment",
+    cloudVia: "Cloud über {{environment}}",
+    providerVia: "{{provider}} über {{environment}}",
+    via: "über {{environment}}",
+    unavailableEnvironment: "nicht verfügbares Environment",
+    manageOpenRouter: "OpenRouter verwalten",
+    manageKey: "Schlüssel verwalten",
     chosenUnavailable: "Gewähltes Environment (nicht verfügbar)",
     destinationUnsupported:
-      "{{environment}} kann kein Audio transkribieren. Wähle ein Environment, das es kann, um die Spracheingabe zu nutzen.",
+      "{{environment}} kann Audio nicht lokal transkribieren. Wähle ein anderes Ziel.",
     language: "Sprache",
+    languageCloud: "Der Cloud-Provider kann deine Sprache automatisch erkennen.",
     languageDetects: "{{model}} erkennt die Sprache automatisch.",
     languageFixed: "{{model}} verwendet eine feste Sprache.",
     languageEmpty:
@@ -297,6 +314,7 @@ export const voiceDe = {
     translateDescription: "Sprich in einer beliebigen Sprache und erhalte englischen Text.",
     optionsSection: "Transkriptionsoptionen",
     silence: "Stillefilterung",
+    silenceOpenAi: "OpenAI verarbeitet Stille automatisch.",
     silenceDescription:
       "Überspringt Stille und andere Nicht-Sprache vor der Transkription und behält einen kurzen Puffer, damit keine Wörter abgeschnitten werden.",
     fillers: "Füllwörter entfernen",
