@@ -71,4 +71,22 @@ describe("LocalApi", () => {
 
     await expect(createLocalApi().dialogs.confirm("Delete this thread?")).resolves.toBe(false);
   });
+
+  it("counts a native context menu as open until it settles", async () => {
+    let settle: (id: string | null) => void = () => {};
+    const menu = new Promise<string | null>((resolve) => {
+      settle = resolve;
+    });
+    Object.defineProperty(testWindow(), "desktopBridge", {
+      configurable: true,
+      value: { showContextMenu: () => menu },
+    });
+    const { createLocalApi, isContextMenuOpen } = await import("./localApi");
+
+    const shown = createLocalApi().contextMenu.show([{ id: "rename", label: "Rename" }]);
+    expect(isContextMenuOpen()).toBe(true);
+    settle(null);
+    await shown;
+    expect(isContextMenuOpen()).toBe(false);
+  });
 });

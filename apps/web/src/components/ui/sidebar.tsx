@@ -23,6 +23,8 @@ import { setLocalStorageItem } from "~/hooks/useLocalStorage";
 import { resolveSidebarState, type ResponsiveSidebarState } from "./sidebarState";
 import * as Schema from "effect/Schema";
 import { announceSidebarVisibility } from "~/lib/accessibilityAnnouncements";
+import { isEditableFocused } from "~/lib/editableFocus";
+import { focusWorkspaceContent } from "~/lib/workspaceFocus";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -266,18 +268,114 @@ function Sidebar({
   variant = "sidebar",
   collapsible = "offcanvas",
   resizable = false,
+  holdPeek,
   className,
   children,
   ...props
-}: React.ComponentProps<"div"> & {
+}: Omit<React.ComponentProps<"div">, "ref"> & {
   side?: "left" | "right";
   variant?: "sidebar" | "floating" | "inset";
   collapsible?: "offcanvas" | "icon" | "none";
   resizable?: boolean | SidebarResizableOptions;
+  holdPeek?: () => boolean;
 }) {
   const { t } = useTranslation("files");
   const { isMobile, state, openMobile, setOpenMobile, setMobileSheetElement } = useSidebar();
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [peek, setPeek] = React.useState(false);
   const offcanvasCollapsed = !isMobile && collapsible === "offcanvas" && state === "collapsed";
+  if (peek && !offcanvasCollapsed) setPeek(false);
+  const concealed = offcanvasCollapsed && !peek;
+
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the overlay follows the document pointer, which can pass it without ever entering it
+  React.useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!peek || !container) return;
+    const outside = (clientX: number) => {
+      const box = container.getBoundingClientRect();
+      const rail = container.querySelector('[data-slot="sidebar-rail"]')?.getBoundingClientRect();
+      const reach = Math.max(
+        container.offsetWidth,
+        rail ? (side === "left" ? rail.right - box.left : box.right - rail.left) : 0,
+      );
+      return side === "left"
+        ? clientX > reach
+        : clientX < document.documentElement.clientWidth - reach;
+    };
+    const blocked = () =>
+      holdPeek?.() ||
+      container.querySelector('[data-popup-open][aria-expanded="true"]') !== null ||
+      document.querySelector(
+        ':is([data-slot="dialog-popup"], [data-slot="alert-dialog-popup"], [data-slot="command-dialog-popup"], [data-slot="sheet-popup"])[data-open]',
+      ) !== null;
+    let pointerX: number | undefined;
+    let buttons = 0;
+    const leave = () => {
+      const focused = document.activeElement;
+      const inside = focused instanceof HTMLElement && container.contains(focused);
+      if ((inside && isEditableFocused()) || blocked()) return;
+      if (inside && !focusWorkspaceContent()) focused.blur();
+      setPeek(false);
+    };
+    const settle = () => {
+      if (pointerX !== undefined && outside(pointerX)) leave();
+    };
+    const onPointer = (event: PointerEvent) => {
+      pointerX = event.clientX;
+      buttons = event.buttons;
+      if (buttons === 0) settle();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType !== "touch") return;
+      pointerX = event.clientX;
+      settle();
+    };
+    const onPointerOut = (event: PointerEvent) => {
+      if (event.relatedTarget !== null || event.pointerType === "touch" || event.buttons !== 0)
+        return;
+      const { clientX, clientY } = event;
+      if (
+        outside(clientX) ||
+        clientX <= 0 ||
+        clientY <= 0 ||
+        clientX >= window.innerWidth - 1 ||
+        clientY >= window.innerHeight - 1
+      )
+        leave();
+    };
+    const onFocusIn = (event: FocusEvent) => {
+      if (!(event.target instanceof Node && container.contains(event.target))) settle();
+    };
+    const onFocusOut = (event: FocusEvent) => {
+      if (event.relatedTarget === null) settle();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key !== "Escape" ||
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.keyCode === 229 ||
+        buttons !== 0 ||
+        blocked()
+      )
+        return;
+      event.preventDefault();
+      moveFocusOutOfCollapsingSidebar();
+      setPeek(false);
+    };
+    const controller = new AbortController();
+    const { signal } = controller;
+    document.addEventListener("pointermove", onPointer, { signal });
+    document.addEventListener("pointerover", onPointer, { signal });
+    document.addEventListener("pointerup", onPointer, { signal });
+    document.addEventListener("pointercancel", onPointer, { signal });
+    document.addEventListener("pointerdown", onPointerDown, { signal });
+    document.addEventListener("pointerout", onPointerOut, { signal });
+    document.addEventListener("focusin", onFocusIn, { signal });
+    document.addEventListener("focusout", onFocusOut, { signal });
+    document.addEventListener("keydown", onKeyDown, { signal });
+    return () => controller.abort();
+  }, [holdPeek, peek, side]);
 
   const resolvedResizable = resolveSidebarResizable({ collapsible, isMobile, resizable });
   const instanceContextValue: SidebarInstanceContextProps = { side, resizable: resolvedResizable };
@@ -342,11 +440,28 @@ function Sidebar({
 
   return (
     <SidebarInstanceContext value={instanceContextValue}>
+      {concealed ? (
+        <div
+          aria-hidden
+          className={cn(
+            "fixed inset-y-0 z-50 hidden w-1 [-webkit-app-region:no-drag] md:block",
+            side === "left" ? "left-0" : "right-0",
+          )}
+          data-slot="sidebar-edge"
+          onPointerMove={(event) => {
+            if (event.pointerType !== "touch" && event.buttons === 0) setPeek(true);
+          }}
+          onPointerOut={(event) => {
+            if (event.relatedTarget === null) setPeek(false);
+          }}
+        />
+      ) : null}
       <div
         className="group peer hidden text-sidebar-foreground md:block"
-        data-collapsible={state === "collapsed" ? collapsible : ""}
+        data-collapsible={state === "collapsed" && !peek ? collapsible : ""}
         data-collapsible-mode={collapsible}
-        inert={offcanvasCollapsed}
+        data-peek={peek}
+        inert={concealed}
         data-side={side}
         data-slot="sidebar"
         data-state={state}
@@ -356,7 +471,7 @@ function Sidebar({
           className={cn(
             "relative w-(--sidebar-width) bg-transparent",
             "[[data-panel-animations=true]_&]:transition-[width] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
-            "group-data-[collapsible=offcanvas]:w-0",
+            "group-data-[collapsible=offcanvas]:w-0 group-data-[peek=true]:w-0",
             "group-data-[side=right]:rotate-180",
             variant === "floating" || variant === "inset"
               ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]"
@@ -366,7 +481,7 @@ function Sidebar({
         />
         <div
           className={cn(
-            "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) md:flex",
+            "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) md:flex group-data-[peek=true]:z-50 group-data-[peek=true]:shadow-lg",
             "[[data-panel-animations=true]_&]:transition-[left,right,width] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
             side === "left"
               ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
@@ -377,6 +492,7 @@ function Sidebar({
             className,
           )}
           data-slot="sidebar-container"
+          ref={containerRef}
           {...props}
         >
           <div

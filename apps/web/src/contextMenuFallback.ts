@@ -230,10 +230,6 @@ function isNodeWithinMenuStack(target: EventTarget | null, menuStack: readonly H
 
 let activeContextMenuDismiss: ((restoreFocus?: boolean) => void) | null = null;
 
-export function isContextMenuOpen(): boolean {
-  return activeContextMenuDismiss !== null;
-}
-
 export function dismissContextMenu(restoreFocus = true): void {
   activeContextMenuDismiss?.(restoreFocus);
   activeContextMenuDismiss = null;

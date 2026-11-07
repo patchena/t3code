@@ -5,6 +5,11 @@ import { dismissContextMenu, showContextMenuFallback } from "./contextMenuFallba
 import { readBrowserClientSettings, writeBrowserClientSettings } from "./clientPersistenceStorage";
 
 let cachedApi: LocalApi | undefined;
+let openContextMenus = 0;
+
+export function isContextMenuOpen(): boolean {
+  return openContextMenus > 0;
+}
 
 export function createLocalApi(): LocalApi {
   return {
@@ -44,10 +49,14 @@ export function createLocalApi(): LocalApi {
         items: readonly ContextMenuItem<T>[],
         position?: { x: number; y: number },
       ): Promise<T | null> => {
-        if (window.desktopBridge) {
-          return window.desktopBridge.showContextMenu(items, position) as Promise<T | null>;
+        openContextMenus += 1;
+        try {
+          return await (window.desktopBridge
+            ? (window.desktopBridge.showContextMenu(items, position) as Promise<T | null>)
+            : showContextMenuFallback(items, position));
+        } finally {
+          openContextMenus -= 1;
         }
-        return showContextMenuFallback(items, position);
       },
       // Unlike native menus, the DOM fallback needs dismissal when underlying state disappears.
       close: async () => {

@@ -1,9 +1,5 @@
 import { expect, it } from "vite-plus/test";
-import {
-  dismissContextMenu,
-  isContextMenuOpen,
-  showContextMenuFallback,
-} from "./contextMenuFallback";
+import { dismissContextMenu, showContextMenuFallback } from "./contextMenuFallback";
 
 const items = [
   { id: "heading", label: "Thread actions", header: true },
@@ -70,7 +66,7 @@ it("opens and cancels one submenu level at a time, then returns to the thread", 
   expect(label()).toBe("Path");
   press("Escape");
   expect(document.activeElement).toBe(parent);
-  expect(isContextMenuOpen()).toBe(true);
+  expect(document.querySelector('[data-context-menu][data-level="0"]')).not.toBeNull();
   press("Escape");
   expect(document.activeElement).toBe(fixture.origin);
   await expect(result).resolves.toBeNull();

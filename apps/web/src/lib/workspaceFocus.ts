@@ -36,7 +36,7 @@ function isWorkspaceElementVisible(element: HTMLElement): boolean {
   if (
     !element.isConnected ||
     element.closest(
-      '[hidden], [inert], [data-closed], [aria-hidden="true"], [data-chat-column-maximized-away="true"], [data-slot="sidebar"][data-state="collapsed"], [data-workspace-unavailable="true"]',
+      '[hidden], [inert], [data-closed], [aria-hidden="true"], [data-chat-column-maximized-away="true"], [data-workspace-unavailable="true"]',
     )
   )
     return false;
@@ -370,6 +370,10 @@ export function requestWorkspaceContentFocus() {
   // Resolve after the layout commits: closing a maximized panel makes the
   // composer available again, while hiding a sidebar may leave only the panel.
   requestWorkspaceFocus({ area: "content" });
+}
+
+export function focusWorkspaceContent(): boolean {
+  return controller?.focus("content", false) ?? false;
 }
 
 let pendingPaletteDirection: 1 | -1 | undefined;

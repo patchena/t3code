@@ -1839,6 +1839,8 @@ code {
   }
 }
 
+[data-slot="sidebar"][data-peek="true"] ~ * .drag-region,
+[data-slot="sidebar"][data-peek="true"] .drag-region,
 .drag-region button,
 .drag-region input,
 .drag-region textarea,

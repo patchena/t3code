@@ -28,6 +28,7 @@ import { isEditableFocused } from "../lib/editableFocus";
 import { isPreviewFocused } from "../lib/previewFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { isModelPickerOpen } from "../modelPickerVisibility";
+import { isContextMenuOpen } from "~/localApi";
 import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { cn, isMacPlatform } from "../lib/utils";
@@ -295,9 +296,14 @@ function registerThreadUndoCommands(
 function registerAppShellCommands(router: AnyRouter, shellElement: Element): () => void {
   // The provider mirrors the visibility it renders onto its wrapper, so the
   // committed state is readable when a key arrives.
-  const readSidebarVisible = () =>
-    shellElement.closest('[data-slot="sidebar-wrapper"]')?.getAttribute("data-sidebar-state") ===
-    "expanded";
+  const readSidebarVisible = () => {
+    const wrapper = shellElement.closest('[data-slot="sidebar-wrapper"]');
+    return (
+      wrapper !== null &&
+      (wrapper.getAttribute("data-sidebar-state") === "expanded" ||
+        wrapper.querySelector(':scope > [data-slot="sidebar"][data-peek="true"]') !== null)
+    );
+  };
   const disposers = [
     registerThreadUndoCommands(router, readSidebarVisible),
     registerNavigationHistoryCommands(router),
@@ -463,6 +469,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
         <Sidebar
           side="left"
           collapsible="offcanvas"
+          holdPeek={isContextMenuOpen}
           data-app-sidebar=""
           {...sidebarArea}
           role="navigation"

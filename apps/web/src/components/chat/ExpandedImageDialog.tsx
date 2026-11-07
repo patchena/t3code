@@ -12,7 +12,7 @@ import { useAssetUrlRefresh, useAssetUrlState } from "../../assets/assetUrls";
 import { OpenMediaLink } from "../media/OpenMediaLink";
 import { MediaActions, type MediaActionSource } from "../media/MediaActions";
 import { MediaVideoPlayer } from "../media/MediaVideoPlayer";
-import { isContextMenuOpen } from "../../contextMenuFallback";
+import { isContextMenuOpen } from "~/localApi";
 import {
   SnapShotAccessibilityData,
   SnapShotContentsButton,
