@@ -58,6 +58,14 @@ in a new thread's model picker to add or remove them. A regular click returns to
 single model. Choose a base branch and send. Each selection starts a separate thread
 and worktree while you stay in the new thread composer. This requires a Git project.
 
+## Hide the sidebar
+
+On web and desktop, the sidebar toggle at the top left or `mod+b` hides the sidebar
+so the chat uses the full window width. While it is hidden, move the pointer to the
+left window edge to show it over the chat without moving the chat. It hides again
+when the pointer leaves it, and stays while you type in it or a menu or dialog
+opened from it is open. Press `Escape` to hide it. Use the toggle to keep it shown.
+
 ## Pin and reorder threads
 
 Pin a thread from its menu to keep it above your active work.
