@@ -1,10 +1,10 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { useTranslation } from "react-i18next";
 import {
-  type DesktopBridge,
-  type DesktopUpdateState,
-  managedUpdatesDenial,
-} from "@t3tools/contracts";
+  downloadLocalUpdate,
+  installLocalUpdate,
+  toastUpdateError,
+} from "~/components/desktopUpdate.actions";
+import { useTranslation } from "react-i18next";
+import { type DesktopUpdateState, managedUpdatesDenial } from "@t3tools/contracts";
 import { TriangleAlertIcon } from "lucide-react";
 import { type ComponentProps, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -15,12 +15,11 @@ import { cn } from "~/lib/utils";
 import { ensureLocalApi } from "~/localApi";
 import { useDesktopUpdateState } from "~/state/desktopUpdate";
 import { usePrimaryManagedPolicy } from "~/state/managedPolicy";
-import { getPatcherBridge, usePatchState } from "~/state/patcher";
+import { usePatchState } from "~/state/patcher";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import {
   canCheckForUpdate,
   getArm64IntelBuildWarningDescription,
-  getDesktopUpdateActionError,
   getDesktopUpdateButtonTooltip,
   getDesktopUpdateDownloadedVersion,
   getDesktopUpdateIdleTooltip,
@@ -28,9 +27,7 @@ import {
   isDesktopUpdateButtonDisabled,
   resolveDesktopUpdateButtonAction,
   shouldShowArm64IntelBuildWarning,
-  shouldToastDesktopUpdateActionResult,
 } from "~/components/desktopUpdate.logic";
-import { showDesktopUpdateDownloadedToast } from "~/components/desktopUpdate.toast";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import {
   Popover,
@@ -59,10 +56,7 @@ import {
   saveUpdateEverythingResult,
   useUpdateEverythingRun,
 } from "~/components/sidebar/updateEverythingRun";
-import {
-  type ReportLocalUpdateError,
-  useUpdateEverything,
-} from "~/components/sidebar/useUpdateEverything";
+import { useUpdateEverything } from "~/components/sidebar/useUpdateEverything";
 
 type SidebarUpdatePopoverChangeDetails = Parameters<
   NonNullable<ComponentProps<typeof Popover>["onOpenChange"]>
@@ -149,83 +143,6 @@ function SidebarUpdateArchitectureWarningContent() {
       <AlertDescription>{description}</AlertDescription>
     </Alert>
   );
-}
-
-const toastUpdateError: ReportLocalUpdateError = (title, description) => {
-  toastManager.add(stackedThreadToast({ type: "error", title, description }));
-};
-
-export async function downloadLocalUpdate(
-  bridge: DesktopBridge,
-  {
-    notifyDownloaded,
-    reportError = toastUpdateError,
-  }: { readonly notifyDownloaded: boolean; readonly reportError?: ReportLocalUpdateError },
-  t: TFunction<"workspace">,
-): Promise<boolean> {
-  try {
-    const result = await bridge.downloadUpdate();
-    if (result.completed && notifyDownloaded) {
-      const patcher = getPatcherBridge();
-      if (patcher) {
-        if (await patcher.waitReady()) {
-          await installLocalUpdate(
-            bridge,
-            t,
-            reportError,
-            result.state.downloadedVersion ?? undefined,
-          );
-        }
-      } else {
-        showDesktopUpdateDownloadedToast(bridge, result.state, t);
-      }
-    }
-    const actionError = shouldToastDesktopUpdateActionResult(result)
-      ? getDesktopUpdateActionError(result)
-      : null;
-    if (actionError)
-      reportError(
-        t(($) => $.updates.couldNotDownloadUpdate),
-        actionError,
-      );
-    return result.completed;
-  } catch (error) {
-    reportError(
-      t(($) => $.updates.couldNotStartUpdateDownload),
-      error instanceof Error ? error.message : t(($) => $.updates.anUnexpectedErrorOccurred),
-    );
-    return false;
-  }
-}
-
-export async function installLocalUpdate(
-  bridge: DesktopBridge,
-  t: TFunction<"workspace">,
-  reportError: ReportLocalUpdateError = toastUpdateError,
-  expectedVersion?: string,
-): Promise<boolean> {
-  try {
-    const result = await bridge.installUpdate(expectedVersion);
-    if (!result.accepted) {
-      showDesktopUpdateDownloadedToast(bridge, result.state, t);
-      return false;
-    }
-    const actionError = shouldToastDesktopUpdateActionResult(result)
-      ? getDesktopUpdateActionError(result)
-      : null;
-    if (!actionError) return true;
-    reportError(
-      t(($) => $.updates.couldNotInstallUpdate),
-      actionError,
-    );
-    return false;
-  } catch (error) {
-    reportError(
-      t(($) => $.updates.couldNotInstallUpdate),
-      error instanceof Error ? error.message : t(($) => $.updates.anUnexpectedErrorOccurred),
-    );
-    return false;
-  }
 }
 
 export function SidebarUpdatePill() {

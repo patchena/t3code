@@ -1,3 +1,4 @@
+import type { ReportLocalUpdateError } from "~/components/desktopUpdate.actions";
 import { useTranslation } from "react-i18next";
 import { useAtomValue } from "@effect/atom-react";
 import { PROVIDER_DISPLAY_NAMES } from "@t3tools/contracts";
@@ -49,8 +50,6 @@ export function isHostedByThisApp(
       isDesktopLocalConnectionTarget(environment.entry.target))
   );
 }
-
-export type ReportLocalUpdateError = (title: string, description: string) => void;
 
 /** `channelSwitch` makes the run move the fleet to that release's track instead of updating it. */
 export function useUpdateEverything(

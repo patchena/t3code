@@ -1,3 +1,4 @@
+import { downloadLocalUpdate, installLocalUpdate } from "~/components/desktopUpdate.actions";
 import { useTranslation } from "react-i18next";
 import type { SettingsTranslation } from "~/components/settings/settingsSearch";
 import {
@@ -231,15 +232,11 @@ function AboutVersionSection() {
     const action = updateState ? resolveDesktopUpdateButtonAction(updateState) : "none";
 
     if (action === "download") {
-      void bridge.downloadUpdate().catch((error: unknown) => {
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: t(($) => $.panels.couldNotDownloadUpdate),
-            description: error instanceof Error ? error.message : t(($) => $.panels.downloadFailed),
-          }),
-        );
-      });
+      if (isUpdateActionPending) return;
+      setIsUpdateActionPending(true);
+      void downloadLocalUpdate(bridge, { notifyDownloaded: true }, tWorkspace).finally(() =>
+        setIsUpdateActionPending(false),
+      );
       return;
     }
 
@@ -270,19 +267,7 @@ function AboutVersionSection() {
         setIsUpdateActionPending(false);
         return;
       }
-      void bridge
-        .installUpdate()
-        .catch((error: unknown) => {
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: t(($) => $.panels.couldNotInstallUpdate),
-              description:
-                error instanceof Error ? error.message : t(($) => $.panels.installFailed),
-            }),
-          );
-        })
-        .finally(() => setIsUpdateActionPending(false));
+      void installLocalUpdate(bridge, tWorkspace).finally(() => setIsUpdateActionPending(false));
       return;
     }
 
