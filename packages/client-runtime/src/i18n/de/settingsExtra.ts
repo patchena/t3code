@@ -44,6 +44,21 @@ export const settingsExtraDe = {
     space: "{{size}} GiB auf {{environment}}",
     copyCommand: "Befehl kopieren",
     dismiss: "Ausblenden",
+    reclaimableDescription:
+      "Diese Datenbanken belegen noch Speicher, der durch die Verlaufsbereinigung freigegeben wurde.",
+    reclaimingTitle: "{{size}} GiB auf {{environment}} werden zurückgewonnen",
+    reclaimingDescription: "T3 Code startet dort neu und ist in etwa {{minutes}} Min. wieder da.",
+    reclaimFailed: "Speicher auf {{environment}} konnte nicht zurückgewonnen werden",
+    error: "Ein Fehler ist aufgetreten.",
+    restartDescription: "Startet T3 Code dort neu. Es ist dann etwa {{minutes}} Min. offline.",
+    lastAttemptFailed: "Der letzte Versuch ist fehlgeschlagen: {{error}}",
+    restarting: "Wird neu gestartet…",
+    reclaimAction: "Zurückgewinnen",
+    confirmTitle: "{{size}} GiB auf {{environment}} zurückgewinnen?",
+    confirmDescription:
+      "T3 Code auf {{environment}} stoppt, baut seine Datenbank neu auf und startet wieder. Es ist dann etwa {{minutes}} Min. offline. Laufende Agenten werden beim Neustart beendet.",
+    cancel: "Abbrechen",
+    confirm: "Neu starten und zurückgewinnen",
   },
   replayAnimation: "Vorschau der Panel-Animation wiederholen",
   threadDetails: {
@@ -65,6 +80,11 @@ export const settingsExtraDe = {
       "Unter {{path}} installiert; der Ordner liegt noch nicht in deinem PATH. Ergänze ihn im PATH, um `t3` auszuführen.",
     remove: "Entfernen",
     install: "Installieren",
+    addToPathFailed: "t3 konnte nicht zum PATH hinzugefügt werden",
+    addedToPath:
+      "Unter {{path}} installiert und in {{file}} zum PATH hinzugefügt. Öffne ein neues Terminal, um es zu verwenden.",
+    notOnPath: "Unter {{path}} installiert; der Ordner liegt noch nicht in deinem PATH.",
+    addToPath: "Zum PATH hinzufügen",
   },
   titles: {
     description: "Wird an den Prompt für neue und neu generierte Thread-Titel angehängt.",
@@ -861,6 +881,12 @@ export const settingsExtraDe = {
     futureDays_other: "in {{count}} Tagen",
     updateFailed: "Geplante Aufgabe konnte nicht aktualisiert werden",
     rotateFailed: "Webhook-URL konnte nicht erneuert werden",
+    startedByFirstRun: "Wird beim ersten Lauf gestartet",
+    destinationThread: "Ziel-Thread",
+    searchThreads: "Threads durchsuchen",
+    searchAllThreads: "Alle Threads durchsuchen...",
+    noThreadsFound: "Keine Threads gefunden.",
+    untitledThread: "Unbenannter Thread",
   },
   licenses: {
     loadError: "Das Lizenzverzeichnis konnte nicht geladen werden.",
@@ -1353,6 +1379,9 @@ export const settingsExtraDe = {
       "Die konfigurierte npm-Registry konnte nicht geprüft werden: Verbinde einen Server, um Versionen zu prüfen.",
     registryUnsupported:
       "Die konfigurierte npm-Registry konnte nicht geprüft werden: Dieser Server unterstützt keine Registry-Abfragen. Aktualisiere ihn vor dem Wechsel des Versionskanals.",
+    allOnChannel: "Alle verbundenen Rechner verwenden bereits {{channel}}.",
+    noMachineCanSwitch: "Derzeit kann kein Rechner zu {{channel}} wechseln.",
+    onlySavesTrack: "{{reason}} Dies speichert nur den Versionskanal.",
   },
   background: {
     balanced: "Ausgewogen",

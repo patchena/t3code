@@ -85,6 +85,7 @@ export const commonEn = {
     preparingWorktree: "Preparing worktree",
     conversation: "Conversation",
     messageInput: "Message input",
+    replyUnavailable: "Try replying after the connection or pending input is resolved.",
   },
   settings: {
     modelPreferencesNotSaved: "Model preferences not saved",

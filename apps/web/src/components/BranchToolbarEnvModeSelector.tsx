@@ -99,7 +99,8 @@ export const BranchToolbarEnvModeSelector = memo(function BranchToolbarEnvModeSe
         <TooltipPopup>
           {forceNewWorktree
             ? t(($) => $.git.modelOwnWorktree)
-            : resolveLockedWorkspaceLabel(activeWorktreePath, effectiveEnvMode, t)}
+            : (activeWorktreePath ??
+              resolveLockedWorkspaceLabel(activeWorktreePath, effectiveEnvMode, t))}
         </TooltipPopup>
       </Tooltip>
     );

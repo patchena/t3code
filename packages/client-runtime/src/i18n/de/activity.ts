@@ -208,4 +208,10 @@ export const activityDe = {
     readThreadStopped: "Lesen von Thread „{{title}}“ gestoppt",
     toolInput: "Werkzeugeingabe\n{{input}}",
   },
+  announcement: {
+    editing: "{{label}} wird bearbeitet",
+    searchingWeb: "Websuche nach {{label}}",
+    searching: "Suche nach {{label}}",
+    truncated: "{{text}} Mehr im Thread.",
+  },
 } as const;

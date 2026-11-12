@@ -254,6 +254,7 @@ export const filesDe = {
       "Vorschau auf die ersten 1 MB begrenzt. Speichere die Datei, um sie vollständig zu lesen.",
     truncatedSaveSize:
       "Vorschau auf die ersten 1 MB einer {{size}} Byte großen Datei begrenzt. Speichere die Datei, um sie vollständig zu lesen.",
+    fileContents: "Dateiinhalt",
   },
   pleaseTryAgain: "Versuche es bitte erneut.",
   readError: {
@@ -564,6 +565,10 @@ export const filesDe = {
     otherHint:
       "Claude, GPT und Gemini verwenden diesen Pool. Grok und Composer weichen bei Bedarf darauf aus.",
     noReportedLimits: "Kein Anbieter in den ausgewählten Umgebungen meldet Abonnement-Limits.",
+    creditOption: "{{label}} · {{available}} übrig",
+    creditOptionExpiry: "{{label}} · {{available}} übrig · Ablauf in {{duration}}",
+    useCreditOption: "Verwenden",
+    creditOptionIrreversible: "{{label}}: {{description}} Dies lässt sich nicht rückgängig machen.",
   },
   worker: {
     expandedArchiveLimit:

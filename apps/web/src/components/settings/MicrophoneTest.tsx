@@ -1,12 +1,15 @@
-import { CheckIcon, MicIcon, PauseIcon, PlayIcon, RotateCcwIcon, XIcon } from "lucide-react";
+import { MicIcon, PauseIcon, PlayIcon, RotateCcwIcon, SquareIcon, XIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useStableCallback } from "~/hooks/useStableCallback";
+import { openMicrophone } from "../../speech/browserPcmCapture";
 import workletUrl from "../../speech/pcmWorklet.ts?worker&url";
-import { VoiceInputErrorPill } from "../chat/VoiceInputErrorPill";
-import { VoiceInputPill, VoiceWaveform } from "../chat/VoiceInputPill";
+import { VoiceWaveform } from "../chat/VoiceInputPill";
+import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
+import { SettingsRow } from "./settingsLayout";
+import { searchableSetting } from "./settingsSearch";
 
 const LOOPBACK_SECONDS = 10;
 const formatTime = (seconds: number) =>
@@ -27,8 +30,16 @@ type Capture = {
  * device: no environment, transcriber, or provider is involved, so a silent result points
  * at the microphone rather than at transcription.
  */
-export function MicrophoneTest({ microphoneId }: { microphoneId: string }) {
+export function MicrophoneTest({
+  microphoneId,
+  onMicrophoneAccess,
+}: {
+  microphoneId: string;
+  /** Labels and device ids become readable once the browser grants access. */
+  onMicrophoneAccess: () => void;
+}) {
   const { t } = useTranslation("voice");
+  const { t: tSettings } = useTranslation("settings");
   const [phase, setPhase] = useState<"idle" | "starting" | "recording" | "ready">("idle");
   const [recording, setRecording] = useState<{ url: string; duration: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,14 +94,13 @@ export function MicrophoneTest({ microphoneId }: { microphoneId: string }) {
     const current: Capture = {};
     capture.current = current;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: microphoneId ? { deviceId: { exact: microphoneId } } : true,
-      });
+      const stream = await openMicrophone(microphoneId);
       if (capture.current !== current) {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
       current.stream = stream;
+      onMicrophoneAccess();
       const recorder = new MediaRecorder(stream);
       current.recorder = recorder;
       const chunks: Blob[] = [];
@@ -164,15 +174,15 @@ export function MicrophoneTest({ microphoneId }: { microphoneId: string }) {
       if (capture.current !== current) return;
       releaseCapture();
       setPhase("idle");
+      const name = typeof cause === "object" && cause !== null && "name" in cause && cause.name;
       setError(
-        typeof cause === "object" &&
-          cause !== null &&
-          "name" in cause &&
-          cause.name === "NotAllowedError"
+        name === "NotAllowedError"
           ? t(($) => $.errors.microphonePermission)
-          : cause instanceof Error
-            ? cause.message
-            : t(($) => $.microphone.accessFailed),
+          : name === "NotFoundError"
+            ? t(($) => $.microphone.notFound)
+            : cause instanceof Error
+              ? cause.message
+              : t(($) => $.microphone.accessFailed),
       );
     }
   };
@@ -182,70 +192,11 @@ export function MicrophoneTest({ microphoneId }: { microphoneId: string }) {
     setError(null);
   };
 
-  if (error) {
-    return (
-      <VoiceInputErrorPill
-        error={error}
-        errorAction="retry"
-        onRetry={() => void start()}
-        onDismiss={cancel}
-      />
-    );
-  }
-  if (phase === "idle") {
-    return (
-      <Button size="sm" variant="outline" onClick={() => void start()}>
-        <MicIcon />
-        {t(($) => $.microphone.test)}
-      </Button>
-    );
-  }
-  if (phase === "ready" && recording) {
-    return (
-      <MicrophonePlayback
-        key={recording.url}
-        src={recording.url}
-        duration={recording.duration}
-        onRetry={() => void start()}
-        onDone={cancel}
-      />
-    );
-  }
-  return (
-    <VoiceInputPill>
+  const control =
+    phase === "recording" || phase === "starting" ? (
       <Button
-        size="icon-sm-pill"
-        variant="ghost"
-        aria-label={t(($) => $.microphone.cancelTest)}
-        onClick={cancel}
-      >
-        <XIcon />
-      </Button>
-      {phase === "recording" ? (
-        <>
-          <VoiceWaveform level={level} />
-          <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" />
-          <span
-            className="shrink-0 text-xs tabular-nums text-muted-foreground"
-            aria-label={t(($) => $.microphone.recordingTime)}
-          >
-            {formatTime(elapsed)} / {formatTime(LOOPBACK_SECONDS)}
-          </span>
-          <meter
-            aria-label={t(($) => $.microphone.inputLevel)}
-            min={0}
-            max={1}
-            value={level}
-            className="sr-only"
-          />
-        </>
-      ) : (
-        <span role="status" className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-          {t(($) => $.microphone.opening)}
-        </span>
-      )}
-      <Button
-        size="icon-sm-pill"
+        size="sm"
+        variant="outline"
         aria-label={t(($) => $.microphone.stopRecording)}
         disabled={phase !== "recording"}
         onClick={() => {
@@ -253,23 +204,79 @@ export function MicrophoneTest({ microphoneId }: { microphoneId: string }) {
           if (recorder && recorder.state !== "inactive") recorder.stop();
         }}
       >
-        <CheckIcon />
+        <SquareIcon />
+        {t(($) => $.microphone.stop)}
       </Button>
-    </VoiceInputPill>
+    ) : (
+      <Button size="sm" variant="outline" onClick={() => void start()}>
+        {phase === "ready" ? <RotateCcwIcon /> : <MicIcon />}
+        {phase === "ready" ? t(($) => $.input.recordAgain) : t(($) => $.microphone.record)}
+      </Button>
+    );
+  const panel = error ? (
+    <p role="alert" className="min-w-0 flex-1 text-xs text-destructive">
+      {error}
+    </p>
+  ) : phase === "starting" ? (
+    <span role="status" className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+      {t(($) => $.microphone.opening)}
+    </span>
+  ) : phase === "recording" ? (
+    <>
+      <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-destructive" />
+      <div className="flex w-24 min-w-0">
+        <VoiceWaveform level={level} />
+      </div>
+      <span
+        className="ms-auto shrink-0 text-xs tabular-nums text-muted-foreground"
+        aria-label={t(($) => $.microphone.recordingTime)}
+      >
+        {formatTime(elapsed)} / {formatTime(LOOPBACK_SECONDS)}
+      </span>
+      <meter
+        aria-label={t(($) => $.microphone.inputLevel)}
+        min={0}
+        max={1}
+        value={level}
+        className="sr-only"
+      />
+    </>
+  ) : phase === "ready" && recording ? (
+    <MicrophonePlayback key={recording.url} src={recording.url} duration={recording.duration} />
+  ) : null;
+
+  return (
+    <SettingsRow
+      {...searchableSetting("microphone-test", tSettings)}
+      title={t(($) => $.microphone.test)}
+      description={t(($) => $.microphone.testDescription)}
+      control={control}
+    >
+      {panel ? (
+        <div
+          className={cn(
+            "mt-3 mb-2 flex min-h-10 items-center gap-3 rounded-lg border border-border/60 bg-muted/30 py-1 pe-1",
+            phase === "ready" && !error ? "ps-1" : "ps-3",
+          )}
+        >
+          {panel}
+          <Button
+            size="icon-sm"
+            variant="ghost-muted"
+            aria-label={
+              phase === "ready" ? t(($) => $.microphone.discard) : t(($) => $.microphone.cancelTest)
+            }
+            onClick={cancel}
+          >
+            <XIcon />
+          </Button>
+        </div>
+      ) : null}
+    </SettingsRow>
   );
 }
 
-function MicrophonePlayback({
-  src,
-  duration,
-  onRetry,
-  onDone,
-}: {
-  src: string;
-  duration: number;
-  onRetry(): void;
-  onDone(): void;
-}) {
+function MicrophonePlayback({ src, duration }: { src: string; duration: number }) {
   const { t } = useTranslation("voice");
   const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -294,7 +301,7 @@ function MicrophonePlayback({
   };
 
   return (
-    <div className="flex flex-col gap-1">
+    <>
       <audio
         ref={audio}
         src={src}
@@ -305,15 +312,19 @@ function MicrophonePlayback({
         onTimeUpdate={() => setPosition(audio.current?.currentTime ?? 0)}
         onError={() => setFailed(true)}
       />
-      <VoiceInputPill>
-        <Button
-          size="icon-sm-pill"
-          variant="ghost"
-          aria-label={playing ? t(($) => $.microphone.pause) : t(($) => $.microphone.play)}
-          onClick={() => void togglePlayback()}
-        >
-          {playing ? <PauseIcon /> : <PlayIcon />}
-        </Button>
+      <Button
+        size="icon-sm-pill"
+        variant="outline"
+        aria-label={playing ? t(($) => $.microphone.pause) : t(($) => $.microphone.play)}
+        onClick={() => void togglePlayback()}
+      >
+        {playing ? <PauseIcon /> : <PlayIcon />}
+      </Button>
+      {failed ? (
+        <p role="alert" className="min-w-0 flex-1 text-xs text-destructive">
+          {t(($) => $.microphone.playFailed)}
+        </p>
+      ) : (
         <input
           type="range"
           aria-label={t(($) => $.microphone.playbackPosition)}
@@ -332,26 +343,10 @@ function MicrophonePlayback({
           }}
           className="h-1 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring [&::-webkit-slider-thumb]:size-2.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-moz-range-thumb]:size-2.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-primary"
         />
-        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-          {formatTime(position)}
-        </span>
-        <Button
-          size="icon-sm-pill"
-          variant="ghost"
-          aria-label={t(($) => $.input.recordAgain)}
-          onClick={onRetry}
-        >
-          <RotateCcwIcon />
-        </Button>
-        <Button size="icon-sm-pill" aria-label={t(($) => $.microphone.done)} onClick={onDone}>
-          <CheckIcon />
-        </Button>
-      </VoiceInputPill>
-      {failed ? (
-        <p role="alert" className="text-xs text-destructive">
-          {t(($) => $.microphone.playFailed)}
-        </p>
-      ) : null}
-    </div>
+      )}
+      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+        {formatTime(position)} / {formatTime(duration)}
+      </span>
+    </>
   );
 }

@@ -178,6 +178,7 @@ export function MediaActions({
           source.kind === "image"
             ? t(($) => $.media.saveImageFailed)
             : t(($) => $.media.saveVideoFailed),
+        "save-image": t(($) => $.media.saveImageFailed),
         "copy-image": t(($) => $.media.copyImageFailed),
       };
       failureTitle = failures[action];

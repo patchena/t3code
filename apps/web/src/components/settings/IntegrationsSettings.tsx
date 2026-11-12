@@ -957,7 +957,7 @@ function DeviceIntegrationControls({
             >
               {pending === `update-${tool}`
                 ? t(($) => $.misc.integrations.updating)
-                : t(($) => $.misc.integrations.updateVersion, { version: version.requiredVersion })}
+                : t(($) => $.misc.integrations.update)}
             </Button>
           ) : null}
           {state.supportsToolInspection ? (

@@ -2,6 +2,7 @@ import {
   secretRequestAnswerInput,
   secretRequestDisplay,
   secretRequestFailureDetail,
+  secretRequestLink,
   secretRequestPrivacyNote,
   secretRequestReference,
   secretRequestSources,
@@ -19,7 +20,7 @@ import type {
   SecretProviderId,
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
-import { CheckIcon, LockIcon, MinusIcon, ShieldCheckIcon } from "lucide-react";
+import { CheckIcon, ExternalLinkIcon, LockIcon, MinusIcon, ShieldCheckIcon } from "lucide-react";
 import { useId, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -127,6 +128,7 @@ function PendingSecretRequestForm(props: {
     }
   };
   const draft = source === null ? secret : reference;
+  const link = secretRequestLink(item);
   const describedBy = error !== null ? `${privacyId} ${errorId}` : privacyId;
 
   return (
@@ -153,6 +155,22 @@ function PendingSecretRequestForm(props: {
           <p className="text-sm wrap-anywhere text-muted-foreground">{item.reason}</p>
         ) : null}
       </div>
+      {link !== null ? (
+        <div className="flex min-w-0 flex-col items-start gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            render={<a href={link.href} target="_blank" rel="noopener noreferrer" />}
+          >
+            {t(($) => $.ui.open, { name: link.host })}
+            <ExternalLinkIcon aria-hidden />
+          </Button>
+          {/* A link found in the reason is already shown there. */}
+          {item.url !== undefined ? (
+            <p className="font-mono text-xs wrap-anywhere text-muted-foreground">{item.url}</p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="flex min-w-0 items-center gap-2">
         {sources.length > 0 ? (
           <SecretSourceSelect

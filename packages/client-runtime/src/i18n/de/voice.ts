@@ -83,6 +83,9 @@ export const voiceDe = {
     modelDownloadFailed:
       "Das Modell konnte nicht heruntergeladen werden. Prüfe die Verbindung dieses Environments und versuche es erneut.",
     annotationUpdateFailed: "Spracheingabe für die Anmerkung konnte nicht aktualisiert werden",
+    settingsAction: "Einstellungen",
+    retryAction: "Wiederholen",
+    dismiss: "Schließen",
   },
   microphone: {
     label: "Mikrofon",
@@ -106,6 +109,11 @@ export const voiceDe = {
     playbackPosition: "Wiedergabeposition der Aufnahme",
     done: "Fertig",
     playFailed: "Diese Aufnahme konnte nicht abgespielt werden. Nimm erneut auf.",
+    notFound: "Kein Mikrofon gefunden.",
+    stop: "Stopp",
+    record: "Aufnehmen",
+    testDescription: "Nimm zehn Sekunden auf und spiele sie ab. Das Audio bleibt auf diesem Gerät.",
+    discard: "Aufnahme verwerfen",
   },
   setup: {
     title: "Spracheingabe einrichten",
@@ -140,6 +148,14 @@ export const voiceDe = {
     askAdmin: "Bitte einen Environment-Admin um den Download",
     customize: "In den Spracheinstellungen anpassen",
     startDictating: "Diktieren starten",
+    readyTitle: "Spracheingabe ist bereit",
+    downloadOnce:
+      "Lade einmalig ein Sprachmodell herunter. Dein Audio wird auf {{environment}} transkribiert.",
+    readyDescription: "Wähle ein Mikrofon und leg los.",
+    modelSize: "{{size}} MB",
+    recommendedSilenceDetector:
+      "Empfohlen für {{language}}. Enthält eine 1,2 MB große Stilleerkennung.",
+    silenceDetector: "Enthält eine 1,2 MB große Stilleerkennung.",
   },
   language: {
     autoDetect: "Automatisch erkennen",
@@ -198,6 +214,23 @@ export const voiceDe = {
     errorRate: "({{percent}} % Fehler)",
     notBenchmarked: "nicht gemessen",
     speed: "Geschwindigkeit:",
+    updateServer: "Server aktualisieren",
+    linkedFrom: "Verwendet deine Datei unter {{path}}",
+    unlink: "Deine Datei für {{model}} nicht mehr verwenden; die Datei bleibt auf dem Datenträger",
+    title: "Modelle",
+    benchmarkDescription:
+      "Die Noten sind Fehlerraten, die Geschwindigkeit ist in Sekunden pro 30 s Audio angegeben, gemessen auf der Benchmark-{{hardware}} von Handy.",
+    filterByLanguage: "Nach Sprache filtern: {{languages}}",
+    sortSmallest: "Am kleinsten",
+    sortMostAccurate: "Am genauesten",
+    sortMostAccurateIn: "Am genauesten für {{language}}",
+    sortFastest: "Am schnellsten",
+    linkFailed: "Das Modell unter diesem Pfad konnte nicht verwendet werden",
+    existingPathLabel:
+      "Pfad zu einer Modelldatei oder einem Modellordner, die bereits in diesem Environment liegen",
+    existingPathPlaceholder:
+      "Schon anderswo heruntergeladen? Füge den Pfad zur Modelldatei oder zum Modellordner ein",
+    useExisting: "Vorhandenes verwenden",
   },
   test: {
     start: "Modell testen",
@@ -206,6 +239,8 @@ export const voiceDe = {
     close: "Modelltest schließen",
     transcript: "Testtranskript",
     noSpeech: "Keine Sprache erkannt. Versuche es erneut.",
+    prompt:
+      "Sprich einen Satz. Die Bereinigung wird übersprungen, damit du genau siehst, was das Modell gehört hat.",
   },
   dictionary: {
     placeholder: "Wörter oder Ausdrücke hinzufügen, getrennt durch Kommas oder Zeilenumbrüche",
@@ -231,6 +266,12 @@ export const voiceDe = {
     title: "Wörterbuch",
     description:
       "Namen und Begriffe, die die Transkription so schreiben soll, wie du es möchtest, gespeichert auf diesem Gerät. Füge einen Alias hinzu, wenn ein Begriff immer wieder falsch erkannt wird. Der Name des Projekts, in dem du diktierst, wird ebenfalls als Hinweis gesendet.",
+    addPlaceholder: "Wörter hinzufügen, durch Kommas getrennt",
+    projectUsage: "Wird von allen verwendet, die in {{project}} diktieren.",
+    sharedUsage: "Wird von allen verwendet, die in diesem Environment diktieren.",
+    personalTitle: "Dein Wörterbuch",
+    personalDescription:
+      "Namen und Begriffe, die so geschrieben werden, wie du es möchtest, gespeichert auf diesem Gerät.",
   },
   cleanup: {
     section: "Bereinigung",
@@ -256,6 +297,17 @@ export const voiceDe = {
     cueDescription:
       "Das Wort oder der Ausdruck, mit dem du eine Korrektur markierst, etwa „sorry“ oder „scratch that“. Die Bereinigung wendet die Korrektur nur dort an, wo eine gemeint ist, und nutzt das Signal als Hinweis.",
     cuePlaceholder: "sorry",
+    modelDescription:
+      "Modell für die Bereinigung von Transkripten, etwa ein günstigeres oder schnelleres. Wenn deaktiviert, wird das für dieses Environment konfigurierte Textgenerierungsmodell verwendet.",
+    noTextGenerationProviders: "Keine Textgenerierungs-Provider verfügbar.",
+    useSeparateModel: "Separates Bereinigungsmodell verwenden",
+    toggle: "Transkripte bereinigen",
+    toggleDescription:
+      "Standardmäßig aus. Sendet das Transkript und den umgebenden Entwurfstext, nie Audio, an das Bereinigungsmodell.",
+    instructionsTitle: "Anweisungen",
+    customDescription: "Deine eigenen Anweisungen für die Bereinigung.",
+    builtInDescription: "Korrigiert Zeichensetzung, Zahlen, Listen und gesprochene Korrekturen.",
+    cueHint: "Der Ausdruck, mit dem du einen Fehler korrigierst, etwa „scratch that“.",
   },
   advanced: {
     hardware: "Hardware",
@@ -319,5 +371,20 @@ export const voiceDe = {
       "Überspringt Stille und andere Nicht-Sprache vor der Transkription und behält einen kurzen Puffer, damit keine Wörter abgeschnitten werden.",
     fillers: "Füllwörter entfernen",
     fillersDescription: "Entfernt Füllwörter wie „äh“ und „ähm“ aus Transkripten.",
+    microphoneOrderDescription:
+      "Die Spracheingabe verwendet das erste verbundene Mikrofon in dieser Liste.",
+    shortcutModeLabels: {
+      auto: "Automatisch",
+      hold: "Halten",
+      toggle: "Umschalten",
+    },
+    shortcutModeHints: {
+      auto: "Tippen zum Umschalten, halten zum Sprechen",
+      hold: "Aufnehmen, solange gedrückt",
+      toggle: "Tippen zum Starten, tippen zum Beenden",
+    },
+    destinationDescription: "Wo deine Sprache in Text umgewandelt wird.",
+    thisModel: "Dieses Modell",
+    silenceHint: "Überspringt Stille und Hintergrundgeräusche vor der Transkription.",
   },
 } as const;

@@ -32,13 +32,9 @@ import {
   toViewerSide,
 } from "~/components/pullRequest/PullRequestReviewAnnotation";
 import type { PendingReviewComment } from "~/components/pullRequest/pullRequestReviewStore";
-import {
-  excerptExpansionOldContents,
-  excerptRows,
-  fileDiffRows,
-  rowsToPatch,
-} from "@t3tools/client-runtime/review-guide-tour";
+import { excerptRows, fileDiffRows, rowsToPatch } from "@t3tools/client-runtime/review-guide-tour";
 import type { PullRequestCompletionScope } from "~/components/pullRequest/PullRequestMarkdownTextarea";
+import { excerptLoader } from "~/components/pullRequest/guide/GuideExcerpt.logic";
 import { GuideNoteMarker } from "~/components/pullRequest/guide/GuideNotes";
 import { GuideProse } from "~/components/pullRequest/guide/GuideProse";
 
@@ -100,30 +96,6 @@ function excerptSlice(file: FileDiffMetadata | null, excerpt: PullRequestReviewG
     deletions: new Set(shown.flatMap((row) => (row.oldLine === null ? [] : [row.oldLine]))),
   };
   return { fileDiff, rows: shown, shown: shown.length, total: rows.length, drawn };
-}
-
-// Other hunks shift old-side context; expand against an excerpt-matching old side.
-function excerptLoader(
-  excerpt: PullRequestReviewGuideExcerpt,
-  sliceRows: ExcerptSlice["rows"],
-  loadDiffFiles: FileDiffContentsLoader,
-): FileDiffContentsLoader | null {
-  if (sliceRows.some((row) => row.hunk !== sliceRows[0]?.hunk)) {
-    return null;
-  }
-  return async (fileDiff) => {
-    const loaded = await loadDiffFiles(fileDiff);
-    const oldContents = excerptExpansionOldContents(loaded.newFile.contents, sliceRows);
-    if (oldContents === null) return loaded;
-    return {
-      newFile: loaded.newFile,
-      oldFile: {
-        name: loaded.oldFile?.name ?? loaded.newFile.name,
-        contents: oldContents,
-        cacheKey: `${loaded.newFile.cacheKey ?? loaded.newFile.name}:excerpt:${excerpt.side}:${excerpt.start}-${excerpt.end}`,
-      },
-    };
-  };
 }
 
 export function GuideExcerpt({
@@ -212,7 +184,7 @@ function ExcerptDiff({
 }) {
   const { t } = useTranslation("workspace");
   const resolvedTheme = useRenderedAppearance();
-  const loadExcerptFiles = excerptLoader(excerpt, slice.rows, loadDiffFiles);
+  const loadExcerptFiles = excerptLoader(excerpt, file, slice.rows, loadDiffFiles);
 
   const annotations = (() => {
     const groups = new Map<string, DiffLineAnnotation<ExcerptAnnotation>>();

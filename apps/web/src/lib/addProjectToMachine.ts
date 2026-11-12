@@ -127,16 +127,15 @@ export function dismissProjectFileCopy(ref: ScopedProjectRef) {
 }
 
 /**
- * Clones a project onto another machine, then copies the chosen ignored files
- * from the source. The client relays the files because the two servers never
- * talk to each other. Resolves once the clone starts. The caller opens the new
- * project, whose composer shows the clone and copy progress, so nothing toasts.
+ * Clones onto another machine, then relays the chosen ignored files, since the
+ * two servers never talk. Resolves with the cloning project once it starts; the
+ * caller opens it, and its composer shows progress, so nothing toasts.
  */
 export async function addProjectToMachine(
   input: AddProjectToMachineInput,
   t: TFunction<"common">,
   tWorkspace: TFunction<"workspace">,
-): Promise<void> {
+): Promise<ProjectId> {
   // Read first, so the copy reflects the files as they were when the user asked.
   const reads = await Promise.all(
     input.files.map(async (relativePath) => {
@@ -154,11 +153,11 @@ export async function addProjectToMachine(
     }),
   );
 
-  const targetRef = { environmentId: input.target.environmentId, projectId: input.projectId };
-  const copyKey = scopedProjectKey(targetRef);
+  const requestedRef = { environmentId: input.target.environmentId, projectId: input.projectId };
+  const requestedKey = scopedProjectKey(requestedRef);
   // Marked before the start request, since the clone list can arrive before its reply.
-  silenceProjectCloneToasts(targetRef);
-  if (reads.length > 0) setFileCopy(copyKey, { phase: "copying" });
+  silenceProjectCloneToasts(requestedRef);
+  if (reads.length > 0) setFileCopy(requestedKey, { phase: "copying" });
   const started = await runAtomCommand(
     appAtomRegistry,
     sourceControlEnvironment.startProjectClone,
@@ -175,14 +174,25 @@ export async function addProjectToMachine(
     { label: t(($) => $.misc.machine.addProject), reportFailure: false },
   );
   if (started._tag === "Failure") {
-    setFileCopy(copyKey, null);
+    setFileCopy(requestedKey, null);
     throw new Error(failureMessage(started));
   }
+  // The server clones for the existing project when one already owns the empty destination.
+  const { projectId } = started.value;
+  const targetRef = { environmentId: input.target.environmentId, projectId };
+  const copyKey = scopedProjectKey(targetRef);
+  if (projectId !== input.projectId) {
+    silenceProjectCloneToasts(targetRef);
+    if (reads.length > 0) {
+      setFileCopy(copyKey, { phase: "copying" });
+      setFileCopy(requestedKey, null);
+    }
+  }
   void suggestAppAccessForRemote(input.target.environmentId, input.remoteUrl, tWorkspace);
-  if (reads.length === 0) return;
+  if (reads.length === 0) return projectId;
 
   void (async () => {
-    const clone = await waitForClone(input.target.environmentId, input.projectId);
+    const clone = await waitForClone(input.target.environmentId, projectId);
     if (!clone) {
       setFileCopy(copyKey, null);
       return;
@@ -230,4 +240,5 @@ export async function addProjectToMachine(
           },
     );
   })();
+  return projectId;
 }

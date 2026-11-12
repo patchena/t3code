@@ -68,6 +68,14 @@ export const miscDe = {
       hideAll: "Alle ausblenden",
       zen: "Zen",
     },
+    multilineNested:
+      "Zeige Threads in Ordnern zweizeilig an: zuerst den Titel, dann Branch, Pull Request und Agenten.",
+    promptSuggestionsDescription:
+      "Zeige nach einem Claude- oder Codex-Turn eine vorhergesagte nächste Nachricht im leeren Eingabefeld an. Mit Tab übernimmst du sie. Jede Vorhersage ist eine zusätzliche gecachte Anfrage in deinem Tarif. Benötigt Codex 0.165+. Claude-Threads übernehmen die Änderung nach einem Neustart.",
+    promptSuggestionsLabel: "Nächsten Prompt vorschlagen",
+    fastWorktreeCheckoutDescription:
+      "Klone neue Worktrees auf einem Mac aus einem im T3-Home-Ordner zwischengespeicherten Checkout, statt jede Datei zu schreiben. Wenn das nicht geht, wird der normale Git-Checkout verwendet. Beim Ausschalten wird der Cache gelöscht.",
+    fastWorktreeCheckoutLabel: "Schneller Worktree-Checkout",
   },
   clipboard: {
     unavailable: "Die Zwischenablage ist beim Kopieren von {{target}} nicht verfügbar.",
@@ -219,5 +227,6 @@ export const miscDe = {
     agentAccess: "Agentenzugriff",
     browsing: "Surfen",
     recordings: "Aufnahmen",
+    update: "Aktualisieren",
   },
 } as const;

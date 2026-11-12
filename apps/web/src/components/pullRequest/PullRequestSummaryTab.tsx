@@ -1,3 +1,6 @@
+import { pullRequestCommentPreview } from "~/components/pullRequest/pullRequestMarkdown.logic";
+import { parsePullRequestAnchor } from "@t3tools/shared/pullRequestAnchor";
+import { holdLinkedNodeInView } from "~/components/pullRequest/holdLinkedNodeInView";
 import { useAtomValue } from "@effect/atom-react";
 import { useTranslation } from "react-i18next";
 import { resolveHour12, systemLocale } from "~/timestampFormat";
@@ -7,13 +10,14 @@ import {
   sourceControlClients,
 } from "@t3tools/client-runtime/source-control-clients";
 import { useAtomCommand } from "~/state/use-atom-command";
-import type {
-  EnvironmentId,
-  PullRequestComment,
-  PullRequestDetailView,
-  PullRequestRef,
-  PullRequestReviewThread,
-  ScopedThreadRef,
+import {
+  type EnvironmentId,
+  type PullRequestComment,
+  type PullRequestDetailView,
+  type PullRequestRef,
+  type PullRequestConversationThread,
+  type ScopedThreadRef,
+  pullRequestConversationThreads,
 } from "@t3tools/contracts";
 import {
   ArrowDownUpIcon,
@@ -26,7 +30,7 @@ import {
   UsersIcon,
 } from "lucide-react";
 import * as Schema from "effect/Schema";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
@@ -94,6 +98,7 @@ import {
   pullRequestCompletionScope,
 } from "~/components/pullRequest/PullRequestMarkdownTextarea";
 import { PullRequestReactionBar } from "~/components/pullRequest/PullRequestReactions";
+import { PullRequestResolveThreadButton } from "~/components/pullRequest/PullRequestResolveThreadButton";
 import { PullRequestConversationGhost } from "~/components/pullRequest/PullRequestGhosts";
 import { sectionCollapseAnchorScrollTop } from "~/components/pullRequest/pullRequestSummaryScroll.logic";
 
@@ -152,7 +157,7 @@ function CommentLocation({
   thread,
 }: {
   comment: PullRequestComment;
-  thread: PullRequestReviewThread | undefined;
+  thread: PullRequestConversationThread | undefined;
 }) {
   const { t } = useTranslation("workspace");
   const path = thread?.path ?? comment.path;
@@ -238,9 +243,10 @@ function CommentBody({
  */
 function chatSubject(
   comment: PullRequestComment,
-  thread: PullRequestReviewThread | undefined,
+  thread: PullRequestConversationThread | undefined,
 ): PullRequestChatSubject | null {
-  if (thread !== undefined) {
+  // An overview thread has no line to attach, so it goes as its opening remark, as fixing it does.
+  if (thread !== undefined && thread.path !== null) {
     return thread.comments.some((entry) => visibleBody(entry.body) !== null)
       ? { kind: "thread", thread }
       : null;
@@ -267,6 +273,7 @@ function CollapsedComment({
   label,
   body,
   reactionBar,
+  resolveButton,
   detail,
   thread,
   replyCount = 0,
@@ -279,8 +286,9 @@ function CollapsedComment({
   label: string;
   body: string | null;
   reactionBar: ReactNode;
+  resolveButton: ReactNode;
   detail: PullRequestDetailView;
-  thread: PullRequestReviewThread | undefined;
+  thread: PullRequestConversationThread | undefined;
   replyCount?: number;
   replies?: ReactNode;
   moreReplies?: ReactNode;
@@ -310,6 +318,8 @@ function CollapsedComment({
                 className={cn("size-3.5 transition-transform", open && "rotate-180")}
               />
             </CollapsibleTrigger>
+            {/* Collapsed, the status label already says "Resolved". */}
+            {open ? resolveButton : null}
             {onAddToChat ? <AddToChatButton onClick={onAddToChat} /> : null}
             {reactionBar}
           </div>
@@ -319,14 +329,7 @@ function CollapsedComment({
               className="mt-2 block w-full truncate text-left text-xs text-muted-foreground hover:text-foreground"
               onClick={() => statusTriggerRef.current?.focus({ preventScroll: true })}
             >
-              {body
-                .replace(/<!--[\s\S]*?-->/gu, "")
-                .replace(/^\s*>?\s*\[!\w+\]\s*$/gmu, "")
-                .replace(/!?(\[([^\]]+)\])\([^)]*\)/gu, "$2")
-                .replace(/^[\s>#*-]+/gmu, "")
-                .replace(/[*`]/gu, "")
-                .replace(/\s+/g, " ")
-                .trim()}
+              {pullRequestCommentPreview(body)}
             </CollapsibleTrigger>
           ) : null}
         </div>
@@ -370,16 +373,27 @@ function Section({
   title,
   defaultOpen = true,
   keepMounted = false,
+  revealCount = 0,
   actions,
   children,
 }: {
   title: string;
   defaultOpen?: boolean;
   keepMounted?: boolean;
+  /** Reopens the section each time a link reveals it. */
+  revealCount?: number;
   actions?: ReactNode;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  // A reveal opens at once: the opening animation would move what was just scrolled to.
+  const [open, setOpen] = useState<boolean | "revealed">(
+    revealCount > 0 ? "revealed" : defaultOpen,
+  );
+  const [seenRevealCount, setSeenRevealCount] = useState(revealCount);
+  if (revealCount !== seenRevealCount) {
+    setSeenRevealCount(revealCount);
+    setOpen("revealed");
+  }
   const headingRef = useRef<HTMLDivElement>(null);
   const setOpenWithScrollAnchor = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -401,7 +415,7 @@ function Section({
   };
   return (
     <Collapsible
-      open={open}
+      open={open !== false}
       onOpenChange={setOpenWithScrollAnchor}
       render={<section aria-label={title} />}
       data-pull-request-summary-section
@@ -422,7 +436,7 @@ function Section({
         </CollapsibleTrigger>
         {actions}
       </div>
-      <CollapsiblePanel keepMounted={keepMounted}>
+      <CollapsiblePanel keepMounted={keepMounted} animate={open !== "revealed"}>
         <div className="px-4 pb-4">{children}</div>
       </CollapsiblePanel>
     </Collapsible>
@@ -436,6 +450,8 @@ const CommentFilterSchema = Schema.Struct({ bots: Schema.Boolean, resolved: Sche
 const DEFAULT_COMMENT_FILTER: typeof CommentFilterSchema.Type = { bots: false, resolved: false };
 
 export function PullRequestSummaryTab({
+  revealUrl,
+  onRevealSettled,
   scrollerRef,
   environmentId,
   threadRef,
@@ -452,6 +468,9 @@ export function PullRequestSummaryTab({
   onRefresh,
   onRefreshChecks = onRefresh,
 }: {
+  /** A clicked link to scroll to, until onRevealSettled reports it shown. */
+  revealUrl?: string | undefined;
+  onRevealSettled?: ((revealUrl: string) => void) | undefined;
   scrollerRef: (node: HTMLDivElement | null) => void;
   environmentId: EnvironmentId;
   threadRef: ScopedThreadRef | null;
@@ -480,7 +499,10 @@ export function PullRequestSummaryTab({
     DEFAULT_COMMENT_FILTER,
     CommentFilterSchema,
   );
-  const items = pullRequestConversationItems(detail.comments, detail.reviewThreads);
+  const items = pullRequestConversationItems(
+    detail.comments,
+    pullRequestConversationThreads(detail),
+  );
   const filteredItems = filterPullRequestConversationItems(items, commentFilter);
   const commentCount = items.reduce(
     (count, item) => count + pullRequestConversationItemComments(item).length,
@@ -581,6 +603,61 @@ export function PullRequestSummaryTab({
   const [commentSaving, setCommentSaving] = useState(false);
   const editingCommentId = commentScope?.pullRequest === detail.url ? commentScope.commentId : null;
 
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const location = parsePullRequestAnchor(revealUrl);
+  const [checksReveals, setChecksReveals] = useState(0);
+  const [descriptionReveals, setDescriptionReveals] = useState(0);
+  const [seenRevealUrl, setSeenRevealUrl] = useState<string | undefined>(undefined);
+  if (revealUrl !== seenRevealUrl) {
+    setSeenRevealUrl(revealUrl);
+    if (location?.kind === "checks") setChecksReveals((count) => count + 1);
+    if (location?.kind === "summary" && location.anchor !== "top") {
+      setDescriptionReveals((count) => count + 1);
+    }
+  }
+  const stopHolding = useRef<(() => void) | null>(null);
+  const revealSummary = useEffectEvent(() => {
+    const root = scrollRef.current;
+    if (revealUrl === undefined || !root) return;
+    let target: HTMLElement | null | undefined;
+    if (location?.kind === "checks") {
+      const checksTitle = t(($) => $.git.checks);
+      target = [...root.querySelectorAll<HTMLElement>("[data-pull-request-summary-section]")].find(
+        (node) => node.getAttribute("aria-label") === checksTitle,
+      );
+    } else if (location?.kind === "summary") {
+      if (location.anchor === "top") {
+        stopHolding.current?.();
+        root.scrollTop = 0;
+        return onRevealSettled?.(revealUrl);
+      }
+      target = /^issue-\d+$/.test(location.anchor)
+        ? root.querySelector<HTMLElement>("[data-pr-description]")
+        : [...root.querySelectorAll<HTMLElement>("[id]")].find(
+            (node) => node.id === location.anchor || node.id === `user-content-${location.anchor}`,
+          );
+    }
+    // A heading may still be rendering; the link stays pending until it appears.
+    if (!target) return;
+    stopHolding.current?.();
+    const heading = target.hasAttribute("data-pull-request-summary-section")
+      ? null
+      : target.closest("[data-pull-request-summary-section]")?.firstElementChild;
+    stopHolding.current = holdLinkedNodeInView(
+      target,
+      root,
+      () => (heading?.getBoundingClientRect().height ?? 0) + (heading ? 8 : 0),
+    );
+    onRevealSettled?.(revealUrl);
+  });
+  const editingDescription = bodyScope?.url === detail.url;
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- scrolls to a linked section, description or heading once it renders
+  useEffect(() => {
+    revealSummary();
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- retries once the description markdown renders, including after its editor closes
+  }, [revealUrl, description, checksReveals, descriptionReveals, editingDescription]);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the hold observes DOM outside React and must end with the tab
+  useEffect(() => () => stopHolding.current?.(), []);
   // Checkbox ticks and the editor share one draft, so each starts from the other's latest body.
   const saveDescription = async (body: string) => {
     const key = detail.url;
@@ -643,9 +720,20 @@ export function PullRequestSummaryTab({
     />
   );
 
+  const resolveButtonFor = (thread: PullRequestConversationThread | undefined) =>
+    thread === undefined ? null : (
+      <PullRequestResolveThreadButton
+        environmentId={environmentId}
+        reference={reference}
+        detail={detail}
+        thread={thread}
+        onRefresh={onRefresh}
+      />
+    );
+
   const renderCommentCard = (
     comment: PullRequestComment,
-    thread: PullRequestReviewThread | undefined,
+    thread: PullRequestConversationThread | undefined,
     { reply = false }: { reply?: boolean } = {},
   ) => {
     const body = visibleBody(comment.body);
@@ -655,7 +743,7 @@ export function PullRequestSummaryTab({
       (comment.kind !== "review" && comment.kind !== "review-comment") ||
       outcome === "approved"
         ? null
-        : thread === undefined
+        : thread === undefined || thread.path === null
           ? body === null
             ? null
             : { kind: "comment", comment }
@@ -694,6 +782,7 @@ export function PullRequestSummaryTab({
               </span>
             </Button>
           ) : null}
+          {resolveButtonFor(thread)}
           {onAddToChat && chat !== null ? (
             <AddToChatButton onClick={() => onAddToChat(chat)} />
           ) : null}
@@ -738,6 +827,7 @@ export function PullRequestSummaryTab({
           moreReplies={moreReplies}
           onAddToChat={onAddToChat && chat !== null ? () => onAddToChat(chat) : undefined}
           reactionBar={reactionBarFor(comment)}
+          resolveButton={resolveButtonFor(thread)}
         />
       );
     }
@@ -752,7 +842,14 @@ export function PullRequestSummaryTab({
   };
 
   return (
-    <div ref={scrollerRef} className="h-full overflow-y-auto" data-pull-request-summary-scroll>
+    <div
+      ref={(node) => {
+        scrollRef.current = node;
+        scrollerRef(node);
+      }}
+      className="h-full overflow-y-auto"
+      data-pull-request-summary-scroll
+    >
       <section className="px-4 pt-2.5 pb-1">
         <div className="space-y-2">
           <MetaRow icon={<UsersIcon className="size-3.5" />} label={t(($) => $.git.reviewers)}>
@@ -841,6 +938,7 @@ export function PullRequestSummaryTab({
                       label={label}
                       size="default"
                       className="max-w-48"
+                      focusable
                     />
                   ))
                 )}
@@ -857,9 +955,14 @@ export function PullRequestSummaryTab({
         </div>
       </section>
 
-      <Section key={`description:${detail.url}`} title={t(($) => $.git.description)} keepMounted>
+      <Section
+        key={`description:${detail.url}`}
+        title={t(($) => $.git.description)}
+        keepMounted
+        revealCount={descriptionReveals}
+      >
         <div className="group">
-          {bodyScope?.url === detail.url ? (
+          {editingDescription ? (
             <PullRequestMarkdownEditor
               allowEmpty
               value={bodyScope.body}
@@ -876,7 +979,7 @@ export function PullRequestSummaryTab({
               onCancel={() => setBodyScope(null)}
             />
           ) : (
-            <div className="flex items-start gap-1">
+            <div className="flex items-start gap-1" data-pr-description>
               <PullRequestMarkdown
                 className="min-w-0 flex-1"
                 text={description.trim().length > 0 ? description : t(($) => $.git.noDescription)}
@@ -896,7 +999,12 @@ export function PullRequestSummaryTab({
         </div>
       </Section>
 
-      <Section key={`checks:${detail.url}`} title={t(($) => $.git.checks)} defaultOpen={false}>
+      <Section
+        key={`checks:${detail.url}`}
+        title={t(($) => $.git.checks)}
+        defaultOpen={false}
+        revealCount={checksReveals}
+      >
         {checksStale ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>{t(($) => $.git.checkDetailsStale)}</span>

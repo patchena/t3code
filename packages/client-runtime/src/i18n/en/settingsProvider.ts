@@ -606,27 +606,30 @@ export const settingsProviderEn = {
   sourceProvidersSuffix: "Source control providers{{suffix}}",
   repoConventions: "Repository conventions",
   repoConventionsHint:
-    "In each project, matches recent change descriptions and change request titles.",
+    "Commit messages and pull request titles and descriptions match each project's history.",
   conventionalCommits: "Conventional Commits",
-  conventionalCommitsHint: "Use Conventional Commit prefixes and keep change request text concise.",
+  conventionalCommitsHint:
+    "Conventional Commit prefixes, with short pull request titles and descriptions.",
   customInstructions: "Custom instructions",
   customInstructionsHint:
-    "Use your instructions for change descriptions and change requests in every project.",
-  writingReview: "Writing & review",
-  sourceWritingStyle: "Source control writing style",
-  sourceWritingStyleReset: "source control writing style",
+    "Your instructions shape commit messages and pull request titles and descriptions.",
+  writingReview: "Commits & pull requests",
+  sourceWritingStyle: "Commit and pull request writing",
+  sourceWritingStyleReset: "commit and pull request writing",
   mixed: "Mixed",
-  allSourceInstructions: "Custom source control instructions for all selected environments",
+  allSourceInstructions:
+    "Custom commit and pull request instructions for all selected environments",
   allInstructionsPlaceholder: "Write the instructions each selected environment should use.",
   applyInstructionsAll: "Apply instructions to all",
   writeInstructionsAll: "Write custom instructions for all",
-  sourceInstructionsPlaceholder: "Keep titles concise. Use short bullet points in descriptions.",
-  sourceInstructions: "Custom source control writing instructions",
+  sourceInstructionsPlaceholder:
+    "Keep commit subjects under 60 characters. Keep pull request descriptions short and plain.",
+  sourceInstructions: "Custom commit and pull request instructions",
   reviewGuidesHint:
     "Add a Guide tab to pull requests. An agent explains the changes and points out decisions that need review.",
   reviewGuides: "Review guides",
   reviewGuideModelHint:
-    "Model that reads a pull request to write its review guide. It reads the change itself over many steps, so a stronger model helps. Off uses the source control writer model.",
+    "Must be a coding agent: it reads the pull request over many steps. Off uses the writer model, or Codex or Claude if that model is a text generator.",
   connectReviewGuideModel: "Connect an environment to choose its review guide model.",
   reviewGuideModel: "Review guide model",
   reviewGuideModelNotSaved: "Review guide model not saved",
@@ -638,12 +641,11 @@ export const settingsProviderEn = {
   mixedInstructions: "Mixed. Enter instructions to apply to all selected targets.",
   reviewGuidePlaceholder:
     "Show service interfaces before implementations. Skip test files unless they change behavior. Keep summaries to two sentences.",
-  changeRequestTemplatesHint:
-    "Use the repository's template for change request descriptions when available.",
-  changeRequestTemplates: "change request templates",
-  followTemplates: "Follow change request templates",
+  changeRequestTemplatesHint: "Use the repository's pull request template when it has one.",
+  changeRequestTemplates: "pull request templates",
+  followTemplates: "Follow pull request templates",
   sourceWriterModelHint:
-    "Model for source control text and branch or bookmark names. When disabled, use the text generation model configured for this environment.",
+    "Model for commit messages, pull request text, and branch or bookmark names. When disabled, use the text generation model configured for this environment.",
   connectWriterModel: "Connect an environment to choose its source control writer model.",
   noTextProviders: "No text generation providers available.",
   sourceWriterModel: "Source control writer model",
@@ -845,4 +847,49 @@ export const settingsProviderEn = {
   launchArgsExample: "e.g. --chrome",
   tokensExample: "e.g. 300000",
   executableExample: "e.g. dsh",
+  textGenerators: {
+    add: "Add generator",
+    empty: "No text generators yet",
+    emptyDescription:
+      "Add a model API to write thread titles, commit messages, and other short text without starting a coding agent.",
+    disabledUrl: "Off · {{url}}",
+    moreActions: "More actions for {{name}}",
+    showModels: "Show models",
+    removeTitle: "Remove {{name}}?",
+    removeDescription:
+      "This deletes the API key stored on {{environment}}. Anything set to use this generator falls back to the text generation model.",
+    stepUse: "Use it",
+    tasks: {
+      textGenerationModelSelection: "Thread titles and other generated text",
+      sourceControlWriterModelSelection: "Commit messages, pull requests, and branch names",
+      speechPostProcessingModelSelection: "Voice transcript cleanup",
+    },
+    editTitle: "Edit {{name}}",
+    addTitle: "Add a text generator",
+    wizardDescription:
+      "Writes thread titles, commit messages, and other short text without starting a coding agent. Your API key is stored on this environment.",
+    service: "Service",
+    custom: "Custom",
+    baseUrl: "Base URL",
+    apiKeyOptional: "API key (optional)",
+    name: "Name (optional)",
+    namePlaceholder: "e.g. My local model",
+    connected_one:
+      "{{name}} is connected and lists {{count}} model. Switch any of these to it, or keep what they use now.",
+    connected_other:
+      "{{name}} is connected and lists {{count}} models. Switch any of these to it, or keep what they use now.",
+    connecting: "Connecting",
+    saveContinue: "Save and continue",
+    testPassed: "{{model}} answered. It works.",
+    followsDefault: "Follows the text generation model",
+    test: "Test",
+    searchModels: "Search models",
+    models: "Models",
+    loadFailed: "Couldn't load {{name}} models",
+    modelsTitle: "{{name}} models",
+    listFailed: "The model list couldn't load.",
+    listLoading: "Loading the model list.",
+    available_one: "{{count}} model available. Pick one in a text generation model picker.",
+    available_other: "{{count}} models available. Pick one in a text generation model picker.",
+  },
 } as const;

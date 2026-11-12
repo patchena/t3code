@@ -67,6 +67,14 @@ export const miscEn = {
       hideAll: "Hide all",
       zen: "Zen",
     },
+    multilineNested:
+      "Show folder threads on two lines: the title, then the branch, pull request, and agent.",
+    promptSuggestionsDescription:
+      "Show a predicted next message in the empty composer after a Claude or Codex turn. Tab uses it. Each is an extra cached request on your plan. Needs Codex 0.165+. Claude threads update on restart.",
+    promptSuggestionsLabel: "Suggest next prompt",
+    fastWorktreeCheckoutDescription:
+      "On a Mac, clone new worktrees from a checkout cached in the T3 home folder instead of writing every file. Uses Git’s normal checkout when it can’t. Turning it off deletes the cache.",
+    fastWorktreeCheckoutLabel: "Fast worktree checkout",
   },
   clipboard: {
     unavailable: "Clipboard API is unavailable while copying {{target}}.",
@@ -214,5 +222,6 @@ export const miscEn = {
     agentAccess: "Agent access",
     browsing: "Browsing",
     recordings: "Recordings",
+    update: "Update",
   },
 } as const;

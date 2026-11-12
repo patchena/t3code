@@ -416,13 +416,6 @@ export function useEnvironmentIdentificationMode(): EnvironmentIdentificationMod
   });
 }
 
-/** Legacy sidebar opt-ins still count, so those users land in the boring sidebar. */
-export function useBoringSidebarEnabled(): boolean {
-  return useClientSettings(
-    (settings) => settings.boringSidebarEnabled || settings.legacySidebarEnabled,
-  );
-}
-
 export async function prepareModelPreferencesPatch(
   settings: ServerSettings,
   patch: ServerSettingsPatch,
@@ -614,7 +607,7 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
   const sharedSettingsSyncTargetIds = useSharedSettingsSyncTargetIds(true);
   const updateSettings = (
     patch: UnifiedSettingsPatch,
-    options?: { readonly onFailed?: () => void },
+    options?: { readonly onFailed?: () => void; readonly onSaved?: () => void },
   ) => {
     const { serverPatch, clientPatch } = splitPatch(patch);
 
@@ -651,7 +644,9 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
           void persistServerSettings(
             { environmentId, input: { patch: localPatch } },
             options?.onFailed,
-          );
+          ).then((result) => {
+            if (result._tag === "Success") options?.onSaved?.();
+          });
         } else {
           warnUnsaved();
         }
@@ -722,6 +717,12 @@ function useUpdateSettingsTarget(environmentId: EnvironmentId | null) {
                 }),
               ];
             });
+            if (
+              deniedLabels.length === 0 &&
+              outcomes.every(({ result }) => result._tag === "Success")
+            ) {
+              options?.onSaved?.();
+            }
             if (failures.length === 0) return;
             const saved = outcomes
               .filter(({ result }) => result._tag === "Success")

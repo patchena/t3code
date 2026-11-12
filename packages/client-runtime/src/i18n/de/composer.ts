@@ -637,4 +637,22 @@ export const composerDe = {
   sideChatUnavailable: "Der Nebenchat ist nicht mehr verfügbar.",
   sideChatModeFailed: "Der Berechtigungsmodus des Nebenchats konnte nicht festgelegt werden.",
   sideChatSendFailed: "Die Nachricht im Nebenchat konnte nicht gesendet werden.",
+  attachmentUploadFailed: "Der Upload des Anhangs „{{name}}“ ist fehlgeschlagen.",
+  imageAttachment: "Bildanhang",
+  preparingAttachment: "Wird vorbereitet",
+  stopped: "Gestoppt",
+  stopping: "Wird gestoppt",
+  stoppingTooltip: "Wird gestoppt…",
+  replyingTo: "Antwort auf",
+  replyingToSubagents: "Antwort auf {{names}}",
+  cancelReply: "Antwort abbrechen",
+  terminalOutputToAnswerTitle:
+    "Terminalausgabe kann nicht zu einer Antwort auf eine Frage hinzugefügt werden.",
+  terminalOutputToAnswerDescription:
+    "Beantworte oder schließe die Frage zuerst und füge sie dann zum Chat hinzu.",
+  openFromComputer: "Öffne das von einem Computer aus, um auf {{environment}} zu bearbeiten",
+  openFromComputerThisMachine:
+    "Öffne das von einem Computer aus, um auf diesem Rechner zu bearbeiten",
+  searchingProjectModels: "Projektmodelle werden gesucht …",
+  retryNow: "Jetzt erneut versuchen",
 } as const;

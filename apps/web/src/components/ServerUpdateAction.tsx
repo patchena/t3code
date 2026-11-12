@@ -210,6 +210,7 @@ export function ServerUpdatesAction({
             t(($) => $.updates.updateDesktops, {
               machines: desktopTargets.map((target) => target.serverLabel).join(", "),
             }),
+            { initialFocus: "confirm" },
           )) ?? true;
         if (!confirmed) return;
       }
@@ -322,8 +323,12 @@ export function ServerUpdateAction({
     }
     if (isDesktopAppUpdate) {
       const confirmed =
-        (await requestConfirmDialog(t(($) => $.updates.updateDesktop, { server: serverLabel }))) ??
-        true;
+        (await requestConfirmDialog(
+          t(($) => $.updates.updateDesktop, { server: serverLabel }),
+          {
+            initialFocus: "confirm",
+          },
+        )) ?? true;
       if (!confirmed) {
         return;
       }

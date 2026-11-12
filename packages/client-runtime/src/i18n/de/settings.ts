@@ -185,6 +185,14 @@ export const settingsDe = {
     speechHardware: "Transkriptionshardware und Entladen von Modellen",
     microphoneTest: "Mikrofon testen",
     transcriptionTest: "Modell testen",
+    screenReaderAnnouncements: "Screenreader-Ansagen",
+    promptSuggestionsBeta: "Nächsten Prompt vorschlagen",
+    worktreeFastCheckout: "Schneller Worktree-Checkout",
+    welcomePage: "Willkommensseite",
+    textGenerators: "Textgeneratoren",
+    cleanUpTranscripts: "Transkripte bereinigen",
+    commitAndPullRequestWriting: "Commit- und Pull-Request-Texte",
+    followPullRequestTemplates: "Pull-Request-Vorlagen verwenden",
   },
   panels: {
     waitForTheFullResponse: "Auf die vollständige Antwort warten",
@@ -451,6 +459,22 @@ export const settingsDe = {
     afterReturn: "Bei deiner Rückkehr",
     beforeCacheExpires: "Vor Ablauf des Caches (Beta)",
     onReturn: "Bei deiner Rückkehr",
+    activity: "Aktivität",
+    screenReaderAnnouncements: "Screenreader-Ansagen",
+    screenReaderAnnouncementsLabel: "Screenreader-Ansagen",
+    screenReaderAnnouncementsDescription:
+      "Was ein Screenreader aus dem geöffneten Thread hört: wenn ein Turn beginnt, dich braucht und endet. „Status und Nachrichten“ ergänzt, was der Agent vor seiner letzten Nachricht schreibt. „Alles“ ergänzt jeden Schritt.",
+    screenReaderAnnouncementModes: {
+      status: "Nur Status",
+      messages: "Status und Nachrichten",
+      everything: "Alles",
+    },
+    toolCallsInChatLabel: "Tool-Aufrufe im Chat",
+    forThreadTitlesAndOtherGeneratedText:
+      "Für Threadtitel und andere generierte Texte. Die Versionsverwaltung hat eine eigene Einstellung. Textgeneratoren aus den Providern erscheinen hier ebenfalls.",
+    seeYourAgentsImportProjectsAndSetUpYourPhone:
+      "Sieh deine Agenten, importiere Projekte und richte dein Smartphone ein.",
+    open: "Öffnen",
   },
   restore: {
     interfaceFont: "Oberflächenschrift",
@@ -696,6 +720,8 @@ export const settingsDe = {
     usagePeriodMonth: "Nutzung: Zeitraum: 30 Tage",
     usagePeriodQuarter: "Nutzung: Zeitraum: 90 Tage",
     runScript: "Skript ausführen: {{script}}",
+    previewFind: "Vorschau: Auf Seite suchen",
+    threadRegenerateTitle: "Thread: Titel neu generieren",
   },
   writes: {
     notSaved: "Einstellung nicht gespeichert",

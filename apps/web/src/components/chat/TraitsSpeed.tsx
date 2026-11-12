@@ -8,7 +8,6 @@ import { cn } from "~/lib/utils";
 import { ComposerControlIcon, type ComposerControlSize } from "./ComposerControl";
 
 export function getTraitsSpeedDisplay(
-  provider: ProviderDriverKind,
   descriptor: ProviderOptionDescriptor,
   t: TFunction<"chat">,
 ): { label: string; speedIcon: "fast" | "ultrafast" | null } | null {
@@ -19,7 +18,7 @@ export function getTraitsSpeedDisplay(
       speedIcon: descriptor.currentValue === true ? "fast" : null,
     };
   }
-  if (provider !== "codex" || descriptor.id !== "serviceTier" || descriptor.type !== "select") {
+  if (descriptor.id !== "serviceTier" || descriptor.type !== "select") {
     return null;
   }
   const currentValue = getProviderOptionCurrentValue(descriptor);

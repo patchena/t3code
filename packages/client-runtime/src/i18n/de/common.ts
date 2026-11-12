@@ -89,6 +89,8 @@ export const commonDe = {
     preparingWorktree: "Worktree wird vorbereitet",
     conversation: "Unterhaltung",
     messageInput: "Nachrichteneingabe",
+    replyUnavailable:
+      "Versuche zu antworten, sobald die Verbindung oder ausstehende Eingabe geklärt ist.",
   },
   settings: {
     modelPreferencesNotSaved: "Modellpräferenzen nicht gespeichert",

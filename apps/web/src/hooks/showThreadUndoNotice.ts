@@ -66,6 +66,25 @@ function threadUndoNoticeSummary(
   }
 }
 
+function threadUndoDoneSummary(
+  action: UndoOptions["action"],
+  count: number,
+  t: TFunction<"workspace">,
+): string {
+  switch (action) {
+    case "Settled":
+      return t(($) => $.undo.undidSettleCount, { count });
+    case "Snoozed":
+      return t(($) => $.undo.undidSnoozeCount, { count });
+    case "Unpinned":
+      return t(($) => $.undo.undidUnpinCount, { count });
+    case "Archived":
+      return t(($) => $.undo.undidArchiveCount, { count });
+    case "Discarded":
+      return t(($) => $.undo.undidDiscardCount, { count });
+  }
+}
+
 export function threadUndoLabel(
   keybindings: Parameters<typeof shortcutLabelForCommand>[0],
   t: TFunction<"workspace">,
@@ -142,6 +161,7 @@ function refreshNotice() {
       // Claim before awaiting to prevent repeated actions restoring a group twice.
       for (const entry of current) entry.claim.finish();
       refreshNotice();
+      let undone = 0;
       await Promise.all(
         current.map(async ({ undo, action }) => {
           const reportFailure = (error: unknown) => {
@@ -158,7 +178,8 @@ function refreshNotice() {
           };
           try {
             const result = await undo();
-            if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+            if (result._tag === "Success") undone++;
+            else if (!isAtomCommandInterrupted(result)) {
               reportFailure(squashAtomCommandFailure(result));
             }
           } catch (error) {
@@ -166,6 +187,12 @@ function refreshNotice() {
           }
         }),
       );
+      // Failures already raise a toast, so only what was actually restored is spoken.
+      if (undone > 0) {
+        announce(
+          threadUndoDoneSummary(latest.action, undone, appI18n.getFixedT(null, "workspace")),
+        );
+      }
     },
   });
 }

@@ -3,6 +3,7 @@ import {
   downloadEnvironmentSpeechModel,
   getEnvironmentSpeechModels,
   getEnvironmentSpeechStatus,
+  linkEnvironmentSpeechModels,
   removeEnvironmentSpeechModel,
   selectEnvironmentSpeechModel,
   updateEnvironmentSpeechAcceleration,
@@ -11,6 +12,7 @@ import {
 import type { PreparedConnection } from "@t3tools/client-runtime/connection";
 import { openRouterIcon } from "@t3tools/client-runtime/provider-clients";
 import {
+  AuthFilesystemReadScope,
   AuthSettingsWriteScope,
   CLOUD_SPEECH_LABELS,
   CloudSpeechProvider,
@@ -21,6 +23,7 @@ import {
   type ProjectId,
   ProviderDriverKind,
   type SpeechAcceleration,
+  type SpeechBenchmarkTier,
   type SpeechCustomWords,
   type SpeechModelUnloadTimeout,
   type VoiceShortcutMode,
@@ -29,6 +32,7 @@ import { createModelSelection } from "@t3tools/shared/model";
 import { resolveSpeechPostProcessingModelSelection } from "@t3tools/shared/serverSettings";
 import { cloudSpeechLanguages } from "@t3tools/shared/speech";
 import {
+  ArrowDownUpIcon,
   AudioLinesIcon,
   CheckIcon,
   DownloadIcon,
@@ -37,17 +41,29 @@ import {
   MonitorIcon,
   MicOffIcon,
   MicIcon,
+  PlusIcon,
   RefreshCwIcon,
+  SearchIcon,
   StarIcon,
-  SlidersHorizontalIcon,
   Trash2Icon,
+  UnlinkIcon,
   XIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useStableCallback } from "~/hooks/useStableCallback";
-import { listBrowserMicrophones, type BrowserMicrophone } from "../../speech/browserMicrophones";
+import { cn } from "~/lib/utils";
+import {
+  listAudioInputs,
+  updateMicrophoneOrder,
+  type BrowserMicrophone,
+} from "../../speech/browserMicrophones";
+import {
+  microphoneOrder,
+  preferredMicrophoneId,
+  rememberMicrophones,
+} from "../../speech/microphoneOrder";
 import { preferredSpeechLanguages } from "../../speech/preferredSpeechLanguages";
 import {
   chooseAudioDestination,
@@ -60,7 +76,7 @@ import {
   getCustomModelOptionsByInstance,
   resolveAppModelSelectionState,
 } from "../../modelSelection";
-import { providerInstanceEntriesFor } from "../../providerInstances";
+import { useTextGenerationTargets } from "../../textGenerators";
 import { useEnvironmentProviders, useEnvironments } from "../../state/environments";
 import { useEnvironmentScope } from "../../state/session";
 import { EMPTY_SERVER_PROVIDERS } from "../../state/server";
@@ -88,6 +104,7 @@ import {
   MenuRadioGroup,
   MenuRadioItem,
   MenuRadioItemIndicator,
+  MenuSearchInput,
   MenuSeparator,
   MenuTrigger,
 } from "../ui/menu";
@@ -103,15 +120,15 @@ import {
 import { Switch } from "../ui/switch";
 import { Textarea } from "../ui/textarea";
 import { toastManager } from "../ui/toast";
+import { MicrophoneOrderList } from "./MicrophoneOrderList";
 import { MicrophoneTest } from "./MicrophoneTest";
 import { CloudVoiceConfiguration } from "./CloudVoiceConfiguration";
-import { LanguageRow, ModelBenchmarks, orderSpeechLanguages } from "./SpeechModelComparison";
+import { ModelBenchmarks, orderSpeechLanguages } from "./SpeechModelComparison";
 import { languageLabel, SpeechLanguageSelect } from "./SpeechLanguageSelect";
 import { filterSpeechModels, type SpeechModelSort } from "./speechModelBrowser";
 import { AdvancedSettings } from "./AdvancedSettings";
 import {
   SETTINGS_PICKER_TRIGGER_CLASSNAME,
-  SettingResetButton,
   SettingsPageContainer,
   SettingsRow,
   SettingsSearchTarget,
@@ -134,7 +151,6 @@ function CloudSpeechLogo({ provider }: { provider: CloudSpeechProvider }) {
     />
   );
 }
-const SYSTEM_DEFAULT = "system-default";
 const formatSize = (bytes: number) => `${Math.round(bytes / 1024 / 1024)} MB`;
 const SHORTCUT_MODES: readonly VoiceShortcutMode[] = ["auto", "hold", "toggle"];
 const UNLOAD_TIMEOUTS: readonly SpeechModelUnloadTimeout[] = [
@@ -157,6 +173,7 @@ const spellingsOf = (words: SpeechCustomWords) =>
 type ModelCardProps = {
   readonly model: EnvironmentSpeechModel;
   readonly comparisonLanguages: readonly string[];
+  readonly benchmarkTier: SpeechBenchmarkTier;
   readonly busy: boolean;
   readonly canCancel: boolean;
   readonly onDownload: () => void;
@@ -164,6 +181,8 @@ type ModelCardProps = {
   readonly onCancel: () => void;
   readonly onDelete: () => void;
   readonly testControls?: ReactNode;
+  /** Keeps the controls under the text, so a live test never squeezes the model's details. */
+  readonly stacked?: boolean;
   readonly children?: ReactNode;
 };
 
@@ -185,106 +204,128 @@ function ModelCard(props: ModelCardProps) {
   const downloading = model.state === "downloading" || model.state === "verifying";
   const progress = model.downloaded === undefined ? 0 : (model.downloaded / model.size) * 100;
   return (
-    <div className="flex flex-wrap items-start gap-3 px-3 py-2.5 sm:px-4">
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-sm font-medium leading-5">{model.name}</span>
-          {model.recommended ? (
-            <ModelBadge
-              icon={<StarIcon className="mr-1 size-3" />}
-              label={t(($) => $.models.recommended)}
-              tooltip={t(($) => $.models.recommendedTooltip)}
-            />
+    <div className="@container/model px-3 py-3">
+      <div
+        className={cn(
+          "flex flex-col gap-2.5",
+          !props.stacked &&
+            "@min-[28rem]/model:flex-row @min-[28rem]/model:items-start @min-[28rem]/model:gap-4",
+        )}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-sm font-medium leading-5">{model.name}</span>
+            {model.recommended ? (
+              <ModelBadge
+                icon={<StarIcon className="mr-1 size-3" />}
+                label={t(($) => $.models.recommended)}
+                tooltip={t(($) => $.models.recommendedTooltip)}
+              />
+            ) : null}
+            {model.supportsStreaming ? (
+              <ModelBadge
+                icon={<AudioLinesIcon className="mr-1 size-3" />}
+                label={t(($) => $.models.livePreview)}
+                tooltip={t(($) => $.models.livePreviewTooltip)}
+              />
+            ) : null}
+            {model.supportsTranslation ? (
+              <ModelBadge
+                icon={<LanguagesIcon className="mr-1 size-3" />}
+                label={t(($) => $.models.translate)}
+                tooltip={t(($) => $.models.translateTooltip)}
+              />
+            ) : null}
+          </div>
+          {model.description ? (
+            <p className="mt-0.5 text-xs leading-normal text-muted-foreground">
+              {model.description}
+            </p>
           ) : null}
-          {model.supportsStreaming ? (
-            <ModelBadge
-              icon={<AudioLinesIcon className="mr-1 size-3" />}
-              label={t(($) => $.models.livePreview)}
-              tooltip={t(($) => $.models.livePreviewTooltip)}
-            />
+          {model.linkedFrom ? (
+            <p className="mt-0.5 break-all text-2xs text-muted-foreground">
+              {t(($) => $.models.linkedFrom, { path: model.linkedFrom })}
+            </p>
           ) : null}
-          {model.supportsTranslation ? (
-            <ModelBadge
-              icon={<LanguagesIcon className="mr-1 size-3" />}
-              label={t(($) => $.models.translate)}
-              tooltip={t(($) => $.models.translateTooltip)}
-            />
+          <ModelBenchmarks
+            model={model}
+            languages={props.comparisonLanguages}
+            tier={props.benchmarkTier}
+            facts={[
+              ...(model.languages.length > 1
+                ? [t(($) => $.models.languageCount, { count: model.languages.length })]
+                : model.benchmark
+                  ? []
+                  : [languageLabel(model.languages[0] ?? "")]),
+              formatSize(model.size),
+            ]}
+          />
+          {downloading ? (
+            <div className="mt-2">
+              <div
+                role="progressbar"
+                aria-label={t(($) => $.models.downloadProgress, { model: model.name })}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(progress)}
+                className="h-1 overflow-hidden rounded-full bg-muted"
+              >
+                <div
+                  className="h-full bg-primary transition-[width] duration-200"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <p className="mt-1 text-2xs text-muted-foreground">
+                {model.state === "verifying"
+                  ? t(($) => $.models.verifying)
+                  : t(($) => $.models.downloaded, { percent: Math.round(progress) })}
+              </p>
+            </div>
           ) : null}
         </div>
-        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{model.description}</p>
-        <ModelBenchmarks
-          model={model}
-          languages={props.comparisonLanguages}
-          facts={[
-            ...(model.languages.length > 1
-              ? [t(($) => $.models.languageCount, { count: model.languages.length })]
-              : model.benchmark
-                ? []
-                : [languageLabel(model.languages[0] ?? "")]),
-            formatSize(model.size),
-          ]}
-        />
-        {downloading ? (
-          <div className="mt-2">
-            <div
-              role="progressbar"
-              aria-label={t(($) => $.models.downloadProgress, { model: model.name })}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round(progress)}
-              className="h-1 overflow-hidden rounded-full bg-muted"
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1.5">
+          {props.testControls}
+          {downloading ? (
+            <Button
+              size="icon-sm"
+              variant="outline"
+              aria-label={t(($) => $.models.cancelDownload, { model: model.name })}
+              disabled={!props.canCancel}
+              onClick={props.onCancel}
             >
-              <div
-                className="h-full bg-primary transition-[width] duration-200"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <p className="mt-1 text-2xs text-muted-foreground">
-              {model.state === "verifying"
-                ? t(($) => $.models.verifying)
-                : t(($) => $.models.downloaded, { percent: Math.round(progress) })}
-            </p>
-          </div>
-        ) : null}
-      </div>
-      <div className="flex max-w-full flex-wrap items-center justify-end gap-1">
-        {props.testControls}
-        {downloading ? (
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            aria-label={t(($) => $.models.cancelDownload, { model: model.name })}
-            disabled={!props.canCancel}
-            onClick={props.onCancel}
-          >
-            <XIcon className="size-3.5" />
-          </Button>
-        ) : model.state === "downloadable" ? (
-          <Button size="sm" variant="outline" disabled={props.busy} onClick={props.onDownload}>
-            <DownloadIcon className="mr-1.5 size-3.5" />
-            {t(($) => $.models.download)}
-          </Button>
-        ) : model.active ? (
-          <Button size="sm" variant="secondary" disabled>
-            <CheckIcon className="mr-1.5 size-3.5" />
-            {t(($) => $.models.selected)}
-          </Button>
-        ) : (
-          <Button size="sm" variant="outline" disabled={props.busy} onClick={props.onSelect}>
-            {t(($) => $.models.use)}
-          </Button>
-        )}
-        {model.state === "installed" ? (
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            disabled={props.busy}
-            aria-label={t(($) => $.models.delete, { model: model.name })}
-            onClick={props.onDelete}
-          >
-            <Trash2Icon className="size-3.5" />
-          </Button>
-        ) : null}
+              <XIcon className="size-3.5" />
+            </Button>
+          ) : model.state === "downloadable" ? (
+            <Button size="sm" variant="outline" disabled={props.busy} onClick={props.onDownload}>
+              <DownloadIcon />
+              {t(($) => $.models.download)}
+            </Button>
+          ) : model.active ? (
+            <Button size="sm" variant="secondary" disabled>
+              <CheckIcon />
+              {t(($) => $.models.selected)}
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" disabled={props.busy} onClick={props.onSelect}>
+              {t(($) => $.models.use)}
+            </Button>
+          )}
+          {model.state === "installed" ? (
+            <Button
+              size="icon-sm"
+              variant="outline"
+              disabled={props.busy}
+              aria-label={
+                model.linkedFrom
+                  ? t(($) => $.models.unlink, { model: model.name })
+                  : t(($) => $.models.delete, { model: model.name })
+              }
+              onClick={props.onDelete}
+            >
+              {model.linkedFrom ? <UnlinkIcon /> : <Trash2Icon />}
+            </Button>
+          ) : null}
+        </div>
       </div>
       {props.children}
     </div>
@@ -337,29 +378,33 @@ function DictionaryEditor(props: {
   };
   return (
     <>
-      <div className="flex items-start gap-1.5">
-        <Textarea
-          value={termDraft}
-          rows={1}
-          maxLength={5_100}
-          disabled={disabled}
-          placeholder={t(($) => $.dictionary.placeholder)}
-          aria-label={t(($) => $.dictionary.addLabel, { label })}
-          onChange={(event) => setTermDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter" || event.shiftKey) return;
-            event.preventDefault();
-            addTerm();
-          }}
-        />
-        <Button type="button" disabled={!canAddTerm} onClick={addTerm}>
+      <div className="flex items-start gap-2">
+        {/* One line while empty, so a wrapped placeholder never makes the field taller than Add. */}
+        <div className="min-w-0 flex-1 [&_textarea]:placeholder-shown:whitespace-nowrap">
+          <Textarea
+            value={termDraft}
+            rows={1}
+            maxLength={5_100}
+            disabled={disabled}
+            placeholder={t(($) => $.dictionary.addPlaceholder)}
+            aria-label={t(($) => $.dictionary.addLabel, { label })}
+            onChange={(event) => setTermDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" || event.shiftKey) return;
+              event.preventDefault();
+              addTerm();
+            }}
+          />
+        </div>
+        <Button type="button" variant="outline" disabled={!canAddTerm} onClick={addTerm}>
+          <PlusIcon />
           {t(($) => $.dictionary.add)}
         </Button>
       </div>
       {words.length > 0 ? (
         <ul
           aria-label={t(($) => $.dictionary.entriesLabel, { label })}
-          className="mt-3 flex flex-wrap gap-1.5"
+          className="mt-2.5 flex flex-col gap-1.5 @min-[32rem]/settings-row:flex-row @min-[32rem]/settings-row:flex-wrap"
         >
           {words.map(({ term, aliases }) => (
             <li
@@ -377,7 +422,7 @@ function DictionaryEditor(props: {
                   maxLength={50}
                   aria-label={t(($) => $.dictionary.aliasFor, { term })}
                   placeholder={t(($) => $.dictionary.misspelling)}
-                  className="w-32"
+                  className="ms-auto w-32"
                   onChange={(event) => setAliasDraft({ term, value: event.target.value })}
                   onBlur={() => setAliasDraft(null)}
                   onKeyDown={(event) => {
@@ -392,6 +437,7 @@ function DictionaryEditor(props: {
                   type="button"
                   size="xs"
                   variant="ghost-muted"
+                  className="ms-auto"
                   disabled={disabled || aliases.length >= 8}
                   aria-label={t(($) => $.dictionary.addAlias, { term })}
                   onClick={() => setAliasDraft({ term, value: "" })}
@@ -436,16 +482,11 @@ function ProjectDictionaryRow() {
       }
       description={
         isProjectScope
-          ? t(($) => $.dictionary.projectDescription, { project: scope.scope.label })
-          : t(($) => $.dictionary.sharedDescription)
-      }
-      control={
-        <span className="text-xs text-muted-foreground">
-          {t(($) => $.dictionary.entries, { count: words.length })}
-        </span>
+          ? t(($) => $.dictionary.projectUsage, { project: scope.scope.label })
+          : t(($) => $.dictionary.sharedUsage)
       }
     >
-      <div className="mt-2 pb-3.5">
+      <div className="mt-3 pb-2">
         <DictionaryEditor
           label={
             isProjectScope
@@ -473,10 +514,18 @@ function CleanupModelRow() {
     (environment?.serverConfig
       ? providersByEnvironment.get(environment.environmentId)
       : undefined) ?? EMPTY_SERVER_PROVIDERS;
-  const textGenerationProviders = providers.filter(
-    (provider) => provider.supportsTextGeneration !== false,
-  );
-  const instanceEntries = providerInstanceEntriesFor(textGenerationProviders, settings, null);
+  const targets = useTextGenerationTargets({
+    environmentId: environment?.environmentId ?? null,
+    settings,
+    providers: providers.filter((provider) => provider.supportsTextGeneration !== false),
+    projectId: null,
+    selections: [
+      settings.speechPostProcessingModelSelection,
+      settings.textGenerationModelSelection,
+    ],
+  });
+  const textGenerationProviders = targets.providers;
+  const instanceEntries = targets.entries;
   const hasProvider = instanceEntries.some((entry) => entry.enabled && entry.isAvailable);
   const dedicated = settings.speechPostProcessingModelSelection !== null;
   const selection = resolveAppModelSelectionState(
@@ -515,49 +564,60 @@ function CleanupModelRow() {
       settingKeys={["speechPostProcessingModelSelection"]}
       {...searchableSetting("speech-post-processing-model", tSettings)}
       title={t(($) => $.cleanup.model)}
-      description={t(
-        ($) => (dedicated ? $.cleanup.dedicatedDescription : $.cleanup.defaultDescription),
-        { environment: environment?.label ?? t(($) => $.cleanup.thisEnvironment) },
-      )}
-      resetAction={
-        dedicated ? (
-          <SettingResetButton
-            label={t(($) => $.cleanup.resetLabel)}
-            onClick={() => updateSettings({ speechPostProcessingModelSelection: null })}
-          />
-        ) : null
-      }
+      description={t(($) => $.cleanup.modelDescription)}
       control={
         connectedEnvironments.length === 0 ? (
           <span className="text-sm text-muted-foreground">{t(($) => $.cleanup.connectFirst)}</span>
-        ) : !hasProvider || !instanceEntry ? (
-          <span className="text-sm text-muted-foreground">{t(($) => $.cleanup.noProviders)}</span>
         ) : (
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
-            <ProviderModelPicker
-              environmentId={environment?.environmentId ?? null}
-              activeInstanceId={selection.instanceId}
-              model={selection.model}
-              lockedProvider={null}
-              instanceEntries={instanceEntries}
-              modelOptionsByInstance={modelOptionsByInstance}
-              triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-              getModelDisabledReason={modelDisabledReason}
-              onInstanceModelChange={(instanceId, model) =>
-                setModel(createModelSelection(instanceId, model))
+          <div className="flex min-w-0 flex-wrap items-center gap-2 @min-[32rem]/settings-row:justify-end">
+            {dedicated && (!hasProvider || !instanceEntry) ? (
+              <span className="text-sm text-muted-foreground">
+                {t(($) => $.cleanup.noTextGenerationProviders)}
+              </span>
+            ) : null}
+            {dedicated && hasProvider && instanceEntry ? (
+              <>
+                <ProviderModelPicker
+                  environmentId={environment?.environmentId ?? null}
+                  activeInstanceId={selection.instanceId}
+                  model={selection.model}
+                  lockedProvider={null}
+                  instanceEntries={instanceEntries}
+                  modelOptionsByInstance={modelOptionsByInstance}
+                  triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
+                  getModelDisabledReason={modelDisabledReason}
+                  onInstanceModelChange={(instanceId, model) =>
+                    setModel(createModelSelection(instanceId, model))
+                  }
+                />
+                <TraitsPicker
+                  provider={instanceEntry.driverKind}
+                  models={instanceEntry.models}
+                  model={selection.model}
+                  modelOptions={selection.options ?? []}
+                  allowPromptInjectedEffort={false}
+                  triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
+                  onModelOptionsChange={(options) =>
+                    setModel(createModelSelection(selection.instanceId, selection.model, options))
+                  }
+                />
+              </>
+            ) : null}
+            <Switch
+              checked={dedicated}
+              disabled={!dedicated && !hasProvider}
+              onCheckedChange={(checked) =>
+                updateSettings({
+                  speechPostProcessingModelSelection: checked
+                    ? createModelSelection(
+                        settings.textGenerationModelSelection.instanceId,
+                        settings.textGenerationModelSelection.model,
+                        settings.textGenerationModelSelection.options,
+                      )
+                    : null,
+                })
               }
-            />
-            <TraitsPicker
-              provider={instanceEntry.driverKind}
-              models={instanceEntry.models}
-              model={selection.model}
-              modelOptions={selection.options ?? []}
-              allowPromptInjectedEffort={false}
-              planModeEnabled={settings.planModeEnabled}
-              triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
-              onModelOptionsChange={(options) =>
-                setModel(createModelSelection(selection.instanceId, selection.model, options))
-              }
+              aria-label={t(($) => $.cleanup.useSeparateModel)}
             />
           </div>
         )
@@ -789,6 +849,8 @@ function SpeechModelBrowser(props: {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SpeechModelSort>("recommended");
   const [downloadedOnly, setDownloadedOnly] = useState(false);
+  const [existingPath, setExistingPath] = useState("");
+  const canReadFiles = useEnvironmentScope(prepared.environmentId, AuthFilesystemReadScope);
   const [languageSearch, setLanguageSearch] = useState("");
   const [selection, setSelection] = useState<string[] | null>(null);
   const [preferred] = useState(preferredSpeechLanguages);
@@ -804,16 +866,21 @@ function SpeechModelBrowser(props: {
   const accuracyLanguage = selectedLanguages[0] ?? "en";
   const sortLabels: Record<SpeechModelSort, string> = {
     recommended: t(($) => $.models.sortRecommended),
-    size: t(($) => $.models.sortSize),
-    accuracy: t(($) => $.models.sortAccuracy, { language: languageLabel(accuracyLanguage) }),
-    speed: t(($) => $.models.sortSpeed),
+    size: t(($) => $.models.sortSmallest),
+    accuracy: t(($) => $.models.sortMostAccurate),
+    speed: t(($) => $.models.sortFastest),
   };
+  const languagesLabel =
+    selectedLanguages.length === 0
+      ? t(($) => $.models.allLanguages)
+      : selectedLanguages.map(languageLabel).join(", ");
   const sortedModels = filterSpeechModels(models, {
     search,
     languages: selectedLanguages,
     downloadedOnly,
     sort,
     accuracyLanguage,
+    benchmarkTier: status?.supported ? status.benchmarkTier : "accelerated",
   });
   const activeModel = models.find((model) => model.active);
   const renderedModels =
@@ -821,193 +888,221 @@ function SpeechModelBrowser(props: {
       ? [activeModel, ...sortedModels]
       : sortedModels;
 
+  if (!status) return null;
+  if (!status.supported)
+    return (
+      <SettingsRow
+        {...searchableSetting("speech-models", tSettings)}
+        title={t(($) => $.models.title)}
+        description={t(($) => $.models.unsupported, { reason: status.reason })}
+      />
+    );
   return (
-    <SettingsSearchTarget
+    <SettingsRow
       {...searchableSetting("speech-models", tSettings)}
+      title={t(($) => $.models.title)}
+      description={t(($) => $.models.benchmarkDescription, {
+        hardware: status.benchmarkTier === "cpu" ? "CPU" : "GPU",
+      })}
       className="@container/voice-models"
     >
-      {status && !status.supported ? (
-        <p className="px-4 py-2 text-sm text-muted-foreground">
-          {t(($) => $.models.unsupported, { reason: status.reason })}
-        </p>
-      ) : null}
-      {status?.supported ? (
-        <>
-          <p className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground sm:px-4">
-            {t(($) => $.models.intro)}
-          </p>
-          <div className="@min-[32rem]/voice-models:grid @min-[32rem]/voice-models:grid-cols-[11rem_minmax(0,1fr)]">
-            <div className="flex min-h-0 flex-col border-b border-border/60 bg-muted/10 @min-[32rem]/voice-models:border-r @min-[32rem]/voice-models:border-b-0">
-              <div className="space-y-2 p-3">
-                <p className="text-sm font-medium">{t(($) => $.models.languages)}</p>
-                <Input
-                  size="compact"
-                  aria-label={t(($) => $.models.searchLanguages)}
-                  placeholder={t(($) => $.models.searchLanguages)}
-                  value={languageSearch}
-                  onChange={(e) => setLanguageSearch(e.target.value)}
-                />
-              </div>
-              <div
-                role="group"
-                aria-label={t(($) => $.models.browseByLanguage)}
-                className="flex gap-1 overflow-x-auto px-2 pb-2 @min-[32rem]/voice-models:h-72 @min-[32rem]/voice-models:flex-col @min-[32rem]/voice-models:overflow-y-auto"
-              >
-                <LanguageRow
-                  label={t(($) => $.models.allLanguages)}
-                  selected={selectedLanguages.length === 0}
-                  onClick={() => setSelection([])}
-                />
-                {visibleLanguages.map((code) => (
-                  <LanguageRow
-                    key={code}
-                    label={languageLabel(code)}
-                    selected={selectedLanguages.includes(code)}
-                    onClick={() =>
-                      setSelection(
-                        selectedLanguages.includes(code)
-                          ? selectedLanguages.filter((language) => language !== code)
-                          : [...selectedLanguages, code],
-                      )
-                    }
-                  />
-                ))}
-                {visibleLanguages.length === 0 && (
-                  <p className="px-2 py-1 text-xs text-muted-foreground">
-                    {t(($) => $.models.noLanguages)}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="flex min-w-0 flex-col">
-              <div className="space-y-2 p-3">
-                <p className="text-sm font-medium">
-                  {selectedLanguages.length
-                    ? t(($) => $.models.modelsFor, {
-                        languages: selectedLanguages.map(languageLabel).join(", "),
-                      })
-                    : t(($) => $.models.allModels)}
+      <div className="mt-3 flex min-w-0 gap-2">
+        <InputGroup className="min-w-0 flex-1 **:[input]:h-9 sm:**:[input]:h-8">
+          <InputGroupAddon>
+            <SearchIcon aria-hidden />
+          </InputGroupAddon>
+          <InputGroupInput
+            type="search"
+            aria-label={t(($) => $.models.searchModelsLabel)}
+            placeholder={t(($) => $.models.searchModels)}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </InputGroup>
+        <Menu>
+          <MenuTrigger
+            render={<Button variant="outline" className="max-w-56" />}
+            aria-label={t(($) => $.models.filterByLanguage, { languages: languagesLabel })}
+          >
+            <LanguagesIcon />
+            <span className="hidden truncate @min-[34rem]/voice-models:inline">
+              {languagesLabel}
+            </span>
+          </MenuTrigger>
+          <MenuPopup align="end">
+            <MenuSearchInput
+              autoFocus
+              aria-label={t(($) => $.models.searchLanguages)}
+              placeholder={t(($) => $.models.searchLanguages)}
+              value={languageSearch}
+              onChange={(e) => setLanguageSearch(e.target.value)}
+            />
+            <div
+              role="group"
+              aria-label={t(($) => $.models.browseByLanguage)}
+              className="max-h-72 overflow-y-auto"
+            >
+              {needle ? null : (
+                <MenuCheckboxItem
+                  checked={selectedLanguages.length === 0}
+                  onCheckedChange={() => setSelection([])}
+                >
+                  {t(($) => $.models.allLanguages)}
+                </MenuCheckboxItem>
+              )}
+              {visibleLanguages.map((code) => (
+                <MenuCheckboxItem
+                  key={code}
+                  checked={selectedLanguages.includes(code)}
+                  onCheckedChange={() =>
+                    setSelection(
+                      selectedLanguages.includes(code)
+                        ? selectedLanguages.filter((language) => language !== code)
+                        : [...selectedLanguages, code],
+                    )
+                  }
+                >
+                  {languageLabel(code)}
+                </MenuCheckboxItem>
+              ))}
+              {visibleLanguages.length === 0 && (
+                <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                  {t(($) => $.models.noLanguages)}
                 </p>
-                <InputGroup>
-                  <InputGroupInput
-                    size="compact"
-                    aria-label={t(($) => $.models.searchModelsLabel)}
-                    placeholder={t(($) => $.models.searchModels)}
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                  <InputGroupAddon align="inline-end">
-                    <Menu>
-                      <MenuTrigger
-                        render={<Button size="compact" variant="ghost-muted" />}
-                        aria-label={
-                          downloadedOnly
-                            ? t(($) => $.models.sortAndFilterDownloaded, { sort: sortLabels[sort] })
-                            : t(($) => $.models.sortAndFilter, { sort: sortLabels[sort] })
-                        }
-                      >
-                        <SlidersHorizontalIcon />
-                        <span className="hidden @min-[40rem]/voice-models:inline">
-                          {sortLabels[sort]}
-                        </span>
-                        {downloadedOnly && <span>1</span>}
-                      </MenuTrigger>
-                      <MenuPopup align="end">
-                        <MenuGroup>
-                          <MenuGroupLabel>{t(($) => $.models.sortBy)}</MenuGroupLabel>
-                          <MenuRadioGroup
-                            value={sort}
-                            onValueChange={(value) => setSort(value as SpeechModelSort)}
-                          >
-                            {(Object.keys(sortLabels) as SpeechModelSort[]).map((value) => (
-                              <MenuRadioItem key={value} value={value} closeOnClick>
-                                <span className="flex items-center justify-between gap-3">
-                                  {sortLabels[value]}
-                                  <MenuRadioItemIndicator />
-                                </span>
-                              </MenuRadioItem>
-                            ))}
-                          </MenuRadioGroup>
-                        </MenuGroup>
-                        <MenuSeparator />
-                        <MenuCheckboxItem
-                          checked={downloadedOnly}
-                          onCheckedChange={setDownloadedOnly}
-                        >
-                          {t(($) => $.models.downloadedOnly)}
-                        </MenuCheckboxItem>
-                      </MenuPopup>
-                    </Menu>
-                  </InputGroupAddon>
-                </InputGroup>
-              </div>
-              <div
-                className="h-72 overflow-y-auto divide-y divide-border/60"
-                role="region"
-                aria-label={t(($) => $.models.region)}
-                tabIndex={0}
-              >
-                {sortedModels.length === 0 && (
-                  <p className="px-4 py-2 text-sm text-muted-foreground">
-                    {t(($) => $.models.noModels)}
-                  </p>
-                )}
-                {renderedModels.map((model) => {
-                  const card: ModelCardProps = {
-                    model:
-                      model.id === requestedDownload && model.state === "downloadable"
-                        ? { ...model, state: "downloading" }
-                        : model,
-                    busy: controlsDisabled,
-                    canCancel,
-                    comparisonLanguages: selectedLanguages,
-                    onDownload: () =>
-                      void run(
-                        t(($) => $.models.downloadFailed),
-                        () =>
-                          runEnvironmentSpeech(downloadEnvironmentSpeechModel(prepared, model.id)),
-                        model.id,
-                      ),
-                    onSelect: () =>
-                      void run(
-                        t(($) => $.models.selectFailed),
-                        () =>
-                          runEnvironmentSpeech(selectEnvironmentSpeechModel(prepared, model.id)),
-                      ),
-                    onCancel: () =>
-                      void run(
-                        t(($) => $.models.cancelFailed),
-                        () =>
-                          runEnvironmentSpeech(
-                            cancelEnvironmentSpeechModelDownload(prepared, model.id),
-                          ),
-                      ),
-                    onDelete: () =>
-                      void run(
-                        t(($) => $.models.deleteFailed),
-                        () =>
-                          runEnvironmentSpeech(removeEnvironmentSpeechModel(prepared, model.id)),
-                      ),
-                  };
-                  return model.active ? (
-                    <TranscriptionTest
-                      key={model.id}
-                      card={card}
-                      hidden={!sortedModels.includes(model)}
-                      environmentId={props.testEnvironmentId}
-                      projectId={props.projectId}
-                      projectName={props.projectName}
-                    />
-                  ) : (
-                    <ModelCard key={model.id} {...card} />
-                  );
-                })}
-              </div>
+              )}
             </div>
+          </MenuPopup>
+        </Menu>
+        <Menu>
+          <MenuTrigger
+            render={<Button variant="outline" />}
+            aria-label={
+              downloadedOnly
+                ? t(($) => $.models.sortAndFilterDownloaded, { sort: sortLabels[sort] })
+                : t(($) => $.models.sortAndFilter, { sort: sortLabels[sort] })
+            }
+          >
+            <ArrowDownUpIcon />
+            <span className="hidden @min-[34rem]/voice-models:inline">{sortLabels[sort]}</span>
+          </MenuTrigger>
+          <MenuPopup align="end">
+            <MenuGroup>
+              <MenuGroupLabel>{t(($) => $.models.sortBy)}</MenuGroupLabel>
+              <MenuRadioGroup
+                value={sort}
+                onValueChange={(value) => setSort(value as SpeechModelSort)}
+              >
+                {(Object.keys(sortLabels) as SpeechModelSort[]).map((value) => (
+                  <MenuRadioItem key={value} value={value} closeOnClick>
+                    <span className="flex items-center justify-between gap-3">
+                      {value === "accuracy"
+                        ? t(($) => $.models.sortMostAccurateIn, {
+                            language: languageLabel(accuracyLanguage),
+                          })
+                        : sortLabels[value]}
+                      <MenuRadioItemIndicator />
+                    </span>
+                  </MenuRadioItem>
+                ))}
+              </MenuRadioGroup>
+            </MenuGroup>
+            <MenuSeparator />
+            <MenuCheckboxItem checked={downloadedOnly} onCheckedChange={setDownloadedOnly}>
+              {t(($) => $.models.downloadedOnly)}
+            </MenuCheckboxItem>
+          </MenuPopup>
+        </Menu>
+      </div>
+      <div
+        className="mt-2 mb-2 max-h-96 divide-y divide-border/60 overflow-y-auto rounded-lg border border-border/60"
+        role="region"
+        aria-label={t(($) => $.models.region)}
+        tabIndex={0}
+      >
+        {sortedModels.length === 0 && (
+          <p className="px-3 py-3 text-sm text-muted-foreground">{t(($) => $.models.noModels)}</p>
+        )}
+        {renderedModels.map((model) => {
+          const card: ModelCardProps = {
+            model:
+              model.id === requestedDownload && model.state === "downloadable"
+                ? { ...model, state: "downloading" }
+                : model,
+            busy: controlsDisabled,
+            canCancel,
+            comparisonLanguages: selectedLanguages,
+            benchmarkTier: status.benchmarkTier,
+            onDownload: () =>
+              void run(
+                t(($) => $.models.downloadFailed),
+                () => runEnvironmentSpeech(downloadEnvironmentSpeechModel(prepared, model.id)),
+                model.id,
+              ),
+            onSelect: () =>
+              void run(
+                t(($) => $.models.selectFailed),
+                () => runEnvironmentSpeech(selectEnvironmentSpeechModel(prepared, model.id)),
+              ),
+            onCancel: () =>
+              void run(
+                t(($) => $.models.cancelFailed),
+                () =>
+                  runEnvironmentSpeech(cancelEnvironmentSpeechModelDownload(prepared, model.id)),
+              ),
+            onDelete: () =>
+              void run(
+                t(($) => $.models.deleteFailed),
+                () => runEnvironmentSpeech(removeEnvironmentSpeechModel(prepared, model.id)),
+              ),
+          };
+          return model.active ? (
+            <TranscriptionTest
+              key={model.id}
+              card={card}
+              hidden={!sortedModels.includes(model)}
+              environmentId={props.testEnvironmentId}
+              projectId={props.projectId}
+              projectName={props.projectName}
+            />
+          ) : (
+            <ModelCard key={model.id} {...card} />
+          );
+        })}
+      </div>
+      {status.supportsModelLinking && canReadFiles ? (
+        <form
+          className="mb-2 flex flex-col items-start gap-2 @min-[28rem]/voice-models:flex-row @min-[28rem]/voice-models:items-center"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void run(
+              t(($) => $.models.linkFailed),
+              async () => {
+                await runEnvironmentSpeech(linkEnvironmentSpeechModels(prepared, existingPath));
+                setExistingPath("");
+              },
+            );
+          }}
+        >
+          <div className="w-full min-w-0 flex-1">
+            <Input
+              size="compact"
+              aria-label={t(($) => $.models.existingPathLabel)}
+              placeholder={t(($) => $.models.existingPathPlaceholder)}
+              value={existingPath}
+              onChange={(e) => setExistingPath(e.target.value)}
+            />
           </div>
-        </>
+          <Button
+            type="submit"
+            size="sm"
+            variant="outline"
+            disabled={controlsDisabled || !existingPath.trim()}
+          >
+            {t(($) => $.models.useExisting)}
+          </Button>
+        </form>
       ) : null}
-    </SettingsSearchTarget>
+    </SettingsRow>
   );
 }
 
@@ -1048,8 +1143,9 @@ function TranscriptionTest(props: {
     >
       <ModelCard
         {...props.card}
+        stacked={showTranscript}
         testControls={
-          <div className="flex min-w-0 max-w-full items-center gap-1">
+          <div className="order-last flex min-w-0 max-w-full basis-full items-center gap-1 @min-[28rem]/model:order-none @min-[28rem]/model:basis-auto">
             <ComposerSpeechRecordingPill
               state={speech.state}
               progress={null}
@@ -1084,39 +1180,39 @@ function TranscriptionTest(props: {
         }
       >
         {showTranscript ? (
-          <div className="w-full">
-            <div className="flex items-start gap-2">
-              <p className="min-w-0 flex-1 text-xs leading-relaxed text-muted-foreground">
-                {t(($) => $.test.hint)}
-              </p>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label={t(($) => $.test.close)}
-                onClick={() => {
-                  speech.cancel();
-                  setShowTranscript(false);
-                }}
-              >
-                <XIcon />
-              </Button>
+          <div className="mt-3 flex items-start gap-3 rounded-lg border border-border/60 bg-muted/30 py-1 ps-3 pe-1">
+            <div className="min-w-0 flex-1 py-1.5">
+              {speech.preview || transcript !== null ? null : (
+                <p className="text-xs text-muted-foreground">{t(($) => $.test.prompt)}</p>
+              )}
+              {speech.preview || transcript !== null ? (
+                <p
+                  role="status"
+                  aria-label={t(($) => $.test.transcript)}
+                  className="select-text whitespace-pre-wrap break-words text-sm leading-relaxed"
+                >
+                  {speech.preview ? (
+                    <>
+                      {speech.preview.committed}
+                      <span className="text-muted-foreground">{speech.preview.tentative}</span>
+                    </>
+                  ) : (
+                    transcript || t(($) => $.test.noSpeech)
+                  )}
+                </p>
+              ) : null}
             </div>
-            {speech.preview || transcript !== null ? (
-              <p
-                role="status"
-                aria-label={t(($) => $.test.transcript)}
-                className="mt-2 select-text whitespace-pre-wrap break-words text-sm leading-relaxed"
-              >
-                {speech.preview ? (
-                  <>
-                    {speech.preview.committed}
-                    <span className="text-muted-foreground">{speech.preview.tentative}</span>
-                  </>
-                ) : (
-                  transcript || t(($) => $.test.noSpeech)
-                )}
-              </p>
-            ) : null}
+            <Button
+              size="icon-sm"
+              variant="ghost-muted"
+              aria-label={t(($) => $.test.close)}
+              onClick={() => {
+                speech.cancel();
+                setShowTranscript(false);
+              }}
+            >
+              <XIcon />
+            </Button>
           </div>
         ) : null}
       </ModelCard>
@@ -1159,7 +1255,9 @@ export function VoiceSettingsPanel() {
   const refreshMicrophones = useStableCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
     try {
-      setMicrophones(await listBrowserMicrophones(t));
+      const devices = await listAudioInputs();
+      setMicrophones(devices);
+      updateMicrophoneOrder((order) => rememberMicrophones(order, devices));
     } catch {
       setMicrophones([]);
     }
@@ -1181,11 +1279,8 @@ export function VoiceSettingsPanel() {
       (member) => member.environmentId === target?.environmentId && member.id === target.projectId,
     ) ?? members?.[0];
 
-  const selectedMicrophone = settings.voiceMicrophone;
-  const selectedMicrophoneLabel = selectedMicrophone
-    ? (microphones.find((device) => device.deviceId === selectedMicrophone)?.label ??
-      t(($) => $.microphone.selectedUnavailable))
-    : t(($) => $.microphone.systemDefault);
+  const order = microphoneOrder(settings);
+  const selectedMicrophone = preferredMicrophoneId(order, microphones);
   const environmentChoices = environments.map((environment) => ({
     environment,
     value: JSON.stringify(["environment", environment.environmentId]),
@@ -1246,58 +1341,39 @@ export function VoiceSettingsPanel() {
         <SettingsRow
           {...searchableSetting("voice-microphone", tSettings)}
           title={t(($) => $.microphone.label)}
-          description={t(($) => $.panel.microphoneDescription)}
+          description={t(($) => $.panel.microphoneOrderDescription)}
           control={
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
-              <SettingsSearchTarget {...searchableSetting("microphone-test", tSettings)}>
-                <MicrophoneTest key={selectedMicrophone} microphoneId={selectedMicrophone} />
-              </SettingsSearchTarget>
-              <div className="flex min-w-0 items-center gap-1.5">
-                <Select
-                  value={selectedMicrophone ? `device:${selectedMicrophone}` : SYSTEM_DEFAULT}
-                  onValueChange={(value) => {
-                    if (value)
-                      void updateClientSettings({
-                        voiceMicrophone:
-                          value === SYSTEM_DEFAULT ? "" : value.slice("device:".length),
-                      });
-                  }}
-                >
-                  <SelectTrigger
-                    size="sm"
-                    aria-label={t(($) => $.microphone.label)}
-                    className="max-w-64"
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label={t(($) => $.microphone.refresh)}
+                    onClick={() => void refreshMicrophones()}
                   >
-                    <SelectValue>{selectedMicrophoneLabel}</SelectValue>
-                  </SelectTrigger>
-                  <SelectPopup align="end" alignItemWithTrigger={false}>
-                    <SelectItem value={SYSTEM_DEFAULT}>
-                      {t(($) => $.microphone.systemDefault)}
-                    </SelectItem>
-                    {microphones.map((device) => (
-                      <SelectItem key={device.deviceId} value={`device:${device.deviceId}`}>
-                        {device.label}
-                      </SelectItem>
-                    ))}
-                  </SelectPopup>
-                </Select>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t(($) => $.microphone.refresh)}
-                  onClick={() => void refreshMicrophones()}
-                >
-                  <RefreshCwIcon className="size-3.5" />
-                </Button>
-              </div>
-            </div>
+                    <RefreshCwIcon />
+                  </Button>
+                }
+              />
+              <TooltipPopup>{t(($) => $.microphone.refresh)}</TooltipPopup>
+            </Tooltip>
           }
+        >
+          <div className="mt-3 pb-2">
+            <MicrophoneOrderList order={order} devices={microphones} />
+          </div>
+        </SettingsRow>
+        <MicrophoneTest
+          key={selectedMicrophone}
+          microphoneId={selectedMicrophone}
+          onMicrophoneAccess={() => void refreshMicrophones()}
         />
         <SettingsRow
           {...searchableSetting("dictation-shortcut-mode", tSettings)}
           title={t(($) => $.panel.shortcut)}
-          description={t(($) => $.panel.shortcutDescription)}
+          description={`${t(($) => $.panel.shortcutModeHints[settings.voiceShortcutMode])}.`}
           control={
             <Select
               value={settings.voiceShortcutMode}
@@ -1306,19 +1382,20 @@ export function VoiceSettingsPanel() {
                   void updateClientSettings({ voiceShortcutMode: value as VoiceShortcutMode });
               }}
             >
-              <SelectTrigger
-                size="sm"
-                aria-label={t(($) => $.panel.shortcutMode)}
-                className="max-w-72"
-              >
+              <SelectTrigger size="sm" aria-label={t(($) => $.panel.shortcutMode)}>
                 <SelectValue>
-                  {t(($) => $.panel.shortcutModes[settings.voiceShortcutMode])}
+                  {t(($) => $.panel.shortcutModeLabels[settings.voiceShortcutMode])}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 {SHORTCUT_MODES.map((mode) => (
                   <SelectItem key={mode} value={mode}>
-                    {t(($) => $.panel.shortcutModes[mode])}
+                    <span className="flex flex-col">
+                      {t(($) => $.panel.shortcutModeLabels[mode])}
+                      <span className="text-xs text-muted-foreground">
+                        {t(($) => $.panel.shortcutModeHints[mode])}
+                      </span>
+                    </span>
                   </SelectItem>
                 ))}
               </SelectPopup>
@@ -1328,20 +1405,16 @@ export function VoiceSettingsPanel() {
       </SettingsSection>
 
       <SettingsSection id="voice-transcription" title={t(($) => $.panel.transcriptionSection)}>
-        <SettingsSearchTarget
+        <SettingsRow
           {...searchableSetting("voice-transcription-destination", tSettings)}
-          className="@container/destination px-3 py-3 sm:px-4"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="shrink-0 text-sm font-medium">
-              <span className="@max-[18rem]/destination:hidden">
-                {t(($) => $.panel.destination)}
-              </span>
-              <span className="@min-[18rem]/destination:hidden">
-                {t(($) => $.panel.destinationShort)}
-              </span>
-            </h3>
-            <div className="flex min-w-0 items-center justify-end gap-1">
+          title={t(($) => $.panel.destination)}
+          description={
+            destination.environmentId && chosenUnsupported
+              ? t(($) => $.panel.destinationUnsupported, { environment: chosenEnvironment.label })
+              : t(($) => $.panel.destinationDescription)
+          }
+          control={
+            <div className="flex w-full min-w-0 items-center gap-1.5 @min-[32rem]/settings-row:w-auto">
               <Select
                 value={destinationValue}
                 onValueChange={(value) => {
@@ -1367,7 +1440,7 @@ export function VoiceSettingsPanel() {
                 <SelectTrigger
                   size="sm"
                   aria-label={t(($) => $.panel.destination)}
-                  className="w-auto min-w-0 max-w-72"
+                  className="min-w-0 @min-[32rem]/settings-row:w-auto @min-[32rem]/settings-row:max-w-72"
                 >
                   <SelectValue>
                     <span className="flex min-w-0 items-center gap-2">
@@ -1477,16 +1550,8 @@ export function VoiceSettingsPanel() {
                   </Tooltip>
                 )}
             </div>
-          </div>
-          {destination.environmentId && chosenUnsupported ? (
-            <p className="mt-2 text-xs text-destructive">
-              {t(($) => $.panel.destinationUnsupported, {
-                environment: chosenEnvironment.label,
-              })}
-            </p>
-          ) : null}
-        </SettingsSearchTarget>
-
+          }
+        />
         {pendingCloud && cloudEnvironment && (
           <CloudVoiceConfiguration
             key={JSON.stringify(pendingCloud)}
@@ -1506,11 +1571,11 @@ export function VoiceSettingsPanel() {
             description={
               destination.cloudProvider
                 ? t(($) => $.panel.languageCloud)
-                : model
-                  ? model.supportsLanguageDetection
-                    ? t(($) => $.panel.languageDetects, { model: model.model })
-                    : t(($) => $.panel.languageFixed, { model: model.model })
-                  : t(($) => $.panel.languageEmpty)
+                : model?.supportsLanguageDetection
+                  ? t(($) => $.panel.languageDetects, { model: model.model })
+                  : t(($) => $.panel.languageFixed, {
+                      model: model?.model ?? t(($) => $.panel.thisModel),
+                    })
             }
             control={
               <SpeechLanguageSelect
@@ -1534,28 +1599,13 @@ export function VoiceSettingsPanel() {
             }
           />
         ) : null}
-        {prepared ? (
-          <SpeechModelBrowser
-            key={prepared.environmentId}
-            prepared={prepared}
-            catalog={catalog}
-            testEnvironmentId={
-              project?.environmentId ?? target?.environmentId ?? prepared.environmentId
-            }
-            projectId={project?.id ?? null}
-            projectName={project?.title ?? null}
-          />
-        ) : null}
-        {prepared && <AdvancedSpeechSettings prepared={prepared} catalog={catalog} />}
-      </SettingsSection>
-      <SettingsSection id="voice-recognition" title={t(($) => $.panel.optionsSection)}>
         <SettingsRow
           {...searchableSetting("speech-silence-filtering", tSettings)}
           title={t(($) => $.panel.silence)}
           description={
             destination.cloudProvider === "openai"
               ? t(($) => $.panel.silenceOpenAi)
-              : t(($) => $.panel.silenceDescription)
+              : t(($) => $.panel.silenceHint)
           }
           control={
             <Switch
@@ -1582,17 +1632,28 @@ export function VoiceSettingsPanel() {
             />
           }
         />
+        {prepared ? (
+          <SpeechModelBrowser
+            key={prepared.environmentId}
+            prepared={prepared}
+            catalog={catalog}
+            testEnvironmentId={
+              project?.environmentId ?? target?.environmentId ?? prepared.environmentId
+            }
+            projectId={project?.id ?? null}
+            projectName={project?.title ?? null}
+          />
+        ) : null}
+        {prepared && <AdvancedSpeechSettings prepared={prepared} catalog={catalog} />}
+      </SettingsSection>
+
+      <SettingsSection id="voice-dictionary" title={t(($) => $.dictionary.title)}>
         <SettingsRow
           {...searchableSetting("speech-dictionary", tSettings)}
-          title={t(($) => $.dictionary.title)}
-          description={t(($) => $.dictionary.description)}
-          control={
-            <span className="text-xs text-muted-foreground">
-              {t(($) => $.dictionary.entries, { count: settings.speechCustomWords.length })}
-            </span>
-          }
+          title={t(($) => $.dictionary.personalTitle)}
+          description={t(($) => $.dictionary.personalDescription)}
         >
-          <div className="mt-2 pb-3.5">
+          <div className="mt-3 pb-2">
             <DictionaryEditor
               label={t(($) => $.dictionary.personalLabel)}
               words={settings.speechCustomWords}
@@ -1608,11 +1669,11 @@ export function VoiceSettingsPanel() {
         title={t(($) => $.cleanup.section)}
       >
         <SettingsRow
-          title={t(($) => $.cleanup.enable)}
-          description={t(($) => $.cleanup.enableDescription)}
+          title={t(($) => $.cleanup.toggle)}
+          description={t(($) => $.cleanup.toggleDescription)}
           control={
             <Switch
-              aria-label={t(($) => $.cleanup.enable)}
+              aria-label={t(($) => $.cleanup.toggle)}
               checked={cleanupEnabled}
               onCheckedChange={chooseTranscriptCleanup}
             />
@@ -1620,8 +1681,12 @@ export function VoiceSettingsPanel() {
         />
         {cleanupEnabled ? (
           <SettingsRow
-            title={t(($) => $.cleanup.instructions)}
-            description={t(($) => $.cleanup.instructionsDescription)}
+            title={t(($) => $.cleanup.instructionsTitle)}
+            description={
+              settings.speechPostProcessingPrompt.mode === "custom"
+                ? t(($) => $.cleanup.customDescription)
+                : t(($) => $.cleanup.builtInDescription)
+            }
             control={
               <Select
                 value={settings.speechPostProcessingPrompt.mode}
@@ -1629,17 +1694,17 @@ export function VoiceSettingsPanel() {
                   if (value === "default" || value === "custom")
                     void updateClientSettings({
                       speechPostProcessingPrompt: {
-                        ...settings.speechPostProcessingPrompt,
                         mode: value,
+                        customInstructions:
+                          value === "custom" &&
+                          !settings.speechPostProcessingPrompt.customInstructions.trim()
+                            ? DEFAULT_SPEECH_POST_PROCESSING_PROMPT
+                            : settings.speechPostProcessingPrompt.customInstructions,
                       },
                     });
                 }}
               >
-                <SelectTrigger
-                  size="sm"
-                  aria-label={t(($) => $.cleanup.instructions)}
-                  className="max-w-64"
-                >
+                <SelectTrigger size="sm" aria-label={t(($) => $.cleanup.instructions)}>
                   <SelectValue>
                     {settings.speechPostProcessingPrompt.mode === "custom"
                       ? t(($) => $.cleanup.custom)
@@ -1653,25 +1718,23 @@ export function VoiceSettingsPanel() {
               </Select>
             }
           >
-            <Textarea
-              aria-label={t(($) => $.cleanup.customInstructions)}
-              className="mt-2"
-              maxLength={10_000}
-              disabled={settings.speechPostProcessingPrompt.mode !== "custom"}
-              value={
-                settings.speechPostProcessingPrompt.mode === "custom"
-                  ? settings.speechPostProcessingPrompt.customInstructions
-                  : DEFAULT_SPEECH_POST_PROCESSING_PROMPT
-              }
-              onChange={(event) =>
-                void updateClientSettings({
-                  speechPostProcessingPrompt: {
-                    mode: "custom",
-                    customInstructions: event.target.value,
-                  },
-                })
-              }
-            />
+            {settings.speechPostProcessingPrompt.mode === "custom" ? (
+              <div className="mt-3 pb-2">
+                <Textarea
+                  aria-label={t(($) => $.cleanup.customInstructions)}
+                  maxLength={10_000}
+                  value={settings.speechPostProcessingPrompt.customInstructions}
+                  onChange={(event) =>
+                    void updateClientSettings({
+                      speechPostProcessingPrompt: {
+                        mode: "custom",
+                        customInstructions: event.target.value,
+                      },
+                    })
+                  }
+                />
+              </div>
+            ) : null}
           </SettingsRow>
         ) : null}
         {cleanupEnabled && settingsScope !== null ? <CleanupModelRow /> : null}
@@ -1679,7 +1742,7 @@ export function VoiceSettingsPanel() {
           <SettingsRow
             {...searchableSetting("speech-correction-word", tSettings)}
             title={t(($) => $.cleanup.cue)}
-            description={t(($) => $.cleanup.cueDescription)}
+            description={t(($) => $.cleanup.cueHint)}
             control={
               <Input
                 key={settings.speechCorrectionWord}
@@ -1687,7 +1750,7 @@ export function VoiceSettingsPanel() {
                 maxLength={50}
                 placeholder={t(($) => $.cleanup.cuePlaceholder)}
                 aria-label={t(($) => $.cleanup.cue)}
-                className="w-40"
+                className="@min-[32rem]/settings-row:w-40"
                 onBlur={(event) => {
                   const next = event.target.value.trim();
                   if (next !== settings.speechCorrectionWord)

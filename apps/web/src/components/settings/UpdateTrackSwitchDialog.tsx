@@ -19,7 +19,11 @@ import {
   type ChannelSwitchRelease,
 } from "../sidebar/updateEverything.logic";
 import { isHostedByThisApp, useUpdateEverything } from "../sidebar/useUpdateEverything";
-import { localUpdaterStaysPut, prepareLocalTrackSwitch } from "./updateTrackSwitch.logic";
+import {
+  localUpdaterStaysPut,
+  nothingToMove,
+  prepareLocalTrackSwitch,
+} from "./updateTrackSwitch.logic";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -91,6 +95,18 @@ function SwitchPlan({
   const [checking, setChecking] = useState(false);
   const everything = useUpdateEverything(switchesLocal ? release.version : null, release);
   const label = channelSwitchLabel(release.channel, tWorkspace);
+  const idle = nothingToMove(
+    {
+      label,
+      channel: release.channel,
+      savedChannel: updateState?.channel ?? null,
+      switchesLocal,
+      crossesLocal,
+      rows: everything.rows,
+      hasTargets: everything.hasUpdates,
+    },
+    t,
+  );
   // This app's reinstall restarts every server it hosts, so each of their databases must allow it.
   const localBlocked = localSwitchBlockReason(
     APP_VERSION,
@@ -182,9 +198,7 @@ function SwitchPlan({
       providerCount={0}
       rows={everything.rows}
       notes={[
-        ...(everything.rows.length === 0 && !crossesLocal
-          ? [t(($) => $.extra.updates.alreadyOn, { channel: label })]
-          : []),
+        ...(idle.note === null ? [] : [idle.note]),
         ...(crossesLocal && updatesOff ? [t(($) => $.extra.updates.updatesOff)] : []),
         ...(switchesLocal && isMacPlatform(navigator.platform)
           ? [t(($) => $.extra.updates.reopen)]
@@ -198,9 +212,9 @@ function SwitchPlan({
       }
       busy={checking}
       disabledReason={
-        !switchesLocal || localBlocked === null
-          ? null
-          : t(($) => $.extra.updates.blocked, { reason: localBlocked })
+        switchesLocal && localBlocked !== null
+          ? t(($) => $.extra.updates.blocked, { reason: localBlocked })
+          : idle.disabledReason
       }
       onConfirm={() => void run()}
     />

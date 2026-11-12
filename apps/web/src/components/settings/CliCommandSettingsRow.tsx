@@ -12,14 +12,16 @@ import { stackedThreadToast, toastManager } from "../ui/toast";
 import { SettingsRow } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 
-export function CliCommandSettingsRow() {
+type CliCommandAction = "install" | "uninstall" | "addToPath";
+
+/** The desktop `t3` command's state, and its actions with a toast on failure. */
+export function useDesktopCliCommand() {
   const { t } = useTranslation("settings");
   const bridge = getDesktopCliCommandBridge();
   const query = useEnvironmentQuery(bridge ? desktopCliCommandStateAtom : null);
-  const state = query.data;
   const [pending, setPending] = useState(false);
 
-  const change = (action: "install" | "uninstall") => {
+  const run = (action: CliCommandAction) => {
     if (!bridge || pending) return;
     setPending(true);
     void bridge[action]()
@@ -31,7 +33,9 @@ export function CliCommandSettingsRow() {
             title:
               action === "install"
                 ? t(($) => $.extra.cli.installFailed)
-                : t(($) => $.extra.cli.removeFailed),
+                : action === "uninstall"
+                  ? t(($) => $.extra.cli.removeFailed)
+                  : t(($) => $.extra.cli.addToPathFailed),
             description: error instanceof Error ? error.message : t(($) => $.extra.cli.error),
           }),
         );
@@ -39,7 +43,18 @@ export function CliCommandSettingsRow() {
       .finally(() => setPending(false));
   };
 
-  if (!bridge || !state?.supported) return null;
+  return {
+    state: bridge ? query.data : undefined,
+    busy: pending || query.isPending,
+    run,
+  };
+}
+
+export function CliCommandSettingsRow() {
+  const { t } = useTranslation("settings");
+  const { state, busy, run } = useDesktopCliCommand();
+
+  if (!state?.supported) return null;
   const installed = state.installedPath !== null;
   const description = state.shadowedBy
     ? t(($) => $.extra.cli.shadowed, { path: state.shadowedBy })
@@ -47,21 +62,35 @@ export function CliCommandSettingsRow() {
       ? t(($) => $.extra.cli.description)
       : state.onPath
         ? t(($) => $.extra.cli.installed, { path: state.installedPath })
-        : t(($) => $.extra.cli.missingPath, { path: state.installedPath });
+        : state.pathSetup?.added
+          ? t(($) => $.extra.cli.addedToPath, {
+              path: state.installedPath,
+              file: state.pathSetup.file,
+            })
+          : state.pathSetup
+            ? t(($) => $.extra.cli.notOnPath, { path: state.installedPath })
+            : t(($) => $.extra.cli.missingPath, { path: state.installedPath });
 
   return (
     <SettingsRow
       {...searchableSetting("cli-command", t)}
       description={description}
       control={
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={pending || query.isPending || (!installed && Boolean(state.shadowedBy))}
-          onClick={() => change(installed ? "uninstall" : "install")}
-        >
-          {installed ? t(($) => $.extra.cli.remove) : t(($) => $.extra.cli.install)}
-        </Button>
+        <div className="flex gap-2">
+          {state.pathSetup && !state.pathSetup.added ? (
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => run("addToPath")}>
+              {t(($) => $.extra.cli.addToPath)}
+            </Button>
+          ) : null}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy || (!installed && Boolean(state.shadowedBy))}
+            onClick={() => run(installed ? "uninstall" : "install")}
+          >
+            {installed ? t(($) => $.extra.cli.remove) : t(($) => $.extra.cli.install)}
+          </Button>
+        </div>
       }
     />
   );

@@ -205,6 +205,10 @@ export const workspaceDe = {
     changeAppearance: "Darstellung wechseln",
     themeEditor: "Designeditor umschalten",
     appearance: "Darstellung: {{appearance}}",
+    findOnPage: "Auf der Seite im Browser suchen",
+    useInAnotherApp: "T3 Code in einer anderen App nutzen (MCP)",
+    cloneWrongEnvironment:
+      "Wähle einen Ordner in der Umgebung, in die das Repository geklont wird.",
   },
   sidebar: {
     brandHome: "T3 Code Startseite",
@@ -378,6 +382,8 @@ export const workspaceDe = {
     terminalProcesses_other: "{{count}} Terminalprozesse laufen",
     worktreeBranch: "Worktree: {{path}} ({{branch}})",
     worktree: "Worktree: {{path}}",
+    autoSettleFollowSettings: "Einstellungen folgen",
+    autoSettleNever: "Nie",
   },
   panel: {
     browser: "Browser",
@@ -503,6 +509,7 @@ export const workspaceDe = {
     cannotChange: "Diese Verbindung kann keine Threads ändern.",
     cannotRemoveWorktree: "Diese Verbindung kann keine Worktrees mehr entfernen.",
     draftHasContent: "Der Entwurf hat neue Inhalte.",
+    notLoaded: "Dieser Thread ist noch nicht geladen.",
   },
   undo: {
     settled: "Erledigt",
@@ -528,5 +535,15 @@ export const workspaceDe = {
     unpinFailed: "Lösen konnte nicht rückgängig gemacht werden",
     settleFailed: "Erledigen konnte nicht rückgängig gemacht werden",
     draftFailed: "Entwurf konnte nicht wiederhergestellt werden",
+    undidSettleCount_one: "Erledigen von {{count}} Thread rückgängig gemacht",
+    undidSettleCount_other: "Erledigen von {{count}} Threads rückgängig gemacht",
+    undidSnoozeCount_one: "Zurückstellen von {{count}} Thread rückgängig gemacht",
+    undidSnoozeCount_other: "Zurückstellen von {{count}} Threads rückgängig gemacht",
+    undidUnpinCount_one: "Lösen von {{count}} Thread rückgängig gemacht",
+    undidUnpinCount_other: "Lösen von {{count}} Threads rückgängig gemacht",
+    undidArchiveCount_one: "Archivieren von {{count}} Thread rückgängig gemacht",
+    undidArchiveCount_other: "Archivieren von {{count}} Threads rückgängig gemacht",
+    undidDiscardCount_one: "Verwerfen von {{count}} Entwurf rückgängig gemacht",
+    undidDiscardCount_other: "Verwerfen von {{count}} Entwürfen rückgängig gemacht",
   },
 } as const;

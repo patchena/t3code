@@ -18,8 +18,10 @@ import {
   PilcrowIcon,
   Rows3Icon,
   TextWrapIcon,
+  ChevronRightIcon,
+  ChevronsDownUpIcon,
+  ChevronsUpDownIcon,
 } from "lucide-react";
-import { ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown } from "lucide";
 import * as Schema from "effect/Schema";
 import { type MouseEvent, useEffect, useRef, useState } from "react";
 import { useCodeViewFileReveal } from "~/components/diffs/useCodeViewFileReveal";
@@ -75,7 +77,6 @@ import { DiffFileTree } from "~/components/diffs/DiffFileTree";
 import { FileExplorerPane } from "~/components/files/FileExplorerPane";
 import { diffFileTreeEntries } from "~/components/diffs/diffFileTree.logic";
 import { Button } from "~/components/ui/button";
-import { MorphIcon } from "~/components/MorphIcon";
 import { ToggleGroup, Toggle } from "~/components/ui/toggle-group";
 import { Switch } from "~/components/ui/switch";
 import {
@@ -182,10 +183,11 @@ function DiffFileCollapseToggle({
           />
         }
       >
-        <MorphIcon
-          className="size-4 text-muted-foreground/80"
-          icon={collapsed ? ChevronRight : ChevronDown}
-        />
+        {collapsed ? (
+          <ChevronRightIcon className="size-4 text-muted-foreground/80" />
+        ) : (
+          <ChevronDownIcon className="size-4 text-muted-foreground/80" />
+        )}
       </TooltipTrigger>
       <TooltipPopup side="top">
         {collapsed ? t(($) => $.git.expandDiff) : t(($) => $.git.collapseDiff)}
@@ -245,7 +247,8 @@ export function DiffPanel({
   }));
   const diffLayout = settings.diffLayout;
   const [wordWrap, setWordWrap] = useState(settings.wordWrap);
-  const [diffIgnoreWhitespace, setDiffIgnoreWhitespace] = useState(settings.diffIgnoreWhitespace);
+  const diffIgnoreWhitespace =
+    useDiffPanelSessionStore((state) => state.ignoreWhitespace) ?? settings.diffIgnoreWhitespace;
   const [fileTreeOpen, setFileTreeOpen] = useLocalStorage(
     DIFF_FILE_TREE_STORAGE_KEY,
     false,
@@ -1199,10 +1202,11 @@ export function DiffPanel({
                 />
               }
             >
-              <MorphIcon
-                className="size-3.5"
-                icon={allDiffFilesCollapsed ? ChevronsUpDown : ChevronsDownUp}
-              />
+              {allDiffFilesCollapsed ? (
+                <ChevronsUpDownIcon className="size-3.5" />
+              ) : (
+                <ChevronsDownUpIcon className="size-3.5" />
+              )}
             </TooltipTrigger>
             <TooltipPopup side="top">
               {allDiffFilesCollapsed
@@ -1265,7 +1269,7 @@ export function DiffPanel({
                 size="sm"
                 pressed={diffIgnoreWhitespace}
                 onPressedChange={(pressed) => {
-                  setDiffIgnoreWhitespace(Boolean(pressed));
+                  useDiffPanelSessionStore.getState().setIgnoreWhitespace(Boolean(pressed));
                 }}
               />
             }

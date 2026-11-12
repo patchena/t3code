@@ -129,6 +129,8 @@ export const chatDe = {
     zoomInstructions:
       "Klicke zum Vergrößern oder Einpassen. Scrolle zum Zoomen und ziehe zum Verschieben. Drücke Enter zum Wechseln des Zooms, Plus oder Minus zum Zoomen und 0 zum Einpassen.",
     annotatedCrop: "Markierter Vorschauausschnitt",
+    zoomGestureInstructions:
+      "Klicke zum Vergrößern oder Einpassen. Zum Zoomen mit zwei Fingern ziehen oder Strg+Scrollen, zum Verschieben scrollen oder ziehen. Drücke Enter zum Wechseln des Zooms, Plus oder Minus zum Zoomen und 0 zum Einpassen.",
   },
   mcp: {
     requestFailed: "Anfrage fehlgeschlagen.",
@@ -179,6 +181,8 @@ export const chatDe = {
     notAssistant: "Das Zitat verweist nicht auf eine Assistentenantwort",
     saved: "Der ausgewählte Text bleibt in deinem Zitat gespeichert.",
     historyFailed: "Verlauf konnte nicht geladen werden.",
+    goToQuoted: "Zur zitierten Antwort: {{label}}",
+    goToReplied: "Zur Antwort, auf die sich diese Nachricht bezieht: {{label}}",
   },
   errors: {
     adminRequest: "Administratoranfrage",
@@ -265,6 +269,7 @@ export const chatDe = {
       important: "Wichtig",
       warning: "Warnung",
       caution: "Achtung",
+      insight: "Erkenntnis",
     },
     cannotReveal: "Diese Verbindung kann keine Dateien in dieser Umgebung anzeigen.",
     previewUnavailable: "Für diesen Client ist kein Vorschauzugriff verfügbar.",
@@ -311,6 +316,7 @@ export const chatDe = {
     openIntegrated: "Im integrierten Browser öffnen",
     openSystem: "Im Systembrowser öffnen",
     copyLink: "Link kopieren",
+    openApp: "App öffnen",
   },
   details: {
     chooseItems: "Sichtbare Elemente auswählen",
@@ -537,6 +543,12 @@ export const chatDe = {
     stopWorkflowFailed: "Workflow konnte nicht gestoppt werden",
     stopSubagent: "Subagent stoppen",
     moreActions: "Weitere Thread-Aktionen",
+    fallbackTitle: "Unterhaltung",
+    openParentAgentOn: "Übergeordneten Agenten auf {{label}} öffnen",
+    replyResponse: "Auf diese Antwort antworten",
+    steerUnread: "Steuern · noch nicht gelesen",
+    steerUnreadDescription:
+      "Wartet darauf, dass der Agent dies liest. Er liest Steuerungen zwischen Schritten, nachdem ein laufender Befehl beendet ist.",
   },
   workflow: {
     running: "laufend",

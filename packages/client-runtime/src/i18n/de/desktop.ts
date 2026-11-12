@@ -27,6 +27,7 @@ export const desktopDe = {
     reload: "Neu laden",
     forceReload: "Vollständig neu laden",
     devTools: "Entwicklerwerkzeuge ein-/ausblenden",
+    closeDevTools: "Entwicklerwerkzeuge schließen",
     actualSize: "Originalgröße",
     zoomIn: "Vergrößern",
     zoomOut: "Verkleinern",
@@ -95,6 +96,12 @@ export const desktopDe = {
     homeUnavailableDetail:
       "Ein anderer T3-Code-Server, etwa der Hintergrunddienst, verwendet dieses Datenverzeichnis, oder ein älterer Hintergrunddienst ist dafür eingerichtet. Beende diesen Server oder versuche `t3 update`. Kann der ältere Starter nicht aktualisiert werden, führe `t3 service uninstall` aus und installiere den Dienst bei Bedarf mit `t3 service install` aus einer aktuellen CLI neu. Verwende `npx t3@latest`, wenn `t3` fehlt oder veraltet ist, und übergib jedem Befehl mit `--base-dir` das T3 Home des Dienstes. Öffne T3 Code anschließend erneut. Du kannst auch ein separates T3CODE_HOME festlegen und dich mit dem laufenden Server koppeln.",
     connecting: "Verbindung zu WSL wird hergestellt…",
+    homeOwnerDetails: "PID {{pid}}, Port {{port}}",
+    homeOwnerDetailsVersion: "PID {{pid}}, Port {{port}}, Version {{version}}",
+    homeOwnedByService:
+      "Der T3-Code-Hintergrunddienst verwendet dieses T3 Home ({{details}}). Beende ihn mit `t3 service uninstall` und übergib dabei mit `--base-dir` dieses T3 Home. Öffne T3 Code anschließend erneut. Du kannst auch ein separates T3CODE_HOME festlegen und dich mit dem laufenden Server koppeln.",
+    homeOwnedByServer:
+      "Ein anderer T3-Code-Server (etwa `t3 serve` oder einer, der über SSH gestartet wurde) verwendet dieses T3 Home ({{details}}). Hat eine T3-Code-App auf einem anderen Rechner ihn über SSH gestartet, startet diese App ihn neu: Entferne oder trenne dort diese SSH-Umgebung oder beende die App. Beende dann den Server und öffne T3 Code erneut. Du kannst auch ein separates T3CODE_HOME festlegen und dich mit dem laufenden Server koppeln.",
   },
   permissions: {
     screenRecording: "Bildschirmaufnahme",

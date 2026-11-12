@@ -1,13 +1,12 @@
-import { Check, Copy } from "lucide";
-import { useTranslation } from "react-i18next";
+import { CheckIcon, CopyIcon } from "lucide-react";
 import { useRef, type ComponentProps } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import {
   serializeTableElementToCsv,
   serializeTableElementToMarkdown,
 } from "../../markdown-clipboard";
-import { MorphIcon } from "../MorphIcon";
 import { Button } from "../ui/button";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "../ui/menu";
 import { ScrollArea } from "../ui/scroll-area";
@@ -58,7 +57,7 @@ export function MarkdownTable({ children, ...props }: ComponentProps<"table">) {
                 />
               }
             >
-              <MorphIcon className="size-3" icon={copied ? Check : Copy} />
+              {copied ? <CheckIcon className="size-3" /> : <CopyIcon className="size-3" />}
             </TooltipTrigger>
             <TooltipPopup side="top">{copyLabel}</TooltipPopup>
           </Tooltip>

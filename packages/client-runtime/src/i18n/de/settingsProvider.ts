@@ -633,29 +633,30 @@ export const settingsProviderDe = {
   sourceProvidersSuffix: "Versionsverwaltungsanbieter{{suffix}}",
   repoConventions: "Repository-Konventionen",
   repoConventionsHint:
-    "Orientiert sich in jedem Projekt an aktuellen Änderungsbeschreibungen und Titeln von Änderungsanfragen.",
+    "Commit-Nachrichten sowie Titel und Beschreibungen von Pull Requests folgen dem Verlauf des jeweiligen Projekts.",
   conventionalCommits: "Conventional Commits",
   conventionalCommitsHint:
-    "Verwende Conventional-Commit-Präfixe und halte Texte für Änderungsanfragen kurz.",
+    "Conventional-Commit-Präfixe mit kurzen Titeln und Beschreibungen für Pull Requests.",
   customInstructions: "Eigene Anweisungen",
   customInstructionsHint:
-    "Verwende deine Anweisungen für Änderungsbeschreibungen und Änderungsanfragen in jedem Projekt.",
-  writingReview: "Texterstellung und Review",
-  sourceWritingStyle: "Schreibstil für die Versionsverwaltung",
-  sourceWritingStyleReset: "Schreibstil für die Versionsverwaltung",
+    "Deine Anweisungen bestimmen Commit-Nachrichten sowie Titel und Beschreibungen von Pull Requests.",
+  writingReview: "Commits und Pull Requests",
+  sourceWritingStyle: "Texte für Commits und Pull Requests",
+  sourceWritingStyleReset: "Texte für Commits und Pull Requests",
   mixed: "Unterschiedlich",
-  allSourceInstructions: "Eigene Versionsverwaltungsanweisungen für alle ausgewählten Umgebungen",
+  allSourceInstructions:
+    "Eigene Anweisungen für Commits und Pull Requests für alle ausgewählten Umgebungen",
   allInstructionsPlaceholder: "Gib die Anweisungen für jede ausgewählte Umgebung ein.",
   applyInstructionsAll: "Anweisungen auf alle anwenden",
   writeInstructionsAll: "Eigene Anweisungen für alle verfassen",
   sourceInstructionsPlaceholder:
-    "Halte Titel kurz. Verwende kurze Aufzählungspunkte in Beschreibungen.",
-  sourceInstructions: "Eigene Schreibanweisungen für die Versionsverwaltung",
+    "Halte Commit-Betreffzeilen unter 60 Zeichen. Halte Beschreibungen von Pull Requests kurz und schlicht.",
+  sourceInstructions: "Eigene Anweisungen für Commits und Pull Requests",
   reviewGuidesHint:
     "Fügt Pull Requests einen Leitfaden-Tab hinzu. Ein Agent erklärt die Änderungen und weist auf Entscheidungen hin, die geprüft werden müssen.",
   reviewGuides: "Review-Leitfäden",
   reviewGuideModelHint:
-    "Modell, das einen Pull Request liest und einen Review-Leitfaden verfasst. Es prüft die Änderung über viele Schritte; ein leistungsfähigeres Modell hilft dabei. Deaktiviert wird das Modell für Versionsverwaltungstexte verwendet.",
+    "Muss ein Coding-Agent sein: Er liest den Pull Request über viele Schritte. Deaktiviert wird das Modell für Commits und Pull Requests verwendet, oder Codex bzw. Claude, falls dieses Modell ein Textgenerator ist.",
   connectReviewGuideModel:
     "Verbinde eine Umgebung, um ihr Modell für Review-Leitfäden auszuwählen.",
   reviewGuideModel: "Modell für Review-Leitfäden",
@@ -669,11 +670,11 @@ export const settingsProviderDe = {
   reviewGuidePlaceholder:
     "Zeige Dienstschnittstellen vor Implementierungen. Überspringe Testdateien, sofern sie kein Verhalten ändern. Begrenze Zusammenfassungen auf zwei Sätze.",
   changeRequestTemplatesHint:
-    "Verwende die Repository-Vorlage für Beschreibungen von Änderungsanfragen, sofern vorhanden.",
-  changeRequestTemplates: "Vorlagen für Änderungsanfragen",
-  followTemplates: "Vorlagen für Änderungsanfragen verwenden",
+    "Verwende die Pull-Request-Vorlage des Repositorys, sofern vorhanden.",
+  changeRequestTemplates: "Pull-Request-Vorlagen",
+  followTemplates: "Pull-Request-Vorlagen verwenden",
   sourceWriterModelHint:
-    "Modell für Versionsverwaltungstexte sowie Branch- oder Lesezeichennamen. Wenn deaktiviert, wird das für diese Umgebung konfigurierte Texterstellungsmodell verwendet.",
+    "Modell für Commit-Nachrichten, Pull-Request-Texte sowie Branch- oder Lesezeichennamen. Wenn deaktiviert, wird das für diese Umgebung konfigurierte Texterstellungsmodell verwendet.",
   connectWriterModel:
     "Verbinde eine Umgebung, um ihr Modell für Versionsverwaltungstexte auszuwählen.",
   noTextProviders: "Keine Anbieter für Texterstellung verfügbar.",
@@ -883,4 +884,51 @@ export const settingsProviderDe = {
   launchArgsExample: "z. B. --chrome",
   tokensExample: "z. B. 300000",
   executableExample: "z. B. dsh",
+  textGenerators: {
+    add: "Generator hinzufügen",
+    empty: "Noch keine Textgeneratoren",
+    emptyDescription:
+      "Füge eine Modell-API hinzu, um Thread-Titel, Commit-Nachrichten und andere kurze Texte zu schreiben, ohne einen Coding-Agenten zu starten.",
+    disabledUrl: "Aus · {{url}}",
+    moreActions: "Weitere Aktionen für {{name}}",
+    showModels: "Modelle anzeigen",
+    removeTitle: "{{name}} entfernen?",
+    removeDescription:
+      "Dadurch wird der auf {{environment}} gespeicherte API-Schlüssel gelöscht. Alles, was diesen Generator nutzt, verwendet wieder das Textgenerierungsmodell.",
+    stepUse: "Verwenden",
+    tasks: {
+      textGenerationModelSelection: "Thread-Titel und andere generierte Texte",
+      sourceControlWriterModelSelection: "Commit-Nachrichten, Pull Requests und Branch-Namen",
+      speechPostProcessingModelSelection: "Bereinigung von Sprachtranskripten",
+    },
+    editTitle: "{{name}} bearbeiten",
+    addTitle: "Textgenerator hinzufügen",
+    wizardDescription:
+      "Schreibt Thread-Titel, Commit-Nachrichten und andere kurze Texte, ohne einen Coding-Agenten zu starten. Dein API-Schlüssel wird in dieser Umgebung gespeichert.",
+    service: "Dienst",
+    custom: "Benutzerdefiniert",
+    baseUrl: "Basis-URL",
+    apiKeyOptional: "API-Schlüssel (optional)",
+    name: "Name (optional)",
+    namePlaceholder: "z. B. Mein lokales Modell",
+    connected_one:
+      "{{name}} ist verbunden und listet {{count}} Modell auf. Stelle beliebige dieser Aufgaben darauf um oder behalte die aktuelle Auswahl.",
+    connected_other:
+      "{{name}} ist verbunden und listet {{count}} Modelle auf. Stelle beliebige dieser Aufgaben darauf um oder behalte die aktuelle Auswahl.",
+    connecting: "Verbindung wird hergestellt",
+    saveContinue: "Speichern und fortfahren",
+    testPassed: "{{model}} hat geantwortet. Es funktioniert.",
+    followsDefault: "Folgt dem Textgenerierungsmodell",
+    test: "Testen",
+    searchModels: "Modelle durchsuchen",
+    models: "Modelle",
+    loadFailed: "Modelle von {{name}} konnten nicht geladen werden",
+    modelsTitle: "Modelle von {{name}}",
+    listFailed: "Die Modellliste konnte nicht geladen werden.",
+    listLoading: "Modellliste wird geladen.",
+    available_one:
+      "{{count}} Modell verfügbar. Wähle es in einer Modellauswahl für die Textgenerierung.",
+    available_other:
+      "{{count}} Modelle verfügbar. Wähle eines in einer Modellauswahl für die Textgenerierung.",
+  },
 } as const;

@@ -1,6 +1,6 @@
 import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { useNavigate } from "@tanstack/react-router";
-import { RotateCcwIcon, SettingsIcon, XIcon } from "lucide-react";
+import { CircleAlertIcon, XIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "../ui/button";
@@ -39,32 +39,36 @@ export function VoiceInputErrorPill(props: {
   errorAction: "retry" | "settings" | null;
   disabled?: boolean;
   cancelShortcutLabel?: string | null;
+  size?: "default" | "compact" | undefined;
   onRetry(): void;
   onDismiss(): void;
 }) {
   const { t } = useTranslation("voice");
   const navigate = useNavigate();
+  const message = props.error ?? t(($) => $.errors.failed);
   const openSettings = props.errorAction === "settings";
-  const actionLabel = openSettings
-    ? t(($) => $.input.openSettings)
+  const compact = props.size === "compact";
+  const action = openSettings
+    ? { label: t(($) => $.input.openSettings), text: t(($) => $.input.settingsAction) }
     : props.error === t(($) => $.errors.transcribeFailed) ||
         props.error === t(($) => $.errors.environmentFailed)
-      ? t(($) => $.input.retryTranscription)
-      : t(($) => $.input.recordAgain);
+      ? { label: t(($) => $.input.retryTranscription), text: t(($) => $.input.retryAction) }
+      : { label: t(($) => $.input.recordAgain), text: t(($) => $.input.recordAgain) };
   const dismissLabel = t(($) => $.input.dismissError);
-  const errorText = props.error ?? t(($) => $.errors.failed);
+  const dismissText = t(($) => $.input.dismiss);
   return (
-    <VoiceInputPill>
+    <VoiceInputPill tone="error" size={props.size}>
       <Tooltip>
         <TooltipTrigger
           render={
             <Button
               type="button"
-              size="icon-sm-pill"
+              size={compact ? "icon-xs" : "icon-sm-pill"}
               variant="ghost"
               aria-label={dismissLabel}
               onPointerDown={(event) => event.preventDefault()}
               onClick={props.onDismiss}
+              className="shrink-0"
             >
               <XIcon />
             </Button>
@@ -73,10 +77,10 @@ export function VoiceInputErrorPill(props: {
         <TooltipPopup side="top">
           {props.cancelShortcutLabel
             ? t(($) => $.input.withShortcut, {
-                label: dismissLabel,
+                label: dismissText,
                 shortcut: props.cancelShortcutLabel,
               })
-            : dismissLabel}
+            : dismissText}
         </TooltipPopup>
       </Tooltip>
       <Tooltip>
@@ -85,42 +89,39 @@ export function VoiceInputErrorPill(props: {
             <span
               tabIndex={0}
               role="status"
-              aria-label={errorText}
-              className="min-w-0 flex-1 truncate text-sm text-destructive"
+              aria-label={message}
+              className="flex min-w-0 items-center gap-1.5 rounded-sm text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             />
           }
         >
-          {voiceErrorLabel(props.error, t)}
+          <CircleAlertIcon aria-hidden className="size-3.5 shrink-0" />
+          <span className="truncate">{voiceErrorLabel(props.error, t)}</span>
         </TooltipTrigger>
-        <TooltipPopup side="top">{errorText}</TooltipPopup>
+        <TooltipPopup side="top">{message}</TooltipPopup>
       </Tooltip>
       {props.errorAction ? (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                type="button"
-                size="icon-sm-pill"
-                variant="ghost"
-                aria-label={actionLabel}
-                disabled={props.disabled}
-                onPointerDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  if (openSettings) {
-                    props.onDismiss();
-                    void navigate({ to: "/settings/voice" });
-                  } else {
-                    props.onRetry();
-                  }
-                }}
-              >
-                {openSettings ? <SettingsIcon /> : <RotateCcwIcon />}
-              </Button>
+        <Button
+          type="button"
+          size={compact ? "xs" : "sm-pill"}
+          variant="outline"
+          aria-label={action.label}
+          disabled={props.disabled}
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={() => {
+            if (openSettings) {
+              props.onDismiss();
+              void navigate({ to: "/settings/voice" });
+            } else {
+              props.onRetry();
             }
-          />
-          <TooltipPopup side="top">{actionLabel}</TooltipPopup>
-        </Tooltip>
-      ) : null}
+          }}
+          className="ms-auto shrink-0"
+        >
+          {action.text}
+        </Button>
+      ) : (
+        <span aria-hidden className="w-1.5 shrink-0" />
+      )}
     </VoiceInputPill>
   );
 }

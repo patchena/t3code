@@ -993,4 +993,10 @@ export const gitEn = {
   replyCount_other: "{{value}} replies",
   approvalCount_one: "{{value}} approval",
   approvalCount_other: "{{value}} approvals",
+  worktreeChangeBlocked: "Stop the current turn to switch worktrees.",
+  commented: "commented",
+  resolvedConversations_one: "Resolved conversation",
+  resolvedConversations_other: "{{count}} resolved conversations",
+  overview: "Overview",
+  linkedItemNotLoaded: "The linked item is not in the loaded activity.",
 } as const;

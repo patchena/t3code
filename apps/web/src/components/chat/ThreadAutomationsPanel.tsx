@@ -18,7 +18,8 @@ import {
 
 import { ThreadDetailsSection } from "./ThreadDetailsSection";
 import { cn } from "../../lib/utils";
-import { ScheduledRelativeLabel, scheduleLabel } from "../settings/ScheduledTasksSettings";
+import { ScheduledRelativeLabel } from "../settings/ScheduledTasksSettings";
+import { scheduleLabel } from "../settings/scheduledTasksSettings.logic";
 import { useEnvironmentQuery } from "../../state/query";
 import { serverEnvironment } from "../../state/server";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -41,12 +42,13 @@ const STATUS_DOT_CLASS: Record<ScheduledTask["lastRunStatus"], string> = {
 
 function taskScheduleLine(
   task: ScheduledTask,
+  timeZone: string | undefined,
   t: TFunction<"chat">,
   tSettings: TFunction<"settings">,
 ) {
   return (
     <>
-      {scheduleLabel(task.schedule, tSettings)}
+      {scheduleLabel(task.schedule, tSettings, timeZone, task.nextRunAt)}
       {task.blockedByPolicy !== undefined ? (
         ` · ${task.blockedByPolicy}`
       ) : task.enabled && task.nextRunAt !== null ? (
@@ -194,12 +196,14 @@ export function ThreadAutomationsPanel(props: {
                   {task.title}
                 </span>
                 <p className="truncate text-2xs text-muted-foreground">
-                  {taskScheduleLine(task, t, tSettings)}
+                  {taskScheduleLine(task, tasksQuery.data?.timeZone, t, tSettings)}
                 </p>
               </TooltipTrigger>
               <TooltipPopup side="left">
                 <p className="font-medium">{task.title}</p>
-                <p className="text-muted-foreground">{taskScheduleLine(task, t, tSettings)}</p>
+                <p className="text-muted-foreground">
+                  {taskScheduleLine(task, tasksQuery.data?.timeZone, t, tSettings)}
+                </p>
               </TooltipPopup>
             </Tooltip>
             <Tooltip>

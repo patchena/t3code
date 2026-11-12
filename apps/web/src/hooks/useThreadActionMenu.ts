@@ -152,7 +152,13 @@ export function useThreadActionMenu(input: {
       const api = readLocalApi();
       if (!api) return;
       const thread = readThreadShell(threadRef);
-      if (!thread) return;
+      if (!thread) {
+        failureToast(
+          t(($) => $.sidebar.unavailable),
+          t(($) => $.threadActions.notLoaded),
+        );
+        return;
+      }
       const now = new Date();
       const configLoaded = readEnvironmentServerConfigLoaded(threadRef.environmentId);
       const supports = {

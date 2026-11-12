@@ -200,6 +200,9 @@ export const workspaceEn = {
     changeAppearance: "Change appearance",
     themeEditor: "Toggle theme editor",
     appearance: "Appearance: {{appearance}}",
+    findOnPage: "Find on page in browser",
+    useInAnotherApp: "Use T3 Code in another app (MCP)",
+    cloneWrongEnvironment: "Choose a folder in the environment the repository is cloned into.",
   },
   sidebar: {
     brandHome: "T3 Code home",
@@ -372,6 +375,8 @@ export const workspaceEn = {
     terminalProcesses_other: "{{count}} terminal processes running",
     worktreeBranch: "Worktree: {{path}} ({{branch}})",
     worktree: "Worktree: {{path}}",
+    autoSettleFollowSettings: "Follow settings",
+    autoSettleNever: "Never",
   },
   panel: {
     browser: "Browser",
@@ -496,6 +501,7 @@ export const workspaceEn = {
     cannotChange: "This connection cannot change threads.",
     cannotRemoveWorktree: "This connection can no longer remove worktrees.",
     draftHasContent: "The draft has new content.",
+    notLoaded: "This thread has not loaded yet.",
   },
   undo: {
     settled: "Settled",
@@ -521,5 +527,15 @@ export const workspaceEn = {
     unpinFailed: "Failed to undo unpin",
     settleFailed: "Failed to undo settle",
     draftFailed: "Failed to restore draft",
+    undidSettleCount_one: "Undid settle of {{count}} thread",
+    undidSettleCount_other: "Undid settle of {{count}} threads",
+    undidSnoozeCount_one: "Undid snooze of {{count}} thread",
+    undidSnoozeCount_other: "Undid snooze of {{count}} threads",
+    undidUnpinCount_one: "Undid unpin of {{count}} thread",
+    undidUnpinCount_other: "Undid unpin of {{count}} threads",
+    undidArchiveCount_one: "Undid archive of {{count}} thread",
+    undidArchiveCount_other: "Undid archive of {{count}} threads",
+    undidDiscardCount_one: "Undid discard of {{count}} draft",
+    undidDiscardCount_other: "Undid discard of {{count}} drafts",
   },
 } as const;

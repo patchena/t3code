@@ -5,7 +5,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import type * as Electron from "electron";
+import * as Electron from "electron";
 import type { InterfaceLanguage } from "@t3tools/contracts/settings";
 import { desktopI18n, desktopT } from "#desktop/i18n";
 
@@ -222,6 +222,17 @@ export const make = Effect.gen(function* () {
                 },
                 { type: "separator" as const },
               ]),
+          {
+            label: desktopT(($) => $.menu.closeDevTools),
+            accelerator: "CmdOrCtrl+W",
+            visible: false,
+            click: () => {
+              Electron.webContents
+                .getAllWebContents()
+                .find((contents) => !contents.isDestroyed() && contents.isDevToolsFocused())
+                ?.closeDevTools();
+            },
+          },
           // Cmd/Ctrl+W belongs to the renderer's tab close; it must never close the window.
           environment.platform === "darwin"
             ? {

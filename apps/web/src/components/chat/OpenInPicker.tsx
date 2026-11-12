@@ -290,13 +290,22 @@ export const OpenInPicker = memo(function OpenInPicker({
     ? t(($) => $.composer.openIn, { editor: primaryOption?.label ?? t(($) => $.composer.editor) })
     : t(($) => $.composer.open);
 
+  const unavailableReason =
+    remote.mode === "remote-unavailable"
+      ? environmentLabel
+        ? t(($) => $.composer.noSshRoute, { environment: environmentLabel })
+        : t(($) => $.composer.noSshRouteThisMachine)
+      : remote.mode === "remote-links" && options.length === 0
+        ? environmentLabel
+          ? t(($) => $.composer.openFromComputer, { environment: environmentLabel })
+          : t(($) => $.composer.openFromComputerThisMachine)
+        : null;
+
   const editorItems = (
     <>
-      {remote.mode === "remote-unavailable" ? (
+      {unavailableReason !== null ? (
         <MenuItem density={presentation === "menu" ? "touch" : "default"} disabled>
-          {environmentLabel
-            ? t(($) => $.composer.noSshRoute, { environment: environmentLabel })
-            : t(($) => $.composer.noSshRouteThisMachine)}
+          {unavailableReason}
         </MenuItem>
       ) : (
         <>

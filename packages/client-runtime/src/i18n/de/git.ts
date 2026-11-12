@@ -1026,4 +1026,10 @@ export const gitDe = {
   replyCount_other: "{{value}} Antworten",
   approvalCount_one: "{{value}} Genehmigung",
   approvalCount_other: "{{value}} Genehmigungen",
+  worktreeChangeBlocked: "Stoppe den aktuellen Turn, um den Worktree zu wechseln.",
+  commented: "hat kommentiert",
+  resolvedConversations_one: "Erledigte Unterhaltung",
+  resolvedConversations_other: "{{count}} erledigte Unterhaltungen",
+  overview: "Übersicht",
+  linkedItemNotLoaded: "Das verlinkte Element ist nicht in der geladenen Aktivität enthalten.",
 } as const;

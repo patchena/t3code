@@ -42,6 +42,20 @@ export const settingsExtraEn = {
     space: "{{size}} GiB on {{environment}}",
     copyCommand: "Copy command",
     dismiss: "Dismiss",
+    reclaimableDescription: "These databases still hold space freed by history cleanup.",
+    reclaimingTitle: "Reclaiming {{size}} GiB on {{environment}}",
+    reclaimingDescription: "T3 Code there restarts and is back in about {{minutes}} min.",
+    reclaimFailed: "Could not reclaim space on {{environment}}",
+    error: "An error occurred.",
+    restartDescription: "Restarts T3 Code there. It will be offline for about {{minutes}} min.",
+    lastAttemptFailed: "The last attempt failed: {{error}}",
+    restarting: "Restarting…",
+    reclaimAction: "Reclaim",
+    confirmTitle: "Reclaim {{size}} GiB on {{environment}}?",
+    confirmDescription:
+      "T3 Code on {{environment}} stops, rebuilds its database, and starts again. It will be offline for about {{minutes}} min. Running agents stop when it restarts.",
+    cancel: "Cancel",
+    confirm: "Restart and reclaim",
   },
   replayAnimation: "Replay panel animation preview",
   threadDetails: {
@@ -61,6 +75,11 @@ export const settingsExtraEn = {
       "Installed at {{path}}, which is not on your PATH yet. Add its folder to your PATH to run `t3`.",
     remove: "Remove",
     install: "Install",
+    addToPathFailed: "Could not add t3 to PATH",
+    addedToPath:
+      "Installed at {{path}} and added to PATH in {{file}}. Open a new terminal to use it.",
+    notOnPath: "Installed at {{path}}, which is not on your PATH yet.",
+    addToPath: "Add to PATH",
   },
   titles: {
     description: "Appended to the prompt for new and regenerated thread titles.",
@@ -832,6 +851,12 @@ export const settingsExtraEn = {
     futureDays_other: "in {{count}}d",
     updateFailed: "Could not update scheduled task",
     rotateFailed: "Could not rotate webhook URL",
+    startedByFirstRun: "Started by the first run",
+    destinationThread: "Destination thread",
+    searchThreads: "Search threads",
+    searchAllThreads: "Search all threads...",
+    noThreadsFound: "No threads found.",
+    untitledThread: "Untitled thread",
   },
   licenses: {
     loadError: "The license manifest could not load.",
@@ -1310,6 +1335,9 @@ export const settingsExtraEn = {
       "Could not check the configured npm registry: Connect to a server to check releases.",
     registryUnsupported:
       "Could not check the configured npm registry: This server does not support registry lookups. Update it before switching tracks.",
+    allOnChannel: "Every connected machine is already on {{channel}}.",
+    noMachineCanSwitch: "No machine can switch to {{channel}} now.",
+    onlySavesTrack: "{{reason}} This only saves the track.",
   },
   background: {
     balanced: "Balanced",

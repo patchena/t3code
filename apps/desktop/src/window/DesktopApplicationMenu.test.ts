@@ -7,7 +7,12 @@ import * as Exit from "effect/Exit";
 import type { InterfaceLanguage } from "@t3tools/contracts/settings";
 import { desktopI18n } from "#desktop/i18n";
 
-import type * as Electron from "electron";
+import * as Electron from "electron";
+import { vi } from "vite-plus/test";
+
+vi.mock("electron", () => ({
+  webContents: { getAllWebContents: vi.fn(() => []) },
+}));
 
 import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as ElectronDialog from "../electron/ElectronDialog.ts";
@@ -288,10 +293,32 @@ describe("DesktopApplicationMenu", () => {
           items.find((item) => item.role === "windowMenu" && item.submenu === undefined),
           platform,
         );
-        assert.isUndefined(
-          items.find((item) => item.accelerator?.toLowerCase().endsWith("+w")),
-          platform,
-        );
+        const closeTools = items.find((item) => item.accelerator === "CmdOrCtrl+W");
+        assert.equal(closeTools?.label, "Close Developer Tools", platform);
+        assert.isFunction(closeTools?.click);
+        const appContents = {
+          isDestroyed: () => false,
+          isDevToolsFocused: () => false,
+          closeDevTools: vi.fn(),
+        };
+        const inspectedContents = {
+          ...appContents,
+          isDevToolsFocused: () => true,
+          closeDevTools: vi.fn(),
+        };
+        using allContents = vi
+          .spyOn(Electron.webContents, "getAllWebContents")
+          .mockReturnValue([
+            appContents as unknown as Electron.WebContents,
+            inspectedContents as unknown as Electron.WebContents,
+          ]);
+        closeTools?.click?.({} as Electron.MenuItem, undefined, {} as KeyboardEvent);
+        assert.equal(inspectedContents.closeDevTools.mock.calls.length, 1);
+        assert.equal(appContents.closeDevTools.mock.calls.length, 0);
+
+        allContents.mockReturnValue([appContents as unknown as Electron.WebContents]);
+        closeTools?.click?.({} as Electron.MenuItem, undefined, {} as KeyboardEvent);
+        assert.equal(appContents.closeDevTools.mock.calls.length, 0);
       }
     }),
   );

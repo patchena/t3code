@@ -61,6 +61,7 @@ export type KeybindingCommandOption = KeybindingCommand;
 const CORE_WHEN_VARIABLES = [
   "terminalFocus",
   "terminalOpen",
+  "previewOpen",
   "isWeb",
   "isDesktop",
   "true",
@@ -411,6 +412,7 @@ const commandLabels = {
   "thread.settle": (t) => t(($) => $.commands.threadSettle),
   "thread.pin": (t) => t(($) => $.commands.threadPin),
   "thread.undo": (t) => t(($) => $.commands.threadUndo),
+  "thread.regenerateTitle": (t) => t(($) => $.commands.threadRegenerateTitle),
   "modelPicker.toggle": (t) => t(($) => $.commands.modelPickerToggle),
   "modelPicker.previousProvider": (t) => t(($) => $.commands.modelPickerPreviousProvider),
   "modelPicker.nextProvider": (t) => t(($) => $.commands.modelPickerNextProvider),
@@ -435,6 +437,7 @@ const commandLabels = {
   "preview.toggle": (t) => t(($) => $.commands.previewToggle),
   "preview.refresh": (t) => t(($) => $.commands.previewRefresh),
   "preview.focusUrl": (t) => t(($) => $.commands.previewFocusUrl),
+  "preview.find": (t) => t(($) => $.commands.previewFind),
   "preview.zoomIn": (t) => t(($) => $.commands.previewZoomIn),
   "preview.zoomOut": (t) => t(($) => $.commands.previewZoomOut),
   "preview.resetZoom": (t) => t(($) => $.commands.previewResetZoom),

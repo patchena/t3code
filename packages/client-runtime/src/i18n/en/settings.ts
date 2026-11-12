@@ -185,6 +185,14 @@ export const settingsEn = {
     speechHardware: "Transcription hardware and model unloading",
     microphoneTest: "Test microphone",
     transcriptionTest: "Test model",
+    screenReaderAnnouncements: "Screen reader announcements",
+    promptSuggestionsBeta: "Suggest next prompt",
+    worktreeFastCheckout: "Fast worktree checkout",
+    welcomePage: "Welcome page",
+    textGenerators: "Text generators",
+    cleanUpTranscripts: "Clean up transcripts",
+    commitAndPullRequestWriting: "Commit and pull request writing",
+    followPullRequestTemplates: "Follow pull request templates",
   },
   panels: {
     waitForTheFullResponse: "Wait for the full response",
@@ -445,6 +453,22 @@ export const settingsEn = {
     afterReturn: "After you return",
     beforeCacheExpires: "Before the cache expires (beta)",
     onReturn: "When you return",
+    activity: "Activity",
+    screenReaderAnnouncements: "Screen reader announcements",
+    screenReaderAnnouncementsLabel: "screen reader announcements",
+    screenReaderAnnouncementsDescription:
+      "What a screen reader hears from the open thread: a turn starting, needing you, and ending. Status and messages adds what the agent writes before its last message. Everything adds each step.",
+    screenReaderAnnouncementModes: {
+      status: "Status only",
+      messages: "Status and messages",
+      everything: "Everything",
+    },
+    toolCallsInChatLabel: "tool calls in chat",
+    forThreadTitlesAndOtherGeneratedText:
+      "For thread titles and other generated text. Source control has its own setting. Text generators from Providers also appear here.",
+    seeYourAgentsImportProjectsAndSetUpYourPhone:
+      "See your agents, import projects, and set up your phone.",
+    open: "Open",
   },
   restore: {
     interfaceFont: "Interface font",
@@ -687,6 +711,8 @@ export const settingsEn = {
     usagePeriodMonth: "Usage: Period: 30 days",
     usagePeriodQuarter: "Usage: Period: 90 days",
     runScript: "Run Script: {{script}}",
+    previewFind: "Preview: Find on Page",
+    threadRegenerateTitle: "Thread: Regenerate Title",
   },
   writes: {
     notSaved: "Setting not saved",

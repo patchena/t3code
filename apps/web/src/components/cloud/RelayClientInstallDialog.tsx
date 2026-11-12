@@ -14,6 +14,7 @@ import { Button } from "../ui/button";
 import {
   Dialog,
   DialogDescription,
+  DialogAction,
   DialogFooter,
   DialogHeader,
   DialogPanel,
@@ -117,9 +118,9 @@ export function RelayClientInstallDialog() {
             >
               {t(($) => $.actions.cancel)}
             </Button>
-            <Button onClick={() => respondToRelayClientInstallConfirmation(true)}>
+            <DialogAction onClick={() => respondToRelayClientInstallConfirmation(true)}>
               {t(($) => $.install.download)}
-            </Button>
+            </DialogAction>
           </DialogFooter>
         ) : null}
       </DialogPopup>

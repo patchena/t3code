@@ -27,6 +27,7 @@ export const desktopEn = {
     reload: "Reload",
     forceReload: "Force Reload",
     devTools: "Toggle Developer Tools",
+    closeDevTools: "Close Developer Tools",
     actualSize: "Actual Size",
     zoomIn: "Zoom In",
     zoomOut: "Zoom Out",
@@ -95,6 +96,12 @@ export const desktopEn = {
     homeUnavailableDetail:
       "Another T3 Code server, such as the background service, is using this data directory, or an older background service is set up for it. Stop that server or try `t3 update`. If the older launcher cannot update, run `t3 service uninstall` and optionally reinstall with `t3 service install` from a current CLI. Use `npx t3@latest` if `t3` is missing or outdated, and pass `--base-dir` with the service's T3 home to each command. Then reopen T3 Code. You can also set a separate T3CODE_HOME and pair with the running server.",
     connecting: "Connecting to WSL…",
+    homeOwnerDetails: "PID {{pid}}, port {{port}}",
+    homeOwnerDetailsVersion: "PID {{pid}}, port {{port}}, version {{version}}",
+    homeOwnedByService:
+      "The T3 Code background service is using this T3 home ({{details}}). Stop it with `t3 service uninstall`, passing `--base-dir` with this T3 home, and reopen T3 Code. You can also set a separate T3CODE_HOME and pair with the running server.",
+    homeOwnedByServer:
+      "Another T3 Code server (for example `t3 serve`, or one started over SSH) is using this T3 home ({{details}}). If a T3 Code app on another machine started it over SSH, that app restarts it: remove or disconnect that SSH environment there, or quit that app. Then stop the server, and reopen T3 Code. You can also set a separate T3CODE_HOME and pair with the running server.",
   },
   permissions: {
     screenRecording: "Screen Recording",

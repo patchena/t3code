@@ -44,13 +44,22 @@ import {
   searchableSetting,
 } from "./settingsSearch";
 
+let fontDefaultFamilies: { readonly sans: string | null; readonly code: string | null } | undefined;
+
+function resolveFontDefaultFamilies() {
+  if (fontDefaultFamilies !== undefined) return fontDefaultFamilies;
+  const families = {
+    sans: resolveDefaultFamilyLabel(DEFAULT_SANS_FONT_STACK),
+    code: resolveDefaultFamilyLabel(DEFAULT_CODE_FONT_STACK),
+  };
+  if (document.fonts.status === "loaded") fontDefaultFamilies = families;
+  return families;
+}
+
 function useFontDefaultFamilies() {
   const { t } = useTranslation("settings");
   const settings = useScopedSettings();
-  const [defaults] = useState(() => ({
-    sans: resolveDefaultFamilyLabel(DEFAULT_SANS_FONT_STACK),
-    code: resolveDefaultFamilyLabel(DEFAULT_CODE_FONT_STACK),
-  }));
+  const [defaults] = useState(resolveFontDefaultFamilies);
   const sans = defaults.sans ?? t(($) => $.extra.typography.system);
   const code = defaults.code ?? t(($) => $.extra.typography.mono);
   return {

@@ -1,9 +1,13 @@
+import { createI18n } from "@t3tools/client-runtime/i18n";
 import { expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
 import { act, render } from "../../../test/render";
 import { SidebarProvider } from "../ui/sidebar";
 import { SettingsSidebarNav } from "./SettingsSidebarNav";
+import { settingsNavGroups, settingsSectionLabels } from "./settingsSearch";
+
+const t = createI18n("en").getFixedT(null, "settings");
 
 vi.mock("./useAvailableSettingsSearchItems", () => ({
   useAvailableSettingsSearchItems: () => [
@@ -41,4 +45,66 @@ it("ignores composing keys in the search", async () => {
   await vi.waitFor(() =>
     expect(screen.router?.state.location.pathname).toBe("/settings/appearance"),
   );
+});
+
+function renderNav() {
+  return render(
+    <SidebarProvider defaultOpen>
+      <SettingsSidebarNav pathname="/settings/general" />
+    </SidebarProvider>,
+    { router: "/settings/general" },
+  );
+}
+
+it("opens search from the physical Slash and F keys on non-US layouts", async () => {
+  await using _screen = await renderNav();
+  const search = page.getByRole("combobox", { name: "Search settings" });
+
+  for (const { init, opens } of [
+    { init: { key: "/", code: "Digit7", shiftKey: true }, opens: true }, // German Shift+7
+    { init: { key: ".", code: "Slash" }, opens: true }, // Russian Slash key
+    { init: { key: "а", code: "KeyF", ctrlKey: true }, opens: true }, // Russian Ctrl+F
+    { init: { key: "?", code: "Slash", shiftKey: true }, opens: false },
+  ]) {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    const event = new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true });
+    await act(() => document.body.dispatchEvent(event));
+    expect(event.defaultPrevented, JSON.stringify(init)).toBe(opens);
+    if (opens) await expect.element(search).toHaveFocus();
+  }
+});
+
+it("moves Tab through every settings section", async () => {
+  await page.viewport(1280, 800);
+  await using _screen = await renderNav();
+  await userEvent.click(page.getByRole("combobox", { name: "Search settings" }));
+
+  const labels = settingsSectionLabels(t);
+  const sections = settingsNavGroups(t)
+    .flatMap((group) => group.paths)
+    .map((to) => labels[to]);
+  const tabbed: string[] = [];
+  for (let step = 0; step < sections.length; step += 1) {
+    await userEvent.tab();
+    const section = document.activeElement?.closest("[data-settings-section]");
+    if (!section) break;
+    tabbed.push(section.textContent ?? "");
+  }
+  expect(tabbed).toEqual(sections);
+});
+
+it.each([1280, 390])("names each group by a heading outside it at %ipx wide", async (width) => {
+  await page.viewport(width, 800);
+  await using _screen = await renderNav();
+
+  for (const name of ["Agents", "Code", "Connections"]) {
+    const heading = page.getByRole("heading", { name, level: 3 });
+    await expect.element(heading).toBeInTheDocument();
+    const group = page.getByRole("group", { name }).element();
+    expect(group.getAttribute("aria-labelledby")).toBe(heading.element().id);
+    expect(group.contains(heading.element()), `the ${name} heading is inside its group`).toBe(
+      false,
+    );
+  }
+  expect(page.getByRole("tree").query()).toBeNull();
 });

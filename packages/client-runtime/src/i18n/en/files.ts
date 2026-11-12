@@ -246,6 +246,7 @@ export const filesEn = {
     truncatedSave: "Preview limited to the first 1 MB. Save the file to read it in full.",
     truncatedSaveSize:
       "Preview limited to the first 1 MB of a {{size}} byte file. Save the file to read it in full.",
+    fileContents: "File contents",
   },
   pleaseTryAgain: "Please try again.",
   readError: {
@@ -542,6 +543,10 @@ export const filesEn = {
     cursorHint: "Grok and Composer use this first. Auto can use either pool.",
     otherHint: "Claude, GPT, and Gemini use this pool. Grok and Composer fall back here.",
     noReportedLimits: "No provider on the selected environments reports subscription limits.",
+    creditOption: "{{label}} · {{available}} left",
+    creditOptionExpiry: "{{label}} · {{available}} left · expires in {{duration}}",
+    useCreditOption: "Use",
+    creditOptionIrreversible: "{{label}}: {{description}} This cannot be undone.",
   },
   worker: {
     expandedArchiveLimit:

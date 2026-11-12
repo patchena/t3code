@@ -206,4 +206,10 @@ export const activityEn = {
     readThreadStopped: "Stopped reading thread “{{title}}”",
     toolInput: "Tool input\n{{input}}",
   },
+  announcement: {
+    editing: "Editing {{label}}",
+    searchingWeb: "Searching the web for {{label}}",
+    searching: "Searching for {{label}}",
+    truncated: "{{text}} More in the thread.",
+  },
 } as const;

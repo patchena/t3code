@@ -78,6 +78,9 @@ export const voiceEn = {
     modelDownloadFailed:
       "Could not download the model. Check this environment's connection and try again.",
     annotationUpdateFailed: "Could not update annotation voice input",
+    settingsAction: "Settings",
+    retryAction: "Retry",
+    dismiss: "Dismiss",
   },
   microphone: {
     label: "Microphone",
@@ -101,6 +104,11 @@ export const voiceEn = {
     playbackPosition: "Recording playback position",
     done: "Done",
     playFailed: "Could not play this recording. Try recording again.",
+    notFound: "No microphone found.",
+    stop: "Stop",
+    record: "Record",
+    testDescription: "Record ten seconds and play it back. The audio stays on this device.",
+    discard: "Discard recording",
   },
   setup: {
     title: "Set up voice input",
@@ -133,6 +141,12 @@ export const voiceEn = {
     askAdmin: "Ask an environment admin to download",
     customize: "Customize in Voice settings",
     startDictating: "Start dictating",
+    readyTitle: "Voice input is ready",
+    downloadOnce: "Download a speech model once. Your audio is transcribed on {{environment}}.",
+    readyDescription: "Pick a microphone, then start talking.",
+    modelSize: "{{size}} MB",
+    recommendedSilenceDetector: "Recommended for {{language}}. Includes a 1.2 MB silence detector.",
+    silenceDetector: "Includes a 1.2 MB silence detector.",
   },
   language: {
     autoDetect: "Auto-detect",
@@ -190,6 +204,21 @@ export const voiceEn = {
     errorRate: "({{percent}}% error)",
     notBenchmarked: "not benchmarked",
     speed: "Speed:",
+    updateServer: "update server",
+    linkedFrom: "Using your file at {{path}}",
+    unlink: "Stop using your {{model}} file; the file stays on disk",
+    title: "Models",
+    benchmarkDescription:
+      "Grades are error rates and speed is seconds per 30 s of audio, from Handy’s benchmark {{hardware}}.",
+    filterByLanguage: "Filter by language: {{languages}}",
+    sortSmallest: "Smallest",
+    sortMostAccurate: "Most accurate",
+    sortMostAccurateIn: "Most accurate in {{language}}",
+    sortFastest: "Fastest",
+    linkFailed: "Could not use a model from that path",
+    existingPathLabel: "Path to a model file or folder already on this environment",
+    existingPathPlaceholder: "Already downloaded elsewhere? Paste the model file or folder path",
+    useExisting: "Use existing",
   },
   test: {
     start: "Test model",
@@ -198,6 +227,7 @@ export const voiceEn = {
     close: "Close model test",
     transcript: "Test transcript",
     noSpeech: "No speech recognized. Try again.",
+    prompt: "Say a sentence. Cleanup is skipped, so you see exactly what the model heard.",
   },
   dictionary: {
     placeholder: "Add words or phrases, separated by commas or line breaks",
@@ -223,6 +253,11 @@ export const voiceEn = {
     title: "Dictionary",
     description:
       "Names and terms transcription should spell your way, saved on this device. Add an alias when it keeps hearing a term wrong. The name of the project you dictate in is also sent as a hint.",
+    addPlaceholder: "Add words, separated by commas",
+    projectUsage: "Used by everyone who dictates in {{project}}.",
+    sharedUsage: "Used by everyone who dictates on this environment.",
+    personalTitle: "Your dictionary",
+    personalDescription: "Names and terms to spell your way, saved on this device.",
   },
   cleanup: {
     section: "Cleanup",
@@ -248,6 +283,17 @@ export const voiceEn = {
     cueDescription:
       "The word or phrase you say to flag a correction, like “sorry” or “scratch that”. Cleanup applies the correction only where one is meant, and hears the cue as a hint.",
     cuePlaceholder: "sorry",
+    modelDescription:
+      "Model for transcript cleanup, such as a cheaper or faster one. When disabled, use the text generation model configured for this environment.",
+    noTextGenerationProviders: "No text generation providers available.",
+    useSeparateModel: "Use a separate cleanup model",
+    toggle: "Clean up transcripts",
+    toggleDescription:
+      "Off by default. Sends the transcript and nearby draft text, never audio, to the cleanup model.",
+    instructionsTitle: "Instructions",
+    customDescription: "Your own instructions for cleanup.",
+    builtInDescription: "Fix punctuation, numbers, lists, and spoken corrections.",
+    cueHint: "The phrase you say to fix a mistake, like “scratch that”.",
   },
   advanced: {
     hardware: "Hardware",
@@ -311,5 +357,19 @@ export const voiceEn = {
       "Skip silence and other non-speech audio before transcription, keeping a short buffer so words aren’t cut off.",
     fillers: "Remove filler words",
     fillersDescription: "Remove filler words like “um” and “uh” from transcripts.",
+    microphoneOrderDescription: "Voice input uses the first connected microphone in this list.",
+    shortcutModeLabels: {
+      auto: "Auto",
+      hold: "Hold",
+      toggle: "Toggle",
+    },
+    shortcutModeHints: {
+      auto: "Tap to toggle, hold to talk",
+      hold: "Record while held",
+      toggle: "Tap to start, tap to stop",
+    },
+    destinationDescription: "Where your speech is turned into text.",
+    thisModel: "This model",
+    silenceHint: "Skip silence and background noise before transcribing.",
   },
 } as const;

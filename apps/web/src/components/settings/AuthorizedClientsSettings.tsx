@@ -1,6 +1,6 @@
 import { Trans, useTranslation } from "react-i18next";
 import { authScopeOptions } from "~/connection/permissions";
-import { PlusIcon, QrCodeIcon } from "lucide-react";
+import { PlugIcon, PlusIcon, QrCodeIcon } from "lucide-react";
 import { type ReactNode, memo, useId, useState } from "react";
 import {
   AuthAccessWriteScope,
@@ -60,6 +60,7 @@ import { readEnvironmentScope } from "~/state/session";
 import { useManagedPolicy, usePrimaryManagedPolicy } from "~/state/managedPolicy";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { ManagedControl } from "../ManagedPolicy";
+import { openUseInAnotherApp } from "~/components/mcp/UseInAnotherAppDialog";
 import { ConnectionStatusDot } from "../ConnectionStatusDot";
 import { ITEM_ROW_CLASSNAME, ITEM_ROW_INNER_CLASSNAME } from "./itemRows";
 import {
@@ -665,7 +666,11 @@ export const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHead
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <Button size="xs" variant="outline" onClick={() => openUseInAnotherApp(environmentId)}>
+        <PlugIcon className="size-3" />
+        {t(($) => $.access.useInAnotherApp)}
+      </Button>
       <Button
         size="xs"
         variant="destructive-outline"

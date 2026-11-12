@@ -31,6 +31,8 @@ import {
   type ResponseStreamingMode,
   type QuitConfirmationMode,
   SidebarProjectSortOrder,
+  ScreenReaderAnnouncements,
+  ToolCallVisibility,
 } from "@t3tools/contracts/settings";
 import { desktopUpdateChannelOf } from "@t3tools/shared/cliRelease";
 import { createModelSelection } from "@t3tools/shared/model";
@@ -80,10 +82,14 @@ import {
   resolveAppModelSelectionState,
   selectsPlanAgent,
 } from "~/modelSelection";
-import { providerInstanceEntriesFor } from "~/providerInstances";
+import { useTextGenerationTargets } from "~/textGenerators";
 import { ensureLocalApi, readLocalApi } from "~/localApi";
 import { isMacPlatform } from "~/lib/utils";
-import { useEnvironmentProviders, useEnvironments } from "~/state/environments";
+import {
+  useEnvironmentProviders,
+  useEnvironments,
+  usePrimaryEnvironmentId,
+} from "~/state/environments";
 import { EMPTY_SERVER_PROVIDERS } from "~/state/server";
 import { Button } from "~/components/ui/button";
 import { DraftInput } from "~/components/ui/draft-input";
@@ -123,6 +129,7 @@ import { StorageCleanupSections } from "~/components/settings/StorageSettings";
 import { UpdateTrackSwitchDialog } from "~/components/settings/UpdateTrackSwitchDialog";
 import { environmentIdsKey } from "~/state/environmentAtomList";
 import { environmentSessionStatesAtom } from "~/state/session";
+import { useCheckProviderUpdates } from "~/components/ProviderUpdatesAction";
 import { canUpdateServer } from "~/components/ServerUpdateAction";
 import { useUpdateEverythingRun } from "~/components/sidebar/updateEverythingRun";
 import { awaitsTrackSwitch, channelSwitchLabel } from "~/components/sidebar/updateEverything.logic";
@@ -195,6 +202,7 @@ function AboutVersionSection() {
   );
   // A second run would replace the first run's progress and local download.
   const updateRun = useUpdateEverythingRun();
+  const checkProviderUpdates = useCheckProviderUpdates();
 
   const hasDesktopBridge = typeof window !== "undefined" && Boolean(window.desktopBridge);
   const selectedUpdateChannel = updateState?.channel ?? "latest";
@@ -250,6 +258,7 @@ function AboutVersionSection() {
             updateState ?? { availableVersion: null, downloadedVersion: null },
             tWorkspace,
           ),
+          { initialFocus: "confirm" },
         );
       } catch (error) {
         setIsUpdateActionPending(false);
@@ -272,6 +281,7 @@ function AboutVersionSection() {
     }
 
     if (typeof bridge.checkForUpdate !== "function") return;
+    void checkProviderUpdates();
     void bridge
       .checkForUpdate()
       .then((result) => {
@@ -587,8 +597,11 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.followUpBehavior !== DEFAULT_UNIFIED_SETTINGS.followUpBehavior
       ? [t(($) => $.panels.followUpBehavior)]
       : []),
-    ...(settings.contextWindowMeterEnabled !== DEFAULT_UNIFIED_SETTINGS.contextWindowMeterEnabled
-      ? [t(($) => $.panels.contextWindowIndicator)]
+    ...(settings.toolCallVisibility !== DEFAULT_UNIFIED_SETTINGS.toolCallVisibility
+      ? [t(($) => $.search.toolCallVisibility)]
+      : []),
+    ...(settings.screenReaderAnnouncements !== DEFAULT_UNIFIED_SETTINGS.screenReaderAnnouncements
+      ? [t(($) => $.panels.screenReaderAnnouncements)]
       : []),
     ...(settings.responseStreamingMode !== DEFAULT_UNIFIED_SETTINGS.responseStreamingMode
       ? [t(($) => $.panels.responseStreaming)]
@@ -723,7 +736,8 @@ export function useSettingsRestore(onRestored?: () => void) {
       composerSpellCheckEnabled: DEFAULT_UNIFIED_SETTINGS.composerSpellCheckEnabled,
       sendShortcut: DEFAULT_UNIFIED_SETTINGS.sendShortcut,
       followUpBehavior: DEFAULT_UNIFIED_SETTINGS.followUpBehavior,
-      contextWindowMeterEnabled: DEFAULT_UNIFIED_SETTINGS.contextWindowMeterEnabled,
+      toolCallVisibility: DEFAULT_UNIFIED_SETTINGS.toolCallVisibility,
+      screenReaderAnnouncements: DEFAULT_UNIFIED_SETTINGS.screenReaderAnnouncements,
       environmentIdentificationMode: DEFAULT_UNIFIED_SETTINGS.environmentIdentificationMode,
       glassOpacity: DEFAULT_UNIFIED_SETTINGS.glassOpacity,
       panelAnimationDurationMs: DEFAULT_UNIFIED_SETTINGS.panelAnimationDurationMs,
@@ -822,43 +836,6 @@ function AutoSettleDaysInput({
       onBlur={() => setDraft(String(value))}
       aria-label={t(($) => $.panels.daysOfInactivityBeforeAutoSettle)}
     />
-  );
-}
-
-export function LegacyFeaturesSection() {
-  const { t } = useTranslation("settings");
-  const settings = useScopedSettings();
-  const updateSettings = useUpdateScopedSettings();
-
-  return (
-    <SettingsSection id="legacy-features" title={t(($) => $.panels.legacy)}>
-      <SettingsRow
-        {...searchableSetting("legacy-plan-mode", t)}
-        description={t(($) => $.panels.restoreBuildPlanPlanDefaultAndShiftTab)}
-        control={
-          <Switch
-            checked={settings.planModeEnabled}
-            onCheckedChange={(checked) => {
-              updateSettings({ planModeEnabled: Boolean(checked) });
-            }}
-            aria-label={t(($) => $.panels.planModeLegacy)}
-          />
-        }
-      />
-      <SettingsRow
-        {...searchableSetting("legacy-context-window-indicator", t)}
-        description={t(($) => $.panels.showsContextWindowUsageAsACircularIndicator)}
-        control={
-          <Switch
-            checked={settings.contextWindowMeterEnabled}
-            onCheckedChange={(checked) =>
-              updateSettings({ contextWindowMeterEnabled: Boolean(checked) })
-            }
-            aria-label={t(($) => $.panels.contextWindowIndicatorLegacy)}
-          />
-        }
-      />
-    </SettingsSection>
   );
 }
 
@@ -1429,7 +1406,116 @@ export function ChatSettingsPanel() {
           }
         />
       </SettingsSection>
+
+      <SettingsSection id="activity" title={t(($) => $.panels.activity)}>
+        <ToolCallVisibilityRow />
+        <ScreenReaderAnnouncementsRow />
+      </SettingsSection>
     </SettingsPageContainer>
+  );
+}
+
+const isToolCallVisibility = Schema.is(ToolCallVisibility);
+
+function ToolCallVisibilityRow() {
+  const { t } = useTranslation("settings");
+  const { t: tCommon } = useTranslation("common");
+  const settings = useScopedSettings();
+  const updateSettings = useUpdateScopedSettings();
+  return (
+    <SettingsRow
+      {...searchableSetting("tool-call-visibility", t)}
+      description={tCommon(($) => $.misc.labs.toolCallsDescription)}
+      resetAction={
+        settings.toolCallVisibility !== DEFAULT_UNIFIED_SETTINGS.toolCallVisibility ? (
+          <SettingResetButton
+            label={t(($) => $.panels.toolCallsInChatLabel)}
+            onClick={() =>
+              updateSettings({ toolCallVisibility: DEFAULT_UNIFIED_SETTINGS.toolCallVisibility })
+            }
+          />
+        ) : null
+      }
+      control={
+        <Select
+          value={settings.toolCallVisibility}
+          onValueChange={(value) => {
+            if (isToolCallVisibility(value)) updateSettings({ toolCallVisibility: value });
+          }}
+        >
+          <SelectTrigger
+            size="sm"
+            className="w-full sm:w-40"
+            aria-label={tCommon(($) => $.misc.labs.toolCallsLabel)}
+          >
+            <SelectValue>
+              {tCommon(($) => $.misc.labs.toolCallVisibility[settings.toolCallVisibility])}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectPopup align="end" alignItemWithTrigger={false}>
+            {ToolCallVisibility.literals.map((value) => (
+              <SelectItem key={value} value={value}>
+                {tCommon(($) => $.misc.labs.toolCallVisibility[value])}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
+      }
+    />
+  );
+}
+
+const isScreenReaderAnnouncements = Schema.is(ScreenReaderAnnouncements);
+
+function ScreenReaderAnnouncementsRow() {
+  const { t } = useTranslation("settings");
+  const settings = useScopedSettings();
+  const updateSettings = useUpdateScopedSettings();
+  return (
+    <SettingsRow
+      {...searchableSetting("screen-reader-announcements", t)}
+      description={t(($) => $.panels.screenReaderAnnouncementsDescription)}
+      resetAction={
+        settings.screenReaderAnnouncements !==
+        DEFAULT_UNIFIED_SETTINGS.screenReaderAnnouncements ? (
+          <SettingResetButton
+            label={t(($) => $.panels.screenReaderAnnouncementsLabel)}
+            onClick={() =>
+              updateSettings({
+                screenReaderAnnouncements: DEFAULT_UNIFIED_SETTINGS.screenReaderAnnouncements,
+              })
+            }
+          />
+        ) : null
+      }
+      control={
+        <Select
+          value={settings.screenReaderAnnouncements}
+          onValueChange={(value) => {
+            if (isScreenReaderAnnouncements(value)) {
+              updateSettings({ screenReaderAnnouncements: value });
+            }
+          }}
+        >
+          <SelectTrigger
+            size="sm"
+            className="w-full sm:w-48"
+            aria-label={t(($) => $.panels.screenReaderAnnouncements)}
+          >
+            <SelectValue>
+              {t(($) => $.panels.screenReaderAnnouncementModes[settings.screenReaderAnnouncements])}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectPopup align="end" alignItemWithTrigger={false}>
+            {ScreenReaderAnnouncements.literals.map((value) => (
+              <SelectItem key={value} value={value}>
+                {t(($) => $.panels.screenReaderAnnouncementModes[value])}
+              </SelectItem>
+            ))}
+          </SelectPopup>
+        </Select>
+      }
+    />
   );
 }
 
@@ -1742,9 +1828,14 @@ export function ThreadsSettingsPanel() {
     (target) => target.serverConfig?.environment.capabilities.threadAutoSettlementScope === true,
   );
 
-  const textGenerationProviders = serverProviders.filter(
-    (provider) => provider.supportsTextGeneration !== false,
-  );
+  const textGenerationTargets = useTextGenerationTargets({
+    environmentId,
+    settings,
+    providers: serverProviders.filter((provider) => provider.supportsTextGeneration !== false),
+    projectId: target?.projectId ?? null,
+    selections: [settings.textGenerationModelSelection],
+  });
+  const textGenerationProviders = textGenerationTargets.providers;
   const textGenerationModelSelection = resolveAppModelSelectionState(
     settings,
     textGenerationProviders,
@@ -1752,11 +1843,7 @@ export function ThreadsSettingsPanel() {
   const textGenInstanceId = textGenerationModelSelection.instanceId;
   const textGenModel = textGenerationModelSelection.model;
   const textGenModelOptions = textGenerationModelSelection.options;
-  const textGenerationModelInstanceEntries = providerInstanceEntriesFor(
-    textGenerationProviders,
-    settings,
-    target?.projectId ?? null,
-  );
+  const textGenerationModelInstanceEntries = textGenerationTargets.entries;
   const hasTextGenerationProvider = textGenerationModelInstanceEntries.some(
     (entry) => entry.enabled && entry.isAvailable,
   );
@@ -1989,7 +2076,7 @@ export function ThreadsSettingsPanel() {
           serverScoped
           settingKeys={["textGenerationModelSelection"]}
           {...searchableSetting("text-generation-model", t)}
-          description={t(($) => $.panels.usedForThreadTitlesAndOtherGeneratedText)}
+          description={t(($) => $.panels.forThreadTitlesAndOtherGeneratedText)}
           resetAction={
             hasServerTargets && isTextGenerationModelDirty ? (
               <SettingResetButton
@@ -2062,9 +2149,7 @@ export function ThreadsSettingsPanel() {
                     model={textGenModel}
                     modelOptions={textGenModelOptions}
                     allowPromptInjectedEffort={false}
-                    planModeEnabled={
-                      settings.planModeEnabled || selectsPlanAgent(textGenModelOptions)
-                    }
+                    includePlanAgent={selectsPlanAgent(textGenModelOptions)}
                     triggerClassName={SETTINGS_PICKER_TRIGGER_CLASSNAME}
                     onModelOptionsChange={(nextOptions) => {
                       updateSettings({
@@ -2268,6 +2353,8 @@ export function MaintenanceSettingsPanel() {
 export function AboutSettingsPanel() {
   const { t } = useTranslation("settings");
   const primaryPolicy = usePrimaryManagedPolicy();
+  // The Welcome page sets up this computer, so it needs one.
+  const primaryEnvironmentId = usePrimaryEnvironmentId();
   const telemetryOff = managedTelemetryOffMessage(primaryPolicy);
   return (
     <SettingsPageContainer>
@@ -2305,6 +2392,17 @@ export function AboutSettingsPanel() {
           </>
         )}
         <MobileAppSettingsRow />
+        {primaryEnvironmentId === null ? null : (
+          <SettingsRow
+            {...searchableSetting("welcome-page", t)}
+            description={t(($) => $.panels.seeYourAgentsImportProjectsAndSetUpYourPhone)}
+            control={
+              <Button size="sm" variant="outline" render={<Link to="/welcome" />}>
+                {t(($) => $.panels.open)}
+              </Button>
+            }
+          />
+        )}
       </SettingsSection>
 
       <SettingsSection id="legal" title={t(($) => $.panels.legal)}>

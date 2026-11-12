@@ -124,6 +124,8 @@ export const chatEn = {
     zoomInstructions:
       "Click to zoom in or return to fit. Scroll to zoom, drag to pan. Use Enter to toggle zoom, plus or minus to zoom, and 0 to fit.",
     annotatedCrop: "Annotated preview crop",
+    zoomGestureInstructions:
+      "Click to zoom in or return to fit. Pinch or Ctrl+scroll to zoom, scroll or drag to pan. Use Enter to toggle zoom, plus or minus to zoom, and 0 to fit.",
   },
   mcp: {
     requestFailed: "Request failed.",
@@ -172,6 +174,8 @@ export const chatEn = {
     notAssistant: "The citation does not refer to an assistant response",
     saved: "The selected text is still saved in your citation.",
     historyFailed: "Could not load history.",
+    goToQuoted: "Go to quoted response: {{label}}",
+    goToReplied: "Go to the response this replies to: {{label}}",
   },
   errors: {
     adminRequest: "admin request",
@@ -254,6 +258,7 @@ export const chatEn = {
       important: "Important",
       warning: "Warning",
       caution: "Caution",
+      insight: "Insight",
     },
     cannotReveal: "This connection cannot reveal files on this environment.",
     previewUnavailable: "Preview access is unavailable for this client.",
@@ -300,6 +305,7 @@ export const chatEn = {
     openIntegrated: "Open in integrated browser",
     openSystem: "Open in system browser",
     copyLink: "Copy Link",
+    openApp: "Open app",
   },
   details: {
     chooseItems: "Choose what to show",
@@ -522,6 +528,12 @@ export const chatEn = {
     stopWorkflowFailed: "Could not stop workflow",
     stopSubagent: "Stop subagent",
     moreActions: "More thread actions",
+    fallbackTitle: "Thread",
+    openParentAgentOn: "Open parent agent on {{label}}",
+    replyResponse: "Reply to this response",
+    steerUnread: "Steer · waiting to be read",
+    steerUnreadDescription:
+      "Waiting for the agent to read this. It reads steers between steps, after a running command finishes.",
   },
   workflow: {
     running: "running",

@@ -70,9 +70,12 @@ export interface SettingsSearchItem {
   readonly providerSettingsOnly?: boolean;
   readonly localBackendManagementOnly?: boolean;
   readonly localEnvironmentOnly?: boolean;
+  readonly primaryEnvironmentOnly?: boolean;
   readonly wslAvailableOnly?: boolean;
   readonly managedTunnelOnly?: boolean;
   readonly peerLinksOnly?: boolean;
+  readonly fastWorktreeCheckoutOnly?: boolean;
+  readonly textGeneratorsOnly?: boolean;
   readonly secondary?: boolean;
   readonly requiresThreadAutoSettlement?: boolean;
 }
@@ -87,6 +90,10 @@ export interface SettingsSearchAvailability {
   readonly hasThreadAutoSettlement: boolean;
   readonly managedTunnelActive?: boolean;
   readonly hasPeerLinkHost?: boolean;
+  readonly hasFastWorktreeCheckoutEnvironment?: boolean;
+  /** An environment without a provider allow-list, which hides text generators. */
+  readonly hasTextGeneratorsEnvironment?: boolean;
+  readonly hasPrimaryEnvironment?: boolean;
 }
 
 const englishSectionLabels: Readonly<Record<SettingsPath, string>> = {
@@ -224,6 +231,7 @@ const englishCommandLabels = {
   "thread.settle": resources.en.settings.commands.threadSettle,
   "thread.pin": resources.en.settings.commands.threadPin,
   "thread.undo": resources.en.settings.commands.threadUndo,
+  "thread.regenerateTitle": resources.en.settings.commands.threadRegenerateTitle,
   "modelPicker.toggle": resources.en.settings.commands.modelPickerToggle,
   "modelPicker.previousProvider": resources.en.settings.commands.modelPickerPreviousProvider,
   "modelPicker.nextProvider": resources.en.settings.commands.modelPickerNextProvider,
@@ -248,6 +256,7 @@ const englishCommandLabels = {
   "preview.toggle": resources.en.settings.commands.previewToggle,
   "preview.refresh": resources.en.settings.commands.previewRefresh,
   "preview.focusUrl": resources.en.settings.commands.previewFocusUrl,
+  "preview.find": resources.en.settings.commands.previewFind,
   "preview.zoomIn": resources.en.settings.commands.previewZoomIn,
   "preview.zoomOut": resources.en.settings.commands.previewZoomOut,
   "preview.resetZoom": resources.en.settings.commands.previewResetZoom,
@@ -640,22 +649,33 @@ const SETTINGS_SEARCH_ITEMS = [
     title: (t) => t(($) => $.search.boringSidebar),
     englishTitle: resources.en.settings.search.boringSidebar,
     to: "/settings/labs",
-    searchTerms: ["beta folders project tree legacy old classic sidebar"],
+    searchTerms: ["beta folders project tree classic sidebar"],
   },
   {
     id: "boring-sidebar-multiline",
     title: (t) => t(($) => $.search.boringSidebarMultiline),
     englishTitle: resources.en.settings.search.boringSidebarMultiline,
     to: "/settings/labs",
+    // Shown inside the boring sidebar row only while it is on, so search lands on the parent.
+    targetId: "boring-sidebar",
     searchTerms: ["beta boring sidebar folder rows multiline branch pull request details"],
   },
   {
     id: "tool-call-visibility",
     title: (t) => t(($) => $.search.toolCallVisibility),
     englishTitle: resources.en.settings.search.toolCallVisibility,
-    to: "/settings/labs",
+    to: "/settings/chat",
     searchTerms: [
-      "beta hide tool calls commands edits searches work log activity quiet chat zen final answers only",
+      "hide tool calls commands edits searches work log activity quiet chat zen final answers only",
+    ],
+  },
+  {
+    id: "screen-reader-announcements",
+    title: (t) => t(($) => $.search.screenReaderAnnouncements),
+    englishTitle: resources.en.settings.search.screenReaderAnnouncements,
+    to: "/settings/chat",
+    searchTerms: [
+      "accessibility a11y screen reader nvda jaws voiceover orca narrator speech announce read aloud messages activity steps",
     ],
   },
   {
@@ -675,12 +695,29 @@ const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["beta link another machine vps peer agents work there delegate"],
   },
   {
+    id: "prompt-suggestions-beta",
+    title: (t) => t(($) => $.search.promptSuggestionsBeta),
+    englishTitle: resources.en.settings.search.promptSuggestionsBeta,
+    to: "/settings/labs",
+    scope: "environment",
+    searchTerms: ["beta tab autocomplete predict next message claude codex ghost text"],
+  },
+  {
     id: "simlock-hosts",
     title: (t) => t(($) => $.search.simlockHosts),
     englishTitle: resources.en.settings.search.simlockHosts,
     to: "/settings/labs",
     scope: "environment",
     searchTerms: ["beta alpha simlock callstack simulator emulator ios android pool lease gateway"],
+  },
+  {
+    id: "worktree-fast-checkout",
+    title: (t) => t(($) => $.search.worktreeFastCheckout),
+    englishTitle: resources.en.settings.search.worktreeFastCheckout,
+    to: "/settings/labs",
+    scope: "environment",
+    fastWorktreeCheckoutOnly: true,
+    searchTerms: ["beta fast worktree checkout clone apfs copy-on-write cache macos speed"],
   },
   {
     id: "voice-transcription-destination",
@@ -696,7 +733,7 @@ const SETTINGS_SEARCH_ITEMS = [
     title: (t) => t(($) => $.search.voiceMicrophone),
     englishTitle: resources.en.settings.search.voiceMicrophone,
     to: "/settings/voice",
-    searchTerms: ["mic input audio device"],
+    searchTerms: ["mic input audio device order priority preferred"],
   },
   {
     id: "dictation-shortcut-mode",
@@ -760,8 +797,8 @@ const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "speech-post-processing",
-    title: (t) => t(($) => $.search.speechPostProcessing),
-    englishTitle: resources.en.settings.search.speechPostProcessing,
+    title: (t) => t(($) => $.search.cleanUpTranscripts),
+    englishTitle: resources.en.settings.search.cleanUpTranscripts,
     to: "/settings/voice",
     searchTerms: ["speech transcription polish clean provider prompt post-processing"],
   },
@@ -1079,6 +1116,14 @@ const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["phone tablet iPhone iPad iOS Android App Store Google Play QR"],
   },
   {
+    id: "welcome-page",
+    title: (t) => t(($) => $.search.welcomePage),
+    englishTitle: resources.en.settings.search.welcomePage,
+    to: "/settings/about",
+    primaryEnvironmentOnly: true,
+    searchTerms: ["onboarding setup first run getting started agents import projects"],
+  },
+  {
     id: "privacy-policy",
     title: (t) => t(($) => $.search.privacyPolicy),
     englishTitle: resources.en.settings.search.privacyPolicy,
@@ -1106,20 +1151,6 @@ const SETTINGS_SEARCH_ITEMS = [
     title: (t) => t(($) => $.search.openSourceLicenses),
     englishTitle: resources.en.settings.search.openSourceLicenses,
     to: "/settings/about",
-  },
-  {
-    id: "legacy-plan-mode",
-    title: (t) => t(($) => $.search.legacyPlanMode),
-    englishTitle: resources.en.settings.search.legacyPlanMode,
-    to: "/settings/labs",
-    searchTerms: ["Open source licenses", "build plan composer old"],
-  },
-  {
-    id: "legacy-context-window-indicator",
-    title: (t) => t(($) => $.search.legacyContextWindowIndicator),
-    englishTitle: resources.en.settings.search.legacyContextWindowIndicator,
-    to: "/settings/labs",
-    searchTerms: ["composer meter usage tokens circle old"],
   },
   {
     id: "keybindings",
@@ -1192,6 +1223,17 @@ const SETTINGS_SEARCH_ITEMS = [
       "usage sources CLIProxyAPI CLI proxy hub quota subscription limits management key add remove",
     ],
     providerSettingsOnly: true,
+  },
+  {
+    id: "text-generators",
+    title: (t) => t(($) => $.search.textGenerators),
+    englishTitle: resources.en.settings.search.textGenerators,
+    to: "/settings/providers",
+    searchTerms: [
+      "model api api key openai openrouter anthropic ollama lm studio custom endpoint base url thread titles commit messages",
+    ],
+    providerSettingsOnly: true,
+    textGeneratorsOnly: true,
   },
   {
     id: "provider-health-check-interval",
@@ -1387,20 +1429,20 @@ const SETTINGS_SEARCH_ITEMS = [
   ...sourceControlHostSearchSources(sourceControlClients.definitions),
   {
     id: "source-control-writing-style",
-    title: (t) => t(($) => $.search.sourceControlWritingStyle),
-    englishTitle: resources.en.settings.search.sourceControlWritingStyle,
+    title: (t) => t(($) => $.search.commitAndPullRequestWriting),
+    englishTitle: resources.en.settings.search.commitAndPullRequestWriting,
     to: "/settings/source-control",
     searchTerms: [
-      "repository conventions conventional commits custom instructions change descriptions request titles",
+      "repository conventions conventional commits custom instructions commit messages change pr pull request merge request titles descriptions body style prompt write my own",
     ],
     environmentOnly: true,
   },
   {
     id: "follow-change-request-templates",
-    title: (t) => t(($) => $.search.followChangeRequestTemplates),
-    englishTitle: resources.en.settings.search.followChangeRequestTemplates,
+    title: (t) => t(($) => $.search.followPullRequestTemplates),
+    englishTitle: resources.en.settings.search.followPullRequestTemplates,
     to: "/settings/source-control",
-    searchTerms: ["repository pr pull request description structure"],
+    searchTerms: ["repository pr pull request merge request change request description structure"],
     environmentOnly: true,
   },
   {
@@ -1644,7 +1686,6 @@ const SPLIT_SETTINGS_PATHS: ReadonlySet<string> = new Set([
 // Section anchors that moved but are not search results themselves.
 const MOVED_SECTION_ANCHORS: Readonly<Record<string, SettingsPath>> = {
   "authorized-clients": "/settings/access",
-  "legacy-features": "/settings/labs",
   "text-generation": "/settings/threads",
   about: "/settings/about",
 };
@@ -1752,10 +1793,14 @@ export function filterAvailableSettingsSearchItems(
       (!item.providerSettingsOnly || availability.hasProviderSettingsEnvironment) &&
       (!item.localBackendManagementOnly || availability.canManageLocalBackend) &&
       (!item.localEnvironmentOnly || !availability.localEnvironmentDisabled) &&
+      (!item.primaryEnvironmentOnly || availability.hasPrimaryEnvironment === true) &&
       (!item.wslAvailableOnly || availability.isWslSettingsRowVisible) &&
       (!item.requiresThreadAutoSettlement || availability.hasThreadAutoSettlement) &&
       (!item.managedTunnelOnly || availability.managedTunnelActive === true) &&
-      (!item.peerLinksOnly || availability.hasPeerLinkHost === true),
+      (!item.peerLinksOnly || availability.hasPeerLinkHost === true) &&
+      (!item.fastWorktreeCheckoutOnly ||
+        availability.hasFastWorktreeCheckoutEnvironment === true) &&
+      (!item.textGeneratorsOnly || availability.hasTextGeneratorsEnvironment === true),
   );
 }
 
