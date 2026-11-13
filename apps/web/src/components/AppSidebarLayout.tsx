@@ -48,10 +48,10 @@ import type { SidebarRouteReveal } from "./sidebar/routeReveal";
 import { useSidebarStageBackdropVariant } from "./SidebarStageBackdrop";
 import {
   clampThreadSidebarWidth,
-  resolveInitialThreadSidebarWidth,
   resolveThreadSidebarMaximumWidth,
   resolveThreadSidebarMinimumWidth,
   THREAD_MAIN_CONTENT_MIN_WIDTH,
+  THREAD_SIDEBAR_DEFAULT_WIDTH,
   THREAD_SIDEBAR_WIDTH_STORAGE_KEY,
 } from "./threadSidebarWidth";
 import {
@@ -118,13 +118,13 @@ function readWindowFullscreen(): boolean {
 
 function readInitialThreadSidebarWidth(): number {
   try {
-    return resolveInitialThreadSidebarWidth(
-      getLocalStorageItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY, Schema.Finite),
-      window.innerWidth,
+    return (
+      getLocalStorageItem(THREAD_SIDEBAR_WIDTH_STORAGE_KEY, Schema.Finite) ??
+      THREAD_SIDEBAR_DEFAULT_WIDTH
     );
   } catch (error) {
     console.error("Could not read persisted thread sidebar width.", error);
-    return resolveInitialThreadSidebarWidth(null, window.innerWidth);
+    return THREAD_SIDEBAR_DEFAULT_WIDTH;
   }
 }
 
@@ -452,7 +452,7 @@ export function AppSidebarLayout({
     } catch (error) {
       console.error("Could not clear persisted thread sidebar width.", error);
     }
-    setSidebarWidth(resolveInitialThreadSidebarWidth(null, viewportWidth));
+    setSidebarWidth(THREAD_SIDEBAR_DEFAULT_WIDTH);
   };
   const isWindowFullscreen = useSyncExternalStore(
     subscribeToWindowFullscreen,

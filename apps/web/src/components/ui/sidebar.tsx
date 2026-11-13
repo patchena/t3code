@@ -80,6 +80,7 @@ type SidebarResolvedResizableOptions = {
 };
 
 type SidebarInstanceContextProps = {
+  peek: boolean;
   resizable: SidebarResolvedResizableOptions | null;
   side: "left" | "right";
 };
@@ -395,7 +396,11 @@ function Sidebar({
   }, [holdPeek, peek, side]);
 
   const resolvedResizable = resolveSidebarResizable({ collapsible, isMobile, resizable });
-  const instanceContextValue: SidebarInstanceContextProps = { side, resizable: resolvedResizable };
+  const instanceContextValue: SidebarInstanceContextProps = {
+    peek,
+    side,
+    resizable: resolvedResizable,
+  };
 
   if (collapsible === "none") {
     return (
@@ -579,12 +584,13 @@ function SidebarRail({
   const sidebarInstance = React.use(SidebarInstanceContext);
   const suppressClickRef = React.useRef(false);
   const resolvedResizable = sidebarInstance?.resizable ?? null;
-  const canResize = resolvedResizable !== null && open;
+  const peek = sidebarInstance?.peek ?? false;
+  const canResize = resolvedResizable !== null && (open || peek);
   const railLabel = canResize ? t(($) => $.ui.resizeSidebar) : t(($) => $.ui.toggleSidebar);
   const railTitle = canResize ? t(($) => $.ui.dragSidebar) : t(($) => $.ui.toggleSidebar);
   const resize = useResizeDrag<HTMLButtonElement>((event) => {
     const options = resolvedResizable;
-    if (!options || !open) return null;
+    if (!options || !canResize) return null;
     const rail = event.currentTarget;
     const wrapper = rail.closest<HTMLElement>("[data-slot='sidebar-wrapper']");
     const sidebarRoot = rail.closest<HTMLElement>("[data-slot='sidebar']");
@@ -598,7 +604,7 @@ function SidebarRail({
     // Write width only to gap/container during drag; inherited --sidebar-width restyles the whole app, so
     // update it at commit.
     const widthTargets = [
-      sidebarRoot.querySelector<HTMLElement>("[data-slot='sidebar-gap']"),
+      peek ? null : sidebarRoot.querySelector<HTMLElement>("[data-slot='sidebar-gap']"),
       sidebarContainer,
     ].filter((element): element is HTMLElement => element !== null);
     const setTargetWidth = (value: number) => {
@@ -692,7 +698,7 @@ function SidebarRail({
               "-translate-x-1/2 group-data-[side=left]:-right-4 absolute inset-y-0 z-20 hidden w-4 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=right]:left-0 sm:flex [[data-collapsible=offcanvas][data-state=collapsed]_&]:pointer-events-none",
               "[[data-panel-animations=true]_&]:transition-all [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
               "touch-none in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
-              "[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
+              "[[data-side=left][data-state=collapsed][data-peek=false]_&]:cursor-e-resize [[data-side=right][data-state=collapsed][data-peek=false]_&]:cursor-w-resize",
               "group-data-[collapsible=offcanvas]:translate-x-0 hover:group-data-[collapsible=offcanvas]:bg-sidebar group-data-[collapsible=offcanvas]:after:left-full",
               "[[data-side=left][data-collapsible=offcanvas]_&]:-right-2",
               "[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",

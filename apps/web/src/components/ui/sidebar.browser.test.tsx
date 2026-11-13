@@ -296,6 +296,37 @@ describe("Sidebar", () => {
 
     expect(onResize).toHaveBeenCalledTimes(1);
   });
+
+  it("resizes a peeking sidebar over the content without pinning it", async () => {
+    await page.viewport(1280, 800);
+    const onResize = vi.fn();
+    await using screen = await render(<Harness onResize={onResize} />, {
+      router: false /* no routes involved */,
+    });
+    const sidebar = await collapse(screen);
+    await peek(screen, sidebar);
+    const container = sidebar.querySelector<HTMLElement>('[data-slot="sidebar-container"]')!;
+    const gap = sidebar.querySelector<HTMLElement>('[data-slot="sidebar-gap"]')!;
+    await vi.waitFor(() => expect(container.getBoundingClientRect().left).toBe(0));
+    const width = container.offsetWidth;
+    const rail = sidebar.querySelector<HTMLElement>('[data-sidebar="rail"]')!;
+    const { left, top } = rail.getBoundingClientRect();
+    const pointer = { bubbles: true, cancelable: true, pointerId: 1, button: 0, clientY: top + 10 };
+
+    rail.dispatchEvent(new PointerEvent("pointerdown", { ...pointer, buttons: 1, clientX: left }));
+    rail.dispatchEvent(
+      new PointerEvent("pointermove", { ...pointer, buttons: 1, clientX: left + 40 }),
+    );
+    expect(gap.getBoundingClientRect().width).toBe(0);
+    await act(() =>
+      rail.dispatchEvent(new PointerEvent("pointerup", { ...pointer, clientX: left + 40 })),
+    );
+
+    expect(onResize).toHaveBeenCalledWith(width + 40);
+    expect(sidebar.dataset.state).toBe("collapsed");
+    expect(sidebar.dataset.peek).toBe("true");
+    expect(gap.getBoundingClientRect().width).toBe(0);
+  });
 });
 
 it("restores collapsed and expanded desktop state after remounting", async () => {

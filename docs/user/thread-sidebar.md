@@ -64,6 +64,8 @@ so the chat uses the full window width. While it is hidden, move the pointer to 
 left window edge to show it over the chat without moving the chat. It hides again
 when the pointer leaves it, and stays while you type in it or a menu or dialog
 opened from it is open. Press `Escape` to hide it. Use the toggle to keep it shown.
+Drag the sidebar's right edge, shown or hidden, to change its width; the width is kept
+after a restart.
 
 ## Pin and reorder threads
 
