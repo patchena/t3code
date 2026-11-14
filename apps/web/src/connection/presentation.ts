@@ -19,6 +19,9 @@ export function connectionStatusText(
     case "connecting":
       return t(($) => $.connection.connectingDots);
     case "reconnecting":
+      if (connection.awaitingApproval) {
+        return connection.error ?? t(($) => $.connection.awaitingHostApproval);
+      }
       return connection.error
         ? t(($) => $.connection.reconnectingReason, { error: connection.error })
         : t(($) => $.connection.reconnectingDots);
@@ -37,6 +40,9 @@ export function connectionStatusTitle(
   connection: EnvironmentConnectionPresentation,
   t: TFunction<"connect">,
 ): string {
+  if (connection.awaitingApproval) {
+    return t(($) => $.saved.waitingApproval);
+  }
   if (connection.phase === "reconnecting" && connection.error) {
     return t(($) => $.connection.reconnectingFailed);
   }

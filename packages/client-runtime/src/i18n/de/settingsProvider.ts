@@ -931,4 +931,17 @@ export const settingsProviderDe = {
     available_other:
       "{{count}} Modelle verfügbar. Wähle eines in einer Modellauswahl für die Textgenerierung.",
   },
+  secretCheck: "{{label}} prüfen",
+  secretCheckFailed: "{{label}} fehlgeschlagen: {{detail}}",
+  secretCheckResolved: "{{label}} aufgelöst",
+  secretCheckUnreachable: "Server nicht erreichbar",
+  secretCheckNotAllowed: "Du kannst in dieser Umgebung keine geheimen Werte prüfen",
+  secretCheckIdle: "Prüfen, ob der geheime Wert aufgelöst wird",
+  secretChecking: "Geheimer Wert wird geprüft",
+  secretResolved: "Geheimer Wert aufgelöst",
+  offerProvider: "{{provider}} beim Hinzufügen oder Veröffentlichen eines Projekts anbieten",
+  offerWhenAddingOrPublishing: "Beim Hinzufügen oder Veröffentlichen eines Projekts anbieten",
+  saveSourceControlProviders: "Versionsverwaltungs-Provider speichern",
+  signInLinkNotWebAddress:
+    "Dieser Anmeldelink ist keine Webadresse und wurde deshalb nicht geöffnet.",
 } as const;

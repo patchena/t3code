@@ -143,4 +143,5 @@ export const welcomeEn = {
   cliPathAdded: "Added to {{file}}. Open a new terminal to use <command>t3</command>.",
   cliPathHint: "Use <command>t3</command> from any terminal. Adds one line to {{file}}.",
   addToPath: "Add to PATH",
+  retrySignIn: "Retry sign-in",
 } as const;

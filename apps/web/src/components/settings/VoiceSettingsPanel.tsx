@@ -73,7 +73,7 @@ import {
 import { updateClientSettings, useClientSettings } from "../../hooks/useSettings";
 import { runEnvironmentSpeech } from "../../speech/runEnvironmentSpeech";
 import {
-  getCustomModelOptionsByInstance,
+  getTextGenerationModelOptionsByInstance,
   resolveAppModelSelectionState,
 } from "../../modelSelection";
 import { useTextGenerationTargets } from "../../textGenerators";
@@ -390,6 +390,7 @@ function DictionaryEditor(props: {
             aria-label={t(($) => $.dictionary.addLabel, { label })}
             onChange={(event) => setTermDraft(event.target.value)}
             onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing || event.keyCode === 229) return;
               if (event.key !== "Enter" || event.shiftKey) return;
               event.preventDefault();
               addTerm();
@@ -426,6 +427,7 @@ function DictionaryEditor(props: {
                   onChange={(event) => setAliasDraft({ term, value: event.target.value })}
                   onBlur={() => setAliasDraft(null)}
                   onKeyDown={(event) => {
+                    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
                     if (event.key === "Escape") setAliasDraft(null);
                     if (event.key !== "Enter") return;
                     event.preventDefault();
@@ -538,14 +540,14 @@ function CleanupModelRow() {
     },
     textGenerationProviders,
   );
-  const modelOptionsByInstance = getCustomModelOptionsByInstance(
+  const modelOptionsByInstance = getTextGenerationModelOptionsByInstance(
     settings,
     textGenerationProviders,
     selection.instanceId,
     selection.model,
   );
   const instanceEntry = instanceEntries.find((entry) => entry.instanceId === selection.instanceId);
-  const modelDisabledReason = useScopedModelDisabledReason(settings, instanceEntries);
+  const modelDisabledReason = useScopedModelDisabledReason(settings, instanceEntries, true);
   const setModel = (next: ReturnType<typeof createModelSelection>) => {
     const reason = modelDisabledReason(next.instanceId, next.model);
     if (reason) {
@@ -1128,7 +1130,6 @@ function TranscriptionTest(props: {
     projectId: props.projectId,
     projectName: props.projectName,
     ownerKey: JSON.stringify([props.environmentId, props.projectId]),
-    draftText: draft,
     cleanup: false,
     readDraft: () => ({
       text: draftRef.current,

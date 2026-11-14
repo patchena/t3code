@@ -154,7 +154,7 @@ export const settingsExtraDe = {
     importDescription:
       "Füge in diesem Checkout definierte Aktionen ohne vorherige Bearbeitung hinzu.",
     addAction: "Aktion hinzufügen",
-    differentActions: "Unterschiedliche Aktionen je Umgebung",
+    differentActions: "Unterschiedliche Aktionen je Checkout",
     chooseEnvironment:
       "Wähle eine Umgebung, um ihre Liste zu bearbeiten. Hier hinzugefügte Aktionen werden allen ausgewählten Umgebungen hinzugefügt.",
     invalidConfig: "t3.json ist ungültig",
@@ -220,6 +220,8 @@ export const settingsExtraDe = {
     emptyName: "Der Projektname darf nicht leer sein",
     imagePickerFailed: "Bildauswahl konnte nicht geöffnet werden",
     searchImages: "Bilddateien suchen…",
+    chooseCheckout:
+      "Schränke die Auswahl oben auf einen Checkout ein, um seine Liste zu bearbeiten. Hier hinzugefügte Aktionen werden allen ausgewählten Checkouts hinzugefügt.",
   },
   notifications: {
     description:
@@ -524,6 +526,11 @@ export const settingsExtraDe = {
     merge: "Mit „{{name}}“ zusammenführen",
     addLight: "Helle Palette hinzufügen",
     addDark: "Dunkle Palette hinzufügen",
+    cssConflict:
+      "„{{name}}“ hat anderes benutzerdefiniertes CSS. Verwende dasselbe CSS oder wähle einen anderen Namen.",
+    customCss: "Benutzerdefiniertes CSS",
+    customCssDescription:
+      "Wird mit diesem Design gespeichert und beim Exportieren mitgenommen. Nur Web und Desktop. Regeln, die entfernte Dateien laden, werden ignoriert.",
   },
   storage: {
     locationDescription:

@@ -182,6 +182,8 @@ export const filesEn = {
     slideDrawFailed: "This slide could not be drawn.",
     bytes_one: "{{count}} byte",
     bytes_other: "{{count}} bytes",
+    resizing: "Resizing preview...",
+    resizeFailed: "This row or column could not be resized.",
   },
   open: "Open",
   openWith: "Open with",

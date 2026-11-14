@@ -618,4 +618,6 @@ export const composerEn = {
   openFromComputerThisMachine: "Open from a computer to edit on this machine",
   searchingProjectModels: "Searching project models...",
   retryNow: "Retry now",
+  typeAnswerPlaceholder: "Type your answer",
+  environmentAwaitingApproval: "{{name}} is waiting to approve this device",
 } as const;

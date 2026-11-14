@@ -186,6 +186,8 @@ export const filesDe = {
     slideDrawFailed: "Diese Folie konnte nicht dargestellt werden.",
     bytes_one: "{{count}} Byte",
     bytes_other: "{{count}} Bytes",
+    resizing: "Vorschau wird angepasst...",
+    resizeFailed: "Diese Zeile oder Spalte konnte nicht in der Größe geändert werden.",
   },
   open: "Öffnen",
   openWith: "Öffnen mit",

@@ -752,6 +752,30 @@ export const activitySharedEn = {
       declined: "Declined to render an HTML page",
       stopped: "Stopped rendering an HTML page",
     },
+    t3_theme_read: {
+      action: "Read themes",
+      running: "Reading themes",
+      completed: "Read themes",
+      failed: "Failed to read themes",
+      declined: "Declined to read themes",
+      stopped: "Stopped reading themes",
+    },
+    t3_theme_set: {
+      action: "Set the theme",
+      running: "Setting the theme",
+      completed: "Set the theme",
+      failed: "Failed to set the theme",
+      declined: "Declined to set the theme",
+      stopped: "Stopped setting the theme",
+    },
+    send_to_user: {
+      action: "Send a message",
+      running: "Sending a message",
+      completed: "Sent a message",
+      failed: "Failed to send a message",
+      declined: "Declined to send a message",
+      stopped: "Stopped sending a message",
+    },
   },
   summaries: {
     "thread-send": {
@@ -1131,6 +1155,24 @@ export const activitySharedEn = {
       unfinished_one: "Tried to check orchestration capabilities {{count}} time",
       completed_other: "Checked orchestration capabilities {{count}} times",
       unfinished_other: "Tried to check orchestration capabilities {{count}} times",
+    },
+    "theme-read": {
+      completed_one: "Checked themes {{count}} time",
+      completed_other: "Checked themes {{count}} times",
+      unfinished_one: "Tried to check themes {{count}} time",
+      unfinished_other: "Tried to check themes {{count}} times",
+    },
+    "theme-set": {
+      completed_one: "Set the theme {{count}} time",
+      completed_other: "Set the theme {{count}} times",
+      unfinished_one: "Tried to set the theme {{count}} time",
+      unfinished_other: "Tried to set the theme {{count}} times",
+    },
+    "send-to-user": {
+      completed_one: "Sent {{count}} message",
+      completed_other: "Sent {{count}} messages",
+      unfinished_one: "Tried to send {{count}} message",
+      unfinished_other: "Tried to send {{count}} messages",
     },
   },
   compaction: {

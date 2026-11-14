@@ -108,6 +108,7 @@ export function AddUsageLimitSourceDialog({
                 aria-label={t(($) => $.providers.managementKey)}
                 value={keyDraft}
                 sources={secretSources}
+                environmentId={environmentId}
                 onChange={(event) => setKeyDraft(event.target.value)}
                 onSecretChange={(secret) => setKeyDraft(secret ?? "")}
                 onValidityChange={setKeyValid}

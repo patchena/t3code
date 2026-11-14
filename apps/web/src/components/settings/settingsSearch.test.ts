@@ -92,6 +92,13 @@ describe("searchSettings", () => {
     );
   });
 
+  it("finds the Scheduled tasks page", () => {
+    expect(searchSettings("scheduled tasks", t)[0]).toMatchObject({
+      id: "scheduled-tasks",
+      to: "/settings/scheduled-tasks",
+    });
+  });
+
   it("matches normalized title substrings", () => {
     expect(searchSettings("  WORD   WRAP  ", t, ITEMS).map((item) => item.id)).toEqual([
       "word-wrap",

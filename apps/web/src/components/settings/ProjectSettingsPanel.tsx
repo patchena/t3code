@@ -29,6 +29,7 @@ import {
 } from "../../sidebarProjectGrouping";
 import { useEnvironments, usePrimaryEnvironmentId } from "../../state/environments";
 import { useThreadShells, waitForProjectRemoval } from "../../state/entities";
+import { refreshProjectFaviconUrl } from "../../state/assets";
 import { projectEnvironment } from "../../state/projects";
 import { ProjectFavicon } from "../ProjectFavicon";
 import { Alert, AlertDescription } from "../ui/alert";
@@ -320,15 +321,7 @@ function ProjectDetail({
       toastManager.add({ type: "warning", title: t(($) => $.extra.projects.emptyName) });
       return;
     }
-    if (
-      !projectGroupTitleNeedsUpdate(
-        group.memberProjects.map((member) => member.title),
-        title,
-        wasEdited,
-      )
-    ) {
-      return;
-    }
+    if (!projectGroupTitleNeedsUpdate(group.memberProjects, title, wasEdited)) return;
     await updateAllMembers(
       { title },
       t(($) => $.extra.projects.renameFailed),
@@ -347,6 +340,15 @@ function ProjectDetail({
       input,
       t(($) => $.extra.projects.iconFailed),
     );
+    for (const member of group.memberProjects) {
+      const update = typeof input === "function" ? input(member) : input;
+      if (update.faviconPath === undefined || update.projectIcon) continue;
+      refreshProjectFaviconUrl({
+        environmentId: member.environmentId,
+        cwd: member.workspaceRoot,
+        faviconPath: update.faviconPath,
+      });
+    }
     savingFaviconRef.current = false;
     setIsSavingFavicon(false);
   };
@@ -388,6 +390,13 @@ function ProjectDetail({
       return;
 
     const draftStore = useComposerDraftStore.getState();
+    const remainingMember = allMembers.find(
+      (candidate) =>
+        !members.some(
+          (member) =>
+            member.environmentId === candidate.environmentId && member.id === candidate.id,
+        ),
+    );
     for (const member of members) {
       if (
         checkProjectAccess(
@@ -423,7 +432,13 @@ function ProjectDetail({
         memberThreads.map((thread) => scopeThreadRef(thread.environmentId, thread.id)),
       );
       const projectDraftThread = draftStore.getDraftThreadByProjectRef(projectRef);
-      if (projectDraftThread) {
+      if (projectDraftThread && remainingMember) {
+        draftStore.setDraftThreadContext(projectDraftThread.draftId, {
+          projectRef: scopeProjectRef(remainingMember.environmentId, remainingMember.id),
+          environmentSelection: "manual",
+          loadBalancedEnvironmentId: null,
+        });
+      } else if (projectDraftThread) {
         draftStore.clearDraftThread(projectDraftThread.draftId);
       }
       draftStore.clearProjectDraftThreadId(projectRef);

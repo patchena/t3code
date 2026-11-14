@@ -107,6 +107,8 @@ function headline(
       return t(($) => $.diagnosis.offline);
     case "session_pending":
       return t(($) => $.diagnosis.sessionPending);
+    case "approval_pending":
+      return t(($) => $.diagnosis.approvalPending, { host });
     case "outdated":
       return t(($) => $.diagnosis.outdated, { host });
     case "clock_skew":
@@ -171,6 +173,16 @@ function steps(
       return [t(($) => $.diagnosis.connectDevice)];
     case "session_pending":
       return [t(($) => $.diagnosis.waitMoment), t(($) => $.diagnosis.reloadDevice)];
+    case "approval_pending": {
+      const code =
+        failure?._tag === "ConnectionTransientError" ? failure.verificationCode : undefined;
+      return [
+        code
+          ? t(($) => $.diagnosis.approveDeviceCode, { host, code })
+          : t(($) => $.diagnosis.approveDevice, { host }),
+        t(($) => $.diagnosis.approveCommand, { host, code: code ?? "<code>" }),
+      ];
+    }
     case "outdated":
       return [t(($) => $.diagnosis.updateHost, { host })];
     case "clock_skew":
@@ -233,6 +245,7 @@ function helpSection(
     case "clock_skew":
       return "the-clock-is-off";
     case "session_pending":
+    case "approval_pending":
     case "not_linked":
     case "tunnel_not_enabled":
       return "sign-in-account-or-link-problems";

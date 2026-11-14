@@ -6,6 +6,7 @@ export type ThreadActivityStatus = "working" | "approval" | "input" | "idle";
 
 /** Background threads say these too, so a status sounds the same wherever it's heard. */
 export const threadStatusText = (t: TFunction<"activity">) => ({
+  working: t(($) => $.status.working),
   approval: t(($) => $.status.needsApproval),
   input: t(($) => $.status.needsInput),
   done: t(($) => $.status.done),

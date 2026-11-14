@@ -287,22 +287,21 @@ export function ServerUpdateAction({
   const canUpdate = useAtomValue(sessionStateAtom, canUpdateServer);
   const updatesDenial = managedUpdatesDenial(useManagedPolicy(environmentId));
   const update = useServerUpdate();
+  const updatesInstall =
+    installation?.kind === "npm-global" || installation?.kind === "t3-launcher";
   const { copyToClipboard } = useCopyToClipboard<{ command: string }>({
-    target:
-      installation?.kind === "npm-global"
-        ? t(($) => $.updates.updateCommand)
-        : t(($) => $.updates.relaunchCommand),
+    target: updatesInstall
+      ? t(($) => $.updates.updateCommand)
+      : t(($) => $.updates.relaunchCommand),
     onCopy: ({ command }) => {
       toastManager.add({
         type: "success",
-        title:
-          installation?.kind === "npm-global"
-            ? t(($) => $.updates.updateCommandCopied)
-            : t(($) => $.updates.relaunchCommandCopied),
-        description:
-          installation?.kind === "npm-global"
-            ? t(($) => $.updates.runUpdateCommand, { command, server: serverLabel })
-            : t(($) => $.updates.runRelaunchCommand, { command, server: serverLabel }),
+        title: updatesInstall
+          ? t(($) => $.updates.updateCommandCopied)
+          : t(($) => $.updates.relaunchCommandCopied),
+        description: updatesInstall
+          ? t(($) => $.updates.runUpdateCommand, { command, server: serverLabel })
+          : t(($) => $.updates.runRelaunchCommand, { command, server: serverLabel }),
       });
     },
     onError: (error) => {
@@ -371,7 +370,7 @@ export function ServerUpdateAction({
     selfUpdate === null ? manualServerUpdateCommand(targetVersion, installation) : null;
   const actionLabel =
     manualCommand !== null
-      ? installation?.kind === "npm-global"
+      ? updatesInstall
         ? t(($) => $.updates.copyUpdateCommand)
         : t(($) => $.updates.copyRelaunchCommand)
       : label;

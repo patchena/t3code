@@ -151,4 +151,5 @@ export const welcomeDe = {
   cliPathHint:
     "Verwende <command>t3</command> in jedem Terminal. Fügt eine Zeile zu {{file}} hinzu.",
   addToPath: "Zu PATH hinzufügen",
+  retrySignIn: "Anmeldung wiederholen",
 } as const;

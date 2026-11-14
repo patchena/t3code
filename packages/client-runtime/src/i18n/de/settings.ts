@@ -26,6 +26,8 @@ export const settingsDe = {
     code: "Code",
     voice: "Spracheingabe",
     groupConnections: "Verbindungen",
+    preferences: "Präferenzen",
+    more: "Mehr",
   },
   search: {
     hostAccounts: "{{host}}-Konten und Token",
@@ -193,6 +195,9 @@ export const settingsDe = {
     cleanUpTranscripts: "Transkripte bereinigen",
     commitAndPullRequestWriting: "Commit- und Pull-Request-Texte",
     followPullRequestTemplates: "Pull-Request-Vorlagen verwenden",
+    screenReaderWindowTitle: "Screenreader-Fenstertitel",
+    keepAwakeWhileAgentsWork: "Wach halten, während Agenten arbeiten",
+    connectDeviceApproval: "Freigabe für neue Geräte verlangen",
   },
   panels: {
     waitForTheFullResponse: "Auf die vollständige Antwort warten",
@@ -475,6 +480,15 @@ export const settingsDe = {
     seeYourAgentsImportProjectsAndSetUpYourPhone:
       "Sieh deine Agenten, importiere Projekte und richte dein Smartphone ein.",
     open: "Öffnen",
+    screenReader: "Screenreader",
+    screenReaderWindowTitle: "Screenreader-Fenstertitel",
+    screenReaderWindowTitleLabel: "Screenreader-Fenstertitel",
+    screenReaderWindowTitleDescription:
+      "Beginnt den Fenstertitel mit dem Status des Threads, etwa „Freigabe erforderlich“, und seinem Namen, damit Screenreader beides beim App-Wechsel zuerst vorlesen. Taskleisten, geteilte Bildschirme und Zeiterfassungen sehen ihn ebenfalls.",
+    keepAwakeWhileAgentsWork: "Wach halten, während Agenten arbeiten",
+    keepAwakeWhileAgentsWorkLabel: "Wach halten, während Agenten arbeiten",
+    keepAwakeWhileAgentsWorkDescription:
+      "Verhindert, dass der Computer in den Ruhezustand wechselt, solange Agenten arbeiten, und erlaubt ihn wieder, sobald sie fertig sind. Das Zuklappen eines Laptops versetzt ihn weiterhin in den Ruhezustand.",
   },
   restore: {
     interfaceFont: "Oberflächenschrift",
@@ -543,8 +557,8 @@ export const settingsDe = {
     unavailableProject: "Projekt nicht verfügbar",
     allProjects: "Alle Projekte",
     searchProjects: "Projekte suchen",
-    applyOn: "Einstellungen für <project/> in <environment/> anwenden",
-    applyAcross: "Einstellungen für <project/> über <environment/> hinweg anwenden",
+    applyOn: "Einstellungen für <project/> in <environment/><checkout/> anwenden",
+    applyAcross: "Einstellungen für <project/> über <environment/> hinweg<checkout/> anwenden",
     unavailableSelection: "Auswahl nicht verfügbar",
     selectProject: "Wähle ein Projekt, um einen seiner Checkouts auszuwählen.",
     environmentRemoved: "Diese Umgebung ist nicht mehr verfügbar.",
@@ -554,6 +568,10 @@ export const settingsDe = {
     checkoutMissing: "Dieses Projekt hat in dieser Umgebung keinen Checkout.",
     checkoutEnvironmentRemoved: "Die Umgebung dieses Checkouts ist nicht mehr verfügbar.",
     allCheckouts: "Alle Checkouts",
+    inCheckout: "in",
+    checkoutScope: "Checkout-Auswahl",
+    unavailableCheckout: "Checkout nicht verfügbar",
+    searchCheckouts: "Checkouts suchen",
   },
   local: {
     couldnTChangeThisSetting: "Diese Einstellung konnte nicht geändert werden.",

@@ -146,7 +146,7 @@ export const settingsExtraEn = {
     importConfig: "Import from t3.json",
     importDescription: "Add actions declared by this checkout without editing them first.",
     addAction: "Add action",
-    differentActions: "Different actions across environments",
+    differentActions: "Different actions across checkouts",
     chooseEnvironment:
       "Choose one environment to edit its list. Adding an action here adds it on every selected environment.",
     invalidConfig: "t3.json is invalid",
@@ -211,6 +211,8 @@ export const settingsExtraEn = {
     emptyName: "Project title cannot be empty",
     imagePickerFailed: "Could not open image picker",
     searchImages: "Search image files…",
+    chooseCheckout:
+      "Narrow the selection above to one checkout to edit its list. Adding an action here adds it to every selected checkout.",
   },
   notifications: {
     description:
@@ -503,6 +505,10 @@ export const settingsExtraEn = {
     merge: "Merge into “{{name}}”",
     addLight: "Add light palette",
     addDark: "Add dark palette",
+    cssConflict: "“{{name}}” has different custom CSS. Use the same CSS or pick another name.",
+    customCss: "Custom CSS",
+    customCssDescription:
+      "Saved with this theme and included when you export it. Web and desktop only. Rules that load remote files are ignored.",
   },
   storage: {
     locationDescription:

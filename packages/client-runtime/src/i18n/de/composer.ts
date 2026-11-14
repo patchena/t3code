@@ -655,4 +655,6 @@ export const composerDe = {
     "Öffne das von einem Computer aus, um auf diesem Rechner zu bearbeiten",
   searchingProjectModels: "Projektmodelle werden gesucht …",
   retryNow: "Jetzt erneut versuchen",
+  typeAnswerPlaceholder: "Gib deine Antwort ein",
+  environmentAwaitingApproval: "{{name}} wartet darauf, dieses Gerät zuzulassen",
 } as const;

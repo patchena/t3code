@@ -18,6 +18,7 @@ import {
   CircleDotIcon,
   CircleSlashIcon,
   CircleXIcon,
+  OctagonXIcon,
   UserCheckIcon,
   UserRoundIcon,
   UserRoundXIcon,
@@ -242,8 +243,8 @@ const CHECK_STATUS_PRESENTATION = {
   },
   cancelled: {
     label: (t: TFunction<"workspace">) => t(($) => $.git.cancelled),
-    Icon: CircleXIcon,
-    toneClassName: "text-destructive",
+    Icon: OctagonXIcon,
+    toneClassName: "text-muted-foreground/70",
   },
   skipped: {
     label: (t: TFunction<"workspace">) => t(($) => $.git.skipped),

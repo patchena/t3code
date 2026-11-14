@@ -66,6 +66,22 @@ export const desktopEn = {
     previewTitle: "Preview · {{title}}",
     preview: "Browser preview",
     livePreview: "Live browser preview",
+    certificate: {
+      authorityInvalid: "No trusted authority issued this certificate.",
+      commonNameInvalid: "This certificate is not for this address.",
+      dateInvalid: "This certificate has expired or is not valid yet.",
+      trust: "Trust and Remember",
+      untrusted: "{{host}} has an untrusted certificate",
+      issuedTo: "Issued to: {{name}}",
+      issuedBy: "Issued by: {{name}}",
+      valid: "Valid: {{start}} – {{end}}",
+      fingerprint: "Fingerprint: {{fingerprint}}",
+      trustHint:
+        "Trust it only if you know this certificate belongs to the site. Clearing this browser profile's cookies forgets it.",
+      saveFailedTitle: "Could not trust the certificate for {{host}}",
+      saveFailed:
+        "T3 Code could not save this approval, so the page stays blocked. Check that the disk is not full and its data folder is writable, then try again.",
+    },
   },
   startup: {
     failed: "T3 Code failed to start",

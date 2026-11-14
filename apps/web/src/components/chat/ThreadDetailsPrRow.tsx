@@ -22,6 +22,7 @@ import {
 import { AsyncResult } from "effect/reactivity";
 import { useState, type MouseEvent as ReactMouseEvent } from "react";
 
+import type { ComposerThreadTarget } from "~/composerDraftStore";
 import { useLiveRefresh } from "~/hooks/useLiveRefresh";
 import { usePullRequestChecksRefresh } from "~/hooks/usePullRequestChecksRefresh";
 import { cn } from "~/lib/utils";
@@ -55,6 +56,8 @@ import {
   usePullRequestActionRunner,
   usePullRequestDefaultMergeMethodResolver,
   usePullRequestHandoffs,
+  writeHandoffToComposer,
+  type PullRequestThreadTask,
 } from "~/components/pullRequest/usePullRequestActions";
 import {
   ChangeRequestStatusIcon,
@@ -71,6 +74,8 @@ import {
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
 import { Button } from "~/components/ui/button";
+import { Spinner } from "~/components/ui/spinner";
+import { toastManager } from "~/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import {
   THREAD_DETAILS_PANEL_ICON_CLASS,
@@ -95,6 +100,7 @@ export function ThreadDetailsPrRow({
   onOpen,
   onActed,
   onStopWatching,
+  composerTarget,
 }: {
   environmentId: EnvironmentId;
   pr: ThreadPr;
@@ -107,6 +113,8 @@ export function ThreadDetailsPrRow({
   onOpen: (event: ReactMouseEvent<HTMLElement>) => void;
   onActed?: () => void;
   onStopWatching?: (() => void) | undefined;
+  /** Fix and Resolve write here instead of checking the pull request out in a new thread. */
+  composerTarget?: ComposerThreadTarget | undefined;
 }) {
   const { t } = useTranslation("workspace");
   const serverConfigs = useServerConfigs();
@@ -192,21 +200,35 @@ export function ThreadDetailsPrRow({
     lastSelectedMergeMethod,
   );
 
+  const handOff = (kind: "conflicts" | "findings", task: PullRequestThreadTask) => {
+    if (composerTarget === undefined) {
+      void startHandoff(kind, task);
+      return;
+    }
+    writeHandoffToComposer(composerTarget, task);
+    toastManager.add({
+      type: "success",
+      title: t(($) => $.git.addedToComposer),
+      description: t(($) => $.git.taskInComposer),
+    });
+  };
+
   const startResolveConflicts = () => {
     if (detail === null) return;
-    void startHandoff("conflicts", {
+    handOff("conflicts", {
       prompt: buildResolveConflictsPrompt({
         number: detail.number,
         url: detail.url,
         headBranch: detail.headBranch,
         baseBranch: detail.baseBranch,
+        inThisThread: composerTarget !== undefined,
       }),
     });
   };
 
   const startFixChecks = () => {
     if (detail === null) return;
-    void startHandoff(
+    handOff(
       "findings",
       buildFixFindingsHandoff({
         number: detail.number,
@@ -220,6 +242,7 @@ export function ThreadDetailsPrRow({
         comments: [],
         checks: detail.checks,
         commentsTruncated: false,
+        inThisThread: composerTarget !== undefined,
       }),
     );
   };
@@ -326,21 +349,28 @@ export function ThreadDetailsPrRow({
       </TooltipPopup>
     );
 
+  const newThreadSuffix =
+    composerTarget === undefined ? (
+      <ArrowUpRightIcon aria-hidden className="size-3 shrink-0" />
+    ) : null;
   const trailingAction =
     rowAction === "resolve"
       ? {
-          label: "Resolve",
-          pendingLabel: "Preparing...",
+          label: t(($) => $.git.resolveConflictsAction),
+          pendingLabel: t(($) => $.git.preparing),
           pending: handoff === "conflicts",
           destructive: true,
-          suffix: <ArrowUpRightIcon aria-hidden className="size-3 shrink-0" />,
-          tooltip: "Check the branch out and resolve the conflicts in a new thread",
+          suffix: newThreadSuffix,
+          tooltip:
+            composerTarget === undefined
+              ? t(($) => $.git.resolveConflictsNewThread)
+              : t(($) => $.git.resolveConflictsThisThread),
           onClick: startResolveConflicts,
         }
       : rowAction === "ready"
         ? {
-            label: "Ready",
-            pendingLabel: "Marking...",
+            label: t(($) => $.git.readyAction),
+            pendingLabel: t(($) => $.git.marking),
             pending: actionPending,
             destructive: false,
             suffix: null,
@@ -349,18 +379,26 @@ export function ThreadDetailsPrRow({
           }
         : rowAction === "fix"
           ? {
-              label: "Fix",
-              pendingLabel: "Preparing...",
+              label: t(($) => $.git.fix),
+              pendingLabel: t(($) => $.git.fix),
               pending: handoff === "findings",
               destructive: true,
-              suffix: <ArrowUpRightIcon aria-hidden className="size-3 shrink-0" />,
-              tooltip: "Fix the failing checks in a new thread",
+              suffix:
+                handoff === "findings" ? (
+                  <Spinner size="xs" aria-label={t(($) => $.git.preparingFix)} />
+                ) : (
+                  newThreadSuffix
+                ),
+              tooltip:
+                composerTarget === undefined
+                  ? t(($) => $.git.fixChecksNewThread)
+                  : t(($) => $.git.fixChecksThisThread),
               onClick: startFixChecks,
             }
           : rowAction === "merge"
             ? {
-                label: "Merge",
-                pendingLabel: "Merging...",
+                label: t(($) => $.git.merge),
+                pendingLabel: t(($) => $.git.merging),
                 pending: actionPending,
                 destructive: false,
                 suffix: null,
@@ -454,7 +492,7 @@ export function ThreadDetailsPrRow({
                 checksState={checksRollup}
                 checks={detail.checks}
                 variant="count"
-                render={<ThreadDetailsControl part="meta" />}
+                render={<ThreadDetailsControl part="meta" className="min-w-0 shrink" />}
               />
             ) : null}
             {watchControl("icon")}

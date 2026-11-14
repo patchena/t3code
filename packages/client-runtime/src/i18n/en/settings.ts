@@ -26,6 +26,8 @@ export const settingsEn = {
     code: "Code",
     voice: "Voice",
     groupConnections: "Connections",
+    preferences: "Preferences",
+    more: "More",
   },
   search: {
     hostAccounts: "{{host}} accounts and token",
@@ -193,6 +195,9 @@ export const settingsEn = {
     cleanUpTranscripts: "Clean up transcripts",
     commitAndPullRequestWriting: "Commit and pull request writing",
     followPullRequestTemplates: "Follow pull request templates",
+    screenReaderWindowTitle: "Screen reader window title",
+    keepAwakeWhileAgentsWork: "Keep awake while agents work",
+    connectDeviceApproval: "Require approval for new devices",
   },
   panels: {
     waitForTheFullResponse: "Wait for the full response",
@@ -469,6 +474,15 @@ export const settingsEn = {
     seeYourAgentsImportProjectsAndSetUpYourPhone:
       "See your agents, import projects, and set up your phone.",
     open: "Open",
+    screenReader: "Screen reader",
+    screenReaderWindowTitle: "Screen reader window title",
+    screenReaderWindowTitleLabel: "screen reader window title",
+    screenReaderWindowTitleDescription:
+      "Start the window title with the thread's status, like Needs approval, and its name, so screen readers read them first when you switch apps. Taskbars, shared screens, and time trackers see it too.",
+    keepAwakeWhileAgentsWork: "Keep awake while agents work",
+    keepAwakeWhileAgentsWorkLabel: "keep awake while agents work",
+    keepAwakeWhileAgentsWorkDescription:
+      "Stop the computer from going to sleep while agents are working, and let it sleep once they finish. Closing a laptop lid still puts it to sleep.",
   },
   restore: {
     interfaceFont: "Interface font",
@@ -536,8 +550,8 @@ export const settingsEn = {
     unavailableProject: "Unavailable project",
     allProjects: "All projects",
     searchProjects: "Search projects",
-    applyOn: "Applying settings for <project/> on <environment/>",
-    applyAcross: "Applying settings for <project/> across <environment/>",
+    applyOn: "Applying settings for <project/> on <environment/><checkout/>",
+    applyAcross: "Applying settings for <project/> across <environment/><checkout/>",
     unavailableSelection: "Unavailable selection",
     selectProject: "Select a project to choose one of its checkouts.",
     environmentRemoved: "This environment is no longer available.",
@@ -547,6 +561,10 @@ export const settingsEn = {
     checkoutMissing: "This project has no checkout on this environment.",
     checkoutEnvironmentRemoved: "This checkout's environment is no longer available.",
     allCheckouts: "All checkouts",
+    inCheckout: "in",
+    checkoutScope: "Checkout scope",
+    unavailableCheckout: "Unavailable checkout",
+    searchCheckouts: "Search checkouts",
   },
   local: {
     couldnTChangeThisSetting: "Couldn't change this setting.",

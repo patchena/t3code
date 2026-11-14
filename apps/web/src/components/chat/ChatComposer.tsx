@@ -208,7 +208,7 @@ import {
   ComposerQueuedAttachmentRow,
   ComposerRestingImagePreviews,
 } from "./ComposerAttachmentStrip";
-import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
+import { CollapsedComposerStopAction, ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { ComposerFooterPrimaryActions } from "./ComposerFooterControls";
 import { ComposerPendingUserInputPanel } from "./ComposerPendingUserInputPanel";
 import { resolveComposerMenuActiveItemId } from "./composerMenuHighlight";
@@ -402,6 +402,7 @@ export interface ChatComposerProps {
     customAnswer: string;
     activeQuestion: {
       id: string;
+      options: ReadonlyArray<unknown>;
       initialAnswer?: string | undefined;
       multiSelect?: boolean | undefined;
       allowCustomAnswer?: boolean | undefined;
@@ -699,7 +700,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     uncommittedSnapShotIds,
     standaloneComposerImages,
   } = useComposerImageGroups(attachmentDraftTarget, composerImages, composerPreviewAnnotations);
-  const preparingComposerImages = usePreparingComposerImages(attachmentTargetKey);
+  const preparingComposerImages = usePreparingComposerImages(attachmentTargetKey).filter(
+    (image) => !image.hidden,
+  );
   const nonPersistedComposerImageIds = attachmentDraft.nonPersistedImageIds;
   const uploadsByImageId = useAttachmentUploadStore((state) => state.uploadsByImageId);
   const openPrLink = useOpenPrLink(routeThreadRef);
@@ -1817,7 +1820,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     projectId: activeProjectId,
     projectName,
     ownerKey: questionAttachmentTarget ?? composerDraftTargetKey,
-    draftText: prompt,
     disabled: dictationDisabled,
     readDraft: () => {
       const snapshot = readComposerSnapshot();
@@ -2150,6 +2152,13 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         description: t(($) => $.composer.waitContextChip),
       });
       return false;
+    }
+    // An empty draft has nothing to send; Enter does what the Resume thread button does.
+    if (showResumeAction && !activePendingProgress) {
+      event?.preventDefault();
+      if (isSendBusy || environmentUnavailable !== null) return false;
+      onResume();
+      return true;
     }
     const submission = submitComposerDraft(
       {
@@ -3420,35 +3429,51 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   )}
                 </button>
                 {collapsedComposerImagePreviews}
-                <button
-                  type="button"
-                  data-chat-composer-transition-actions="true"
-                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-message-action text-message-action-foreground hover:bg-message-action-hover disabled:opacity-64"
-                  disabled={collapsedComposerPrimaryActionDisabled}
-                  aria-label={collapsedComposerPrimaryActionLabel}
-                  onPointerDown={(event) => event.preventDefault()}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    if (showResumeAction) onResume();
-                    else if (props.resumeCompactionTokens !== null && !props.keepFullHistory)
-                      expandMobileComposer();
-                    else submitComposer();
-                  }}
+                <CollapsedComposerStopAction
+                  key={`${environmentId}:${activeThreadId ?? "new"}`}
+                  canOperateThread={canOperateThread}
+                  canInterrupt={canInterrupt}
+                  runId={activeThread?.runtime?.activeRunId ?? null}
+                  hasSendableContent={composerSendState.hasSendableContent}
+                  isEditingQueuedMessage={isEditingQueuedMessage}
+                  onInterrupt={handleInterruptPrimaryActionStable}
                 >
-                  {showResumeAction ? (
-                    <PlayIcon className="size-4 fill-current" aria-hidden="true" />
-                  ) : (
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                      <path
-                        d="M8 3L8 13M8 3L4 7M8 3L12 7"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  )}
-                </button>
+                  <button
+                    type="button"
+                    data-chat-composer-transition-actions="true"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-full bg-message-action text-message-action-foreground hover:bg-message-action-hover disabled:opacity-64"
+                    disabled={collapsedComposerPrimaryActionDisabled}
+                    aria-label={collapsedComposerPrimaryActionLabel}
+                    onPointerDown={(event) => event.preventDefault()}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (showResumeAction) onResume();
+                      else if (props.resumeCompactionTokens !== null && !props.keepFullHistory)
+                        expandMobileComposer();
+                      else submitComposer();
+                    }}
+                  >
+                    {showResumeAction ? (
+                      <PlayIcon className="size-4 fill-current" aria-hidden="true" />
+                    ) : (
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M8 3L8 13M8 3L4 7M8 3L12 7"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </CollapsedComposerStopAction>
               </div>
             ) : null}
 
@@ -3582,7 +3607,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                         : activePendingProgress
                           ? isChoiceOnlyPendingQuestion
                             ? t(($) => $.composer.chooseOption)
-                            : t(($) => $.composer.ownAnswerPlaceholder)
+                            : activePendingProgress.activeQuestion?.options.length === 0
+                              ? t(($) => $.composer.typeAnswerPlaceholder)
+                              : t(($) => $.composer.ownAnswerPlaceholder)
                           : projectSelectionRequired
                             ? t(($) => $.composer.chooseProjectStartThread)
                             : showProviderUnavailable

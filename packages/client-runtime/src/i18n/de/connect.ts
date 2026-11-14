@@ -203,6 +203,7 @@ export const connectDe = {
     environmentsEmpty: "Keine T3-Connect-Umgebungen",
     environmentsEmptyDescription:
       "Verknüpfe eine Umgebung in ihren lokalen Einstellungen, um sie über T3 Connect bereitzustellen.",
+    retryLoad: "T3 Connect erneut versuchen",
   },
   tunnels: {
     linkUpgrade:
@@ -295,6 +296,8 @@ export const connectDe = {
     foundAddress: "{{address}} · automatisch gefunden",
     reorderLabel: "{{route}} neu anordnen, Position {{position}}",
     removeLabel: "Route {{route}} entfernen",
+    awaitingApproval: "Wartet auf Freigabe…",
+    awaitingHostApproval: "Wartet auf Freigabe auf dem Host",
   },
   links: {
     loadFailed: "Verknüpfte Umgebungen konnten nicht geladen werden",
@@ -303,7 +306,7 @@ export const connectDe = {
     emptyDescription:
       "Verknüpfe einen anderen Computer mit T3 Code, etwa einen VPS, damit Agenten von hier aus dort Threads starten und steuern können.",
     forgetConfirm:
-      "{{environment}} vergessen? Agenten von hier arbeiten dann dort nicht mehr. Widerrufe „T3 Code · …“ unter Verbindungen auf {{environment}}, um auch die dortige Sitzung zu beenden.",
+      "{{environment}} vergessen? Agenten von hier arbeiten dann dort nicht mehr. Widerrufe „T3 Code · …“ unter „Freigabe und Zugriff“ auf {{environment}}, um auch die dortige Sitzung zu beenden.",
     forgetFailed: "Verknüpfung konnte nicht vergessen werden",
     expired: "Abgelaufen. Verknüpfe die Umgebung erneut mit einem neuen Kopplungscode.",
     unreachable: "Antwortet derzeit nicht.",
@@ -320,16 +323,16 @@ export const connectDe = {
     link: "Verknüpfen",
     title: "Eine Umgebung verknüpfen",
     description:
-      "Agenten von hier können dort anschließend Threads starten, Nachrichten senden und auf Threads warten. Die Verknüpfung erscheint dort unter Verbindungen und kann widerrufen werden.",
+      "Agenten von hier können dort anschließend Threads starten, Nachrichten senden und auf Threads warten. Die Verknüpfung erscheint dort unter „Freigabe und Zugriff“ → „Autorisierte Clients“ und kann widerrufen werden.",
     renew:
       "Bereits verknüpft. Erneutes Verknüpfen verlängert die Verbindung mit dem gewählten Zugriff.",
     address: "Adresse",
     addressDescription:
       "Diese App kennt für {{environment}} keine von anderen Computern erreichbare Adresse. Gib die HTTPS- oder Tailscale-Adresse ein.",
-    codeFromEnvironment: "Aus den Verbindungen dieser Umgebung oder dort über t3 pair",
+    codeFromEnvironment: "Aus „Freigabe und Zugriff“ dort oder über t3 pair",
     pasteCode: "Code einfügen",
     createCode:
-      "Erstelle auf {{environment}} unter Einstellungen → Verbindungen → Link erstellen einen Link und füge seinen Code hier ein.",
+      "Erstelle auf {{environment}} unter Einstellungen → Freigabe und Zugriff → Autorisierte Clients → Link erstellen einen Link und füge seinen Code hier ein.",
     linking: "Wird verknüpft…",
     access: "Was Agenten von hier dort tun dürfen",
     accessDescription:
@@ -713,6 +716,11 @@ export const connectDe = {
       "Klicke auf „Umgebung hinzufügen“, um eine andere Umgebung zu koppeln, oder verbinde eine über T3 Connect.",
     emptyLocal: "Klicke auf „Umgebung hinzufügen“, um eine andere Umgebung zu koppeln.",
     linkOnHost: "Führe auf dem Host `t3 connect link` aus und starte T3 Code dort danach neu.",
+    waitingApproval: "Wartet auf Freigabe",
+    deviceApprovalDescription:
+      "Geräte, die sich bei deinem T3-Connect-Konto anmelden, warten, bis jemand, der hier bereits verbunden ist, sie freigibt.",
+    requireDeviceApproval: "Freigabe für neue T3-Connect-Geräte verlangen",
+    noAccessPermission: "Deine Sitzung darf den Zugriff nicht verwalten.",
   },
   add: {
     routeAdded: "Route hinzugefügt",
@@ -849,6 +857,12 @@ export const connectDe = {
     retry: "Jetzt erneut versuchen",
     copy: "Diagnose kopieren",
     addRoute: "Direkte Route hinzufügen",
+    approvalPending: "{{host}} wartet darauf, dass jemand dieses Gerät freigibt",
+    approveDeviceCode:
+      "Öffne auf einem Gerät, das bereits mit {{host}} verbunden ist, Einstellungen > Freigabe und Zugriff und gib das Gerät mit dem Code {{code}} frei.",
+    approveDevice:
+      "Öffne auf einem Gerät, das bereits mit {{host}} verbunden ist, Einstellungen > Freigabe und Zugriff und gib dieses Gerät frei.",
+    approveCommand: "Oder führe `t3 auth connect-device approve {{code}}` auf {{host}} aus.",
   },
   providerBanner: {
     install: "Öffne die Provider-Einrichtung, um {{provider}} in dieser Umgebung zu installieren.",
@@ -935,5 +949,23 @@ export const connectDe = {
     linkExpired: "Abgelaufen",
     linked: "Verknüpft: {{links}}",
     manageAccess: "Zugriff verwalten",
+    getApp: "{{app}} herunterladen",
+  },
+  connectDevices: {
+    fallbackName: "dieses Gerät",
+    unknown: "Unbekanntes Gerät",
+    revokeTitle: "{{device}} widerrufen?",
+    revokeAllTitle: "Alle anderen Clients widerrufen?",
+    requestTitle: "Ein Gerät möchte sich mit {{environment}} verbinden",
+    requestDescription: "{{device}}. Lass es nur zu, wenn es den Code {{code}} anzeigt.",
+    approveFailed: "Das Gerät konnte nicht zugelassen werden",
+    denyFailed: "Das Gerät konnte nicht abgelehnt werden",
+    revokeFailed: "Das Gerät konnte nicht widerrufen werden",
+    review: "Prüfen",
+    title: "T3-Connect-Geräte",
+    approveHint: "{{device}}. Lass es nur zu, wenn das Gerät vor dir diesen Code anzeigt.",
+    saving: "Wird gespeichert…",
+    trustedSince: "Vertraut seit {{date}}",
+    empty: "Bisher hat sich kein Gerät über T3 Connect verbunden.",
   },
 } as const;

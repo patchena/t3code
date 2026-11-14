@@ -144,6 +144,7 @@ export function SourceControlTokenSettings({
               id={`${definition.kind}-token-${environmentId}`}
               size="sm"
               aria-label={t(($) => $.providers.hostToken, { host: definition.label })}
+              environmentId={environmentId}
               configured={isSaved && !isSecretReference(savedToken)}
               value={draft}
               sources={secretSources}

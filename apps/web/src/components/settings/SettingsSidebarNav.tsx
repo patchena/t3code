@@ -388,22 +388,17 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                       key={group.paths[0] ?? index}
                       className="flex flex-col gap-1 max-md:border-t max-md:border-sidebar-border max-md:pt-4 max-md:first:border-t-0 max-md:first:pt-0"
                     >
-                      {group.heading ? (
-                        <h3
-                          id={`settings-nav-group-${index}`}
-                          className={cn(
-                            "px-2 text-xs font-medium text-sidebar-muted-foreground/80",
-                            !compactSearchOpen && "max-md:sr-only",
-                          )}
-                        >
-                          {group.heading}
-                        </h3>
-                      ) : null}
-                      {/* The heading stays outside the group it names so NVDA does not read the name twice. */}
-                      <div
-                        role="group"
-                        aria-labelledby={group.heading ? `settings-nav-group-${index}` : undefined}
+                      <h3
+                        id={`settings-nav-group-${index}`}
+                        className={cn(
+                          "px-2 text-xs font-medium text-sidebar-muted-foreground/80",
+                          group.headingHidden ? "sr-only" : !compactSearchOpen && "max-md:sr-only",
+                        )}
                       >
+                        {group.heading}
+                      </h3>
+                      {/* The heading stays outside the group it names so NVDA does not read the name twice. */}
+                      <div role="group" aria-labelledby={`settings-nav-group-${index}`}>
                         <SidebarMenu>
                           {group.paths.map((to) => {
                             const Icon = SETTINGS_SECTION_ICONS[to];

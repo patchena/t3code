@@ -262,7 +262,8 @@ export const workspaceDe = {
     snoozeFailedCount_one: "{{count}} Thread konnte nicht zurückgestellt werden",
     snoozeFailedCount_other: "{{count}} Threads konnten nicht zurückgestellt werden",
     snoozeThreadsFailed: "Threads konnten nicht zurückgestellt werden",
-    regenerateTitlesFailed: "Threadtitel konnten nicht neu erstellt werden",
+    regenerateTitlesFailed:
+      "{{failed}} von {{total}} Threadtiteln konnten nicht neu erstellt werden",
     deleteThreads_one: "{{count}} Thread löschen?",
     deleteThreads_other: "{{count}} Threads löschen?",
     deleteThreadsDescription:
@@ -384,6 +385,16 @@ export const workspaceDe = {
     worktree: "Worktree: {{path}}",
     autoSettleFollowSettings: "Einstellungen folgen",
     autoSettleNever: "Nie",
+    noActiveThreadsInProjects: "Keine aktiven Threads in diesen Projekten",
+    noActiveThreadsInProject: "Keine aktiven Threads in {{project}}",
+    titleRegenerationError: "Ein Fehler ist aufgetreten.",
+    titleGenerationFailed: "Titel konnte nicht erzeugt werden.",
+    titleKept: "Titel beibehalten",
+    titleKeptDescription: "Der aktuelle Titel passt bereits zu diesem Thread.",
+    titlesKept: "Titel beibehalten",
+    titlesKeptPartial: "{{kept}} von {{total}} Titeln beibehalten",
+    titlesKeptDescription: "Die aktuellen Titel passen bereits zu diesen Threads.",
+    titlesKeptPartialDescription: "Diese Titel passen bereits zu ihren Threads.",
   },
   panel: {
     browser: "Browser",
@@ -461,6 +472,10 @@ export const workspaceDe = {
     cloneTo: "Auf {{machine}} klonen",
     machine: "Computer",
     tooLarge: "Über 1 MB",
+    noIgnoredMatch: "Keine ignorierten Dateien gefunden.",
+    truncatedSearchable:
+      "Die ersten {{count}} Dateien werden angezeigt. Suche, um die übrigen zu finden.",
+    searchIgnored: "Ignorierte Dateien durchsuchen",
   },
   ssh: {
     failed: "SSH-Bestätigungsdialog fehlgeschlagen.",

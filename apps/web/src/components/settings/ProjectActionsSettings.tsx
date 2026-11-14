@@ -176,7 +176,7 @@ export function ProjectActionsSettings() {
       {mixed ? (
         <SettingsRow
           title={t(($) => $.extra.projects.differentActions)}
-          description={t(($) => $.extra.projects.chooseEnvironment)}
+          description={t(($) => $.extra.projects.chooseCheckout)}
         />
       ) : (
         <ProjectActionsList

@@ -2,8 +2,6 @@ import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { useTranslation } from "react-i18next";
 import { ThreadDetailsControl } from "~/components/chat/ThreadDetailsControl";
 import { ComposerContextLabel } from "~/components/ComposerContextLabel";
-import { useSupportsMultiplePullRequests } from "~/hooks/useSupportsMultiplePullRequests";
-import { resolveThreadCurrentPullRequestLink } from "@t3tools/client-runtime/thread-pull-requests";
 import { useRightPanelStore } from "~/rightPanelStore";
 import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
@@ -21,6 +19,7 @@ import {
 import { GitBranchIcon } from "lucide-react";
 import {
   useEffect,
+  useEffectEvent,
   useImperativeHandle,
   useOptimistic,
   useState,
@@ -34,6 +33,7 @@ import { clipboardErrorMessage, writeTextToClipboard } from "~/hooks/useCopyToCl
 import { readLocalApi } from "~/localApi";
 import { useOpenPrLink } from "~/lib/openPullRequestLink";
 import { usePaginatedBranches } from "~/state/queries";
+import { useProjectClone } from "~/state/projectClones";
 import { readThreadShell, useProject, useQuietThreadShell } from "~/state/entities";
 import { useEnvironmentQuery } from "~/state/query";
 import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
@@ -42,7 +42,7 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { vcsEnvironment } from "~/state/vcs";
 import { cn } from "~/lib/utils";
 import { THREAD_DETAILS_PANEL_ICON_CLASS } from "~/components/chat/threadDetailsPanelStyles";
-import { ThreadDetailsPrRows } from "~/components/chat/ThreadDetailsPrRows";
+import { ThreadDetailsThreadPrRows } from "~/components/chat/ThreadDetailsPrRows";
 import { parsePullRequestReference } from "@t3tools/client-runtime/pull-request-link-input";
 import { getSourceControlPresentation } from "~/sourceControlPresentation";
 import { useComposerMenuProps } from "~/components/chat/composerEventScope";
@@ -53,6 +53,7 @@ import {
   resolveBranchToolbarPrBranch,
   resolveBranchSelectionTarget,
   resolveBranchToolbarValue,
+  resolveDefaultWorktreeBaseBranch,
   resolveDraftEnvModeAfterBranchChange,
   resolveEffectiveEnvMode,
   sanitizeNewRefName,
@@ -60,10 +61,8 @@ import {
 } from "~/components/BranchToolbar.logic";
 import {
   ThreadPullRequestBadgeControl,
-  prStatusIndicator,
   resolveDisplayedThreadPr,
-  resolveThreadPullRequestBadge,
-  useLinkedThreadPullRequest,
+  useThreadDisplayedPullRequest,
 } from "~/components/ThreadStatusIndicators";
 
 import { ComboboxItem, ComboboxTrigger } from "~/components/ui/combobox";
@@ -131,7 +130,7 @@ export function BranchToolbarBranchSelector({
   const switchRef = useAtomCommand(vcsEnvironment.switchRef, {
     reportFailure: false,
   });
-  const refreshStatus = useAtomCommand(vcsEnvironment.refreshStatus, {
+  const refreshLocalStatusForPicker = useAtomCommand(vcsEnvironment.refreshLocalStatusForPicker, {
     reportFailure: false,
   });
   const createRefMutation = useAtomCommand(vcsEnvironment.createRef, {
@@ -296,7 +295,6 @@ export function BranchToolbarBranchSelector({
   const createBranchItemValue = canCreateBranch
     ? `__create_new_branch__:${trimmedBranchQuery}`
     : null;
-  const defaultBranchName = refs.find((refName) => refName.isDefault)?.name ?? null;
   const pickerCreateBranchItemValue = hasExactBranchMatch ? null : createBranchItemValue;
   const branchPickerItems = [
     ...(checkoutPullRequestItemValue ? [checkoutPullRequestItemValue] : []),
@@ -451,7 +449,10 @@ export function BranchToolbarBranchSelector({
     )
       return;
 
-    if (selectionTarget.reuseExistingWorktree) {
+    if (
+      selectionTarget.reuseExistingWorktree &&
+      !(selectionTarget.staysInActiveCheckout && canWriteSourceControl)
+    ) {
       setThreadBranch(refName.name, selectionTarget.nextWorktreePath);
       setIsBranchMenuOpen(false);
       onComposerFocusRequest?.();
@@ -543,7 +544,20 @@ export function BranchToolbarBranchSelector({
 
   const worktreeBaseBranchCandidate = isInitialBranchesLoadPending
     ? null
-    : (defaultBranchName ?? currentGitBranch);
+    : resolveDefaultWorktreeBaseBranch(refs);
+
+  const projectCloneDone = useProjectClone(activeProjectRef)?.phase === "done";
+  const refreshRefsAfterClone = useEffectEvent(() => {
+    if (branchCwd === null) return;
+    void refreshLocalStatusForPicker({
+      environmentId,
+      input: { cwd: branchCwd, localOnly: true },
+    });
+  });
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- refs listed while the project was cloning are empty; reload them past the server's snapshot when the clone finishes
+  useEffect(() => {
+    if (projectCloneDone) refreshRefsAfterClone();
+  }, [projectCloneDone]);
 
   // The server sets started threads' branches; defaulting here would detach the agent from its worktree.
   const threadStarted = serverSession !== null;
@@ -571,7 +585,10 @@ export function BranchToolbarBranchSelector({
   const handleOpenChange = (open: boolean) => {
     setIsBranchMenuOpen(open);
     if (open && !isBranchMenuOpen && branchCwd !== null) {
-      void refreshStatus({ environmentId, input: { cwd: branchCwd, localOnly: true } });
+      void refreshLocalStatusForPicker({
+        environmentId,
+        input: { cwd: branchCwd, localOnly: true },
+      });
     }
     if (!open) {
       setBranchQuery("");
@@ -608,33 +625,18 @@ export function BranchToolbarBranchSelector({
     threadBranch: branchPrBranch,
     gitStatus: branchStatusQuery.data,
   });
-  const supportsMultiplePullRequests = useSupportsMultiplePullRequests(environmentId);
-  const linkedStatus = useLinkedThreadPullRequest(
+  const {
+    badge: prBadge,
+    number: prNumber,
+    url: prUrl,
+    status: prStatus,
+  } = useThreadDisplayedPullRequest(
     environmentId,
-    serverThread?.linkedPullRequest,
-    true,
-    serverThread?.pullRequests,
-    serverThread?.branchPullRequest,
+    serverThread,
+    branchPr,
+    branchStatusQuery.data?.sourceControlProvider,
   );
-  const currentLinkedPr = supportsMultiplePullRequests
-    ? resolveThreadCurrentPullRequestLink(serverThread?.pullRequests ?? [])
-    : null;
-  const prBadge = supportsMultiplePullRequests
-    ? resolveThreadPullRequestBadge(serverThread?.pullRequests)
-    : null;
-  const displayedPr = linkedStatus?.pr ?? (currentLinkedPr === null ? branchPr : null);
-  const displayedPrStatus = prStatusIndicator(
-    displayedPr,
-    linkedStatus?.sourceControlProvider ?? branchStatusQuery.data?.sourceControlProvider,
-    t,
-  );
-  const prNumber = currentLinkedPr?.number ?? displayedPr?.number;
-  const prUrl = currentLinkedPr?.url ?? displayedPr?.url;
   const openPrLink = useOpenPrLink(threadRef);
-  const panelPrLabel =
-    prNumber === undefined
-      ? ""
-      : `#${prNumber}${displayedPr?.title.trim() ? `: ${displayedPr.title}` : ""}`;
 
   function selectPickerItem(itemValue: string) {
     if (itemValue === checkoutPullRequestItemValue && prReference && onCheckoutPullRequestRequest) {
@@ -767,7 +769,7 @@ export function BranchToolbarBranchSelector({
             pullRequests={serverThread?.pullRequests ?? []}
             number={prNumber}
             url={prUrl}
-            status={displayedPrStatus}
+            status={prStatus}
             onOpenList={() => useRightPanelStore.getState().open(threadRef, "pull-requests")}
             onOpenPullRequest={(event, targetUrl = prUrl) => {
               if (targetUrl) openPrLink(event, targetUrl);
@@ -793,6 +795,8 @@ export function BranchToolbarBranchSelector({
             }
             className="min-w-0 max-w-full active:scale-100"
             disabled={isInitialBranchesLoadPending || isBranchActionPending}
+            // NVDA browse mode re-reads a combobox when its attributes change, not when its text does.
+            aria-label={t(($) => $.git.branchTriggerLabel, { label: triggerLabel })}
           >
             <GitBranchIcon
               className={cn(
@@ -801,28 +805,21 @@ export function BranchToolbarBranchSelector({
               )}
             />
             <ComposerContextLabel displayMode={displayMode}>
-              <MiddleTruncate value={triggerLabel} variant="cap-aligned" className="w-full" />
+              <MiddleTruncate
+                value={triggerLabel}
+                variant="cap-aligned"
+                className="w-full"
+                aria-hidden
+              />
             </ComposerContextLabel>
           </ComboboxTrigger>
         </span>
-        {displayMode === "panel" && prNumber !== undefined && prUrl !== undefined ? (
-          <ThreadDetailsPrRows
+        {displayMode === "panel" ? (
+          <ThreadDetailsThreadPrRows
             threadRef={threadRef}
-            links={serverThread?.pullRequests ?? []}
-            currentLink={currentLinkedPr}
-            onOpenLink={openPrLink}
-            environmentId={environmentId}
-            pr={displayedPr}
-            number={prNumber}
-            reference={currentLinkedPr}
-            status={displayedPrStatus}
             project={activeProject}
-            label={panelPrLabel}
-            openAriaLabel={
-              prUrl ??
-              t(($) => $.git.openRequest, { term: sourceControlPresentation.terminology.singular })
-            }
-            onOpen={(event) => openPrLink(event, prUrl)}
+            branchPr={branchPr}
+            branchSourceControlProvider={branchStatusQuery.data?.sourceControlProvider}
             onActed={() => branchStatusQuery.refresh()}
           />
         ) : null}

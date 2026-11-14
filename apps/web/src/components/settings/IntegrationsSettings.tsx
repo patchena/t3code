@@ -322,7 +322,7 @@ function BrowserViewportSetting({ disabled }: { readonly disabled: boolean }) {
   const { t } = useTranslation("common");
   const { t: tSettings } = useTranslation("settings");
   const viewport = useClientSettings((settings) => settings.browserDefaultViewport);
-  const updateSettings = useUpdatePrimarySettings();
+  const updateSettings = useUpdateScopedSettings();
 
   const sized = viewport._tag === "fill" ? null : viewport;
   const presentedSize = {
@@ -478,7 +478,7 @@ function BrowserZoomSetting({ disabled }: { readonly disabled: boolean }) {
   const { t } = useTranslation("common");
   const { t: tSettings } = useTranslation("settings");
   const zoomFactor = useClientSettings((settings) => settings.browserDefaultZoomFactor);
-  const updateSettings = useUpdatePrimarySettings();
+  const updateSettings = useUpdateScopedSettings();
 
   return (
     <SettingsRow
@@ -532,7 +532,7 @@ function BrowserAppearanceSetting({ disabled }: { readonly disabled: boolean }) 
     dark: t(($) => $.misc.integrations.dark),
   };
   const appearance = useClientSettings((settings) => settings.browserDefaultAppearance);
-  const updateSettings = useUpdatePrimarySettings();
+  const updateSettings = useUpdateScopedSettings();
 
   return (
     <SettingsRow
@@ -581,7 +581,7 @@ function BrowserRecordingInputSettings({ disabled }: { readonly disabled: boolea
   const { t: tSettings } = useTranslation("settings");
   const showKeys = useClientSettings((settings) => settings.browserRecordingShowKeyPresses);
   const showMouse = useClientSettings((settings) => settings.browserRecordingShowMousePresses);
-  const updateSettings = useUpdatePrimarySettings();
+  const updateSettings = useUpdateScopedSettings();
   return (
     <>
       <SettingsRow
@@ -620,7 +620,7 @@ function BrowserRecordingFrameRateSetting({ disabled }: { readonly disabled: boo
   const { t } = useTranslation("common");
   const { t: tSettings } = useTranslation("settings");
   const frameRate = useClientSettings((settings) => settings.browserRecordingFrameRate);
-  const updateSettings = useUpdatePrimarySettings();
+  const updateSettings = useUpdateScopedSettings();
 
   return (
     <SettingsRow
@@ -675,7 +675,7 @@ function BrowserLinkTargetSetting({ disabled }: { readonly disabled: boolean }) 
     app: "T3 Code",
   };
   const linkTarget = useClientSettings((settings) => settings.browserLinkTarget);
-  const updateSettings = useUpdatePrimarySettings();
+  const updateSettings = useUpdateScopedSettings();
 
   return (
     <SettingsRow
@@ -733,7 +733,7 @@ function BrowserSearchEngineSetting() {
   };
   const engine = useClientSettings((settings) => settings.browserSearchEngine);
   const customUrl = useClientSettings((settings) => settings.browserCustomSearchUrl);
-  const updateSettings = useUpdatePrimarySettings();
+  const updateSettings = useUpdateScopedSettings();
 
   return (
     <>
@@ -1131,7 +1131,7 @@ function BrowserAutoShowFloatingPreviewSetting({ disabled }: { readonly disabled
   const { t } = useTranslation("common");
   const { t: tSettings } = useTranslation("settings");
   const autoShow = useClientSettings((settings) => settings.browserAutoShowFloatingPreview);
-  const updateSettings = useUpdatePrimarySettings();
+  const updateSettings = useUpdateScopedSettings();
 
   return (
     <SettingsRow
@@ -1170,7 +1170,9 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
   const userProfiles = useClientSettings((settings) => settings.browserProfiles);
   const defaultProfileId = useClientSettings((settings) => settings.browserDefaultProfileId);
   const settingsHydrated = useClientSettingsHydrated();
+  // Profile edits pair with profile data on disk, so they save for this device in every scope.
   const updateSettings = useUpdatePrimarySettings();
+  const updateDefaultProfile = useUpdateScopedSettings();
   const { environments, isReady: environmentsReady } = useEnvironments();
   const primaryEnvironment = usePrimaryEnvironment();
   // Cookie import runs on this desktop, whose policy the primary environment reports.
@@ -1498,7 +1500,7 @@ function BrowserProfilesSetting({ disabled }: { readonly disabled: boolean }) {
                     disabled={!settingsHydrated || isDefault}
                     onClick={() => {
                       if (settingsHydrated) {
-                        updateSettings({ browserDefaultProfileId: profile.id });
+                        updateDefaultProfile({ browserDefaultProfileId: profile.id });
                       }
                     }}
                   >

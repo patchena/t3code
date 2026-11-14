@@ -1,7 +1,8 @@
 import { Trans, useTranslation } from "react-i18next";
 import { resolveEnvironmentMachineKind } from "@t3tools/contracts";
+import { fileBasename } from "@t3tools/shared/path";
 import { useLocation } from "@tanstack/react-router";
-import { CheckIcon, ChevronDownIcon, LayersIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, FolderIcon, LayersIcon } from "lucide-react";
 import { Fragment, useState, type ReactNode } from "react";
 
 import type { SidebarProjectSnapshot } from "~/sidebarProjectGrouping";
@@ -33,13 +34,17 @@ import {
   type SettingsScopeSearch,
 } from "~/components/settings/settingsScope";
 import {
+  ALL_CHECKOUTS_VALUE,
   ALL_ENVIRONMENTS_VALUE,
   ALL_PROJECTS_VALUE,
   environmentAxisValue,
   projectAxisValue,
   projectScopeMenuGroups,
+  selectCheckoutAxis,
   selectEnvironmentAxis,
   selectProjectAxis,
+  settingsScopeCheckoutChoices,
+  settingsScopeCheckoutLabel,
   settingsScopeEnvironmentAddress,
   settingsScopeEnvironmentLabel,
   settingsScopeEnvironmentLabels,
@@ -92,6 +97,7 @@ export function SettingsScopeSentence() {
         components={{
           project: <ProjectScopeMenu {...props} />,
           environment: <EnvironmentScopeMenu {...props} />,
+          checkout: <CheckoutScopeMenu {...props} />,
         }}
       />
     </p>
@@ -311,6 +317,46 @@ function EnvironmentScopeMenu({
         };
       })}
     />
+  );
+}
+
+function CheckoutScopeMenu({ value, groups, onChange }: SettingsScopeMenuProps) {
+  const { t } = useTranslation("settings");
+  const group = groups.find((candidate) => candidate.projectKey === value.project);
+  const checkouts = group ? settingsScopeCheckoutChoices(group, value) : [];
+  if (checkouts.length === 0) return null;
+  const selected = checkouts.find((member) => member.physicalProjectKey === value.checkout);
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span className="shrink-0">{t(($) => $.scope.inCheckout)}</span>
+      <ScopeMenu
+        ariaLabel={t(($) => $.scope.checkoutScope)}
+        icon={<FolderIcon aria-hidden className="size-3.5 shrink-0" />}
+        label={
+          selected
+            ? settingsScopeCheckoutLabel(selected, checkouts)
+            : value.checkout
+              ? t(($) => $.scope.unavailableCheckout)
+              : t(($) => $.scope.allCheckouts)
+        }
+        value={value.checkout ?? ALL_CHECKOUTS_VALUE}
+        onChange={(next) =>
+          onChange(
+            selectCheckoutAxis(
+              value,
+              checkouts.find((member) => member.physicalProjectKey === next) ?? null,
+            ),
+          )
+        }
+        searchLabel={t(($) => $.scope.searchCheckouts)}
+        allOption={{ value: ALL_CHECKOUTS_VALUE, label: t(($) => $.scope.allCheckouts) }}
+        options={checkouts.map((member) => ({
+          value: member.physicalProjectKey,
+          label: fileBasename(member.workspaceRoot),
+          secondary: member.workspaceRoot,
+        }))}
+      />
+    </span>
   );
 }
 

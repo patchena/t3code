@@ -61,6 +61,7 @@ import { type EnvironmentPresentation, useRelayEnvironmentDiscovery } from "~/st
 import { APP_VERSION } from "~/branding";
 import { useManagedPolicy } from "~/state/managedPolicy";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { useUpdateEnvironmentSettings } from "~/hooks/useSettings";
 import { serverEnvironment } from "~/state/server";
 import {
   OutdatedServerUpdateAction,
@@ -94,6 +95,9 @@ function savedBackendStatus(
     case "connecting":
       return { text: t(($) => $.saved.connecting), tone: "muted" };
     case "reconnecting":
+      if (connection.awaitingApproval) {
+        return { text: connection.error ?? t(($) => $.saved.waitingApproval), tone: "muted" };
+      }
       return {
         text: connection.error
           ? t(($) => $.saved.reconnectingError, { error: connection.error })
@@ -555,12 +559,15 @@ function T3ConnectTunnelUsage({ tunnelLimit }: { readonly tunnelLimit: number | 
 function ConfiguredCloudLinkRow({
   environmentId,
   canManageRelay,
+  connectDeviceApproval,
 }: {
   readonly environmentId: EnvironmentId;
   readonly canManageRelay: boolean;
+  readonly connectDeviceApproval: ConnectDeviceApprovalControl | null;
 }) {
   const { t } = useTranslation("connect");
   const { t: tSettings } = useTranslation("settings");
+  const updateEnvironmentSettings = useUpdateEnvironmentSettings(environmentId);
   const {
     isSignedIn,
     linkState: cloudLinkState,
@@ -782,25 +789,59 @@ function ConfiguredCloudLinkRow({
           }
         />
       ) : null}
+      {managedTunnelActive && connectDeviceApproval ? (
+        <SettingsRow
+          title={searchableSetting("connect-device-approval", tSettings).title}
+          description={t(($) => $.saved.deviceApprovalDescription)}
+          managed={connectDenial}
+          control={
+            <CloudLinkSwitch
+              ariaLabel={t(($) => $.saved.requireDeviceApproval)}
+              checked={connectDeviceApproval.required}
+              disabled={!connectDeviceApproval.canManage}
+              disabledReason={
+                connectDeviceApproval.canManage ? null : t(($) => $.saved.noAccessPermission)
+              }
+              onCheckedChange={(enabled) =>
+                updateEnvironmentSettings({ requireConnectDeviceApproval: enabled })
+              }
+            />
+          }
+        />
+      ) : null}
     </>
   );
+}
+
+/** Older servers have no device approval, so callers pass null and the row stays hidden. */
+export interface ConnectDeviceApprovalControl {
+  readonly required: boolean;
+  readonly canManage: boolean;
 }
 
 export function CloudLinkRow({
   environmentId,
   canReadRelay,
   canManageRelay,
+  connectDeviceApproval,
 }: {
   readonly environmentId: EnvironmentId;
   readonly canReadRelay: boolean;
   readonly canManageRelay: boolean;
+  readonly connectDeviceApproval: ConnectDeviceApprovalControl | null;
 }) {
   const { t } = useTranslation("connect");
   if (!hasCloudPublicConfig()) return null;
   if (!canReadRelay) {
     return <SettingsRow title="T3 Connect" description={t(($) => $.saved.relayPermissions)} />;
   }
-  return <ConfiguredCloudLinkRow environmentId={environmentId} canManageRelay={canManageRelay} />;
+  return (
+    <ConfiguredCloudLinkRow
+      environmentId={environmentId}
+      canManageRelay={canManageRelay}
+      connectDeviceApproval={connectDeviceApproval}
+    />
+  );
 }
 
 function EmptyRemoteEnvironments({ cloudEnabled = true }: { readonly cloudEnabled?: boolean }) {

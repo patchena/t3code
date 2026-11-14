@@ -752,6 +752,30 @@ export const activitySharedDe = {
       declined: "HTML-Seite darstellen: abgelehnt",
       stopped: "HTML-Seite darstellen: gestoppt",
     },
+    t3_theme_read: {
+      action: "Designs lesen",
+      running: "Designs werden gelesen",
+      completed: "Designs gelesen",
+      failed: "Designs lesen: fehlgeschlagen",
+      declined: "Designs lesen: abgelehnt",
+      stopped: "Designs lesen: gestoppt",
+    },
+    t3_theme_set: {
+      action: "Design festlegen",
+      running: "Design wird festgelegt",
+      completed: "Design festgelegt",
+      failed: "Design festlegen: fehlgeschlagen",
+      declined: "Design festlegen: abgelehnt",
+      stopped: "Design festlegen: gestoppt",
+    },
+    send_to_user: {
+      action: "Nachricht senden",
+      running: "Nachricht wird gesendet",
+      completed: "Nachricht gesendet",
+      failed: "Nachricht senden: fehlgeschlagen",
+      declined: "Nachricht senden: abgelehnt",
+      stopped: "Nachricht senden: gestoppt",
+    },
   },
   summaries: {
     "thread-send": {
@@ -1131,6 +1155,24 @@ export const activitySharedDe = {
       completed_other: "Orchestrierungsfunktionen {{count}}-mal geprüft",
       unfinished_one: "Prüfen der Orchestrierungsfunktionen {{count}}-mal versucht",
       unfinished_other: "Prüfen der Orchestrierungsfunktionen {{count}}-mal versucht",
+    },
+    "theme-read": {
+      completed_one: "Designs {{count}}-mal geprüft",
+      completed_other: "Designs {{count}}-mal geprüft",
+      unfinished_one: "Prüfen der Designs {{count}}-mal versucht",
+      unfinished_other: "Prüfen der Designs {{count}}-mal versucht",
+    },
+    "theme-set": {
+      completed_one: "Design {{count}}-mal festgelegt",
+      completed_other: "Design {{count}}-mal festgelegt",
+      unfinished_one: "Festlegen des Designs {{count}}-mal versucht",
+      unfinished_other: "Festlegen des Designs {{count}}-mal versucht",
+    },
+    "send-to-user": {
+      completed_one: "{{count}} Nachricht gesendet",
+      completed_other: "{{count}} Nachrichten gesendet",
+      unfinished_one: "Senden von {{count}} Nachricht versucht",
+      unfinished_other: "Senden von {{count}} Nachrichten versucht",
     },
   },
   compaction: {

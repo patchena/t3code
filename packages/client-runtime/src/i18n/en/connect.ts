@@ -197,6 +197,7 @@ export const connectEn = {
     environmentsEmpty: "No T3 Connect environments",
     environmentsEmptyDescription:
       "Link an environment from its local Settings to make it available through T3 Connect.",
+    retryLoad: "Retry T3 Connect",
   },
   tunnels: {
     linkUpgrade: "Link T3 Chat Pro for up to {{pro}} tunnels, or Premier for up to {{premier}}.",
@@ -287,6 +288,8 @@ export const connectEn = {
     foundAddress: "{{address}} · found automatically",
     reorderLabel: "Reorder {{route}}, position {{position}}",
     removeLabel: "Remove {{route}} route",
+    awaitingApproval: "Waiting for approval…",
+    awaitingHostApproval: "Waiting for approval on the host",
   },
   links: {
     loadFailed: "Could not load linked environments",
@@ -295,7 +298,7 @@ export const connectEn = {
     emptyDescription:
       "Link another machine running T3 Code, such as a VPS, so agents here can launch and drive threads there.",
     forgetConfirm:
-      'Forget {{environment}}? Agents here stop working there. Revoke "T3 Code · …" in {{environment}}\'s Connections to end the session there too.',
+      'Forget {{environment}}? Agents here stop working there. Revoke "T3 Code · …" in {{environment}}\'s Sharing & access to end the session there too.',
     forgetFailed: "Could not forget the link",
     expired: "Expired. Link it again with a new pairing code.",
     unreachable: "Not answering right now.",
@@ -310,15 +313,15 @@ export const connectEn = {
     link: "Link",
     title: "Link an environment",
     description:
-      "Agents here can then launch, message and wait on threads there. It appears in that environment's Connections, where it can be revoked.",
+      "Agents here can then launch, message and wait on threads there. It appears under Authorized clients in that environment's Sharing & access, where it can be revoked.",
     renew: "Already linked. Linking again renews it with the access you pick.",
     address: "Address",
     addressDescription:
       "This app has no address for {{environment}} that another machine can reach. Enter its https or Tailscale address.",
-    codeFromEnvironment: "From that environment's Connections, or t3 pair there",
+    codeFromEnvironment: "From Sharing & access there, or t3 pair",
     pasteCode: "Paste the code",
     createCode:
-      "Create a link on {{environment}}: Settings → Connections → Create link, then paste its code here.",
+      "Create a link on {{environment}}: Settings → Sharing & access → Authorized clients → Create link, then paste its code here.",
     linking: "Linking…",
     access: "What agents here may do there",
     accessDescription:
@@ -684,6 +687,11 @@ export const connectEn = {
       "Click “Add environment” to pair another environment, or connect one from T3 Connect.",
     emptyLocal: "Click “Add environment” to pair another environment.",
     linkOnHost: "Run `t3 connect link` on the host, then restart T3 Code there.",
+    waitingApproval: "Waiting for approval",
+    deviceApprovalDescription:
+      "Devices that sign in to your T3 Connect account wait until someone already connected here approves them.",
+    requireDeviceApproval: "Require approval for new T3 Connect devices",
+    noAccessPermission: "Your session does not have permission to manage access.",
   },
   add: {
     routeAdded: "Route added",
@@ -810,6 +818,12 @@ export const connectEn = {
     retry: "Retry now",
     copy: "Copy diagnostics",
     addRoute: "Add direct route",
+    approvalPending: "{{host}} is waiting for someone to approve this device",
+    approveDeviceCode:
+      "On a device already connected to {{host}}, open Settings > Sharing & access and approve the device showing {{code}}.",
+    approveDevice:
+      "On a device already connected to {{host}}, open Settings > Sharing & access and approve this device.",
+    approveCommand: "Or run `t3 auth connect-device approve {{code}}` on {{host}}.",
   },
   providerBanner: {
     install: "Open provider setup to install {{provider}} on this environment.",
@@ -893,5 +907,23 @@ export const connectEn = {
     linkExpired: "Expired",
     linked: "Linked: {{links}}",
     manageAccess: "Manage access",
+    getApp: "Get {{app}}",
+  },
+  connectDevices: {
+    fallbackName: "this device",
+    unknown: "Unknown device",
+    revokeTitle: "Revoke {{device}}?",
+    revokeAllTitle: "Revoke all other clients?",
+    requestTitle: "A device wants to connect to {{environment}}",
+    requestDescription: "{{device}}. Approve only if it shows code {{code}}.",
+    approveFailed: "Could not approve the device",
+    denyFailed: "Could not deny the device",
+    revokeFailed: "Could not revoke the device",
+    review: "Review",
+    title: "T3 Connect devices",
+    approveHint: "{{device}}. Approve only if the device in front of you shows this code.",
+    saving: "Saving…",
+    trustedSince: "Trusted since {{date}}",
+    empty: "No device has connected through T3 Connect yet.",
   },
 } as const;

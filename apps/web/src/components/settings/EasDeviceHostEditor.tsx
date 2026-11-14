@@ -208,6 +208,7 @@ export function EasDeviceHostEditor(props: {
                         : ""
                   }
                   sources={secretSources}
+                  environmentId={props.environmentId}
                   onValidityChange={(valid) => {
                     setTokenValid(valid);
                     resetAccount();

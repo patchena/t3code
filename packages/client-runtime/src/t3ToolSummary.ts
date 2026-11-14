@@ -298,6 +298,8 @@ export function summarizeT3ToolCalls(
     case "project-list":
     case "environment-read":
     case "environment-update":
+    case "theme-read":
+    case "theme-set":
     case "environment-links":
     case "environment-link":
     case "watch-pr":
@@ -308,6 +310,7 @@ export function summarizeT3ToolCalls(
     case "device":
     case "html-preview":
     case "html-render":
+    case "send-to-user":
     case "capabilities":
       label = summary(selected.length);
       break;

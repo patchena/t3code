@@ -671,7 +671,7 @@ export const chatDe = {
     linkMachine: "Rechner verknüpfen",
     linkTarget: "{{target}} verknüpfen",
     description:
-      "Agenten hier können dann Threads dort starten, ihnen Nachrichten senden und auf sie warten. Widerrufe die Verknüpfung unter Verbindungen auf diesem Rechner.",
+      "Agenten hier können dann Threads dort starten, ihnen Nachrichten senden und auf sie warten. Widerrufe die Verknüpfung auf diesem Rechner unter „Freigabe und Zugriff“.",
     machineStep: "Rechner",
     accessStep: "Zugriff",
     address: "Adresse",
@@ -680,9 +680,9 @@ export const chatDe = {
     pairingCode: "Kopplungscode",
     pasteCode: "Code einfügen",
     createCode:
-      "Erstelle auf {{target}} unter Einstellungen → Verbindungen → Link erstellen einen Link und füge seinen Code hier ein.",
+      "Erstelle auf {{target}} unter Einstellungen → Freigabe und Zugriff → Autorisierte Clients → Link erstellen einen Link und füge seinen Code hier ein.",
     alreadyLinked:
-      "Diese Umgebung ist bereits mit {{target}} verknüpft. Der Agent kann die vorhandene Verknüpfung nutzen. Ändere den Zugriff unter Einstellungen → Verbindungen.",
+      "Diese Umgebung ist bereits mit {{target}} verknüpft. Der Agent kann die vorhandene Verknüpfung nutzen. Ändere den Zugriff unter Einstellungen → Umgebungen.",
     back: "Zurück",
     linking: "Wird verknüpft…",
     useExisting: "Diese Verknüpfung nutzen",

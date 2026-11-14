@@ -152,14 +152,16 @@ export function settingsSectionLabels(
   };
 }
 
-/** Sidebar order. A group without a heading is set apart by space alone. */
+/** Sidebar order. A group with a hidden heading is set apart on screen by space alone. */
 export function settingsNavGroups(t: SettingsTranslation): ReadonlyArray<{
-  readonly heading: string | null;
+  readonly heading: string;
+  readonly headingHidden?: true;
   readonly paths: ReadonlyArray<SettingsPath>;
 }> {
   return [
     {
-      heading: null,
+      heading: t(($) => $.navigation.preferences),
+      headingHidden: true,
       paths: [
         "/settings/general",
         "/settings/appearance",
@@ -193,7 +195,8 @@ export function settingsNavGroups(t: SettingsTranslation): ReadonlyArray<{
       ],
     },
     {
-      heading: null,
+      heading: t(($) => $.navigation.more),
+      headingHidden: true,
       paths: ["/settings/maintenance", "/settings/labs", "/settings/about", "/settings/archived"],
     },
   ];
@@ -679,6 +682,15 @@ const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    id: "screen-reader-window-title",
+    title: (t) => t(($) => $.search.screenReaderWindowTitle),
+    englishTitle: resources.en.settings.search.screenReaderWindowTitle,
+    to: "/settings/chat",
+    searchTerms: [
+      "accessibility a11y screen reader nvda jaws voiceover orca narrator window title tab title alt tab taskbar thread status order working approval",
+    ],
+  },
+  {
     id: "guest-links",
     title: (t) => t(($) => $.search.guestLinks),
     englishTitle: resources.en.settings.search.guestLinks,
@@ -991,6 +1003,14 @@ const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    id: "keep-awake-while-agents-work",
+    title: (t) => t(($) => $.search.keepAwakeWhileAgentsWork),
+    englishTitle: resources.en.settings.search.keepAwakeWhileAgentsWork,
+    to: "/settings/maintenance",
+    scope: "environment-defaults",
+    searchTerms: ["caffeinate sleep prevent stay awake power laptop lid inhibit"],
+  },
+  {
     id: "background-activity",
     title: (t) => t(($) => $.search.backgroundActivity),
     englishTitle: resources.en.settings.search.backgroundActivity,
@@ -1242,6 +1262,12 @@ const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/providers",
     searchTerms: ["refresh availability versions auth state models background probes seconds off"],
     providerSettingsOnly: true,
+  },
+  {
+    id: "scheduled-tasks",
+    title: (t) => t(($) => $.navigation.scheduledTasks),
+    englishTitle: resources.en.settings.navigation.scheduledTasks,
+    to: "/settings/scheduled-tasks",
   },
   {
     id: "agent-browser-access",
@@ -1550,6 +1576,16 @@ const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["managed tunnel cloud other devices remote tunnels limit t3 chat"],
     desktopOnly: true,
     cloudOnly: true,
+  },
+  {
+    id: "connect-device-approval",
+    title: (t) => t(($) => $.search.connectDeviceApproval),
+    englishTitle: resources.en.settings.search.connectDeviceApproval,
+    to: "/settings/access",
+    targetId: "connections-environment",
+    searchTerms: ["t3 connect devices approve deny trust revoke pairing code security account"],
+    cloudOnly: true,
+    managedTunnelOnly: true,
   },
   {
     id: "hold-webhooks-while-offline",

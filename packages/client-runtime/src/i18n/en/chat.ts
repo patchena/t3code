@@ -654,7 +654,7 @@ export const chatEn = {
     linkMachine: "Link a machine",
     linkTarget: "Link {{target}}",
     description:
-      "Agents here can then launch, message and wait on threads there. Revoke it in that machine's Connections.",
+      "Agents here can then launch, message and wait on threads there. Revoke it in that machine's Sharing & access.",
     machineStep: "Machine",
     accessStep: "Access",
     address: "Address",
@@ -663,9 +663,9 @@ export const chatEn = {
     pairingCode: "Pairing code",
     pasteCode: "Paste the code",
     createCode:
-      "Create a link on {{target}}: Settings → Connections → Create link, then paste its code here.",
+      "Create a link on {{target}}: Settings → Sharing & access → Authorized clients → Create link, then paste its code here.",
     alreadyLinked:
-      "This environment is already linked to {{target}}. The agent can use that link as it is; change its access in Settings → Connections.",
+      "This environment is already linked to {{target}}. The agent can use that link as it is; change its access in Settings → Environments.",
     back: "Back",
     linking: "Linking…",
     useExisting: "Use this link",

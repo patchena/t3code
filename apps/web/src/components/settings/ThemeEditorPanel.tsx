@@ -7,6 +7,7 @@ import {
   PlusIcon,
   XIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
   ChevronUpIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
@@ -39,6 +40,7 @@ import { Switch } from "../ui/switch";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { getThemeRoleLabel, ThemeColorField } from "./ThemeColorPicker";
+import { ThemeCssEditor } from "./ThemeCssEditor";
 import {
   clearThemeInspectorHover,
   clearThemeInspectorHighlights,
@@ -328,6 +330,7 @@ type ThemeEditorError =
   | { readonly kind: "activate" }
   | { readonly kind: "collision"; readonly name: string; readonly appearance: ThemeAppearance }
   | { readonly kind: "both"; readonly name: string }
+  | { readonly kind: "css"; readonly name: string }
   | { readonly kind: "cause"; readonly cause: unknown };
 
 export function ThemeEditorPanel({
@@ -367,6 +370,8 @@ export function ThemeEditorPanel({
     Record<ThemeAppearance, boolean>
   >({ light: false, dark: false });
   const [shouldRegenerateGuidedColors, setShouldRegenerateGuidedColors] = useState(false);
+  const [css, setCss] = useState("");
+  const [cssOpen, setCssOpen] = useState(false);
   const [error, setError] = useState<ThemeEditorError | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [roleQuery, setRoleQuery] = useState("");
@@ -419,6 +424,8 @@ export function ThemeEditorPanel({
       setSimpleColorsDirtyByAppearance({ light: false, dark: false });
       setShouldRegenerateGuidedColors(sourceTheme !== null && sourceTheme.managed !== true);
       setColorsByAppearance(nextColors);
+      setCss(sourceTheme?.css ?? "");
+      setCssOpen(Boolean(sourceTheme?.css));
       setSelectedRole(null);
       setUsageCount(null);
       setIsInspecting(false);
@@ -437,6 +444,8 @@ export function ThemeEditorPanel({
             (theme.id === nameTargetId || theme.label.trim().toLowerCase() === normalizedName),
         ) ?? null);
   const takenAppearances = mergeTarget ? getThemeModes(mergeTarget) : [];
+  // A merge keeps the target's CSS when this draft has none.
+  const cssForSave = css.trim() ? css : (mergeTarget?.css ?? "");
   const editableAppearances = editingTheme ? getThemeModes(editingTheme) : null;
 
   const appearanceLockReason = (appearance: ThemeAppearance): string | null => {
@@ -478,8 +487,8 @@ export function ThemeEditorPanel({
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- applies the edited colors to the document as a live theme preview while the editor is open
   useEffect(() => {
     if (!open) return;
-    applyThemeColorPreview(colorsByAppearance[activeAppearance], activeAppearance);
-  }, [activeAppearance, colorsByAppearance, open]);
+    applyThemeColorPreview(colorsByAppearance[activeAppearance], activeAppearance, cssForSave);
+  }, [activeAppearance, colorsByAppearance, cssForSave, open]);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- restores the document theme when the editor closes or unmounts
   useEffect(() => {
@@ -789,6 +798,11 @@ export function ThemeEditorPanel({
       return;
     }
 
+    if (mergeTarget?.css && css.trim() && mergeTarget.css !== css) {
+      setError({ kind: "css", name: mergeTarget.label });
+      return;
+    }
+
     try {
       const colorsForSave = !isAdvanced
         ? {
@@ -824,6 +838,7 @@ export function ThemeEditorPanel({
               ...Object.fromEntries(editedModes.map((mode) => [mode, colorsForSave[mode]])),
             },
             ...(mergeTarget.managed === true && !isAdvanced ? { managed: true } : {}),
+            ...(cssForSave ? { css: cssForSave } : {}),
           }),
           ...(mergeTarget.collection ? { collection: mergeTarget.collection } : {}),
         });
@@ -843,6 +858,7 @@ export function ThemeEditorPanel({
               ? { variants: { [variantAppearance]: colorsForSave[variantAppearance] } }
               : {}),
             ...(isAdvanced ? {} : { managed: true }),
+            ...(cssForSave ? { css: cssForSave } : {}),
           }),
           ...(editingTheme.collection ? { collection: editingTheme.collection } : {}),
         });
@@ -864,6 +880,7 @@ export function ThemeEditorPanel({
               [activeAppearance]: colorsForSave[activeAppearance],
             },
             ...(mergeTarget.managed === true && !isAdvanced ? { managed: true } : {}),
+            ...(cssForSave ? { css: cssForSave } : {}),
           }),
           ...(mergeTarget.collection ? { collection: mergeTarget.collection } : {}),
         });
@@ -875,6 +892,7 @@ export function ThemeEditorPanel({
             appearance: activeAppearance,
             colors: colorsForSave[activeAppearance],
             ...(isAdvanced ? {} : { managed: true }),
+            ...(cssForSave ? { css: cssForSave } : {}),
           }),
         );
       }
@@ -916,7 +934,9 @@ export function ThemeEditorPanel({
               })
             : error.kind === "both"
               ? t(($) => $.extra.themeEditor.bothPalettes, { name: error.name })
-              : themeErrorMessage(error.cause, t);
+              : error.kind === "css"
+                ? t(($) => $.extra.themeEditor.cssConflict, { name: error.name })
+                : themeErrorMessage(error.cause, t);
 
   const renderNameField = () => (
     <label className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-center gap-3">
@@ -1283,6 +1303,25 @@ export function ThemeEditorPanel({
             <div className="space-y-3">
               {renderColorsHeader()}
               {renderColorFields()}
+            </div>
+            <div className="space-y-2">
+              <Button
+                aria-expanded={cssOpen}
+                size="xs"
+                variant="ghost"
+                onClick={() => setCssOpen(!cssOpen)}
+              >
+                {cssOpen ? <ChevronDownIcon /> : <ChevronRightIcon />}
+                {t(($) => $.extra.themeEditor.customCss)}
+              </Button>
+              {cssOpen ? (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    {t(($) => $.extra.themeEditor.customCssDescription)}
+                  </p>
+                  <ThemeCssEditor value={css} onChange={setCss} />
+                </>
+              ) : null}
             </div>
           </div>
           <div className="flex items-center justify-end gap-2 border-t border-border/70 px-3 py-2">

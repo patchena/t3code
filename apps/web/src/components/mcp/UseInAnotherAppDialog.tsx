@@ -701,7 +701,7 @@ function PrimaryAction({ app, mcpUrl }: { readonly app: McpApp; readonly mcpUrl:
                 children:
                   appLink === null
                     ? t(($) => $.mcp.openApp, { app: app.name })
-                    : t(($) => $.mcp.openAppWeb, { app: app.name }),
+                    : t(($) => $.mcp.getApp, { app: app.name }),
                 onClick: () => openLink(link, tCommon),
               },
             }),

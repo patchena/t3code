@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { discardComposerDraft } from "../../lib/discardComposerDraft";
+import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
 import { replaceComposerContextReferences } from "@t3tools/shared/composerContextReferences";
 import { SquarePenIcon, XIcon } from "lucide-react";
 import {
@@ -36,7 +37,9 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
   const { composer, draftId, onContextMenu, onDiscard, onNavigate } = props;
   const { t } = useTranslation("workspace");
   const promptPreview =
-    replaceComposerContextReferences(composer.prompt, (occurrence) => occurrence.label)
+    assistantCitationsToPlainText(
+      replaceComposerContextReferences(composer.prompt, (occurrence) => occurrence.label),
+    )
       .trim()
       .split("\n", 1)[0] ?? "";
   // images mirrors persistedAttachments once rehydration finishes; before

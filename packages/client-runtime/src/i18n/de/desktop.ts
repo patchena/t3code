@@ -66,6 +66,22 @@ export const desktopDe = {
     previewTitle: "Vorschau · {{title}}",
     preview: "Browservorschau",
     livePreview: "Live-Browservorschau",
+    certificate: {
+      authorityInvalid: "Keine vertrauenswürdige Stelle hat dieses Zertifikat ausgestellt.",
+      commonNameInvalid: "Dieses Zertifikat gilt nicht für diese Adresse.",
+      dateInvalid: "Dieses Zertifikat ist abgelaufen oder noch nicht gültig.",
+      trust: "Vertrauen und merken",
+      untrusted: "{{host}} hat ein nicht vertrauenswürdiges Zertifikat",
+      issuedTo: "Ausgestellt für: {{name}}",
+      issuedBy: "Ausgestellt von: {{name}}",
+      valid: "Gültig: {{start}} – {{end}}",
+      fingerprint: "Fingerabdruck: {{fingerprint}}",
+      trustHint:
+        "Vertraue ihm nur, wenn du weißt, dass dieses Zertifikat zu dieser Seite gehört. Wenn du die Cookies dieses Browserprofils löschst, wird es vergessen.",
+      saveFailedTitle: "Dem Zertifikat für {{host}} konnte nicht vertraut werden",
+      saveFailed:
+        "T3 Code konnte diese Freigabe nicht speichern, daher bleibt die Seite blockiert. Prüfe, ob der Datenträger voll ist und der Datenordner beschreibbar ist, und versuche es dann erneut.",
+    },
   },
   startup: {
     failed: "T3 Code konnte nicht gestartet werden",
