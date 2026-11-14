@@ -888,7 +888,6 @@ export const gitEn = {
   loadingPath: "Loading {{path}}...",
   linkCountsSynced: "{{open}} open · {{count}} linked · synced <time/>",
   moreRepliesLabel: "More replies",
-  completedChecks: "{{done}}/{{total}} checks",
   copyRequestNumber: "Copy {{term}} number",
   hiddenTestFiles_one: "{{count}} test file hidden",
   hiddenTestFiles_other: "{{count}} test files hidden",

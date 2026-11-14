@@ -147,8 +147,6 @@ export const settingsExtraEn = {
     importDescription: "Add actions declared by this checkout without editing them first.",
     addAction: "Add action",
     differentActions: "Different actions across checkouts",
-    chooseEnvironment:
-      "Choose one environment to edit its list. Adding an action here adds it on every selected environment.",
     invalidConfig: "t3.json is invalid",
     invalidDescription:
       "A t3.json exists in this checkout but fails to parse, so every action and icon it declares is ignored. Check the JSON syntax and icon values.",
@@ -652,7 +650,6 @@ export const settingsExtraEn = {
     weekdays: "Weekdays",
     notScheduled: "Not scheduled",
     underMinute: "in under a minute",
-    title: "Scheduled tasks",
     newTask: "New task",
     unavailableSelection: "Unavailable selection",
     noEnvironments: "No environments available",

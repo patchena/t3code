@@ -3,7 +3,6 @@ export const toolsDe = {
   forward: "Vorwärts",
   stop: "Stoppen",
   refresh: "Aktualisieren",
-  loading: "Wird geladen…",
   cancel: "Abbrechen",
   continue: "Weiter",
   done: "Fertig",

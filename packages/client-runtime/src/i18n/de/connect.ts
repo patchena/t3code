@@ -937,7 +937,6 @@ export const connectDe = {
     copyFailed: "Kopieren fehlgeschlagen",
     useAnotherWay: "Nutze „Anders einrichten“.",
     openApp: "{{app}} öffnen",
-    openAppWeb: "{{app}} im Web öffnen",
     codeFailed: "Von {{environment}} konnte kein Code abgerufen werden. Versuch es erneut.",
     codeToApprove: "Code zum Erlauben von <level/>",
     gettingCode: "Code wird abgerufen…",

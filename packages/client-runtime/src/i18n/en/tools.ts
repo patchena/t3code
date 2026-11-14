@@ -3,7 +3,6 @@ export const toolsEn = {
   forward: "Forward",
   stop: "Stop",
   refresh: "Refresh",
-  loading: "Loading…",
   cancel: "Cancel",
   continue: "Continue",
   done: "Done",

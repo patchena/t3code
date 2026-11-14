@@ -640,7 +640,6 @@ export const composerDe = {
   attachmentUploadFailed: "Der Upload des Anhangs „{{name}}“ ist fehlgeschlagen.",
   imageAttachment: "Bildanhang",
   preparingAttachment: "Wird vorbereitet",
-  stopped: "Gestoppt",
   stopping: "Wird gestoppt",
   stoppingTooltip: "Wird gestoppt…",
   replyingTo: "Antwort auf",

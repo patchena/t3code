@@ -895,7 +895,6 @@ export const connectEn = {
     copyFailed: "Could not copy",
     useAnotherWay: "Use Set up another way.",
     openApp: "Open {{app}}",
-    openAppWeb: "Open {{app}} on the web",
     codeFailed: "Could not get a code from {{environment}}. Try again.",
     codeToApprove: "Code to approve <level/>",
     gettingCode: "Getting code…",

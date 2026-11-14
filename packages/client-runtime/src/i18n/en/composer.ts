@@ -606,7 +606,6 @@ export const composerEn = {
   attachmentUploadFailed: "Attachment '{{name}}' failed to upload.",
   imageAttachment: "Image attachment",
   preparingAttachment: "Preparing",
-  stopped: "Stopped",
   stopping: "Stopping",
   stoppingTooltip: "Stopping…",
   replyingTo: "Replying to",

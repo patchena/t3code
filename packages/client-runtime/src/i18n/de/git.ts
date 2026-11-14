@@ -916,7 +916,6 @@ export const gitDe = {
   loadingPath: "{{path}} wird geladen...",
   linkCountsSynced: "{{open}} offen · {{count}} verknüpft · synchronisiert <time/>",
   moreRepliesLabel: "Weitere Antworten",
-  completedChecks: "{{done}}/{{total}} Prüfungen",
   copyRequestNumber: "{{term}}-Nummer kopieren",
   hiddenTestFiles_one: "{{count}} Testdatei ausgeblendet",
   hiddenTestFiles_other: "{{count}} Testdateien ausgeblendet",

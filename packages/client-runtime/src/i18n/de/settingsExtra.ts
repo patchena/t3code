@@ -155,8 +155,6 @@ export const settingsExtraDe = {
       "Füge in diesem Checkout definierte Aktionen ohne vorherige Bearbeitung hinzu.",
     addAction: "Aktion hinzufügen",
     differentActions: "Unterschiedliche Aktionen je Checkout",
-    chooseEnvironment:
-      "Wähle eine Umgebung, um ihre Liste zu bearbeiten. Hier hinzugefügte Aktionen werden allen ausgewählten Umgebungen hinzugefügt.",
     invalidConfig: "t3.json ist ungültig",
     invalidDescription:
       "In diesem Checkout liegt eine nicht lesbare t3.json. Alle darin definierten Aktionen und Symbole werden deshalb ignoriert. Prüfe die JSON-Syntax und Symbolwerte.",
@@ -677,7 +675,6 @@ export const settingsExtraDe = {
     weekdays: "Werktags",
     notScheduled: "Nicht geplant",
     underMinute: "in weniger als einer Minute",
-    title: "Geplante Aufgaben",
     newTask: "Neue Aufgabe",
     unavailableSelection: "Auswahl nicht verfügbar",
     noEnvironments: "Keine Umgebungen verfügbar",
