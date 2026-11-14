@@ -1513,6 +1513,7 @@ export const settingsExtraEn = {
     invalidColor:
       'The color for "{{role}}" must be a literal CSS color such as oklch(0.62 0.2 280).',
     unsupportedVersion: "This theme file uses an unsupported version. Expected {{version}}.",
+    cssTooLong: "Theme CSS must be text of {{maxLength}} characters or fewer.",
     baseAppearance: 'Theme variants must not repeat the base appearance "{{appearance}}".',
     invalidJson: "{{subject}} is not valid JSON.",
     missingFile: "{{subject}} is missing from the extension package.",

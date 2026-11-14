@@ -75,6 +75,7 @@ const ThemeErrorDetail = Schema.Union([
     role: Schema.String,
   }),
   Schema.Struct({ kind: Schema.Literal("unsupportedVersion"), version: Schema.Number }),
+  Schema.Struct({ kind: Schema.Literal("cssTooLong"), maxLength: Schema.Number }),
   Schema.Struct({
     kind: Schema.Literal("baseAppearance"),
     appearance: Schema.Literals(["light", "dark"]),

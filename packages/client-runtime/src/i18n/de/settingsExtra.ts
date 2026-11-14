@@ -1566,6 +1566,7 @@ export const settingsExtraDe = {
       "Die Farbe für „{{role}}“ muss eine direkte CSS-Farbe wie oklch(0.62 0.2 280) sein.",
     unsupportedVersion:
       "Diese Designdatei verwendet eine nicht unterstützte Version. Erwartet wird {{version}}.",
+    cssTooLong: "Design-CSS muss Text mit höchstens {{maxLength}} Zeichen sein.",
     baseAppearance:
       "Designvarianten dürfen die Basisdarstellung „{{appearance}}“ nicht wiederholen.",
     invalidJson: "{{subject}} ist kein gültiges JSON.",

@@ -32,6 +32,8 @@ export function themeErrorMessage(error: unknown, t: TFunction<"settings">): str
       return t(($) => $.extra.themeErrors.invalidColor, { role: detail.role });
     case "unsupportedVersion":
       return t(($) => $.extra.themeErrors.unsupportedVersion, { version: detail.version });
+    case "cssTooLong":
+      return t(($) => $.extra.themeErrors.cssTooLong, { maxLength: detail.maxLength });
     case "baseAppearance":
       return t(($) => $.extra.themeErrors.baseAppearance, { appearance: detail.appearance });
     case "invalidJson":
