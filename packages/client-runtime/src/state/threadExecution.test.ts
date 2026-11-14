@@ -38,6 +38,7 @@ import {
   presentProviderGoal,
   presentRunStop,
   threadRuntimeHasInterruptibleRun,
+  providerStartingText,
 } from "./threadExecution.ts";
 
 const now = DateTime.makeUnsafe("2026-07-28T10:00:00.000Z");
@@ -341,10 +342,10 @@ describe("thread execution presentation", () => {
     };
     const starting = { ...v2Projection, runs: [openRun], providerSessions: [session] };
 
-    expect(deriveThreadActivityRun(starting)?.providerStartingLabel).toBe("Starting Claude");
+    expect(deriveThreadActivityRun(starting)?.providerStarting).toEqual({ provider: "Claude" });
     expect(
-      deriveThreadActivityRun({ ...starting, providerSessions: [] })?.providerStartingLabel,
-    ).toBe("Starting");
+      deriveThreadActivityRun({ ...starting, providerSessions: [] })?.providerStarting,
+    ).toEqual({ provider: null });
     expect(
       deriveThreadActivityRun({
         ...starting,
@@ -361,8 +362,17 @@ describe("thread execution presentation", () => {
             completedAt: null,
           },
         ],
-      })?.providerStartingLabel,
+      })?.providerStarting,
     ).toBeUndefined();
+    for (const language of ["en", "de"] as const) {
+      const t = createI18n(language).getFixedT(language, "activity");
+      expect(providerStartingText({ provider: "Claude" }, t)).toBe(
+        language === "en" ? "Starting Claude" : "Claude wird gestartet",
+      );
+      expect(providerStartingText({ provider: null }, t)).toBe(
+        language === "en" ? "Starting" : "Wird gestartet",
+      );
+    }
   });
 
   it("presents a held queue as the stopped run instead of queued work", () => {

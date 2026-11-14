@@ -42,6 +42,7 @@ import * as DateTime from "effect/DateTime";
 
 import {
   threadRuntimeIsActive,
+  type ProviderStarting,
   type ThreadRunSummary,
   type ThreadRuntimeSummary,
   type ThreadStructure,
@@ -108,15 +109,20 @@ function latestMatchingRun(
   );
 }
 
-function providerStartingLabel(
+function providerStarting(
   projection: ThreadStructure,
   run: OrchestrationV2ThreadProjection["runs"][number],
-): string {
+): ProviderStarting {
   const driver = projection.providerSessions.findLast(
     (session) => session.providerInstanceId === run.providerInstanceId,
   )?.driver;
-  const name = driver === undefined ? undefined : PROVIDER_DISPLAY_NAMES[driver];
-  return name === undefined ? "Starting" : `Starting ${name}`;
+  return { provider: (driver === undefined ? undefined : PROVIDER_DISPLAY_NAMES[driver]) ?? null };
+}
+
+export function providerStartingText(starting: ProviderStarting, t: TFunction<"activity">): string {
+  return starting.provider === null
+    ? t(($) => $.status.starting)
+    : t(($) => $.status.startingProvider, { provider: starting.provider });
 }
 
 function summarizeThreadRun(
@@ -140,7 +146,7 @@ function summarizeThreadRun(
     // the provider can still be launching for minutes.
     ...(turnStatus === undefined
       ? PROVIDER_STARTING_RUN_STATUSES.has(run.status)
-        ? { providerStartingLabel: providerStartingLabel(projection, run) }
+        ? { providerStarting: providerStarting(projection, run) }
         : {}
       : turnStatus === "pending" || turnStatus === "running"
         ? {}

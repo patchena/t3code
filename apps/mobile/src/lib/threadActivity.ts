@@ -7,6 +7,8 @@ import { linkRequestTargetName } from "@t3tools/client-runtime/link-request";
 import { turnItemIsWorkspacePreparation } from "@t3tools/client-runtime/state/turn-item-presentation";
 import type { ThreadCheckpointSummary } from "@t3tools/client-runtime/state/thread-checkpoints";
 import { formatSubagentDisplayTitle } from "@t3tools/client-runtime/state/subagent-display";
+import type { ProviderStarting } from "@t3tools/client-runtime/state/models";
+import { providerStartingText } from "@t3tools/client-runtime/state/thread-execution";
 import {
   isLiveSubagentTurnItem,
   waitingOnSubagentsLabel,
@@ -271,7 +273,7 @@ export interface ThreadFeedLatestRun {
   readonly startedAt: string | null;
   readonly completedAt: string | null;
   readonly turnEnded?: boolean;
-  readonly providerStartingLabel?: string;
+  readonly providerStarting?: ProviderStarting;
 }
 
 /** Long Android headers can ANR despite one-line display; cap labels only, preserving expanded and copied text. */
@@ -1430,7 +1432,7 @@ function latestRunsEqual(left: ThreadFeedLatestRun | null, right: ThreadFeedLate
       left.startedAt === right.startedAt &&
       left.completedAt === right.completedAt &&
       left.turnEnded === right.turnEnded &&
-      left.providerStartingLabel === right.providerStartingLabel)
+      left.providerStarting?.provider === right.providerStarting?.provider)
   );
 }
 
@@ -1836,7 +1838,9 @@ export function deriveThreadFeedPresentation(
         activeWorkStartedAt,
         activeRunId,
         waitingOn > 0 ? waitingOnSubagentsLabel(waitingOn) : zen ? liveAnswerPreview(feed) : null,
-        latestRun?.providerStartingLabel,
+        latestRun?.providerStarting === undefined
+          ? undefined
+          : providerStartingText(latestRun.providerStarting, activityT),
       ),
     );
   }

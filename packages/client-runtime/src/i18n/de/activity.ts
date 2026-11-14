@@ -32,6 +32,7 @@ export const activityDe = {
     needsInput: "Benötigt deine Eingabe",
     working: "Arbeitet",
     notStarted: "nicht gestartet",
+    startingProvider: "{{provider}} wird gestartet",
   },
   providerStatus: {
     idle: "Untätig",

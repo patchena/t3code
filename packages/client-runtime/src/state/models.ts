@@ -78,6 +78,10 @@ export interface EnvironmentThreadStructure {
   readonly projection: ThreadStructure;
 }
 
+export interface ProviderStarting {
+  readonly provider: string | null;
+}
+
 export interface ThreadRunSummary {
   readonly runId: RunId;
   readonly status: OrchestrationV2RunStatus;
@@ -95,7 +99,7 @@ export interface ThreadRunSummary {
    * provider is still launching and nothing is generating. Clients show it
    * instead of "Thinking".
    */
-  readonly providerStartingLabel?: string;
+  readonly providerStarting?: ProviderStarting;
   readonly sourcePlanRef?: {
     readonly threadId: ThreadId;
     readonly planId: PlanId;
