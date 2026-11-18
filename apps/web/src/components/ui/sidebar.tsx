@@ -520,11 +520,13 @@ function Sidebar({
         />
         <div
           className={cn(
-            "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) md:flex group-data-[peek=true]:z-50 group-data-[peek=true]:shadow-lg",
+            "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) md:flex group-data-[peek=true]:z-50 group-data-[peek=true]:shadow-sidebar-peek dark:group-data-[peek=true]:shadow-sidebar-peek-dark",
+            "group-data-[peek=true]:before:absolute group-data-[peek=true]:before:inset-0 group-data-[peek=true]:before:-z-1 group-data-[peek=true]:before:rounded-[inherit] group-data-[peek=true]:before:bg-sidebar/(--glass-opacity) group-data-[peek=true]:before:backdrop-blur-(--glass-blur) group-data-[peek=true]:before:backdrop-saturate-(--glass-saturation)",
+            "group-data-[peek=true]:after:pointer-events-none group-data-[peek=true]:after:absolute group-data-[peek=true]:after:inset-0 group-data-[peek=true]:after:rounded-[inherit] group-data-[peek=true]:after:border-sidebar-border",
             "[[data-panel-animations=true]_&]:transition-[left,right,width] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
             side === "left"
-              ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
-              : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
+              ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] group-data-[peek=true]:rounded-r-xl group-data-[peek=true]:after:-right-px group-data-[peek=true]:has-[[data-slot=sidebar-rail]:hover]:after:border-r-2"
+              : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] group-data-[peek=true]:rounded-l-xl group-data-[peek=true]:after:-left-px group-data-[peek=true]:has-[[data-slot=sidebar-rail]:hover]:after:border-l-2",
             variant === "floating" || variant === "inset"
               ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
               : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
@@ -535,7 +537,7 @@ function Sidebar({
           {...props}
         >
           <div
-            className="flex h-full w-full flex-col bg-sidebar surface-grain group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
+            className="flex h-full w-full flex-col bg-sidebar surface-grain group-data-[peek=true]:overflow-clip group-data-[peek=true]:rounded-[inherit] group-data-[peek=true]:bg-transparent group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
             data-sidebar="sidebar"
             data-slot="sidebar-inner"
           >
@@ -708,7 +710,7 @@ function SidebarRail({
               /* A collapsed offcanvas rail overlaps the native scrollbar on Windows and Linux. */
               "-translate-x-1/2 group-data-[side=left]:-right-4 absolute inset-y-0 z-20 hidden w-4 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=right]:left-0 sm:flex [[data-collapsible=offcanvas][data-state=collapsed]_&]:pointer-events-none",
               "[[data-panel-animations=true]_&]:transition-all [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
-              "touch-none",
+              "touch-none group-data-[peek=true]:after:hidden",
               canResize
                 ? "cursor-col-resize"
                 : "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize [[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
