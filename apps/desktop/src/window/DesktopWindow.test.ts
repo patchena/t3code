@@ -1218,17 +1218,39 @@ describe("DesktopWindow", () => {
       maximized: false,
     },
     {
-      state: "fullscreen read unmaximized before entering it",
+      state: "fullscreen entered after a Linux move read unmaximized",
+      platform: "linux",
       fullScreen: true,
       saved: true,
-      before: [["move", false]],
+      before: [["move", "windowed"]],
+      maximized: true,
+    },
+    {
+      state: "fullscreen entered after a macOS title-bar drag unzoomed it",
+      fullScreen: true,
+      saved: true,
+      before: [["move", "windowed"]],
+      maximized: false,
+    },
+    {
+      state: "fullscreen resized on macOS",
+      fullScreen: true,
+      saved: true,
+      before: [["resize", "fullscreen"]],
+      maximized: true,
+    },
+    {
+      state: "fullscreen entered after a macOS resize while minimized",
+      fullScreen: true,
+      saved: true,
+      before: [["resize", "minimized"]],
       maximized: true,
     },
     {
       state: "fullscreen entered after a macOS edge resize unzoomed it",
       fullScreen: true,
       saved: true,
-      before: [["resize", false]],
+      before: [["resize", "windowed"]],
       maximized: false,
     },
     {
@@ -1236,21 +1258,21 @@ describe("DesktopWindow", () => {
       platform: "linux",
       fullScreen: true,
       saved: true,
-      before: [["resize", false]],
+      before: [["resize", "windowed"]],
       maximized: true,
     },
     {
       state: "fullscreen entered from maximized",
       fullScreen: true,
       saved: true,
-      before: [["unmaximize", true]],
+      before: [["unmaximize", "fullscreen"]],
       maximized: true,
     },
     {
       state: "fullscreen entered after unmaximizing",
       fullScreen: true,
       saved: true,
-      before: [["unmaximize", false]],
+      before: [["unmaximize", "windowed"]],
       maximized: false,
     },
   ] as const)(
@@ -1283,16 +1305,18 @@ describe("DesktopWindow", () => {
           const desktopWindow = yield* DesktopWindow.DesktopWindow;
           yield* desktopWindow.handleBackendReady(new URL("http://127.0.0.1:3773"));
 
-          for (const [eventName, duringFullScreen] of before) {
+          for (const [eventName, during] of before) {
             const listener = fakeWindow.windowListeners.get(eventName);
             if (!listener) {
               return yield* Effect.die(`window ${eventName} listener was not registered`);
             }
-            fakeWindow.isFullScreen.mockReturnValue(duringFullScreen);
+            fakeWindow.isFullScreen.mockReturnValue(during === "fullscreen");
+            fakeWindow.isMinimized.mockReturnValue(during === "minimized");
             fakeWindow.isMaximized.mockReturnValue(false);
             listener();
           }
           fakeWindow.isFullScreen.mockReturnValue(fullScreen);
+          fakeWindow.isMinimized.mockReturnValue(false);
           fakeWindow.isMaximized.mockReturnValue(!fullScreen && maximized);
           const normalBoundsReads = fakeWindow.getNormalBounds.mock.calls.length;
           const close = fakeWindow.windowListeners.get("close");

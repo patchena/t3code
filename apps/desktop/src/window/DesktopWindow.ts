@@ -839,13 +839,14 @@ export const make = Effect.gen(function* () {
       event.preventDefault();
       window.setTitle(environment.displayName);
     });
-    window.on("resize", () => {
+    const trackBounds = () => {
       if (environment.platform === "darwin" && !window.isFullScreen() && !window.isMinimized()) {
         maximizedOutsideFullScreen = window.isMaximized();
       }
       scheduleBoundsPersist();
-    });
-    window.on("move", scheduleBoundsPersist);
+    };
+    window.on("resize", trackBounds);
+    window.on("move", trackBounds);
     const trackMaximized = (maximized: boolean) => {
       if (!window.isFullScreen()) maximizedOutsideFullScreen = maximized;
       scheduleBoundsPersist();
