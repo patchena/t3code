@@ -1,4 +1,6 @@
-import { useTranslation } from "react-i18next";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { heldPullRequestListEntriesAtom } from "@t3tools/client-runtime/state/pull-requests";
+import { AsyncResult, Atom } from "effect/reactivity";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { applyPullRequestDraftFilterChange } from "@t3tools/client-runtime/pull-request-query";
 import { Spinner } from "~/components/ui/spinner";
@@ -22,6 +24,9 @@ import type {
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { ArrowDownUpIcon, LayersIcon, Plug2Icon } from "lucide-react";
+import { msg, T, useGT, useMessages } from "gt-react";
+
+import { m } from "~/i18n/messages";
 import { useEffect, useEffectEvent, useRef, useState, type ComponentProps } from "react";
 
 import {
@@ -47,62 +52,59 @@ import {
   settlePullRequestOverrides,
   comparePullRequestsByRecency,
   largestPullRequestReadCount,
-} from "~/components/pullRequest/pullRequestList.logic";
+} from "./pullRequestList.logic";
 import {
   pullRequestListPreferences,
   type PullRequestListPreferencePatch,
   writePullRequestListPreferences,
-} from "~/components/pullRequest/pullRequestListPreferences";
-import { environmentMachineIcon } from "~/components/EnvironmentMachineIcon";
-import { PullRequestDetailPanel } from "~/components/pullRequest/PullRequestDetailPanel";
+} from "./pullRequestListPreferences";
+import { SavedViewsMenu } from "../SavedViewsMenu";
+import { PULL_REQUEST_SAVED_VIEWS, pullRequestSavedViewPatch } from "./pullRequestSavedViews";
+import { environmentMachineIcon } from "../EnvironmentMachineIcon";
+import { PullRequestDetailPanel } from "./PullRequestDetailPanel";
 import {
   PullRequestFiltersMenu,
   PullRequestSearchInput,
   pullRequestHostLabel,
   pullRequestProjectKey,
   type PullRequestFilterOption,
-} from "~/components/pullRequest/PullRequestListFilters";
-import { PullRequestCompactFilterMenu } from "~/components/pullRequest/PullRequestCompactFilterMenu";
+} from "./PullRequestListFilters";
+import { PullRequestCompactFilterMenu } from "./PullRequestCompactFilterMenu";
 import {
   INVOLVEMENT_TABS,
+  resolveFilterOptions,
   SORT_OPTIONS,
   STATE_TABS,
-} from "~/components/pullRequest/pullRequestListOptions";
-import { PullRequestsColumn } from "~/components/pullRequest/PullRequestsColumn";
-import { PullRequestListGroups } from "~/components/pullRequest/PullRequestListGroups";
-import { pullRequestPanelReference } from "~/components/pullRequest/usePullRequestDetail";
-import { usePullRequestIntentPrefetch } from "~/components/pullRequest/usePullRequestIntentPrefetch";
+} from "./pullRequestListOptions";
+import { PullRequestsColumn } from "./PullRequestsColumn";
+import { PullRequestListGroups } from "./PullRequestListGroups";
+import { pullRequestPanelReference } from "./usePullRequestDetail";
+import { usePullRequestIntentPrefetch } from "./usePullRequestIntentPrefetch";
 import {
   usePullRequestDisplayGroups,
   usePullRequestQueryFilters,
   usePullRequestScope,
   type PullRequestsSearch,
-} from "~/components/pullRequest/usePullRequestListView";
-import {
-  pullRequestGroups,
-  pullRequestListEntryId,
-} from "~/components/pullRequest/pullRequestListGroups.logic";
-import { PullRequestListEmptyState } from "~/components/pullRequest/PullRequestListEmptyState";
-import { PullRequestListGhost } from "~/components/pullRequest/PullRequestGhosts";
-import { type PullRequestRowTarget } from "~/components/pullRequest/PullRequestRow";
-import { PullRequestsUnavailableState } from "~/components/pullRequest/PullRequestsUnavailableState";
-import { RightPanelTabs } from "~/components/RightPanelTabs";
+} from "./usePullRequestListView";
+import { pullRequestGroups, pullRequestListEntryId } from "./pullRequestListGroups.logic";
+import { PullRequestListEmptyState } from "./PullRequestListEmptyState";
+import { PullRequestListGhost } from "./PullRequestGhosts";
+import { type PullRequestRowTarget } from "./PullRequestRow";
+import { PullRequestsUnavailableState } from "./PullRequestsUnavailableState";
+import { RightPanelTabs } from "../RightPanelTabs";
 import { isCommandPaletteOpen } from "~/commandPaletteBus";
 import { isElectron } from "~/env";
 import { resolveShortcutCommand, shortcutLabelForCommand } from "~/keybindings";
 import { registerCommands } from "~/shortcuts/dispatcher";
 import { isTerminalFocused } from "~/lib/terminalFocus";
-import {
-  PanelLayoutControls,
-  RightPanelMaximizeControl,
-} from "~/components/chat/PanelLayoutControls";
-import { Button } from "~/components/ui/button";
-import { SidebarInset, useMobileSidebarSheetMounted } from "~/components/ui/sidebar";
+import { PanelLayoutControls, RightPanelMaximizeControl } from "../chat/PanelLayoutControls";
+import { Button } from "../ui/button";
+import { SidebarInset, useMobileSidebarSheetMounted } from "../ui/sidebar";
 import { useLiveRefresh } from "~/hooks/useLiveRefresh";
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { useOpenPanelPullRequestUrl } from "~/hooks/useOpenPanelPullRequestUrl";
-import { clipboardErrorMessage, writeTextToClipboard } from "~/hooks/useCopyToClipboard";
-import { toastManager } from "~/components/ui/toast";
+import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
+import { toastManager } from "../ui/toast";
 import { usePanelAnimationSettings, usePanelPresence } from "~/panelAnimations";
 import {
   PULL_REQUESTS_PANEL_REF,
@@ -115,7 +117,7 @@ import {
 import { useSidebarProjectGroups } from "~/hooks/useSidebarProjectGroups";
 import {
   pullRequestEnvironment,
-  usePullRequestList,
+  usePullRequestHostList,
   usePullRequestListStats,
   restoredPullRequestList,
   usePullRequestTurnRefreshes,
@@ -130,7 +132,9 @@ import {
   rememberPullRequestHosts,
   resetPullRequestHosts,
   type PullRequestHostRead,
-} from "~/components/pullRequest/pullRequestProjectAssignment.logic";
+} from "./pullRequestProjectAssignment.logic";
+
+import { changeRequestTermKind } from "./changeRequestTerm";
 
 function getShortcutContext() {
   return {
@@ -158,9 +162,38 @@ const EMPTY_PREVIEW_SESSIONS = {};
 const EMPTY_PREVIEW_DESKTOP_STATE = {};
 const EMPTY_TERMINAL_LABELS = new Map<string, string>();
 const EMPTY_PENDING_SURFACES = new Set<string>();
+const heldRowReaders = new WeakMap<
+  EnvironmentPullRequestEntry,
+  Map<string, ReturnType<typeof heldPullRequestListEntriesAtom<EnvironmentPullRequestEntry>>>
+>();
+
+function usePendingListEntries(
+  input: PullRequestListInput,
+  entries: ReadonlyArray<EnvironmentPullRequestEntry> | undefined,
+) {
+  const key = JSON.stringify(input);
+  return useAtomValue(
+    Atom.make((get) =>
+      (entries ?? []).flatMap((entry) => {
+        let readers = heldRowReaders.get(entry);
+        if (readers === undefined) {
+          readers = new Map();
+          heldRowReaders.set(entry, readers);
+        }
+        let reader = readers.get(key);
+        if (reader === undefined) {
+          reader = heldPullRequestListEntriesAtom(entry.environmentId, input, [entry]);
+          readers.set(key, reader);
+        }
+        return AsyncResult.getOrElse(get(reader), () => []);
+      }),
+    ),
+  );
+}
+
 export function PullRequestsPage() {
-  const { t } = useTranslation("workspace");
-  const { t: tCommon } = useTranslation("common");
+  const gt = useGT();
+  const resolve = useMessages();
   const search = useSearch({ from: "/_chat/pull-requests" });
   const sort = search.sort ?? "ready";
   const statsPolicy: PullRequestStatsPolicy =
@@ -354,7 +387,7 @@ export function PullRequestsPage() {
       ];
     });
   const listTargets = listTargetsFor(environmentQueries);
-  const listQuery = usePullRequestList(listTargets);
+  const listQuery = usePullRequestHostList(listTargets);
 
   /**
    * Kept as its own read rather than remembered from an earlier answer because an answer cannot
@@ -375,7 +408,7 @@ export function PullRequestsPage() {
       } satisfies PullRequestListInput,
     }));
   const baselineTargets = baselineTargetsFor(environmentQueries);
-  const baselineQuery = usePullRequestList(baselineTargets);
+  const baselineQuery = usePullRequestHostList(baselineTargets);
   const observedHosts = rememberPullRequestHosts(
     rememberPullRequestHosts(hostReads, baselineQuery.observations),
     listQuery.observations,
@@ -400,7 +433,7 @@ export function PullRequestsPage() {
       } satisfies PullRequestListInput,
     }));
   })();
-  const facetQuery = usePullRequestList(facetTargets);
+  const facetQuery = usePullRequestHostList(facetTargets);
   const filterOptionScope = environmentQueries.map(({ environmentId, projectIds }) => ({
     environmentId,
     input: {
@@ -436,8 +469,8 @@ export function PullRequestsPage() {
       }));
     return { authored: targetsFor("authored"), reviewing: targetsFor("reviewing") };
   })();
-  const authoredQuery = usePullRequestList(partitionTargets.authored);
-  const reviewingQuery = usePullRequestList(partitionTargets.reviewing);
+  const authoredQuery = usePullRequestHostList(partitionTargets.authored);
+  const reviewingQuery = usePullRequestHostList(partitionTargets.reviewing);
   const invalidate = useAtomCommand(pullRequestEnvironment.invalidate, { reportFailure: false });
   const [detailRefreshToken, setDetailRefreshToken] = useState(0);
   const [invalidating, setInvalidating] = useState(false);
@@ -716,6 +749,23 @@ export function PullRequestsPage() {
     search.state,
   );
 
+  const heldEntries = ordered?.key === filterKey ? ordered.entries : (listData?.entries ?? []);
+  const overlayInput = { state: search.state, filters };
+  const shownEntries = usePendingListEntries(overlayInput, heldEntries);
+  const shownBaseline = usePendingListEntries(
+    overlayInput,
+    typedParsed.filters.checks === undefined ? baselineQuery.data?.entries : undefined,
+  );
+  const shownAuthored = usePendingListEntries(
+    overlayInput,
+    partitionsWanted ? authoredQuery.data?.entries : undefined,
+  );
+  const shownReviewing = usePendingListEntries(
+    overlayInput,
+    partitionsWanted ? reviewingQuery.data?.entries : undefined,
+  );
+  const shownHeldAuthored = usePendingListEntries(overlayInput, heldPartitions?.authored);
+  const shownHeldReviewing = usePendingListEntries(overlayInput, heldPartitions?.reviewing);
   const scrollRef = useRef<HTMLDivElement>(null);
   const {
     entries,
@@ -723,29 +773,32 @@ export function PullRequestsPage() {
     groups,
     entriesByStatsKey,
     heldPullRequestsBySurface,
-  } = pullRequestGroups(
-    {
-      known: ordered?.key === filterKey ? ordered.entries : (listData?.entries ?? []),
-      // The baseline was read without typed qualifiers, and rows cannot be checked for `checks:`.
-      baseline: typedParsed.filters.checks === undefined ? baselineQuery.data?.entries : undefined,
-      providers: baselineQuery.data?.providers ?? listData?.providers ?? [],
-      viewers,
-      involvement: search.involvement,
-      localFilters,
-      hasLocalFilters,
-      text: typedParsed.text,
-      answeredLocally: querySettled && !showingCarried,
-      baselineEmpty,
-      held:
-        loaded !== null && loaded.environmentKey === environmentKey && loaded.scope === scopeKey
-          ? loaded.partitions
-          : undefined,
-      authored: partitionsWanted ? authoredQuery.data?.entries : undefined,
-      reviewing: partitionsWanted ? reviewingQuery.data?.entries : undefined,
-      partitionsWanted,
-    },
-    t,
-  );
+  } = pullRequestGroups({
+    known: shownEntries,
+    // The baseline was read without typed qualifiers, and rows cannot be checked for `checks:`.
+    baseline:
+      typedParsed.filters.checks === undefined && baselineQuery.data !== null
+        ? shownBaseline
+        : undefined,
+    providers: baselineQuery.data?.providers ?? listData?.providers ?? [],
+    viewers,
+    involvement: search.involvement,
+    localFilters,
+    hasLocalFilters,
+    text: typedParsed.text,
+    answeredLocally: querySettled && !showingCarried,
+    baselineEmpty,
+    held:
+      heldPartitions === undefined
+        ? undefined
+        : {
+            authored: shownHeldAuthored,
+            reviewing: shownHeldReviewing,
+          },
+    authored: partitionsWanted && authoredQuery.data !== null ? shownAuthored : undefined,
+    reviewing: partitionsWanted && reviewingQuery.data !== null ? shownReviewing : undefined,
+    partitionsWanted,
+  });
 
   const visibleStatsKeys = useRef({ key: filterKey, values: new Set<string>() });
   const [statsByRow, setStatsByRow] = useState<PullRequestDiffStats>(() => new Map());
@@ -1151,6 +1204,8 @@ export function PullRequestsPage() {
   const searchInput = (
     <PullRequestSearchInput
       value={search.q ?? ""}
+      label={gt("Search pull requests")}
+      placeholder={gt("Search pull requests, or label:bug")}
       busy={typedQuery.length > 0 && (!querySettled || showingCarried)}
       onChange={(query) => updateListScope({ q: query || undefined })}
       onSubmit={submitQuery}
@@ -1170,7 +1225,7 @@ export function PullRequestsPage() {
       rightPanelAvailable={rightPanelAvailable}
       rightPanelOpen={rightPanelState.isOpen}
       rightPanelShortcutLabel={shortcutLabelForCommand(keybindings, "rightPanel.toggle")}
-      rightPanelUnavailableLabel={t(($) => $.git.selectRequestFirst)}
+      rightPanelUnavailableLabel={gt("Select a pull request first")}
       onToggleTerminal={() => undefined}
       onToggleRightPanel={toggleRightPanel}
     />
@@ -1192,6 +1247,9 @@ export function PullRequestsPage() {
       {panelToggleControls}
     </div>
   );
+  const listError = listQuery.error
+    ? `${environmentLabels.get(listQuery.error.environmentId) || gt("Environment")}: ${listQuery.error.message}`
+    : null;
   const carriedToNothing =
     shownCount === 0 &&
     typedQuery.length === 0 &&
@@ -1199,17 +1257,17 @@ export function PullRequestsPage() {
   const listBody = (
     <>
       {!capabilityKnown ? (
-        <PullRequestListGhost rows={7} caption={t(($) => $.git.loadingPullRequestsEllipsis)} />
+        <PullRequestListGhost rows={7} caption={gt("Loading pull requests…")} />
       ) : !pullRequestsSupported ? (
         <PullRequestsUnavailableState
-          title={t(($) => $.git.pullRequestsUnavailable)}
-          error={t(($) => $.git.updateServersForRequests)}
+          title={gt("Pull requests unavailable")}
+          error={gt("Update your T3 Code servers to browse pull requests.")}
         />
       ) : firstLoad ? (
-        <PullRequestListGhost rows={7} caption={t(($) => $.git.loadingPullRequestsEllipsis)} />
-      ) : listQuery.error && shownCount === 0 ? (
+        <PullRequestListGhost rows={7} caption={gt("Loading pull requests…")} />
+      ) : listError && shownCount === 0 ? (
         <PullRequestsUnavailableState
-          error={listQuery.error}
+          error={listError}
           refreshing={listQuery.isPending}
           onRetry={() => listQuery.refresh()}
         />
@@ -1252,14 +1310,11 @@ export function PullRequestsPage() {
         />
       )}
 
-      {listQuery.error && shownCount > 0 ? (
+      {listError && shownCount > 0 ? (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning-surface px-3 py-2 text-xs">
-          <span>
-            {listQuery.error}
-            {t(($) => $.git.showLastLoaded)}
-          </span>
+          <span>{gt("{error} Showing the last pull requests loaded.", { error: listError })}</span>
           <Button size="xs" variant="outline" onClick={() => listQuery.refresh()}>
-            {t(($) => $.git.retry)}
+            <T>Retry</T>
           </Button>
         </div>
       ) : null}
@@ -1268,9 +1323,7 @@ export function PullRequestsPage() {
           {loadingMore ? (
             <span className="flex items-center gap-2">
               <Spinner aria-hidden size="sm" />
-              {sentCursors === null
-                ? t(($) => $.git.updatingPullRequests)
-                : t(($) => $.git.loadingMore)}
+              {sentCursors === null ? gt("Updating pull requests") : gt("Loading more")}
             </span>
           ) : canContinue || pageSize < MAX_PAGE_SIZE ? (
             <Button
@@ -1279,10 +1332,12 @@ export function PullRequestsPage() {
               onClick={loadMore}
               disabled={listQuery.isPending || showingCarried}
             >
-              {t(($) => $.git.loadMorePullRequests)}
+              <T>Load more pull requests</T>
             </Button>
           ) : (
-            <span>{t(($) => $.git.narrowSearch)}</span>
+            <span>
+              <T>Narrow your search to find more pull requests.</T>
+            </span>
           )}
         </div>
       ) : null}
@@ -1290,7 +1345,7 @@ export function PullRequestsPage() {
   );
   const hostEntries = hosts.length > 0 ? hosts : expectedHosts;
   const hostMenuOptions: ReadonlyArray<PullRequestFilterOption<string>> = [
-    { value: "", label: t(($) => $.git.all), Icon: Plug2Icon },
+    { value: "", label: gt("All", { $context: "all hosts" }), Icon: Plug2Icon },
     ...hostEntries.map((entry) => {
       const summary = hosts.find((host) => host.host === entry.host);
       return {
@@ -1299,12 +1354,12 @@ export function PullRequestsPage() {
         Icon: getSourceControlPresentationForKind(entry.kind).Icon,
         ...(summary === undefined || summary.configured
           ? {}
-          : { unavailable: summary.detail ?? t(($) => $.git.hostReadFailed) }),
+          : { unavailable: summary.detail ?? gt("This host could not be read.") }),
       };
     }),
   ];
   const serverMenuOptions: ReadonlyArray<PullRequestFilterOption<string>> = [
-    { value: "", label: t(($) => $.git.allServers), Icon: LayersIcon },
+    { value: "", label: gt("All servers"), Icon: LayersIcon },
     ...capableEnvironments.map((environment) => ({
       value: environment.environmentId,
       label: environment.label,
@@ -1313,12 +1368,12 @@ export function PullRequestsPage() {
   ];
   const sortMenu = (
     <PullRequestCompactFilterMenu
-      label={t(($) => $.git.sortPullRequests)}
+      label={gt("Sort pull requests")}
       triggerIcon={<ArrowDownUpIcon aria-hidden className="size-4" />}
-      triggerLabel={t(($) => $.git.sort)}
+      triggerLabel={gt("Sort", { $context: "verb, sort a list" })}
       outlined
       value={sort}
-      options={SORT_OPTIONS(t)}
+      options={resolveFilterOptions(SORT_OPTIONS, resolve)}
       onChange={(next) => updateListScope({ sort: next })}
     />
   );
@@ -1326,10 +1381,10 @@ export function PullRequestsPage() {
     <PullRequestFiltersMenuInSidebarOrder
       onOpenChange={setFiltersOpen}
       state={search.state}
-      stateOptions={STATE_TABS(t)}
+      stateOptions={resolveFilterOptions(STATE_TABS, resolve)}
       onState={(state) => updateListScope({ state })}
       involvement={search.involvement}
-      involvementOptions={INVOLVEMENT_TABS(t)}
+      involvementOptions={resolveFilterOptions(INVOLVEMENT_TABS, resolve)}
       onInvolvement={(involvement) => updateListScope({ involvement })}
       filters={
         typedParsed.filters.draft
@@ -1383,6 +1438,13 @@ export function PullRequestsPage() {
     searchInput,
     sortMenu,
     filtersMenu,
+    savedViewsMenu: (
+      <SavedViewsMenu
+        kind={PULL_REQUEST_SAVED_VIEWS}
+        preferences={search}
+        onApply={(preferences) => updateListScope(pullRequestSavedViewPatch(preferences))}
+      />
+    ),
     rightPanelControl: !pullRequestsSupported ? null : (
       <span
         aria-hidden
@@ -1458,29 +1520,30 @@ export function PullRequestsPage() {
     event.stopPropagation();
     if (event.repeat) return;
     const url = openPanelPullRequestUrl;
-    const { shortLabel, singular } = (
+    const terminology = (
       sourceControlClients.findByChangeRequestUrl(url) ?? sourceControlClients.get(undefined)
     ).changeRequest;
-    void writeTextToClipboard(
-      url,
-      t(($) => $.git.requestLink, { term: singular }),
-    ).then(
-      (didCopy) => {
-        if (didCopy)
-          toastManager.add({
-            type: "success",
-            title: t(($) => $.git.requestLinkCopied, { term: shortLabel }),
-            description: url,
-          });
-      },
-      (error) => {
-        toastManager.add({
-          type: "error",
-          title: t(($) => $.git.copyRequestLinkFailed, { term: shortLabel }),
-          description: clipboardErrorMessage(error, tCommon),
-        });
-      },
-    );
+    void writeTextToClipboard(url, {
+      target: `${terminology.singular} link`,
+      unavailableMessage: msg(
+        "Clipboard API is unavailable while copying {term, select, mr {merge request} cr {change request} other {pull request}} link.",
+        { term: changeRequestTermKind(terminology) },
+      ),
+      failureMessage: msg(
+        "Failed to copy {term, select, mr {merge request} cr {change request} other {pull request}} link to the clipboard.",
+        { term: changeRequestTermKind(terminology) },
+      ),
+    }).then(undefined, (error) => {
+      toastManager.add({
+        type: "error",
+        title: m(
+          msg("Failed to copy {term, select, mr {MR} cr {change request} other {PR}} link", {
+            term: changeRequestTermKind(terminology),
+          }),
+        ),
+        description: thrownErrorMessage(error, m) ?? m(msg("An error occurred.")),
+      });
+    });
   });
   const closeActiveSurfaceFromShortcut = useEffectEvent((event: KeyboardEvent) => {
     if (activePullRequestSurface === null) return;

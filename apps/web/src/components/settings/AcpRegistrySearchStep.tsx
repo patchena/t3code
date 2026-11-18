@@ -1,6 +1,9 @@
-import { useTranslation } from "react-i18next";
 import { pipe } from "effect/Function";
-import { ACP_REGISTRY_MAX_AGENTS, AuthProvidersManageScope } from "@t3tools/contracts";
+import {
+  ACP_REGISTRY_MAX_AGENTS,
+  ACP_REGISTRY_SEARCH_QUERY_MAX_LENGTH,
+  AuthProvidersManageScope,
+} from "@t3tools/contracts";
 import { readEnvironmentScope, useEnvironmentScope } from "../../state/session";
 import {
   isAtomCommandInterrupted,
@@ -13,9 +16,11 @@ import type {
   ProviderInstanceConfig,
 } from "@t3tools/contracts";
 import { ExternalLinkIcon, SearchIcon } from "lucide-react";
+import { msg, T, useGT, useMessages, Var } from "gt-react";
 import { type FormEvent, useState } from "react";
 
 import { useDeadlinePassed } from "../../hooks/useDeadline";
+import { m } from "../../i18n/messages";
 import { serverEnvironment } from "../../state/server";
 import { useEnvironmentQuery } from "../../state/query";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -29,10 +34,10 @@ import { ProviderDriverKind } from "@t3tools/contracts";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { providerClients } from "./providerDriverMeta";
 
-function errorMessage(error: unknown): { message: string } | { kind: "prepare" } {
+function errorMessage(error: unknown): string {
   return error instanceof Error && error.message.trim()
-    ? { message: error.message }
-    : { kind: "prepare" };
+    ? error.message
+    : m(msg("The ACP could not be prepared."));
 }
 
 const ACP_REGISTRY_SEARCH_DEBOUNCE_MS = 300;
@@ -59,7 +64,6 @@ function applyAcpRegistryPrepareResult(
  * search is not kept subscribed.
  */
 export function useAcpRegistrySearch(environmentId: EnvironmentId, enabled: boolean) {
-  const { t } = useTranslation("settings");
   const [input, setInput] = useState<{
     readonly text: string;
     readonly submitted: string;
@@ -70,9 +74,7 @@ export function useAcpRegistrySearch(environmentId: EnvironmentId, enabled: bool
   );
   const submittedQuery = typingSettled ? input.text.trim() : input.submitted;
   const [preparingId, setPreparingId] = useState<string | null>(null);
-  const [prepareError, setPrepareError] = useState<
-    { message: string } | { kind: "prepare" } | null
-  >(null);
+  const [prepareError, setPrepareError] = useState<string | null>(null);
   const search = useEnvironmentQuery(
     enabled
       ? serverEnvironment.searchAcpRegistry({
@@ -82,6 +84,7 @@ export function useAcpRegistrySearch(environmentId: EnvironmentId, enabled: bool
             : { query: "", limit: ACP_REGISTRY_MAX_AGENTS },
         })
       : null,
+    useMessages(),
   );
   const prepareAgent = useAtomCommand(serverEnvironment.prepareAcpRegistryAgent, {
     reportFailure: false,
@@ -91,15 +94,14 @@ export function useAcpRegistrySearch(environmentId: EnvironmentId, enabled: bool
     query: input.text,
     search,
     preparingId,
-    prepareError:
-      prepareError === null
-        ? null
-        : "message" in prepareError
-          ? prepareError.message
-          : t(($) => $.providers.acpPrepareError),
+    prepareError,
     type: (text: string) => {
       setPrepareError(null);
-      setInput({ text, submitted: submittedQuery, typedAt: Date.now() });
+      setInput({
+        text: text.slice(0, ACP_REGISTRY_SEARCH_QUERY_MAX_LENGTH),
+        submitted: submittedQuery,
+        typedAt: Date.now(),
+      });
     },
     submit: () => {
       const trimmed = input.text.trim();
@@ -146,7 +148,7 @@ export function AcpRegistrySearchStep({
   onManualConfiguration,
   onLocalConfiguration,
 }: AcpRegistrySearchStepProps) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   const canManageProviders = useEnvironmentScope(environmentId, AuthProvidersManageScope);
   const { query, search, preparingId, prepareError } = registry;
 
@@ -168,7 +170,7 @@ export function AcpRegistrySearchStep({
   return (
     <section className="grid gap-3" aria-labelledby="acp-registry-search-heading">
       <h3 className="sr-only" id="acp-registry-search-heading">
-        {t(($) => $.providers.chooseAgent)}
+        <T>Choose an agent</T>
       </h3>
 
       <form className="flex flex-wrap items-center gap-2" onSubmit={handleSearch}>
@@ -177,10 +179,11 @@ export function AcpRegistrySearchStep({
             <SearchIcon />
           </InputGroupAddon>
           <InputGroupInput
-            aria-label={t(($) => $.providers.searchAcpRegistry)}
+            aria-label={gt("Search ACP Registry")}
+            maxLength={ACP_REGISTRY_SEARCH_QUERY_MAX_LENGTH}
             disabled={preparingId !== null}
             onChange={(event) => registry.type(event.currentTarget.value)}
-            placeholder={t(($) => $.providers.searchAgents)}
+            placeholder={gt("Search agents…")}
             size="sm"
             type="search"
             value={query}
@@ -193,7 +196,7 @@ export function AcpRegistrySearchStep({
           type="button"
           variant="ghost-muted"
         >
-          {t(($) => $.providers.enterManually)}
+          <T>Enter manually</T>
         </Button>
         {onLocalConfiguration ? (
           <Button
@@ -203,18 +206,21 @@ export function AcpRegistrySearchStep({
             type="button"
             variant="outline"
           >
-            {t(($) => $.providers.localAcpCommand)}
+            <T>Local ACP command</T>
           </Button>
         ) : null}
       </form>
 
       <div className="sr-only" role="status">
         {isInitialSearch
-          ? t(($) => $.providers.searchingAcp)
+          ? gt("Searching the ACP Registry.")
           : isRefreshing
-            ? t(($) => $.providers.refreshingAcp)
+            ? gt("Refreshing ACP Registry results.")
             : results
-              ? t(($) => $.providers.compatibleAgents, { count: resultCount })
+              ? gt(
+                  "{count, plural, one {{count} compatible agent found.} other {{count} compatible agents found.}}",
+                  { count: resultCount },
+                )
               : ""}
       </div>
 
@@ -226,16 +232,18 @@ export function AcpRegistrySearchStep({
 
       {isInitialSearch ? (
         <div className="flex min-h-20 items-center justify-center text-sm text-muted-foreground">
-          {t(($) => $.providers.searchingRegistry)}
+          <T>Searching the registry...</T>
         </div>
       ) : null}
 
       {results ? (
         results.length === 0 ? (
           <div className="flex min-h-28 flex-col items-center justify-center rounded-2xl border border-dashed px-4 text-center">
-            <p className="text-sm font-medium">{t(($) => $.providers.noCompatibleAgents)}</p>
+            <p className="text-sm font-medium">
+              <T>No compatible agents found</T>
+            </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {t(($) => $.providers.broaderSearch)}
+              <T>Try a broader search.</T>
             </p>
           </div>
         ) : (
@@ -272,11 +280,8 @@ function AcpRegistryAgentRow({
   readonly isPreparing: boolean;
   readonly onAdd: (agent: AcpRegistrySearchAgent) => void;
 }) {
-  const { t } = useTranslation("settings");
-  const progressLabel =
-    agent.distribution === "binary"
-      ? t(($) => $.providers.downloading)
-      : t(($) => $.providers.preparing);
+  const gt = useGT();
+  const progressLabel = agent.distribution === "binary" ? gt("Downloading") : gt("Preparing");
   const aboutUrl = agent.website || agent.repository;
   return (
     <article className="min-w-0 py-2.5">
@@ -306,25 +311,29 @@ function AcpRegistryAgentRow({
                   <Button
                     size="icon-xs"
                     variant="ghost-muted"
-                    aria-label={t(($) => $.providers.aboutAgent, { name: agent.name })}
+                    aria-label={gt("About {name}", { name: agent.name })}
                     render={<a href={aboutUrl} target="_blank" rel="noreferrer" />}
                   >
                     <ExternalLinkIcon />
                   </Button>
                 }
               />
-              <TooltipPopup>{t(($) => $.providers.aboutAgent, { name: agent.name })}</TooltipPopup>
+              <TooltipPopup>
+                <T>
+                  About <Var>{agent.name}</Var>
+                </T>
+              </TooltipPopup>
             </Tooltip>
           ) : null}
           <Button
             aria-label={
               alreadyAdded
-                ? t(($) => $.providers.alreadyAddedAgent, { name: agent.name })
+                ? gt("Already added {name}", { name: agent.name })
                 : isPreparing
                   ? agent.distribution === "binary"
-                    ? t(($) => $.providers.downloadingAgent, { name: agent.name })
-                    : t(($) => $.providers.preparingAgent, { name: agent.name })
-                  : t(($) => $.providers.addAgent, { name: agent.name })
+                    ? gt("Downloading {name}", { name: agent.name })
+                    : gt("Preparing {name}", { name: agent.name })
+                  : gt("Add {name}", { name: agent.name })
             }
             disabled={!canAdd || alreadyAdded}
             onClick={() => onAdd(agent)}
@@ -332,10 +341,10 @@ function AcpRegistryAgentRow({
             variant={isPreparing ? "secondary" : "outline"}
           >
             {alreadyAdded
-              ? t(($) => $.providers.added)
+              ? gt("Added")
               : isPreparing
                 ? progressLabel
-                : t(($) => $.providers.add)}
+                : gt("Add", { $context: "verb, adds an agent" })}
           </Button>
         </div>
       </div>

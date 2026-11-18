@@ -7,6 +7,7 @@ import {
   openSpeechStream,
   throwIfVoiceTranscriptionAborted,
   transcribeEnvironmentPcm,
+  type VoiceInputErrorCode,
   VoiceTranscriptionError,
   type VoiceTranscriptionOptions,
 } from "@t3tools/client-runtime/voice-input";
@@ -15,9 +16,10 @@ import type { SpeechTranscriptionOptions, SpeechStreamText } from "@t3tools/cont
 import type { CloudSpeechModelId, CloudSpeechProvider } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 
-import { appI18n } from "~/i18n";
 import { createBrowserPcmCapture } from "./browserPcmCapture";
 import { runEnvironmentSpeech } from "./runEnvironmentSpeech";
+import { msg } from "gt-react";
+import { m } from "../i18n/messages";
 
 const isVoiceTranscriptionError = Schema.is(VoiceTranscriptionError);
 
@@ -28,15 +30,16 @@ export function createBrowserVoiceInputPlatform(input: {
   readonly cloudModel?: CloudSpeechModelId | undefined;
   readonly hasAudioConsent: () => boolean;
   readonly getTranscriptionOptions: () => SpeechTranscriptionOptions;
+  readonly getStreamingEnabled: () => boolean;
   readonly getMicrophoneId: () => string | Promise<string>;
   readonly onLevel: (level: number) => void;
   readonly onDurationLimit: () => void;
   readonly onText: (text: SpeechStreamText) => void;
-  readonly onError: (message: string) => void;
+  readonly onError: (message: string, code?: VoiceInputErrorCode) => void;
 }) {
-  const t = appI18n.getFixedT(null, "voice");
   return createBrowserPcmCapture(input, async (options) => {
     const recordingOptions = input.getTranscriptionOptions();
+    const streamingEnabled = input.getStreamingEnabled();
     const transcribeRecording = async (
       uri: string,
       { signal: transcriptionSignal }: VoiceTranscriptionOptions,
@@ -69,7 +72,7 @@ export function createBrowserVoiceInputPlatform(input: {
         if (isVoiceTranscriptionError(cause)) throw cause;
         throw new VoiceTranscriptionError({
           code: "transcription-failed",
-          message: t(($) => $.errors.environmentFailed),
+          message: m(msg("Voice transcription failed. Check the destination in Settings → Voice.")),
           cause,
         });
       }
@@ -78,7 +81,7 @@ export function createBrowserVoiceInputPlatform(input: {
       if (input.cloudProvider === "openrouter" && !input.cloudModel)
         throw new VoiceTranscriptionError({
           code: "unavailable",
-          message: t(($) => $.errors.openRouterModelMissing),
+          message: m(msg("Choose an OpenRouter model in Settings → Voice.")),
         });
       await runEnvironmentSpeech(
         requireCloudSpeechKey(input.prepared, input.cloudProvider),
@@ -103,13 +106,12 @@ export function createBrowserVoiceInputPlatform(input: {
           recordingOptions.speechLanguage,
         )
       : "auto";
+    const nativeStreaming = status.supportsStreaming && streamingEnabled;
     const locale =
-      !status.supportsStreaming &&
-      status.supportsTranslation &&
-      recordingOptions.speechTranslateToEnglish
+      !nativeStreaming && status.supportsTranslation && recordingOptions.speechTranslateToEnglish
         ? "en"
         : language;
-    if (!status.supportsStreaming && !status.supportsBufferedStreaming) {
+    if (status.supportsStreaming ? !nativeStreaming : !status.supportsBufferedStreaming) {
       return { locale, transcribe: transcribeRecording };
     }
     const url = await runEnvironmentSpeech(getEnvironmentSpeechStreamUrl(input.prepared), options);
@@ -123,7 +125,6 @@ export function createBrowserVoiceInputPlatform(input: {
         signal: options.signal,
         onText: input.onText,
         onError: (error) => input.onError(error.message),
-        t,
       }),
     };
   });

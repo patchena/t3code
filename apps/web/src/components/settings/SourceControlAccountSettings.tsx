@@ -1,7 +1,7 @@
-import { Trans, useTranslation } from "react-i18next";
 import type { EnvironmentId, SourceControlProviderAuth } from "@t3tools/contracts";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { useState } from "react";
+import { T, useGT, Var } from "gt-react";
 
 import { useEnvironmentSettings } from "../../hooks/useSettings";
 import { serverEnvironment } from "../../state/server";
@@ -25,7 +25,7 @@ function RedactedLogin(props: {
   readonly revealed: boolean;
   readonly label?: string;
 }) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   return props.revealed ? (
     <span className="min-w-0 truncate font-mono text-2xs">{props.account}</span>
   ) : (
@@ -33,7 +33,7 @@ function RedactedLogin(props: {
       <span className="select-none blur-xs" aria-hidden>
         {redactedPlaceholder(props.account)}
       </span>
-      <span className="sr-only">{props.label ?? t(($) => $.providers.hiddenAccount)}</span>
+      <span className="sr-only">{props.label ?? gt("Hidden account")}</span>
     </span>
   );
 }
@@ -51,14 +51,14 @@ export function SourceControlAccountSettings({
   readonly auth: SourceControlProviderAuth;
   readonly onSaved: () => void;
 }) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   const { hosts } = useEnvironmentSettings(environmentId, (settings) =>
     readHostCredentialSettings(settings, definition.kind),
   );
   const { label } = definition;
   const { cliName } = credentials;
   const updateSettings = useAtomCommand(serverEnvironment.updateSettings, {
-    label: t(($) => $.providers.saveHostAccounts, { provider: label }),
+    label: `save ${label} account settings`,
   });
   const [saving, setSaving] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -86,17 +86,13 @@ export function SourceControlAccountSettings({
   if (groups.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
-        <Trans
-          t={t}
-          i18nKey={($) => $.providers.hostCliLogin}
-          components={{
-            command: (
-              <code className="rounded bg-muted px-1 py-px text-2xs">
-                {credentials.loginCommand}
-              </code>
-            ),
-          }}
-        />
+        <T>
+          Sign in with{" "}
+          <code className="rounded bg-muted px-1 py-px text-2xs">
+            <Var>{credentials.loginCommand}</Var>
+          </code>{" "}
+          on the server host, then rescan to choose accounts here.
+        </T>
       </p>
     );
   }
@@ -105,14 +101,13 @@ export function SourceControlAccountSettings({
     <div className="grid gap-4">
       <div className="flex items-center justify-between gap-3">
         <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
-          <Trans
-            t={t}
-            i18nKey={($) => $.providers.hostAccountChoice}
-            components={{
-              cli: <code className="rounded bg-muted px-1 py-px text-2xs">{cliName}</code>,
-              provider: <span>{label}</span>,
-            }}
-          />
+          <T>
+            Choose which{" "}
+            <code className="rounded bg-muted px-1 py-px text-2xs">
+              <Var>{cliName}</Var>
+            </code>{" "}
+            login each <Var>{label}</Var> host uses, or turn a host off.
+          </T>
         </p>
         <Button
           size="icon-xs"
@@ -120,8 +115,8 @@ export function SourceControlAccountSettings({
           onClick={() => setRevealed((current) => !current)}
           aria-label={
             revealed
-              ? t(($) => $.providers.hideHostAccounts, { provider: label })
-              : t(($) => $.providers.revealHostAccounts, { provider: label })
+              ? gt("Hide {label} accounts", { label })
+              : gt("Reveal {label} accounts", { label })
           }
           aria-pressed={revealed}
         >
@@ -141,32 +136,24 @@ export function SourceControlAccountSettings({
                 <span className="text-xs font-medium text-foreground">{group.host}</span>
                 {group.selectable.length === 1 && group.selectable[0] !== undefined ? (
                   <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                    <Trans
-                      t={t}
-                      i18nKey={($) => $.providers.signedInAs}
-                      components={{
-                        account: (
-                          <RedactedLogin revealed={revealed} account={group.selectable[0]} />
-                        ),
-                      }}
-                    />
+                    <span>
+                      <T>Signed in as</T>
+                    </span>
+                    <RedactedLogin revealed={revealed} account={group.selectable[0]} />
                   </p>
                 ) : null}
               </div>
               <Switch
                 checked={enabled}
                 disabled={saving}
-                aria-label={t(($) => $.providers.useProviderHost, {
-                  provider: label,
-                  host: group.host,
-                })}
+                aria-label={gt("Use {label} on {host}", { label, host: group.host })}
                 onCheckedChange={(checked) => void save(group.host, { enabled: checked })}
               />
             </div>
             {group.selectable.length > 1 ? (
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs text-muted-foreground">
-                  {t(($) => $.providers.account)}
+                  <T>Account</T>
                 </span>
                 <div className="w-64 max-w-full">
                   <Select
@@ -181,26 +168,26 @@ export function SourceControlAccountSettings({
                   >
                     <SelectTrigger
                       size="sm"
-                      aria-label={t(($) => $.providers.accountForHost, {
-                        provider: label,
-                        host: group.host,
-                      })}
+                      aria-label={gt("{label} account for {host}", { label, host: group.host })}
                     >
                       <SelectValue>
                         {(value: string) =>
                           value === ACTIVE_ACCOUNT ? (
                             <span className="flex min-w-0 items-center gap-1">
-                              {t(($) => $.providers.activeCliAccount, { cli: cliName })}
                               {group.activeAccount ? (
-                                <>
-                                  (
+                                <T>
+                                  Active <Var>{cliName}</Var> account (
                                   <RedactedLogin
                                     revealed={revealed}
                                     account={group.activeAccount}
                                   />
                                   )
-                                </>
-                              ) : null}
+                                </T>
+                              ) : (
+                                <T>
+                                  Active <Var>{cliName}</Var> account
+                                </T>
+                              )}
                             </span>
                           ) : (
                             <RedactedLogin revealed={revealed} account={value} />
@@ -211,12 +198,16 @@ export function SourceControlAccountSettings({
                     <SelectPopup align="end" alignItemWithTrigger={false}>
                       <SelectItem value={ACTIVE_ACCOUNT}>
                         <span className="flex min-w-0 items-center gap-1">
-                          {t(($) => $.providers.activeCliAccount, { cli: cliName })}
                           {group.activeAccount ? (
-                            <>
-                              (<RedactedLogin revealed={revealed} account={group.activeAccount} />)
-                            </>
-                          ) : null}
+                            <T>
+                              Active <Var>{cliName}</Var> account (
+                              <RedactedLogin revealed={revealed} account={group.activeAccount} />)
+                            </T>
+                          ) : (
+                            <T>
+                              Active <Var>{cliName}</Var> account
+                            </T>
+                          )}
                         </span>
                       </SelectItem>
                       {group.selectable.map((account, index) => (
@@ -224,7 +215,7 @@ export function SourceControlAccountSettings({
                           <RedactedLogin
                             revealed={revealed}
                             account={account}
-                            label={t(($) => $.providers.accountNumber, { index: index + 1 })}
+                            label={gt("Account {number}", { number: index + 1 })}
                           />
                         </SelectItem>
                       ))}
@@ -236,7 +227,10 @@ export function SourceControlAccountSettings({
             {stalePin ? (
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs text-warning">
-                  {t(($) => $.providers.staleAccount, { cli: cliName })}
+                  <T>
+                    The chosen login is no longer signed in, so the active <Var>{cliName}</Var>{" "}
+                    login is used.
+                  </T>
                 </p>
                 <Button
                   size="xs"
@@ -244,7 +238,7 @@ export function SourceControlAccountSettings({
                   disabled={saving}
                   onClick={() => void save(group.host, { account: null })}
                 >
-                  {t(($) => $.providers.useActiveLogin)}
+                  <T>Use active login</T>
                 </Button>
               </div>
             ) : null}
@@ -253,17 +247,29 @@ export function SourceControlAccountSettings({
                 key={entry.account}
                 className="flex min-w-0 flex-wrap items-center gap-1 text-xs text-muted-foreground/70"
               >
-                <RedactedLogin revealed={revealed} account={entry.account} />
-                <span>
-                  {t(($) => $.providers.loginUnusable, {
-                    error: entry.error ?? t(($) => $.providers.invalidLogin, { cli: cliName }),
-                  })}
-                </span>
+                {entry.error ? (
+                  <T>
+                    <RedactedLogin revealed={revealed} account={entry.account} />{" "}
+                    <span>
+                      can&apos;t be used: <Var>{entry.error}</Var>
+                    </span>
+                  </T>
+                ) : (
+                  <T>
+                    <RedactedLogin revealed={revealed} account={entry.account} />{" "}
+                    <span>
+                      can&apos;t be used: <Var>{cliName}</Var> reports this login as invalid.
+                    </span>
+                  </T>
+                )}
               </p>
             ))}
             {group.environmentVariable ? (
               <p className="text-xs text-warning">
-                {t(($) => $.providers.envAccountOverride, { variable: group.environmentVariable })}
+                <T>
+                  <Var>{group.environmentVariable}</Var> is set on the server, so it overrides the
+                  account chosen here until it is unset.
+                </T>
               </p>
             ) : null}
           </div>

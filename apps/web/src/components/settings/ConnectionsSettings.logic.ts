@@ -1,11 +1,13 @@
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import * as DateTime from "effect/DateTime";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { interfaceDateLocale } from "~/timestampFormat";
+import { msg } from "gt-react";
 
 import { resolveDesktopPairingUrl, resolveHostedPairingUrl } from "./pairingUrls";
 import { getPairingTokenFromUrl, setPairingTokenOnUrl } from "@t3tools/shared/remote";
 import { readHostedPairingRequest } from "../../hostedPairing";
+import { m, type MessageResolver } from "../../i18n/messages";
 import {
+  isLoopbackHostname,
   type ServerClientSessionRecord,
   type ServerPairingLinkRecord,
 } from "~/environments/primary";
@@ -67,11 +69,11 @@ export function isQrShareableEndpoint(endpoint: AdvertisedEndpoint): boolean {
  * means unchecked. */
 export function missingTailscaleEndpointDescription(
   state: Pick<DesktopServerExposureState, "mode" | "tailscaleServeEnabled"> | null,
-  t: TFunction<"connect">,
+  resolve: MessageResolver = m,
 ): string {
   return state && state.mode !== "network-accessible" && !state.tailscaleServeEnabled
-    ? t(($) => $.exposure.detectTailscale)
-    : t(($) => $.exposure.startTailscale);
+    ? resolve(msg("Turn on Network access to detect Tailscale."))
+    : resolve(msg("Start Tailscale to set up HTTPS access through MagicDNS."));
 }
 
 export function resolveTailscaleServeBaseUrl(
@@ -104,13 +106,13 @@ export function isWslSettingsRowVisible(input: {
  */
 export function resolveLocalVersionStatusLabel(
   state: DesktopUpdateState | null,
-  t: TFunction<"connect">,
+  resolve: MessageResolver = m,
 ): string {
-  if (!state) return t(($) => $.endpoints.upToDate);
+  if (!state) return resolve(msg("Up to date"));
   if (state.status === "downloading") {
     return state.availableVersion
-      ? t(($) => $.endpoints.downloadingVersion, { version: state.availableVersion })
-      : t(($) => $.endpoints.downloading);
+      ? resolve(msg("Downloading update {version}", { version: state.availableVersion }))
+      : resolve(msg("Downloading update"));
   }
   const action = resolveDesktopUpdateButtonAction(state);
   if (
@@ -120,15 +122,15 @@ export function resolveLocalVersionStatusLabel(
   ) {
     const version = getDesktopUpdateDownloadedVersion(state);
     return version
-      ? t(($) => $.endpoints.downloadedVersion, { version })
-      : t(($) => $.endpoints.downloaded);
+      ? resolve(msg("Update {version} downloaded", { version }))
+      : resolve(msg("Update downloaded"));
   }
   if (action === "download") {
     return state.availableVersion
-      ? t(($) => $.endpoints.availableVersion, { version: state.availableVersion })
-      : t(($) => $.endpoints.available);
+      ? resolve(msg("Update {version} available", { version: state.availableVersion }))
+      : resolve(msg("Update available"));
   }
-  return t(($) => $.endpoints.upToDate);
+  return resolve(msg("Up to date"));
 }
 
 export type QrEndpointOption = {
@@ -170,20 +172,17 @@ export async function applyWslEnableSelection(input: {
   return await bridge.setWslBackendEnabled(true);
 }
 
-const accessTimestampFormatters = new Map<string, Intl.DateTimeFormat>();
+const accessTimestampFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
 
-export function formatAccessTimestamp(value: string, language: string): string {
+export function formatAccessTimestamp(value: string): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
     return value;
   }
-  const locale = interfaceDateLocale(language);
-  let formatter = accessTimestampFormatters.get(locale);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
-    accessTimestampFormatters.set(locale, formatter);
-  }
-  return formatter.format(parsed);
+  return accessTimestampFormatter.format(parsed);
 }
 
 export function parseManualDesktopSshTarget(
@@ -192,11 +191,11 @@ export function parseManualDesktopSshTarget(
     readonly username: string;
     readonly port: string;
   },
-  t: TFunction<"connect">,
+  resolve: MessageResolver = m,
 ): DesktopSshEnvironmentTarget {
   const rawHost = input.host.trim();
   if (rawHost.length === 0) {
-    throw new Error(t(($) => $.endpoints.hostRequired));
+    throw new Error(resolve(msg("SSH host or alias is required.")));
   }
 
   let hostname = rawHost;
@@ -228,15 +227,15 @@ export function parseManualDesktopSshTarget(
 
   const rawPort = input.port.trim();
   if (rawPort.length > 0) {
-    port = Number.parseInt(rawPort, 10);
+    port = /^\d+$/u.test(rawPort) ? Number.parseInt(rawPort, 10) : Number.NaN;
   }
 
   if (hostname.length === 0) {
-    throw new Error(t(($) => $.endpoints.hostRequired));
+    throw new Error(resolve(msg("SSH host or alias is required.")));
   }
 
   if (port !== null && (!Number.isInteger(port) || port <= 0 || port > 65_535)) {
-    throw new Error(t(($) => $.endpoints.portValidation));
+    throw new Error(resolve(msg("SSH port must be between 1 and 65535.")));
   }
 
   return {
@@ -283,7 +282,7 @@ export function parseRemotePairingFields(
     readonly host: string;
     readonly pairingCode: string;
   },
-  t: TFunction<"connect">,
+  resolve: MessageResolver = m,
 ): {
   readonly host: string;
   readonly pairingCode: string;
@@ -294,17 +293,21 @@ export function parseRemotePairingFields(
   const host = input.host.trim();
   const pairingCode = input.pairingCode.trim();
   if (!host) {
-    throw new Error(t(($) => $.endpoints.backendRequired));
+    throw new Error(resolve(msg("Enter a backend host.")));
   }
   if (!pairingCode) {
-    throw new Error(t(($) => $.endpoints.codeRequired));
+    throw new Error(resolve(msg("Enter a pairing code.")));
   }
   return { host, pairingCode };
 }
 
-export function formatDesktopSshConnectionError(error: unknown, t: TFunction<"connect">): string {
-  const fallback = t(($) => $.endpoints.sshFailed);
-  const rawMessage = error instanceof Error ? error.message : fallback;
+export function formatDesktopSshConnectionError(
+  error: unknown,
+  resolve: MessageResolver = m,
+): string {
+  const fallback = resolve(msg("Failed to connect SSH host."));
+  const rawMessage =
+    error instanceof Error ? (thrownErrorMessage(error, m) ?? error.message) : fallback;
   const withoutIpcPrefix = rawMessage.replace(
     /^Error invoking remote method 'desktop:ensure-ssh-environment':\s*/u,
     "",
@@ -322,13 +325,23 @@ export function sortDesktopPairingLinks(links: ReadonlyArray<ServerPairingLinkRe
 export function summarizeAuthorizedClients(
   sessions: ReadonlyArray<ServerClientSessionRecord>,
   links: ReadonlyArray<ServerPairingLinkRecord>,
-  t: TFunction<"connect">,
+  resolve: MessageResolver = m,
 ): string {
   const parts = [
-    t(($) => $.endpoints.clients, { count: sessions.length }),
-    links.length > 0 ? t(($) => $.endpoints.links, { count: links.length }) : null,
+    resolve(
+      msg("{count, plural, one {{count} client} other {{count} clients}}", {
+        count: sessions.length,
+      }),
+    ),
+    links.length > 0
+      ? resolve(
+          msg("{count, plural, one {{count} pairing link} other {{count} pairing links}}", {
+            count: links.length,
+          }),
+        )
+      : null,
   ];
-  return parts.filter((part) => part !== null).join(" · ");
+  return parts.filter((part): part is string => part !== null).join(" · ");
 }
 
 export function sortDesktopClientSessions(sessions: ReadonlyArray<ServerClientSessionRecord>) {
@@ -436,8 +449,15 @@ export function resolveAdvertisedEndpointPairingUrl(
   return resolveDesktopPairingUrl(endpoint.httpBaseUrl, credential);
 }
 
-export function resolveCurrentOriginPairingUrl(credential: string): string {
-  const url = new URL("/pair", window.location.href);
+export function resolveCurrentOriginPairingUrl(
+  credential: string,
+  currentHref: string = window.location.href,
+): string | null {
+  const url = new URL("/pair", currentHref);
+  // The packaged desktop window loads from t3code://app, which no other device can open.
+  if ((url.protocol !== "http:" && url.protocol !== "https:") || isLoopbackHostname(url.hostname)) {
+    return null;
+  }
   return setPairingTokenOnUrl(url, credential).toString();
 }
 
@@ -453,20 +473,20 @@ export function isHostedAppPairingUrl(value: string): boolean {
 export function endpointShareHint(
   endpoint: AdvertisedEndpoint,
   url: string,
-  t: TFunction<"connect">,
+  resolve: MessageResolver = m,
 ): string {
   if (isHostedAppPairingUrl(url)) {
-    return t(($) => $.endpoints.hosted);
+    return resolve(msg("Opens the hosted app, no install needed"));
   }
   switch (endpoint.reachability) {
     case "lan":
-      return t(($) => $.endpoints.lan);
+      return resolve(msg("Devices on the same network"));
     case "private-network":
-      return t(($) => $.endpoints.private);
+      return resolve(msg("Devices on your private network"));
     case "public":
-      return t(($) => $.endpoints.public);
+      return resolve(msg("Reachable from anywhere"));
     case "loopback":
-      return t(($) => $.endpoints.loopback);
+      return resolve(msg("Clients on this machine"));
   }
 }
 
@@ -489,22 +509,6 @@ export function resolveAccessEnvironmentId(input: {
   );
 }
 
-export function advertisedEndpointLabel(
-  endpoint: AdvertisedEndpoint,
-  t: TFunction<"connect">,
-): string {
-  if (endpoint.provider.id === "desktop-core") {
-    if (endpoint.reachability === "loopback") return t(($) => $.connection.thisMachine);
-    if (endpoint.reachability === "lan") return t(($) => $.endpoints.localNetwork);
-  }
-  if (endpoint.provider.id === "manual") {
-    return new URL(endpoint.httpBaseUrl).protocol === "https:"
-      ? t(($) => $.endpoints.customHttps)
-      : t(($) => $.endpoints.custom);
-  }
-  return endpoint.label;
-}
-
 /** A short name for a T3 Connect device: its label, or what it runs on. */
 export function connectDeviceName(
   {
@@ -512,9 +516,9 @@ export function connectDeviceName(
   }: {
     readonly client?: AuthClientMetadata | undefined;
   },
-  t: TFunction<"connect">,
+  resolve: MessageResolver = m,
 ): string {
-  return client?.label ?? client?.os ?? client?.browser ?? t(($) => $.connectDevices.fallbackName);
+  return client?.label ?? client?.os ?? client?.browser ?? resolve(msg("this device"));
 }
 
 /** How a T3 Connect device describes itself. It can say anything, so the code is what to trust. */
@@ -524,10 +528,10 @@ export function describeConnectDeviceClient(
   }: {
     readonly client?: AuthClientMetadata | undefined;
   },
-  t: TFunction<"connect">,
+  resolve: MessageResolver = m,
 ): string {
   const bits = [client?.label, client?.os, client?.browser, client?.ipAddress].filter(
     (value): value is string => typeof value === "string" && value.length > 0,
   );
-  return bits.length > 0 ? [...new Set(bits)].join(" · ") : t(($) => $.connectDevices.unknown);
+  return bits.length > 0 ? [...new Set(bits)].join(" · ") : resolve(msg("Unknown device"));
 }

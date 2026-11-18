@@ -1,29 +1,22 @@
-import { useTranslation } from "react-i18next";
-import {
-  capitalizeTerm,
-  sourceControlClients,
-} from "@t3tools/client-runtime/source-control-clients";
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import type { EnvironmentId, PullRequestDetailView, PullRequestRef } from "@t3tools/contracts";
 import { MessageSquareIcon, Trash2Icon, XIcon } from "lucide-react";
+import { T, useGT } from "gt-react";
 import { useRef, useState } from "react";
 
-import { Button } from "~/components/ui/button";
-import {
-  Popover,
-  PopoverClose,
-  PopoverPopup,
-  PopoverTitle,
-  PopoverTrigger,
-} from "~/components/ui/popover";
-import { Toggle, ToggleGroup } from "~/components/ui/toggle-group";
-import { PullRequestCommentForm } from "~/components/pullRequest/PullRequestCommentForm";
-import { PullRequestReviewForm } from "~/components/pullRequest/PullRequestReviewForm";
+import { Button } from "../ui/button";
+import { Popover, PopoverClose, PopoverPopup, PopoverTitle, PopoverTrigger } from "../ui/popover";
+import { Toggle, ToggleGroup } from "../ui/toggle-group";
+import { PullRequestCommentForm } from "./PullRequestCommentForm";
+import { PullRequestReviewForm } from "./PullRequestReviewForm";
 import {
   pullRequestReviewKey,
   usePendingReviewComments,
   usePullRequestReviewStore,
-} from "~/components/pullRequest/pullRequestReviewStore";
-import { pullRequestCompletionScope } from "~/components/pullRequest/PullRequestMarkdownTextarea";
+} from "./pullRequestReviewStore";
+import { pullRequestCompletionScope } from "./PullRequestMarkdownTextarea";
+
+import { changeRequestTermKind } from "./changeRequestTerm";
 
 export function PullRequestComposer({
   environmentId,
@@ -47,8 +40,8 @@ export function PullRequestComposer({
   onReviewSubmitted: () => void;
   openReviewRequest?: number | undefined;
 }) {
-  const { t } = useTranslation("workspace");
-  const term = sourceControlClients.get(detail.provider).changeRequest.singular;
+  const gt = useGT();
+  const term = changeRequestTermKind(sourceControlClients.get(detail.provider).changeRequest);
   const [open, setOpen] = useState(false);
   const [reviewPending, setReviewPending] = useState(false);
   const [requestedMode, setRequestedMode] = useState<"comment" | "review">("comment");
@@ -89,10 +82,19 @@ export function PullRequestComposer({
         render={<Button size="icon" variant="glass" />}
         aria-label={
           pendingComments.length > 0
-            ? t(($) => $.git.pendingReviewComments, { term, count: pendingComments.length })
+            ? gt(
+                "{count, plural, one {Review {term, select, mr {merge request} cr {change request} other {pull request}}, {count} comment pending} other {Review {term, select, mr {merge request} cr {change request} other {pull request}}, {count} comments pending}}",
+                { count: pendingComments.length, term },
+              )
             : reviewStarted || !canComment
-              ? t(($) => $.git.reviewRequest, { term: term })
-              : t(($) => $.git.commentRequest, { term: term })
+              ? gt(
+                  "Review {term, select, mr {merge request} cr {change request} other {pull request}}",
+                  { term },
+                )
+              : gt(
+                  "Comment on {term, select, mr {merge request} cr {change request} other {pull request}}",
+                  { term },
+                )
         }
       >
         <MessageSquareIcon className="size-4" />
@@ -112,12 +114,15 @@ export function PullRequestComposer({
         sideOffset={8}
         width="lg"
         initialFocus={mode === "review" ? reviewRef : commentRef}
-        aria-label={t(($) => $.git.requestComposer, { term: capitalizeTerm(term) })}
+        aria-label={gt(
+          "{term, select, mr {Merge request} cr {Change request} other {Pull request}} composer",
+          { term },
+        )}
       >
         <div className="mb-3 flex items-center justify-between gap-2">
           {canComment && verdicts.length > 0 ? (
             <ToggleGroup
-              aria-label={t(($) => $.git.composerMode)}
+              aria-label={gt("Composer mode")}
               variant="segmented"
               value={[mode]}
               onValueChange={(next) => {
@@ -125,18 +130,26 @@ export function PullRequestComposer({
                 if (value === "comment" || value === "review") setRequestedMode(value);
               }}
             >
-              <Toggle value="comment">{t(($) => $.git.comment)}</Toggle>
+              <Toggle value="comment">
+                <T context="noun, composer mode">Comment</T>
+              </Toggle>
               <Toggle value="review">
                 {pendingComments.length > 0
-                  ? t(($) => $.git.reviewCount, { count: pendingComments.length })
-                  : t(($) => $.git.review)}
+                  ? gt("Review ({count})", { count: pendingComments.length })
+                  : gt("Review", { $context: "noun, composer mode" })}
               </Toggle>
             </ToggleGroup>
           ) : (
             <PopoverTitle>
               {mode === "review"
-                ? t(($) => $.git.reviewRequest, { term: term })
-                : t(($) => $.git.commentRequest, { term: term })}
+                ? gt(
+                    "Review {term, select, mr {merge request} cr {change request} other {pull request}}",
+                    { term },
+                  )
+                : gt(
+                    "Comment on {term, select, mr {merge request} cr {change request} other {pull request}}",
+                    { term },
+                  )}
             </PopoverTitle>
           )}
           <div className="flex items-center gap-1">
@@ -144,8 +157,8 @@ export function PullRequestComposer({
               <Button
                 size="icon-xs"
                 variant="ghost"
-                aria-label={t(($) => $.git.discardLineComments)}
-                title={t(($) => $.git.discardLineComments)}
+                aria-label={gt("Discard pending line comments")}
+                title={gt("Discard pending line comments")}
                 disabled={reviewPending}
                 onClick={() => clearComments(reviewKey)}
               >
@@ -154,7 +167,7 @@ export function PullRequestComposer({
             ) : null}
             <PopoverClose
               render={<Button size="icon-xs" variant="ghost" />}
-              aria-label={t(($) => $.git.closeComposer)}
+              aria-label={gt("Close composer")}
             >
               <XIcon className="size-3.5" />
             </PopoverClose>

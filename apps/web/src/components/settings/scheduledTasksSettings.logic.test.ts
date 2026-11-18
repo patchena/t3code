@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import {
   EnvironmentId,
   ProjectId,
@@ -27,8 +26,6 @@ import {
   taskToDraft,
   unbindDraftFromThread,
 } from "./scheduledTasksSettings.logic";
-
-const t = createI18n("en").getFixedT(null, "settings");
 
 const laptopId = EnvironmentId.make("laptop");
 const serverId = EnvironmentId.make("server");
@@ -102,7 +99,7 @@ describe("scheduled task settings scope", () => {
     { search: { project: "t3code", checkout: "removed" }, expected: [] },
     { search: { project: "other", machine: laptopId }, expected: [] },
   ])("lists only matching tasks for $search", ({ search, expected }) => {
-    const scope = resolveSettingsScope(search, groups, environments, t);
+    const scope = resolveSettingsScope(search, groups, environments);
     expect(
       tasks
         .filter((task) => matchesScheduledTaskScope(scope, task.environmentId, task.projectId))
@@ -117,8 +114,8 @@ describe("scheduled task settings scope", () => {
       pinnedAt,
       archivedAt,
     });
-    const all = resolveSettingsScope({}, groups, environments, t);
-    const scoped = resolveSettingsScope({ project: "t3code" }, groups, environments, t);
+    const all = resolveSettingsScope({}, groups, environments);
+    const scoped = resolveSettingsScope({ project: "t3code" }, groups, environments);
     expect(
       defaultScheduledTaskProjectId([project("a", null, null), project("b", at, null)], all),
     ).toBe("b");
@@ -130,14 +127,14 @@ describe("scheduled task settings scope", () => {
     const removedProject = ProjectId.make("removed");
     expect(
       matchesScheduledTaskScope(
-        resolveSettingsScope({}, groups, environments, t),
+        resolveSettingsScope({}, groups, environments),
         laptopId,
         removedProject,
       ),
     ).toBe(true);
     expect(
       matchesScheduledTaskScope(
-        resolveSettingsScope({ project: "t3code" }, groups, environments, t),
+        resolveSettingsScope({ project: "t3code" }, groups, environments),
         laptopId,
         removedProject,
       ),
@@ -183,6 +180,16 @@ describe("fixed-time scheduled tasks", () => {
       schedule: { type: "fixed_time", timeOfDay: "9:05" },
     });
     expect(draft.timeOfDay).toBe("09:05");
+  });
+
+  it("keeps a fixed run time and rejects a cleared one", () => {
+    const draft = taskToDraft({
+      ...legacyTask,
+      schedule: { type: "fixed_time", timeOfDay: "14:30" },
+    });
+    expect(scheduleFromDraft(draft)).toEqual({ type: "fixed_time", timeOfDay: "14:30" });
+    // A native time input reports "" when it is cleared or only partly filled.
+    expect(scheduleFromDraft({ ...draft, timeOfDay: "" })).toBeNull();
   });
 });
 
@@ -413,10 +420,10 @@ it("rejects dedupe templates without a request placeholder", () => {
 });
 
 it("appends the server zone only to fixed-time schedule labels", () => {
-  expect(scheduleLabel({ type: "fixed_time", timeOfDay: "16:31" }, t, "Etc/UTC")).toBe(
+  expect(scheduleLabel({ type: "fixed_time", timeOfDay: "16:31" }, "Etc/UTC")).toBe(
     "Daily at 16:31 UTC",
   );
-  expect(scheduleLabel({ type: "fixed_time", timeOfDay: "09:00" }, t)).toBe("Daily at 09:00");
-  expect(scheduleLabel({ type: "interval", everyMs: 60_000 }, t, "Etc/UTC")).toBe("Every 1 min");
-  expect(scheduleLabel({ type: "webhook", signature: null }, t, "Etc/UTC")).toBe("On webhook");
+  expect(scheduleLabel({ type: "fixed_time", timeOfDay: "09:00" })).toBe("Daily at 09:00");
+  expect(scheduleLabel({ type: "interval", everyMs: 60_000 }, "Etc/UTC")).toBe("Every 1 min");
+  expect(scheduleLabel({ type: "webhook", signature: null }, "Etc/UTC")).toBe("On webhook");
 });

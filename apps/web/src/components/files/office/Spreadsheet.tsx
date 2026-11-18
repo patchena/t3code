@@ -1,13 +1,8 @@
 import * as Schema from "effect/Schema";
-import {
-  FilePreviewFailure,
-  fileFailureText,
-  type FileFailure,
-} from "~/components/files/fileFailure";
-import { useTranslation } from "react-i18next";
-import type { OfficeDetails } from "~/components/files/office/OfficePages";
 import { observeResize } from "~/lib/observeResize";
+import { msg, useGT } from "gt-react";
 import { useEffect, useRef, useState } from "react";
+import { m } from "~/i18n/messages";
 import {
   cellAtPoint,
   normalizeRange,
@@ -52,16 +47,16 @@ type Opened = {
   layout: SheetLayout;
   target?: CellAddr | undefined;
 };
-export function Spreadsheet(props: {
+export default function Spreadsheet(props: {
   bytes: ArrayBuffer;
   view: WorkbookView;
-  onDetails: (details: OfficeDetails) => void;
+  onDetails: (text: string) => void;
   onError: (cause: unknown) => void;
 }) {
-  const { t } = useTranslation("files");
   const { onError, bytes: source, onDetails, view } = props;
+  const gt = useGT();
   const [opened, setOpened] = useState<Opened>();
-  const [error, setError] = useState<FileFailure>("");
+  const [error, setError] = useState("");
   const picking = useRef<AbortController | null>(null);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Open the workbook worker and cancel workbook and sheet requests when the source changes or unmounts.
   useEffect(() => {
@@ -79,10 +74,15 @@ export function Spreadsheet(props: {
     void engine
       .call("open", { bytes, view }, { transfer: [bytes], signal: controller.signal })
       .then((value) => {
-        if (!value)
-          throw new FilePreviewFailure({ describe: (t) => t(($) => $.document.noVisibleSheets) });
+        if (!value) throw new Error(m(msg("This workbook has no visible sheets.")));
         setOpened({ ...value, engine });
-        onDetails({ count: value.tabs.length, unit: "sheets" });
+        onDetails(
+          m(
+            msg("{count, plural, one {{count} sheet} other {{count} sheets}}", {
+              count: value.tabs.length,
+            }),
+          ),
+        );
       })
       .catch(fail);
     return () => {
@@ -104,16 +104,13 @@ export function Spreadsheet(props: {
         setOpened({ ...opened, layout, target });
       })
       .catch(() => {
-        if (!controller.signal.aborted)
-          setError(
-            new FilePreviewFailure({ describe: (t) => t(($) => $.document.sheetOpenFailed) }),
-          );
+        if (!controller.signal.aborted) setError(m(msg("This sheet could not be opened.")));
       });
   };
   if (!opened) return <FileSurfaceLoading />;
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {error ? <FileSurfaceNotice>{fileFailureText(error, t)}</FileSurfaceNotice> : null}
+      {error ? <FileSurfaceNotice>{error}</FileSurfaceNotice> : null}
       <SpreadsheetGrid
         key={opened.layout.info.activeSheet}
         engine={opened.engine}
@@ -126,7 +123,7 @@ export function Spreadsheet(props: {
       />
       <div
         role="tablist"
-        aria-label={t(($) => $.document.sheetsLabel)}
+        aria-label={gt("Sheets")}
         className="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-t border-border px-2"
         onKeyDown={(event) => {
           const current = opened.tabs.findIndex(
@@ -173,14 +170,13 @@ function SpreadsheetGrid(props: {
   initialCell: CellAddr | undefined;
   onNavigate: (sheet: string, cell: CellAddr) => void;
 }) {
-  const { t } = useTranslation("files");
   const { onNavigate, layout, engine, initialCell } = props;
   const scroller = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const spacer = useRef<HTMLDivElement>(null);
   const columnHeaderBand = useRef<HTMLDivElement>(null);
   const rowHeaderBand = useRef<HTMLDivElement>(null);
-  const [notice, setNotice] = useState<FileFailure>("");
+  const [notice, setNotice] = useState("");
   const [reader, setReader] = useState<{ row: number; col: number; text: string }[]>([]);
   const [active, setActive] = useState({ row: 0, col: 0 });
   const navigate = useRef(onNavigate);
@@ -303,11 +299,7 @@ function SpreadsheetGrid(props: {
             received = order;
             if (!reply) {
               if (requested === key) requested = "";
-              setNotice(
-                new FilePreviewFailure({
-                  describe: (t) => t(($) => $.document.cellsDrawFailedScroll),
-                }),
-              );
+              setNotice(m(msg("These cells could not be drawn. Try scrolling to another area.")));
               return;
             }
             if (
@@ -332,9 +324,7 @@ function SpreadsheetGrid(props: {
           .catch((cause: unknown) => {
             if (!isSupersededError(cause) && !controller.signal.aborted) {
               if (requested === key) requested = "";
-              setNotice(
-                new FilePreviewFailure({ describe: (t) => t(($) => $.document.cellsDrawFailed) }),
-              );
+              setNotice(m(msg("These cells could not be drawn.")));
             }
           });
       }
@@ -565,7 +555,7 @@ function SpreadsheetGrid(props: {
         schedule();
         if (track.delta === 0) return;
         resizingPending = true;
-        setNotice(new FilePreviewFailure({ describe: (t) => t(($) => $.document.resizing) }));
+        setNotice(m(msg("Resizing preview...")));
         void engine
           .call(
             "resize",
@@ -588,9 +578,7 @@ function SpreadsheetGrid(props: {
           })
           .catch(() => {
             if (!controller.signal.aborted)
-              setNotice(
-                new FilePreviewFailure({ describe: (t) => t(($) => $.document.resizeFailed) }),
-              );
+              setNotice(m(msg("This row or column could not be resized.")));
           })
           .finally(() => {
             resizingPending = false;
@@ -635,21 +623,18 @@ function SpreadsheetGrid(props: {
         right: Math.min(selected.right, Math.max(selected.left, used?.right ?? 0)),
       };
       if ((clipped.bottom - clipped.top + 1) * (clipped.right - clipped.left + 1) > 200_000) {
-        setNotice(new FilePreviewFailure({ describe: (t) => t(($) => $.document.copyCellLimit) }));
+        setNotice(m(msg("Select fewer than 200,000 cells to copy.")));
         return;
       }
       void engine
         .call("copy", { sheet, range: clipped }, { signal: controller.signal })
         .then((text) => {
-          if (text === undefined)
-            throw new FilePreviewFailure({ describe: (t) => t(($) => $.document.noCells) });
+          if (text === undefined) throw new Error("No cells");
           return navigator.clipboard.writeText(text);
         })
         .catch(() => {
           if (!controller.signal.aborted)
-            setNotice(
-              new FilePreviewFailure({ describe: (t) => t(($) => $.document.copyCellsFailed) }),
-            );
+            setNotice(m(msg("The selected cells could not be copied.")));
         });
     };
     const key = (event: KeyboardEvent) => {
@@ -779,7 +764,7 @@ function SpreadsheetGrid(props: {
           role="status"
           className="absolute inset-x-3 bottom-3 rounded-md bg-background p-2 text-xs text-foreground shadow-md"
         >
-          {notice ? fileFailureText(notice, t) : null}
+          {notice}
         </div>
       ) : null}
     </div>

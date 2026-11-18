@@ -1,11 +1,10 @@
 import type { EnvironmentId } from "@t3tools/contracts";
 import { splitFilePathPosition } from "@t3tools/shared/fileLinks";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { msg } from "gt-react";
 
-import {
-  shouldOpenMarkdownFileLinkInBrowserByDefault,
-  type MarkdownFileLinkMeta,
-} from "../../markdown-links";
+import { m } from "../../i18n/messages";
+
+import type { MarkdownFileLinkMeta } from "../../markdown-links";
 import type { RemoteOpenMode } from "../../remoteOpen";
 
 export function canUseMarkdownFileShellActions(
@@ -30,47 +29,34 @@ export function hasMarkdownFilePrimaryAction(input: {
   );
 }
 
-export function markdownFileCopyMenuItems(
-  {
-    targetPath,
-    workspaceRelativePath,
-  }: Pick<MarkdownFileLinkMeta, "targetPath" | "workspaceRelativePath">,
-  t: TFunction<"chat">,
-) {
-  const items: {
-    id: "copy-full" | "copy-relative";
-    label: string;
-    value: string;
-    title: string;
-  }[] = [
+export function markdownFileCopyMenuItems({
+  targetPath,
+  workspaceRelativePath,
+}: Pick<MarkdownFileLinkMeta, "targetPath" | "workspaceRelativePath">) {
+  const items = [
     {
       id: "copy-full",
-      label: t(($) => $.markdown.copyFullPath),
+      label: m(msg("Copy full path")),
       value: targetPath,
-      title: t(($) => $.markdown.fullPath),
+      title: m(msg("Full path")),
     },
   ];
   if (workspaceRelativePath !== null) {
     const position = targetPath.slice(splitFilePathPosition(targetPath).path.length);
     items.unshift({
       id: "copy-relative",
-      label: t(($) => $.markdown.copyRelativePath),
+      label: m(msg("Copy relative path")),
       value: `${workspaceRelativePath}${position}`,
-      title: t(($) => $.markdown.relativePath),
+      title: m(msg("Relative path")),
     });
   }
   return items;
 }
 
 export function shouldUseMarkdownFileBrowserPrimaryAction(input: {
-  iconPath: string;
   canOpenInEditor: boolean;
   canOpenInBrowser: boolean;
   canOpenInPanel: boolean;
 }): boolean {
-  return (
-    input.canOpenInBrowser &&
-    (shouldOpenMarkdownFileLinkInBrowserByDefault(input.iconPath) ||
-      (!input.canOpenInEditor && !input.canOpenInPanel))
-  );
+  return input.canOpenInBrowser && !input.canOpenInEditor && !input.canOpenInPanel;
 }

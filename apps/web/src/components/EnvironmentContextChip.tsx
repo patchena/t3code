@@ -1,5 +1,6 @@
 import { type EnvironmentContextRecord, resolveEnvironmentMachineKind } from "@t3tools/contracts";
-import { useTranslation } from "react-i18next";
+
+import { useGT } from "gt-react";
 
 import { useEnvironment } from "~/state/environments";
 import { ContextChip, ContextChipLabel } from "./ContextChip";
@@ -14,7 +15,7 @@ export function EnvironmentContextChip(props: {
   record: Pick<EnvironmentContextRecord, "environmentId" | "label">;
   copyMarkdown?: string;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const environment = useEnvironment(props.record.environmentId);
   const label = environment?.label.trim() || props.record.label;
   return (
@@ -24,7 +25,7 @@ export function EnvironmentContextChip(props: {
           <ContextChip
             kind="environment"
             tabIndex={0}
-            aria-label={t(($) => $.context.machine, { label })}
+            aria-label={gt("Machine, {label}", { label })}
             data-markdown-copy={props.copyMarkdown}
           >
             <EnvironmentMachineIcon
@@ -35,7 +36,7 @@ export function EnvironmentContextChip(props: {
         }
       />
       <TooltipPopup side="top">
-        {environment ? t(($) => $.context.environment) : t(($) => $.context.machineMissing)}
+        {environment ? gt("T3 Code environment") : gt("Machine not in this app")}
       </TooltipPopup>
     </Tooltip>
   );

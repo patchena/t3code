@@ -3,7 +3,6 @@ import {
   AuthSourceControlWriteScope,
   EnvironmentId,
   ThreadId,
-  type GitResolvedPullRequest,
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
@@ -38,11 +37,16 @@ vi.mock("react", async (importOriginal) => ({
   useRef: (current: unknown) => ({ current }),
   useEffect: () => {},
 }));
-vi.mock("react-i18next", async () => {
-  const { createI18n } = await import("@t3tools/client-runtime/i18n");
-  const t = createI18n("en").getFixedT(null, "workspace");
-  return { useTranslation: () => ({ t }) };
-});
+vi.mock("gt-react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("gt-react")>()),
+  useGT:
+    () =>
+    (text: string, values: Record<string, unknown> = {}) =>
+      text.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key])),
+  useMessages: () => (text: string) => text,
+  T: ({ children }: { children: ReactNode }) => children,
+  Var: ({ children }: { children: ReactNode }) => children,
+}));
 vi.mock("@tanstack/react-pacer", () => ({
   useDebouncedValue: (value: unknown) => [value, { state: { isPending: false } }],
 }));
@@ -63,16 +67,7 @@ vi.mock("~/state/sourceControlActions", async () => {
   return {
     readCachedPullRequestResolution: () => null,
     usePullRequestResolutionState: () => ({
-      data: {
-        pullRequest: {
-          number: 123,
-          title: "Pull request",
-          state: "open",
-          baseBranch: "main",
-          headBranch: "feature/pr",
-          url: "https://github.com/acme/repo/pull/123",
-        } satisfies GitResolvedPullRequest,
-      },
+      data: { pullRequest: { number: 123, title: "Pull request", state: "open" } },
     }),
     usePreparePullRequestThreadAction,
   };
@@ -129,7 +124,7 @@ vi.mock("./ui/dialog", () => ({
   DialogTitle: "DialogTitle",
 }));
 
-import { PullRequestThreadDialog } from "~/components/PullRequestThreadDialog";
+import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 
 function findAction(node: ReactNode, label: string): (() => unknown) | null {
   if (Array.isArray(node)) {

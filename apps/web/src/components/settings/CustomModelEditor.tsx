@@ -1,6 +1,6 @@
-import { useTranslation } from "react-i18next";
 import { PlusIcon, XIcon } from "lucide-react";
-import { useState } from "react";
+import { T, useGT, useMessages } from "gt-react";
+import { useState, type SetStateAction } from "react";
 import type { ProviderDriverKind, ServerProviderModel } from "@t3tools/contracts";
 import type { CustomModelDefinition } from "@t3tools/shared/model";
 
@@ -34,6 +34,7 @@ interface CustomModelEditorProps {
   readonly builtInModels: ReadonlyArray<ServerProviderModel>;
   readonly onSave: (next: CustomModelDefinition) => void;
   readonly onCancel: () => void;
+  readonly onDraftChange: () => void;
 }
 
 export function CustomModelEditor({
@@ -43,39 +44,33 @@ export function CustomModelEditor({
   builtInModels,
   onSave,
   onCancel,
+  onDraftChange,
 }: CustomModelEditorProps) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
+  const m = useMessages();
   const [draft, setDraft] = useState<CustomModelDraft>(() => draftFromDefinition(entry));
-  const [showValidation, setShowValidation] = useState(false);
-  const error = showValidation ? validateDraft(draft, t) : null;
-  const presets = driverKind ? (DESCRIPTOR_PRESETS_BY_KIND[driverKind] ?? []) : [];
-  const presetLabel = (id: string, label: string) => {
-    switch (id) {
-      case "reasoningEffort":
-      case "effort":
-      case "reasoning":
-      case "variant":
-        return t(($) => $.providers.reasoning);
-      case "serviceTier":
-        return t(($) => $.providers.speed);
-      case "fastMode":
-        return t(($) => $.providers.fastMode);
-      case "thinking":
-        return t(($) => $.providers.thinking);
-      case "agent":
-        return t(($) => $.providers.agent);
-      default:
-        return label;
-    }
+  const [error, setError] = useState<string | null>(null);
+  const updateDraft = (next: SetStateAction<CustomModelDraft>) => {
+    onDraftChange();
+    setDraft(next);
   };
+  const presets = (driverKind ? (DESCRIPTOR_PRESETS_BY_KIND[driverKind] ?? []) : []).map(
+    (preset) => ({
+      ...preset,
+      label: m(preset.label),
+      ...(preset.choices
+        ? { choices: preset.choices.map((choice) => ({ ...choice, label: m(choice.label) })) }
+        : {}),
+    }),
+  );
   const startFromCandidates = builtInModels.filter(
     (model) => (model.capabilities?.optionDescriptors?.length ?? 0) > 0,
   );
   const domId = (suffix: string) => `provider-instance-${instanceId}-custom-model-${suffix}`;
 
   const updateDescriptor = (key: string, patch: Partial<EditorDescriptor>) => {
-    setShowValidation(false);
-    setDraft((current) => ({
+    setError(null);
+    updateDraft((current) => ({
       ...current,
       descriptors: current.descriptors.map((descriptor) =>
         descriptor.key === key ? { ...descriptor, ...patch } : descriptor,
@@ -84,8 +79,8 @@ export function CustomModelEditor({
   };
 
   const updateChoice = (descriptorKey: string, choiceKey: string, patch: Partial<EditorChoice>) => {
-    setShowValidation(false);
-    setDraft((current) => ({
+    setError(null);
+    updateDraft((current) => ({
       ...current,
       descriptors: current.descriptors.map((descriptor) => {
         if (descriptor.key !== descriptorKey) return descriptor;
@@ -101,16 +96,16 @@ export function CustomModelEditor({
   };
 
   const removeDescriptor = (key: string) => {
-    setShowValidation(false);
-    setDraft((current) => ({
+    setError(null);
+    updateDraft((current) => ({
       ...current,
       descriptors: current.descriptors.filter((descriptor) => descriptor.key !== key),
     }));
   };
 
   const addDescriptor = (descriptor: EditorDescriptor) => {
-    setShowValidation(false);
-    setDraft((current) => ({ ...current, descriptors: [...current.descriptors, descriptor] }));
+    setError(null);
+    updateDraft((current) => ({ ...current, descriptors: [...current.descriptors, descriptor] }));
   };
 
   const applyPresetId = (descriptor: EditorDescriptor, value: string | null) => {
@@ -135,17 +130,17 @@ export function CustomModelEditor({
     if (slug === null || slug === START_FROM_NONE) return;
     const model = startFromCandidates.find((candidate) => candidate.slug === slug);
     if (!model) return;
-    setShowValidation(false);
-    setDraft((current) => ({
+    setError(null);
+    updateDraft((current) => ({
       ...current,
       descriptors: descriptorsFromCapabilities(model.capabilities, driverKind),
     }));
   };
 
   const handleSave = () => {
-    const problem = validateDraft(draft, t);
+    const problem = validateDraft(draft, m);
     if (problem) {
-      setShowValidation(true);
+      setError(problem);
       return;
     }
     onSave(definitionFromDraft(draft));
@@ -160,11 +155,11 @@ export function CustomModelEditor({
         size="compact"
         value={choice.id}
         onChange={(event) => updateChoice(descriptor.key, choice.key, { id: event.target.value })}
-        placeholder={t(($) => $.providers.valuePlaceholder)}
+        placeholder={gt("value", { $context: "placeholder for a choice's stored value" })}
         font="mono"
         className="w-28"
         spellCheck={false}
-        aria-label={t(($) => $.providers.choiceValue)}
+        aria-label={gt("Choice value")}
       />
       <Input
         size="compact"
@@ -172,9 +167,9 @@ export function CustomModelEditor({
         onChange={(event) =>
           updateChoice(descriptor.key, choice.key, { label: event.target.value })
         }
-        placeholder={t(($) => $.providers.label)}
+        placeholder={gt("Label", { $context: "noun, display name" })}
         className="min-w-0 flex-1"
-        aria-label={t(($) => $.providers.choiceLabel)}
+        aria-label={gt("Choice label")}
       />
       <label className="flex shrink-0 items-center gap-1.5 text-2xs text-muted-foreground">
         <Switch
@@ -183,14 +178,14 @@ export function CustomModelEditor({
           onCheckedChange={(checked) =>
             updateChoice(descriptor.key, choice.key, { isDefault: checked })
           }
-          aria-label={t(($) => $.providers.defaultChoice)}
+          aria-label={gt("Default choice")}
         />
-        {t(($) => $.providers.default)}
+        {gt("Default", { $context: "marks the default choice" })}
       </label>
       <Button
         size="icon-micro"
         variant="ghost-muted"
-        aria-label={t(($) => $.providers.removeChoice)}
+        aria-label={gt("Remove choice")}
         onClick={() =>
           updateDescriptor(descriptor.key, {
             choices: descriptor.choices.filter((candidate) => candidate.key !== choice.key),
@@ -209,22 +204,16 @@ export function CustomModelEditor({
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="w-14 shrink-0 text-2xs text-muted-foreground">
-          {t(($) => $.providers.optionNumber, { index: index + 1 })}
+          {gt("Option {number}", { number: index + 1 })}
         </span>
         {presets.length > 0 ? (
           <Select
             value={idSelectValue(descriptor)}
             onValueChange={(value) => applyPresetId(descriptor, value)}
           >
-            <SelectTrigger
-              size="compact"
-              className="w-40"
-              aria-label={t(($) => $.providers.optionId)}
-            >
+            <SelectTrigger size="compact" className="w-40" aria-label={gt("Option id")}>
               <SelectValue>
-                {idSelectValue(descriptor) === CUSTOM_ID_VALUE
-                  ? t(($) => $.providers.customDots)
-                  : descriptor.id}
+                {idSelectValue(descriptor) === CUSTOM_ID_VALUE ? gt("Custom…") : descriptor.id}
               </SelectValue>
             </SelectTrigger>
             <SelectPopup align="start" alignItemWithTrigger={false}>
@@ -232,13 +221,13 @@ export function CustomModelEditor({
                 <SelectItem key={preset.id} value={preset.id}>
                   <span className="flex items-baseline gap-2">
                     <code className="font-mono text-xs">{preset.id}</code>
-                    <span className="text-muted-foreground">
-                      {presetLabel(preset.id, preset.label)}
-                    </span>
+                    <span className="text-muted-foreground">{preset.label}</span>
                   </span>
                 </SelectItem>
               ))}
-              <SelectItem value={CUSTOM_ID_VALUE}>{t(($) => $.providers.customDots)}</SelectItem>
+              <SelectItem value={CUSTOM_ID_VALUE}>
+                <T>Custom…</T>
+              </SelectItem>
             </SelectPopup>
           </Select>
         ) : null}
@@ -251,16 +240,16 @@ export function CustomModelEditor({
             font="mono"
             className="w-36"
             spellCheck={false}
-            aria-label={t(($) => $.providers.optionId)}
+            aria-label={gt("Option id")}
           />
         ) : null}
         <Input
           size="compact"
           value={descriptor.label}
           onChange={(event) => updateDescriptor(descriptor.key, { label: event.target.value })}
-          placeholder={t(($) => $.providers.label)}
+          placeholder={gt("Label", { $context: "noun, display name" })}
           className="min-w-0 flex-1"
-          aria-label={t(($) => $.providers.optionLabel)}
+          aria-label={gt("Option label")}
         />
         <Select
           value={descriptor.type}
@@ -268,26 +257,26 @@ export function CustomModelEditor({
             updateDescriptor(descriptor.key, { type: value === "boolean" ? "boolean" : "select" })
           }
         >
-          <SelectTrigger
-            size="compact"
-            className="w-24"
-            aria-label={t(($) => $.providers.optionType)}
-          >
+          <SelectTrigger size="compact" className="w-24" aria-label={gt("Option type")}>
             <SelectValue>
               {descriptor.type === "boolean"
-                ? t(($) => $.providers.toggle)
-                : t(($) => $.providers.choices)}
+                ? gt("Toggle", { $context: "noun, on/off option type" })
+                : gt("Choices")}
             </SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
-            <SelectItem value="select">{t(($) => $.providers.choices)}</SelectItem>
-            <SelectItem value="boolean">{t(($) => $.providers.toggle)}</SelectItem>
+            <SelectItem value="select">
+              <T>Choices</T>
+            </SelectItem>
+            <SelectItem value="boolean">
+              {gt("Toggle", { $context: "noun, on/off option type" })}
+            </SelectItem>
           </SelectPopup>
         </Select>
         <Button
           size="icon-micro"
           variant="ghost-muted"
-          aria-label={t(($) => $.providers.removeOption, { index: index + 1 })}
+          aria-label={gt("Remove option {number}", { number: index + 1 })}
           onClick={() => removeDescriptor(descriptor.key)}
         >
           <XIcon className="size-3" />
@@ -308,7 +297,7 @@ export function CustomModelEditor({
             }
           >
             <PlusIcon className="size-3" />
-            {t(($) => $.providers.addChoice)}
+            <T>Add choice</T>
           </Button>
         </div>
       ) : null}
@@ -327,14 +316,14 @@ export function CustomModelEditor({
     >
       <div className="flex flex-col gap-1">
         <label htmlFor={domId("name")} className="text-xs text-muted-foreground">
-          {t(($) => $.providers.displayName)}
+          <T>Display name</T>
         </label>
         <Input
           id={domId("name")}
           size="sm"
           autoFocus
           value={draft.name}
-          onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+          onChange={(event) => updateDraft((current) => ({ ...current, name: event.target.value }))}
           placeholder={draft.slug}
           className="sm:w-72"
           spellCheck={false}
@@ -344,16 +333,18 @@ export function CustomModelEditor({
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">
-            {t(($) => $.providers.composerOptions)}
+            <T>Options shown in the composer</T>
           </span>
           {startFromCandidates.length > 0 ? (
             <Select value={START_FROM_NONE} onValueChange={handleStartFrom}>
               <SelectTrigger
                 size="compact"
                 className="w-44"
-                aria-label={t(($) => $.providers.copyBuiltInOptions)}
+                aria-label={gt("Copy options from a built-in model")}
               >
-                <SelectValue>{t(($) => $.providers.copyFrom)}</SelectValue>
+                <SelectValue>
+                  <T>Copy from…</T>
+                </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 {startFromCandidates.map((model) => (
@@ -367,7 +358,7 @@ export function CustomModelEditor({
         </div>
         {draft.descriptors.length === 0 ? (
           <p className="text-xs text-muted-foreground/70">
-            {t(($) => $.providers.noCustomOptions)}
+            <T>No custom options. The composer uses the provider's default options.</T>
           </p>
         ) : null}
         {draft.descriptors.map(renderDescriptor)}
@@ -386,7 +377,7 @@ export function CustomModelEditor({
                 onClick={() => addDescriptor(descriptorFromPreset(preset))}
               >
                 <PlusIcon className="size-3" />
-                {presetLabel(preset.id, preset.label)}
+                {preset.label}
               </Button>
             ))}
           <Button
@@ -396,7 +387,7 @@ export function CustomModelEditor({
             onClick={() => addDescriptor(emptyEditorDescriptor())}
           >
             <PlusIcon className="size-3" />
-            {t(($) => $.providers.customOption)}
+            <T>Custom option</T>
           </Button>
         </div>
       </div>
@@ -405,10 +396,10 @@ export function CustomModelEditor({
 
       <div className="flex gap-2">
         <Button size="sm" variant="outline" onClick={handleSave}>
-          {t(($) => $.providers.save)}
+          {gt("Save", { $context: "verb" })}
         </Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>
-          {t(($) => $.providers.cancel)}
+          <T>Cancel</T>
         </Button>
       </div>
     </div>

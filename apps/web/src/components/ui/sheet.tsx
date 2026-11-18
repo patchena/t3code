@@ -1,5 +1,5 @@
-import { useTranslation } from "react-i18next";
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog";
+import { useGT } from "gt-react";
 import { XIcon } from "lucide-react";
 import type { CSSProperties } from "react";
 import { cn } from "~/lib/utils";
@@ -41,7 +41,7 @@ function SheetViewport({
   return (
     <SheetPrimitive.Viewport
       className={cn(
-        "fixed inset-0 z-(--z-sheet) grid",
+        "fixed inset-0 z-(--z-sheet) grid [-webkit-app-region:no-drag]",
         side === "bottom" && "grid grid-rows-[1fr_auto] pt-12",
         side === "top" && "grid grid-rows-[auto_1fr] pb-12",
         side === "left" && "flex justify-start",
@@ -72,7 +72,7 @@ function SheetPopup({
   side?: "right" | "left" | "top" | "bottom";
   variant?: "default" | "inset";
 }) {
-  const { t } = useTranslation("files");
+  const gt = useGT();
   const transitionStyle =
     transitionDurationMs === undefined
       ? undefined
@@ -115,7 +115,7 @@ function SheetPopup({
           {children}
           {showCloseButton && (
             <SheetPrimitive.Close
-              aria-label={t(($) => $.ui.close)}
+              aria-label={gt("Close", { $context: "button, closes the panel" })}
               className="absolute end-2 top-2"
               render={<Button size="icon" variant="ghost" />}
             >

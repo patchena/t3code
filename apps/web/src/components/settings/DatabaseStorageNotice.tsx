@@ -1,3 +1,5 @@
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { m } from "~/i18n/messages";
 import { useAtomValue } from "@effect/atom-react";
 import {
   isAtomCommandInterrupted,
@@ -9,8 +11,8 @@ import {
   type EnvironmentId,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
+import { msg, T, useGT, Var } from "gt-react";
 import { type ReactNode, useState } from "react";
-import { useTranslation } from "react-i18next";
 
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
@@ -36,7 +38,7 @@ const reclaimPermissionsAtom = environmentAtomList(
   serverEnvironment.reclaimDatabaseSpace.permissionAtom,
 );
 
-const formatGiB = (bytes: number) => (bytes / 1024 ** 3).toFixed(1);
+const formatGiB = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
 
 /** Offers to reclaim the space on every machine whose database still holds at least 1 GiB of freed pages. */
 export function DatabaseStorageNotice({
@@ -44,7 +46,7 @@ export function DatabaseStorageNotice({
 }: {
   environments: ReadonlyArray<{ readonly environmentId: EnvironmentId; readonly label: string }>;
 }) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   const environmentIds = environments.map((environment) => environment.environmentId);
   const recommendations = useAtomValue(
     serverEnvironment.databaseCompactionRecommendations(JSON.stringify(environmentIds)),
@@ -55,7 +57,13 @@ export function DatabaseStorageNotice({
     [],
     DismissedEnvironmentIds,
   );
-  const { copyToClipboard } = useCopyToClipboard({ target: "command" });
+  const { copyToClipboard } = useCopyToClipboard({
+    target: {
+      target: "command",
+      unavailableMessage: msg("Clipboard API is unavailable while copying command."),
+      failureMessage: msg("Failed to copy command to the clipboard."),
+    },
+  });
   const visible = recommendations
     .filter((recommendation) => !dismissed.includes(recommendation.environmentId))
     .map((recommendation) => ({
@@ -70,13 +78,15 @@ export function DatabaseStorageNotice({
     }));
   if (visible.length === 0) return null;
   return (
-    <SettingsSection id="storage-database" title={t(($) => $.extra.database.title)}>
+    <SettingsSection id="storage-database" title={gt("Database")}>
       <SettingsRow
-        title={t(($) => $.extra.database.reclaim)}
+        title={gt("Reclaim freed database space")}
         description={
           visible.every((recommendation) => recommendation.reclaimable)
-            ? t(($) => $.extra.database.reclaimableDescription)
-            : t(($) => $.extra.database.description)
+            ? gt("These databases still hold space freed by history cleanup.")
+            : gt(
+                "These databases still hold space freed by history cleanup. Run the command on each machine to reclaim it. It restarts the background service. Quit the desktop app first if it hosts the environment.",
+              )
         }
       />
       {visible.map(({ environmentId, status, label, reclaimable }) => {
@@ -86,7 +96,7 @@ export function DatabaseStorageNotice({
             size="xs"
             onClick={() => setDismissed((current) => [...current, environmentId])}
           >
-            {t(($) => $.extra.database.dismiss)}
+            <T>Dismiss</T>
           </Button>
         );
         return reclaimable ? (
@@ -100,8 +110,8 @@ export function DatabaseStorageNotice({
         ) : (
           <SettingsRow
             key={environmentId}
-            title={t(($) => $.extra.database.space, {
-              size: formatGiB(status.reclaimableBytes),
+            title={gt("{amount} on {environment}", {
+              amount: formatGiB(status.reclaimableBytes),
               environment: label,
             })}
             description={<code className="select-text break-all">{status.compactCommand}</code>}
@@ -112,7 +122,7 @@ export function DatabaseStorageNotice({
                   size="xs"
                   onClick={() => copyToClipboard(status.compactCommand, undefined)}
                 >
-                  {t(($) => $.extra.database.copyCommand)}
+                  <T>Copy command</T>
                 </Button>
                 {dismiss}
               </div>
@@ -135,14 +145,14 @@ function ReclaimRow({
   readonly status: DatabaseStorageStatus;
   readonly dismiss: ReactNode;
 }) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   const reclaim = useAtomCommand(serverEnvironment.reclaimDatabaseSpace);
   const [confirming, setConfirming] = useState(false);
   const [requested, setRequested] = useState(false);
   // A failed repair reports back after the restart, which ends the wait.
   const restarting = requested && status.reclaimFailure === undefined;
   const minutes = databaseReclaimMinutes(status);
-  const size = formatGiB(status.reclaimableBytes);
+  const amount = formatGiB(status.reclaimableBytes);
   const start = async () => {
     setConfirming(false);
     setRequested(true);
@@ -150,8 +160,10 @@ function ReclaimRow({
     if (result._tag === "Success") {
       toastManager.add({
         type: "success",
-        title: t(($) => $.extra.database.reclaimingTitle, { size, environment: label }),
-        description: t(($) => $.extra.database.reclaimingDescription, { minutes }),
+        title: gt("Reclaiming {amount} on {environment}", { amount, environment: label }),
+        description: gt("T3 Code there restarts and is back in about {minutes} min.", {
+          minutes,
+        }),
       });
       return;
     }
@@ -160,17 +172,20 @@ function ReclaimRow({
     const error = squashAtomCommandFailure(result);
     toastManager.add({
       type: "error",
-      title: t(($) => $.extra.database.reclaimFailed, { environment: label }),
-      description: error instanceof Error ? error.message : t(($) => $.extra.database.error),
+      title: gt("Could not reclaim space on {environment}", { environment: label }),
+      description:
+        error instanceof Error
+          ? (thrownErrorMessage(error, m) ?? error.message)
+          : gt("An error occurred."),
     });
   };
   return (
     <SettingsRow
-      title={t(($) => $.extra.database.space, { size, environment: label })}
+      title={gt("{amount} on {environment}", { amount, environment: label })}
       description={
         status.reclaimFailure === undefined
-          ? t(($) => $.extra.database.restartDescription, { minutes })
-          : t(($) => $.extra.database.lastAttemptFailed, { error: status.reclaimFailure })
+          ? gt("Restarts T3 Code there. It will be offline for about {minutes} min.", { minutes })
+          : gt("The last attempt failed: {reason}", { reason: status.reclaimFailure })
       }
       control={
         <div className="flex flex-wrap items-center gap-1.5">
@@ -180,26 +195,32 @@ function ReclaimRow({
             disabled={restarting}
             onClick={() => setConfirming(true)}
           >
-            {restarting
-              ? t(($) => $.extra.database.restarting)
-              : t(($) => $.extra.database.reclaimAction)}
+            {restarting ? gt("Restarting…") : gt("Reclaim")}
           </Button>
           {dismiss}
           <AlertDialog open={confirming} onOpenChange={setConfirming}>
             <AlertDialogPopup>
               <AlertDialogHeader>
                 <AlertDialogTitle>
-                  {t(($) => $.extra.database.confirmTitle, { size, environment: label })}
+                  <T>
+                    Reclaim <Var>{amount}</Var> on <Var>{label}</Var>?
+                  </T>
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  {t(($) => $.extra.database.confirmDescription, { environment: label, minutes })}
+                  <T>
+                    T3 Code on <Var>{label}</Var> stops, rebuilds its database, and starts again. It
+                    will be offline for about <Var>{minutes}</Var> min. Running agents stop when it
+                    restarts.
+                  </T>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogClose render={<Button variant="outline" />}>
-                  {t(($) => $.extra.database.cancel)}
+                  <T>Cancel</T>
                 </AlertDialogClose>
-                <Button onClick={() => void start()}>{t(($) => $.extra.database.confirm)}</Button>
+                <Button onClick={() => void start()}>
+                  <T>Restart and reclaim</T>
+                </Button>
               </AlertDialogFooter>
             </AlertDialogPopup>
           </AlertDialog>

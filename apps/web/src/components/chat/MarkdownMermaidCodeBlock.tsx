@@ -1,5 +1,5 @@
+import { useGT } from "gt-react";
 import { CodeIcon, WorkflowIcon } from "lucide-react";
-import { useTranslation } from "react-i18next";
 import { Suspense, use, useState, type ReactNode } from "react";
 
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
@@ -24,13 +24,13 @@ export function MarkdownMermaidCodeBlock({
   onExpand: (imageUrl: string) => void;
   children: ReactNode;
 }) {
+  const gt = useGT();
   const [showCode, setShowCode] = useState(false);
   const searching = use(MarkdownFindContext);
   const revealSource = () => setShowCode(true);
   const sourceRevealRef = findRevealRef(revealSource);
   const showDiagram = !showCode && !isStreaming && code.trim().length > 0;
-  const { t } = useTranslation("chat");
-  const toggleLabel = showCode ? t(($) => $.markdown.showDiagram) : t(($) => $.markdown.showCode);
+  const toggleLabel = showCode ? gt("Show diagram") : gt("Show code");
   return (
     <MarkdownCodeBlock
       code={code}

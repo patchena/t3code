@@ -1,5 +1,5 @@
+import { useMessages } from "gt-react";
 import { type ReactNode } from "react";
-import { useTranslation } from "react-i18next";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
 import { type TimestampFormat } from "@t3tools/contracts/settings";
@@ -22,7 +22,7 @@ export function TimelineRowTimestamp({
   className?: string;
   alwaysVisible?: boolean;
 }) {
-  const { t: tCommon, i18n } = useTranslation("common");
+  const m = useMessages();
   return (
     <Tooltip>
       <TooltipTrigger
@@ -36,23 +36,29 @@ export function TimelineRowTimestamp({
           />
         }
       >
-        {formatDayAwareTimestamp(createdAt, timestampFormat, tCommon)}
+        {formatDayAwareTimestamp(createdAt, timestampFormat, undefined, undefined, m)}
       </TooltipTrigger>
-      <TooltipPopup>
-        {formatChatTimestampTooltip(createdAt, timestampFormat, tCommon, i18n.language)}
-      </TooltipPopup>
+      <TooltipPopup>{formatChatTimestampTooltip(createdAt, timestampFormat, m)}</TooltipPopup>
     </Tooltip>
   );
 }
 
-export function ActivityShimmerOverlay({ children }: { children: ReactNode }) {
+export function ActivityShimmerOverlay({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
     <span
       aria-hidden
       className="live-activity-focus pointer-events-none absolute inset-y-0 select-none"
     >
       <span className="live-activity-focus-counter block">
-        <span className="live-activity-focus-aligned block text-foreground">{children}</span>
+        <span className={cn("live-activity-focus-aligned block text-foreground", className)}>
+          {children}
+        </span>
       </span>
     </span>
   );

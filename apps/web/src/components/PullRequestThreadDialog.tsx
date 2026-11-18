@@ -1,5 +1,3 @@
-import { pullRequestStatePresentation } from "~/components/pullRequest/pullRequestIcons";
-import { useTranslation } from "react-i18next";
 import {
   AuthOrchestrationOperateScope,
   type EnvironmentId,
@@ -9,8 +7,12 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { m } from "../i18n/messages";
 import { useDebouncedValue } from "@tanstack/react-pacer";
 import { useRef, useState } from "react";
+import { T, useGT, useMessages, Var } from "gt-react";
+import { changeRequestTermKind } from "./pullRequest/changeRequestTerm";
 
 import {
   readCachedPullRequestResolution,
@@ -23,8 +25,8 @@ import { getSourceControlPresentation } from "~/sourceControlPresentation";
 import { useEnvironmentQuery } from "~/state/query";
 import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
 import { vcsEnvironment } from "~/state/vcs";
-import { offHeadPullRequestCheckoutToast } from "~/components/pullRequest/pullRequestCheckoutToast";
-import { Button } from "~/components/ui/button";
+import { offHeadPullRequestCheckoutToast } from "./pullRequest/pullRequestCheckoutToast";
+import { Button } from "./ui/button";
 import {
   Dialog,
   DialogDescription,
@@ -33,10 +35,10 @@ import {
   DialogPanel,
   DialogPopup,
   DialogTitle,
-} from "~/components/ui/dialog";
-import { Input } from "~/components/ui/input";
-import { Spinner } from "~/components/ui/spinner";
-import { toastManager } from "~/components/ui/toast";
+} from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Spinner } from "./ui/spinner";
+import { toastManager } from "./ui/toast";
 
 interface PullRequestThreadDialogProps {
   open: boolean;
@@ -74,12 +76,13 @@ export function PullRequestThreadDialog({
   onOpenChange,
   onPrepared,
 }: PullRequestThreadDialogProps) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
+  const messages = useMessages();
   const referenceInputRef = useRef<HTMLInputElement>(null);
   const [reference, setReference] = useState(initialReference ?? "");
   const [referenceDirty, setReferenceDirty] = useState(false);
   const [preparingMode, setPreparingMode] = useState<"local" | "worktree" | null>(null);
-  const [prepareError, setPrepareError] = useState<{ readonly cause: unknown } | null>(null);
+  const [prepareErrorMessage, setPrepareErrorMessage] = useState<string | null>(null);
   const [debouncedReference, referenceDebouncer] = useDebouncedValue(
     reference,
     { wait: 450 },
@@ -95,6 +98,7 @@ export function PullRequestThreadDialog({
   );
   const sourceControlPresentation = getSourceControlPresentation(gitStatus?.sourceControlProvider);
   const terminology = sourceControlPresentation.terminology;
+  const term = changeRequestTermKind(terminology);
   const SourceControlIcon = sourceControlPresentation.Icon;
 
   const parsedReference = parsePullRequestReference(reference);
@@ -143,7 +147,7 @@ export function PullRequestThreadDialog({
     if (!parsedReference || !resolvedPullRequest || !cwd) {
       return;
     }
-    setPrepareError(null);
+    setPrepareErrorMessage(null);
     setPreparingMode(mode);
     const result = await preparePullRequestThreadAction.run({
       reference: parsedReference,
@@ -156,7 +160,13 @@ export function PullRequestThreadDialog({
         preparePullRequestThreadAction.resetError();
       } else {
         const error = squashAtomCommandFailure(result);
-        setPrepareError({ cause: error });
+        setPrepareErrorMessage(
+          thrownErrorMessage(error, m) ??
+            gt(
+              "Failed to prepare {term, select, mr {merge request} cr {change request} other {pull request}} thread.",
+              { term },
+            ),
+        );
       }
       return;
     }
@@ -166,7 +176,7 @@ export function PullRequestThreadDialog({
       pullRequestUrl: result.value.pullRequest.url,
     });
     if (!result.value.isOnPullRequestHead) {
-      toastManager.add(offHeadPullRequestCheckoutToast(terminology, t));
+      toastManager.add(offHeadPullRequestCheckoutToast(terminology));
     }
     onOpenChange(false);
   };
@@ -174,26 +184,28 @@ export function PullRequestThreadDialog({
   const validationMessage = !referenceDirty
     ? null
     : reference.trim().length === 0
-      ? t(($) => $.git.requestReferenceHelp, { term: terminology.singular })
+      ? gt(
+          "Paste a {term, select, mr {merge request} cr {change request} other {pull request}} URL, checkout command, or enter 123 / #123.",
+          { term },
+        )
       : parsedReference === null
-        ? t(($) => $.git.requestReferenceFormats, { term: terminology.singular })
+        ? gt(
+            "Use a {term, select, mr {merge request} cr {change request} other {pull request}} URL, checkout command, 123, or #123.",
+            { term },
+          )
         : null;
-  const prepareErrorMessage =
-    prepareError === null
-      ? null
-      : prepareError.cause instanceof Error
-        ? prepareError.cause.message
-        : t(($) => $.git.prepareRequestThreadFailed, { term: terminology.singular });
   const errorMessage =
     validationMessage ??
     prepareErrorMessage ??
     (resolvedPullRequest === null && pullRequestResolution.error
       ? pullRequestResolution.error
-      : preparePullRequestThreadAction.error instanceof Error
-        ? preparePullRequestThreadAction.error.message
-        : preparePullRequestThreadAction.error
-          ? t(($) => $.git.prepareRequestThreadFailed, { term: terminology.singular })
-          : null);
+      : preparePullRequestThreadAction.error
+        ? (thrownErrorMessage(preparePullRequestThreadAction.error, messages) ??
+          gt(
+            "Failed to prepare {term, select, mr {merge request} cr {change request} other {pull request}} thread.",
+            { term },
+          ))
+        : null);
 
   return (
     <Dialog
@@ -215,24 +227,34 @@ export function PullRequestThreadDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center">
             <SourceControlIcon className="me-2 size-4" />
-            {t(($) => $.git.checkoutRequestTitle, { term: terminology.singular })}
+            {gt(
+              "Checkout {term, select, mr {merge request} cr {change request} other {pull request}}",
+              { term },
+            )}
           </DialogTitle>
           <DialogDescription>
-            {t(($) => $.git.resolveRequestDescription, {
-              term: `${sourceControlPresentation.providerName} ${terminology.singular}`,
-            })}
+            {gt(
+              "Resolve a {provider} {term, select, mr {merge request} cr {change request} other {pull request}}, then create the draft thread in the main repo or in a dedicated worktree.",
+              { provider: sourceControlPresentation.providerName, term },
+            )}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <label className="grid gap-1.5">
             <span className="text-xs font-medium text-foreground capitalize">
-              {terminology.singular}
+              {gt("{term, select, mr {merge request} cr {change request} other {pull request}}", {
+                term,
+                $context: "field label, capitalized by CSS",
+              })}
             </span>
             <Input
               ref={referenceInputRef}
-              placeholder={t(($) => $.git.requestReferencePlaceholder, {
-                term: terminology.shortLabel,
-              })}
+              placeholder={gt(
+                "{term, select, mr {MR} cr {change request} other {PR}} URL, checkout command, or #42",
+                {
+                  term,
+                },
+              )}
               value={reference}
               onChange={(event) => {
                 setReferenceDirty(true);
@@ -259,15 +281,21 @@ export function PullRequestThreadDialog({
                 <div className="min-w-0">
                   <p className="truncate font-medium text-sm">{resolvedPullRequest.title}</p>
                   <p className="truncate text-muted-foreground text-xs">
-                    #{resolvedPullRequest.number} ·{" "}
-                    {t(($) => $.git.refDirection, {
-                      head: resolvedPullRequest.headBranch,
-                      base: resolvedPullRequest.baseBranch,
-                    })}
+                    <T>
+                      #<Var>{resolvedPullRequest.number}</Var> ·{" "}
+                      <Var>{resolvedPullRequest.headBranch}</Var> to{" "}
+                      <Var>{resolvedPullRequest.baseBranch}</Var>
+                    </T>
                   </p>
                 </div>
                 <span className={cn("shrink-0 text-xs capitalize", statusTone)}>
-                  {pullRequestStatePresentation(t)[resolvedPullRequest.state].label}
+                  {gt(
+                    "{state, select, open {open} closed {closed} merged {merged} other {{state}}}",
+                    {
+                      state: resolvedPullRequest.state,
+                      $context: "pull request state, capitalized by CSS",
+                    },
+                  )}
                 </span>
               </div>
             </div>
@@ -276,8 +304,10 @@ export function PullRequestThreadDialog({
           {isResolving ? (
             <div className="flex items-center gap-2 text-muted-foreground text-xs">
               <Spinner size="sm" />
-              {t(($) => $.git.resolving)}
-              {terminology.singular}...
+              {gt(
+                "Resolving {term, select, mr {merge request} cr {change request} other {pull request}}...",
+                { term },
+              )}
             </div>
           ) : null}
 
@@ -291,7 +321,7 @@ export function PullRequestThreadDialog({
             onClick={() => onOpenChange(false)}
             disabled={preparePullRequestThreadAction.isPending}
           >
-            {t(($) => $.git.cancel)}
+            {gt("Cancel")}
           </Button>
           <Button
             type="button"
@@ -306,7 +336,9 @@ export function PullRequestThreadDialog({
               preparePullRequestThreadAction.isPending
             }
           >
-            {preparingMode === "local" ? t(($) => $.git.preparingLocal) : t(($) => $.git.local)}
+            {preparingMode === "local"
+              ? gt("Preparing local...")
+              : gt("Local", { $context: "checkout in the main repo" })}
           </Button>
           <Button
             type="button"
@@ -322,8 +354,8 @@ export function PullRequestThreadDialog({
             }
           >
             {preparingMode === "worktree"
-              ? t(($) => $.git.preparingWorktree)
-              : t(($) => $.git.worktree)}
+              ? gt("Preparing worktree...")
+              : gt("Worktree", { $context: "checkout in a new git worktree" })}
           </Button>
         </DialogFooter>
       </DialogPopup>

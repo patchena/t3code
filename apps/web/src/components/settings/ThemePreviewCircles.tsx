@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+import { useGT } from "gt-react";
 import { MoonIcon, SunIcon } from "lucide-react";
 import type { CSSProperties } from "react";
 import {
@@ -160,7 +160,7 @@ export function ThemePreviewCircles({
   onSelectMode: (mode: ThemeMode) => void;
   previews: ThemeCardDefinition["previews"];
 }) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   return (
     <div className="flex min-h-16 items-center justify-center gap-2.5 px-3 pt-3">
       {previews.map((preview) => {
@@ -173,8 +173,8 @@ export function ThemePreviewCircles({
                 <button
                   aria-label={
                     mode === "light"
-                      ? t(($) => $.extra.themes.previewLight, { name: label })
-                      : t(($) => $.extra.themes.previewDark, { name: label })
+                      ? gt("Use {label} light mode", { label })
+                      : gt("Use {label} dark mode", { label })
                   }
                   aria-pressed={isPicked}
                   className={cn(
@@ -211,9 +211,7 @@ export function ThemePreviewCircles({
               }
             />
             <TooltipPopup>
-              {mode === "light"
-                ? t(($) => $.extra.themes.previewLightOnly)
-                : t(($) => $.extra.themes.previewDarkOnly)}
+              {mode === "light" ? gt("Use for light mode only") : gt("Use for dark mode only")}
             </TooltipPopup>
           </Tooltip>
         );

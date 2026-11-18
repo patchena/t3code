@@ -3,7 +3,7 @@ import { create } from "zustand";
 
 import type { PullRequestDetailTab } from "~/rightPanelStore";
 
-import { pullRequestReviewKey } from "~/components/pullRequest/pullRequestReviewStore";
+import { pullRequestReviewKey } from "../pullRequestReviewStore";
 
 export interface GuideRunWatch {
   readonly environmentId: EnvironmentId;

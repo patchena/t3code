@@ -1,4 +1,3 @@
-import { useTranslation } from "react-i18next";
 import { useAtomValue } from "@effect/atom-react";
 import {
   canEditPullRequestMaintainerEdits,
@@ -27,14 +26,17 @@ import {
   ScrollTextIcon,
   Trash2Icon,
 } from "lucide-react";
+import { Branch, msg, T, useGT, useMessages } from "gt-react";
 import { useId, useState } from "react";
+
+import { m } from "~/i18n/messages";
 
 import { shortcutLabelForCommand } from "~/keybindings";
 import { readLocalApi } from "~/localApi";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { primaryServerKeybindingsAtom } from "~/state/server";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { Button } from "~/components/ui/button";
+import { Button } from "../ui/button";
 import {
   Menu,
   MenuCheckboxItem,
@@ -45,23 +47,22 @@ import {
   MenuSeparator,
   MenuShortcut,
   MenuTrigger,
-} from "~/components/ui/menu";
-import { RefreshIcon } from "~/components/ui/refresh-icon";
-import { toastManager } from "~/components/ui/toast";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+} from "../ui/menu";
+import { RefreshIcon } from "../ui/refresh-icon";
+import { toastManager } from "../ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { ActOnEnvironmentPicker, type PerformPullRequestAction } from "./PullRequestDetailActions";
 import {
-  ActOnEnvironmentPicker,
-  type PerformPullRequestAction,
-} from "~/components/pullRequest/PullRequestDetailActions";
-import {
-  pullRequestMergeMethodLabels,
+  PULL_REQUEST_MERGE_METHOD_LABELS,
   pullRequestActionMenuHasGroup,
   readableFailure,
-} from "~/components/pullRequest/pullRequestDetail.logic";
-import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
-import type { PickableEnvironment } from "~/components/pullRequest/pullRequestProjectAssignment.logic";
-import { PullRequestThreadLinks } from "~/components/pullRequest/PullRequestThreadLinks";
-import { useInlineActionConfirm } from "~/components/pullRequest/useInlineActionConfirm";
+} from "./pullRequestDetail.logic";
+import { PullRequestGlyph } from "./pullRequestIcons";
+import type { PickableEnvironment } from "./pullRequestProjectAssignment.logic";
+import { PullRequestThreadLinks } from "./PullRequestThreadLinks";
+import { useInlineActionConfirm } from "./useInlineActionConfirm";
+
+import { changeRequestTermKind } from "./changeRequestTerm";
 
 /** Everything else the reader can do with the pull request, behind the header's overflow button. */
 export function PullRequestActionsMenu({
@@ -157,9 +158,10 @@ export function PullRequestActionsMenu({
   pendingAction: PullRequestAction | null;
   perform: PerformPullRequestAction;
   openOnHostText: string;
-  copyReference: (value: string, label: string) => void;
+  copyReference: (value: string, failureTitle: string) => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
+  const resolve = useMessages();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const inlineConfirm = useInlineActionConfirm(pullRequestKey);
   const actionPending = pendingAction !== null;
@@ -197,11 +199,8 @@ export function PullRequestActionsMenu({
       setMaintainerEditsChoice(previousChoice);
       toastManager.add({
         type: "error",
-        title: t(($) => $.git.maintainerAccessFailed),
-        description: readableFailure(
-          squashAtomCommandFailure(result),
-          t(($) => $.git.tryAgainSentence),
-        ),
+        title: m(msg("Could not save maintainer access")),
+        description: readableFailure(squashAtomCommandFailure(result), m(msg("Try again."))),
       });
       return;
     }
@@ -217,8 +216,14 @@ export function PullRequestActionsMenu({
                 <Button
                   aria-label={
                     refreshing
-                      ? t(($) => $.git.refreshingRequest, { term: terminology.singular })
-                      : t(($) => $.git.moreRequestActions, { term: terminology.singular })
+                      ? gt(
+                          "Refreshing {term, select, mr {merge request} cr {change request} other {pull request}}",
+                          { term: changeRequestTermKind(terminology) },
+                        )
+                      : gt(
+                          "More {term, select, mr {merge request} cr {change request} other {pull request}} actions",
+                          { term: changeRequestTermKind(terminology) },
+                        )
                   }
                   size="icon-xs"
                   variant="ghost-muted"
@@ -235,8 +240,14 @@ export function PullRequestActionsMenu({
         />
         <TooltipPopup>
           {refreshing
-            ? t(($) => $.git.refreshingRequest, { term: terminology.singular })
-            : t(($) => $.git.moreRequestActions, { term: terminology.singular })}
+            ? gt(
+                "Refreshing {term, select, mr {merge request} cr {change request} other {pull request}}",
+                { term: changeRequestTermKind(terminology) },
+              )
+            : gt(
+                "More {term, select, mr {merge request} cr {change request} other {pull request}} actions",
+                { term: changeRequestTermKind(terminology) },
+              )}
         </TooltipPopup>
       </Tooltip>
       <MenuPopup align="end" side="bottom">
@@ -250,16 +261,24 @@ export function PullRequestActionsMenu({
         />
         <MenuItem disabled={refreshing} onClick={() => void refreshFromHost()}>
           <RefreshIcon size="sm" refreshing={refreshing} />
-          {t(($) => $.git.refresh)}
+          <T context="verb, menu item">Refresh</T>
         </MenuItem>
         <MenuItem disabled={handoff !== null} onClick={askAboutPullRequest}>
           <MessageCircleQuestionIcon className="mt-1 size-3.5 shrink-0 self-start" />
           <span className="flex min-w-0 flex-col">
-            <span>{handoff === "ask" ? t(($) => $.git.opening) : t(($) => $.git.askQuestion)}</span>
+            <span>{handoff === "ask" ? gt("Opening...") : gt("Ask a question")}</span>
             <span className="text-xs text-muted-foreground">
               {attachesToComposer
-                ? t(($) => $.git.addRequestToComposer, { term: terminology.singular })
-                : t(($) => $.git.openRequestThread, { term: terminology.singular })}
+                ? gt(
+                    "Adds the {term, select, mr {merge request} cr {change request} other {pull request}} to this thread's composer.",
+                    { term: changeRequestTermKind(terminology) },
+                  )
+                : gt(
+                    "Opens a thread that knows which {term, select, mr {merge request} cr {change request} other {pull request}} you mean.",
+                    {
+                      term: changeRequestTermKind(terminology),
+                    },
+                  )}
             </span>
           </span>
         </MenuItem>
@@ -268,26 +287,28 @@ export function PullRequestActionsMenu({
           <span className="flex min-w-0 flex-col">
             <span>
               {handoff === "explain"
-                ? t(($) => $.git.opening)
-                : t(($) => $.git.explainRequest, { term: terminology.shortLabel })}
+                ? gt("Opening...")
+                : gt("Explain this {term, select, mr {MR} cr {change request} other {PR}}", {
+                    term: changeRequestTermKind(terminology),
+                  })}
             </span>
             <span className="text-xs text-muted-foreground">
-              {t(($) => $.git.guideDescription)}
+              <T>A walk through the diff and what to read closely.</T>
             </span>
           </span>
         </MenuItem>
         <MenuItem disabled={handoff !== null || !canFixFindings} onClick={startFixFindings}>
           <HammerIcon className="size-3.5" />
-          {handoff === "findings" ? t(($) => $.git.preparing) : handoffLabels.fixFindings}
+          {handoff === "findings" ? gt("Preparing...") : handoffLabels.fixFindings}
         </MenuItem>
         {canWriteGuide ? (
           <MenuItem disabled={guideRunning} onClick={writeGuide}>
             <ScrollTextIcon className="size-3.5" />
             {guideRunning
-              ? t(($) => $.git.writingGuide)
+              ? gt("Writing guide...")
               : !guideWritten
-                ? t(($) => $.git.writeGuide)
-                : t(($) => $.git.rewriteGuide)}
+                ? gt("Write guide")
+                : gt("Rewrite guide")}
           </MenuItem>
         ) : null}
         {pickableEnvironments.length > 0 ? (
@@ -306,18 +327,23 @@ export function PullRequestActionsMenu({
               checked={maintainerCanModify === true}
               disabled={!canSaveMaintainerEdits}
               closeOnClick={false}
-              aria-label={t(($) => $.git.allowMaintainerEdits)}
+              aria-label={gt("Allow edits from maintainers")}
               aria-describedby={maintainerEditsHintId}
               onCheckedChange={(value) => void saveMaintainerEdits(value)}
             >
               <span className="flex max-w-xs flex-col gap-0.5">
-                <span>{t(($) => $.git.allowMaintainerEdits)}</span>
+                <span>
+                  <T>Allow edits from maintainers</T>
+                </span>
                 <span id={maintainerEditsHintId} className="text-xs text-muted-foreground">
-                  {t(($) => $.git.maintainerAccessDescription)}
+                  <T>
+                    Maintainers can push to this branch. If your fork has workflows, this can also
+                    give access to its secrets.
+                  </T>
                 </span>
                 {maintainerEditsSaving ? (
                   <span role="status" className="text-xs text-muted-foreground">
-                    {t(($) => $.git.savingEllipsis)}
+                    <T>Saving…</T>
                   </span>
                 ) : null}
               </span>
@@ -337,38 +363,32 @@ export function PullRequestActionsMenu({
                 ) : (
                   <PullRequestGlyph.draft className="size-3.5" />
                 )}
-                {detail.isDraft ? t(($) => $.git.readyForReview) : t(($) => $.git.convertToDraft)}
+                {detail.isDraft ? gt("Ready for review") : gt("Convert to draft")}
               </MenuItem>
             ) : null}
             {showsMergeNow ? (
               <MenuItem
                 closeOnClick={inlineConfirm.isArmed("merge")}
-                aria-label={
-                  inlineConfirm.isArmed("merge")
-                    ? t(($) => $.git.confirmMerge)
-                    : t(($) => $.git.mergeNow)
-                }
+                aria-label={inlineConfirm.isArmed("merge") ? gt("Confirm merge?") : gt("Merge now")}
                 disabled={actionPending}
                 {...inlineConfirm.props("merge", () => void perform("merge", selectedMergeMethod))}
               >
                 <PullRequestGlyph.merged className="size-3.5" />
-                {inlineConfirm.isArmed("merge")
-                  ? t(($) => $.git.confirmMerge)
-                  : t(($) => $.git.mergeNow)}
+                {inlineConfirm.isArmed("merge") ? gt("Confirm merge?") : gt("Merge now")}
               </MenuItem>
             ) : null}
             {autoMergeArmed && can("disable-auto-merge") ? (
               <MenuItem disabled={actionPending} onClick={() => void perform("disable-auto-merge")}>
                 <PullRequestGlyph.merged className="size-3.5" />
-                {t(($) => $.git.disableAutoMerge)}
+                <T>Disable auto-merge</T>
               </MenuItem>
             ) : showsAutoMerge ? (
               <MenuItem
                 closeOnClick={inlineConfirm.isArmed("enable-auto-merge")}
                 aria-label={
                   inlineConfirm.isArmed("enable-auto-merge")
-                    ? t(($) => $.git.confirmAutoMerge)
-                    : t(($) => $.git.enableAutoMerge)
+                    ? gt("Confirm auto-merge?")
+                    : gt("Enable auto-merge")
                 }
                 disabled={actionPending}
                 {...inlineConfirm.props(
@@ -378,8 +398,8 @@ export function PullRequestActionsMenu({
               >
                 <PullRequestGlyph.merged className="size-3.5" />
                 {inlineConfirm.isArmed("enable-auto-merge")
-                  ? t(($) => $.git.confirmAutoMerge)
-                  : t(($) => $.git.enableAutoMerge)}
+                  ? gt("Confirm auto-merge?")
+                  : gt("Enable auto-merge")}
               </MenuItem>
             ) : null}
             {showsMergeMethods ? (
@@ -398,7 +418,7 @@ export function PullRequestActionsMenu({
                     >
                       <span className="flex min-w-0 items-center gap-2">
                         <PullRequestGlyph.merged className="size-3.5" />
-                        <span>{pullRequestMergeMethodLabels(t)[method]}</span>
+                        <span>{resolve(PULL_REQUEST_MERGE_METHOD_LABELS[method])}</span>
                       </span>
                     </MenuRadioItem>
                   ))}
@@ -422,12 +442,16 @@ export function PullRequestActionsMenu({
           onClick={() =>
             copyReference(
               detail.url,
-              t(($) => $.git.requestLink, { term: terminology.shortLabel }),
+              resolve(
+                msg("Failed to copy {term, select, mr {MR} cr {change request} other {PR}} link", {
+                  term: changeRequestTermKind(terminology),
+                }),
+              ),
             )
           }
         >
           <LinkIcon className="size-3.5" />
-          {t(($) => $.git.copyLink)}
+          <T>Copy link</T>
           <MenuShortcut>
             {shortcutLabelForCommand(keybindings, "thread.copyReference")}
           </MenuShortcut>
@@ -436,12 +460,23 @@ export function PullRequestActionsMenu({
           onClick={() =>
             copyReference(
               `#${reference.number}`,
-              t(($) => $.git.requestNumber, { term: terminology.shortLabel }),
+              resolve(
+                msg(
+                  "Failed to copy {term, select, mr {MR} cr {change request} other {PR}} number",
+                  { term: changeRequestTermKind(terminology) },
+                ),
+              ),
             )
           }
         >
           <CopyIcon className="size-3.5" />
-          {t(($) => $.git.copyRequestNumber, { term: terminology.shortLabel })}
+          <T>
+            Copy{" "}
+            <Branch branch={changeRequestTermKind(terminology)} mr="MR" cr="change request">
+              PR
+            </Branch>{" "}
+            number
+          </T>
           <MenuShortcut>
             {shortcutLabelForCommand(keybindings, "pullRequest.copyNumber")}
           </MenuShortcut>
@@ -453,8 +488,11 @@ export function PullRequestActionsMenu({
               closeOnClick={inlineConfirm.isArmed("close")}
               aria-label={
                 inlineConfirm.isArmed("close")
-                  ? t(($) => $.git.confirmClose)
-                  : t(($) => $.git.closeRequest, { term: terminology.singular })
+                  ? gt("Confirm close?")
+                  : gt(
+                      "Close {term, select, mr {merge request} cr {change request} other {pull request}}",
+                      { term: changeRequestTermKind(terminology) },
+                    )
               }
               variant="destructive"
               disabled={actionPending}
@@ -462,8 +500,11 @@ export function PullRequestActionsMenu({
             >
               <PullRequestGlyph.closed className="size-3.5" />
               {inlineConfirm.isArmed("close")
-                ? t(($) => $.git.confirmClose)
-                : t(($) => $.git.closeRequest, { term: terminology.singular })}
+                ? gt("Confirm close?")
+                : gt(
+                    "Close {term, select, mr {merge request} cr {change request} other {pull request}}",
+                    { term: changeRequestTermKind(terminology) },
+                  )}
             </MenuItem>
           </>
         ) : detail.state === "closed" && can("reopen") ? (
@@ -471,8 +512,16 @@ export function PullRequestActionsMenu({
             <MenuSeparator />
             <MenuItem disabled={actionPending} onClick={() => void perform("reopen")}>
               <PullRequestGlyph.reopen className="size-3.5" />
-              {t(($) => $.git.reopen)}
-              {terminology.singular}
+              <T>
+                Reopen{" "}
+                <Branch
+                  branch={changeRequestTermKind(terminology)}
+                  mr="merge request"
+                  cr="change request"
+                >
+                  pull request
+                </Branch>
+              </T>
             </MenuItem>
           </>
         ) : detail.state === "merged" && can("revert") ? (
@@ -481,18 +530,14 @@ export function PullRequestActionsMenu({
             <MenuItem
               closeOnClick={inlineConfirm.isArmed("revert")}
               aria-label={
-                inlineConfirm.isArmed("revert")
-                  ? t(($) => $.git.confirmRevert)
-                  : t(($) => $.git.revertChanges)
+                inlineConfirm.isArmed("revert") ? gt("Confirm revert?") : gt("Revert changes")
               }
               variant={inlineConfirm.isArmed("revert") ? "destructive" : "default"}
               disabled={actionPending}
               {...inlineConfirm.props("revert", () => void perform("revert"))}
             >
               <RotateCcwIcon className="size-3.5" />
-              {inlineConfirm.isArmed("revert")
-                ? t(($) => $.git.confirmRevert)
-                : t(($) => $.git.revertChanges)}
+              {inlineConfirm.isArmed("revert") ? gt("Confirm revert?") : gt("Revert changes")}
             </MenuItem>
           </>
         ) : null}
@@ -508,11 +553,11 @@ export function PullRequestActionsMenu({
               <span className="flex min-w-0 flex-col">
                 <span>
                   {pendingAction === "delete-branch"
-                    ? t(($) => $.git.deletingBranch)
-                    : t(($) => $.git.deleteBranch)}
+                    ? gt("Deleting branch...")
+                    : gt("Delete branch")}
                 </span>
                 <span className="truncate text-xs text-muted-foreground">
-                  {environmentConnected ? detail.headBranch : t(($) => $.git.reconnectDeleteBranch)}
+                  {environmentConnected ? detail.headBranch : gt("Reconnect to delete this branch")}
                 </span>
               </span>
             </MenuItem>

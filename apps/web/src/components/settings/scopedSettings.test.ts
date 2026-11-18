@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import {
   DEFAULT_SERVER_SETTINGS,
   EnvironmentAuthorizationError,
@@ -6,6 +5,7 @@ import {
   ProjectId,
   ProviderInstanceId,
   type ServerSettings,
+  type ServerSettingsPatch,
 } from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
@@ -14,6 +14,8 @@ import { resolveWorktreeCleanup } from "@t3tools/shared/projectSettings";
 
 import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
 import {
+  applyPendingScopedWrites,
+  createScopedSettingsWriter,
   persistScopedSettingsPatch,
   planProjectOverridesClear,
   planScopedSettingsClear,
@@ -23,10 +25,10 @@ import {
   scopedSettingsAreMixed,
   scopedSettingsSource,
   selectScopedSettingsEnvironments,
+  settlePendingScopedWrites,
+  type PendingScopedWrite,
 } from "./scopedSettings";
 import { resolveSettingsScope } from "./settingsScope";
-
-const t = createI18n("en").getFixedT(null, "settings");
 
 function environment(
   id: string,
@@ -56,8 +58,8 @@ const server = environment("Server");
 const offline = environment("Offline", { connected: false });
 const loading = environment("Loading", { loaded: false });
 const environments = [laptop, server, offline, loading];
-const all = resolveSettingsScope({}, [], environments, t);
-const named = resolveSettingsScope({ machine: server.environmentId }, [], environments, t);
+const all = resolveSettingsScope({}, [], environments);
+const named = resolveSettingsScope({ machine: server.environmentId }, [], environments);
 
 const projectId = ProjectId.make("project");
 const laptopProjectId = ProjectId.make("laptop-project");
@@ -97,12 +99,11 @@ const group: SidebarProjectSnapshot = {
   pinned: false,
   archived: false,
 };
-const project = resolveSettingsScope({ project: group.projectKey }, [group], environments, t);
+const project = resolveSettingsScope({ project: group.projectKey }, [group], environments);
 const checkout = resolveSettingsScope(
   { project: group.projectKey, machine: server.environmentId, checkout: member.physicalProjectKey },
   [group],
   environments,
-  t,
 );
 
 describe("scoped settings targets", () => {
@@ -113,13 +114,13 @@ describe("scoped settings targets", () => {
   });
 
   it("keeps an offline named environment selected without falling back to primary", () => {
-    const scope = resolveSettingsScope({ machine: offline.environmentId }, [], environments, t);
+    const scope = resolveSettingsScope({ machine: offline.environmentId }, [], environments);
     const selected = selectScopedSettingsEnvironments(scope, environments, laptop.environmentId);
     expect(selected.environments).toEqual([offline]);
     expect(selected.connectedEnvironments).toEqual([]);
     expect(selected.environment).toBeNull();
     expect(
-      planScopedSettingsPatch(scope, environments, { enableProviderUpdateChecks: false }, t),
+      planScopedSettingsPatch(scope, environments, { enableProviderUpdateChecks: false }),
     ).toMatchObject({
       serverWrites: [],
       unavailableReason: "Connect Offline to save this setting.",
@@ -166,14 +167,9 @@ describe("scoped settings writes", () => {
       settings: { worktreeCleanup: { mode: "off" } },
     });
     const targets = [custom, disabled];
-    const plan = planScopedSettingsPatch(
-      all,
-      targets,
-      {
-        storageCleanup: { worktreeOnDelete: false },
-      },
-      t,
-    );
+    const plan = planScopedSettingsPatch(all, targets, {
+      storageCleanup: { worktreeOnDelete: false },
+    });
     const policies = plan.serverWrites.map((write, index) =>
       resolveWorktreeCleanup(
         applyServerSettingsPatch(targets[index]!.serverConfig!.settings, write.patch),
@@ -214,6 +210,20 @@ describe("scoped settings writes", () => {
     const legacy = { settings: { ...DEFAULT_SERVER_SETTINGS, compactIdleThreads: false } };
     expect(scopedIdleCompaction([fixed, modes])).toEqual({ mixed: false, neverAvailable: true });
     expect(scopedIdleCompaction([fixed, legacy])).toEqual({ mixed: false, neverAvailable: false });
+    const legacyEnvironment = environment("Legacy", { settings: legacy.settings });
+    const projected = applyPendingScopedWrites(
+      [legacyEnvironment],
+      [
+        {
+          save: {},
+          environmentId: legacyEnvironment.environmentId,
+          patch: { defaultRuntimeMode: "auto" },
+        },
+      ],
+    );
+    expect(scopedIdleCompaction(resolveScopedSettingsTargets(all, projected)).neverAvailable).toBe(
+      false,
+    );
     expect(
       scopedIdleCompaction([fixed, { settings: { ...fixed.settings, idleCompaction: "off" } }])
         .mixed,
@@ -226,14 +236,9 @@ describe("scoped settings writes", () => {
       environment("Modes", { settings: { compactIdleThreads: "onReturn" } }),
       environment("Switch", { settings: { compactIdleThreads: false } }),
     ];
-    const plan = planScopedSettingsPatch(
-      resolveSettingsScope({}, [], targets, t),
-      targets,
-      {
-        idleCompaction: "beforeCacheExpires",
-      },
-      t,
-    );
+    const plan = planScopedSettingsPatch(resolveSettingsScope({}, [], targets), targets, {
+      idleCompaction: "beforeCacheExpires",
+    });
     expect(plan.serverWrites.map((write) => write.patch)).toEqual([
       { idleCompaction: "beforeCacheExpires" },
       { compactIdleThreads: "beforeCacheExpires" },
@@ -245,10 +250,9 @@ describe("scoped settings writes", () => {
     const persistServer = vi.fn().mockResolvedValue({ _tag: "Success" });
     const persistClient = vi.fn();
     await persistScopedSettingsPatch(
-      planScopedSettingsPatch(all, environments, { enableProviderUpdateChecks: false }, t),
+      planScopedSettingsPatch(all, environments, { enableProviderUpdateChecks: false }),
       persistServer,
       persistClient,
-      t,
     );
     expect(persistServer.mock.calls.map(([input]) => input.environmentId)).toEqual([
       laptop.environmentId,
@@ -270,7 +274,7 @@ describe("scoped settings writes", () => {
       plan: ReturnType<typeof planScopedSettingsPatch>,
       persistServer: ReturnType<typeof upgradedLaptop>,
     ) => {
-      const result = await persistScopedSettingsPatch(plan, persistServer, vi.fn(), t);
+      const result = await persistScopedSettingsPatch(plan, persistServer, vi.fn());
       return {
         saved: result.savedEnvironments.map(({ label }) => label),
         failed: result.failedEnvironments.map(({ label, message }) => ({ label, message })),
@@ -286,7 +290,7 @@ describe("scoped settings writes", () => {
     it("reports a dropped toggle", async () => {
       expect(
         await outcome(
-          planScopedSettingsPatch(all, environments, { reviewGuidesEnabled: true }, t),
+          planScopedSettingsPatch(all, environments, { reviewGuidesEnabled: true }),
           upgradedLaptop({ reviewGuidesEnabled: true }),
         ),
       ).toEqual({ saved: [laptop.label], failed: unsupported });
@@ -295,12 +299,7 @@ describe("scoped settings writes", () => {
     it("reports dropped text but accepts the server trimming it", async () => {
       expect(
         await outcome(
-          planScopedSettingsPatch(
-            all,
-            environments,
-            { reviewGuideInstructions: " Read tests " },
-            t,
-          ),
+          planScopedSettingsPatch(all, environments, { reviewGuideInstructions: " Read tests " }),
           upgradedLaptop({ reviewGuideInstructions: "Read tests" }),
         ),
       ).toEqual({ saved: [laptop.label], failed: unsupported });
@@ -310,7 +309,7 @@ describe("scoped settings writes", () => {
     it("reports a dropped key inside a project override", async () => {
       expect(
         await outcome(
-          planScopedSettingsPatch(project, environments, { defaultAutoPull: true }, t),
+          planScopedSettingsPatch(project, environments, { defaultAutoPull: true }),
           upgradedLaptop({
             projectSettingsOverrides: { [laptopProjectId]: { defaultAutoPull: true } },
           }),
@@ -321,7 +320,7 @@ describe("scoped settings writes", () => {
     it("accepts a write that matches what the environment already had", async () => {
       expect(
         await outcome(
-          planScopedSettingsPatch(all, environments, { reviewGuidesEnabled: false }, t),
+          planScopedSettingsPatch(all, environments, { reviewGuidesEnabled: false }),
           upgradedLaptop({}),
         ),
       ).toEqual({ saved: [laptop.label, server.label], failed: [] });
@@ -332,18 +331,12 @@ describe("scoped settings writes", () => {
     const persistServer = vi.fn().mockResolvedValue({ _tag: "Success" });
     const persistClient = vi.fn();
     await persistScopedSettingsPatch(
-      planScopedSettingsPatch(
-        named,
-        environments,
-        {
-          diffIgnoreWhitespace: false,
-          enableProviderUpdateChecks: false,
-        },
-        t,
-      ),
+      planScopedSettingsPatch(named, environments, {
+        diffIgnoreWhitespace: false,
+        enableProviderUpdateChecks: false,
+      }),
       persistServer,
       persistClient,
-      t,
     );
     expect(persistClient).toHaveBeenCalledExactlyOnceWith({ diffIgnoreWhitespace: false });
     expect(persistServer).toHaveBeenCalledExactlyOnceWith({
@@ -358,14 +351,9 @@ describe("scoped settings writes", () => {
         projectSettingsOverrides: { [projectId]: { enableAgentBrowserAccess: false } },
       },
     });
-    const plan = planScopedSettingsPatch(
-      project,
-      [laptop, withExisting],
-      {
-        defaultAutoPull: true,
-      },
-      t,
-    );
+    const plan = planScopedSettingsPatch(project, [laptop, withExisting], {
+      defaultAutoPull: true,
+    });
     expect(plan.unavailableReason).toBeNull();
     expect(plan.serverWrites).toEqual([
       {
@@ -386,7 +374,7 @@ describe("scoped settings writes", () => {
       },
     ]);
     expect(
-      planScopedSettingsPatch(checkout, [laptop, server], { defaultAutoPull: true }, t),
+      planScopedSettingsPatch(checkout, [laptop, server], { defaultAutoPull: true }),
     ).toMatchObject({
       serverWrites: [{ environmentId: server.environmentId }],
     });
@@ -418,22 +406,12 @@ describe("scoped settings writes", () => {
         },
       },
     });
-    const plan = planScopedSettingsPatch(
-      project,
-      [machine, customized],
-      {
-        worktreeCleanup: { mode: "custom", rules: { worktreeOnDelete: true } },
-      },
-      t,
-    );
-    const settledPlan = planScopedSettingsPatch(
-      project,
-      [machine, customized],
-      {
-        worktreeCleanup: { mode: "custom", rules: { worktreeSettledAfterDays: 0 } },
-      },
-      t,
-    );
+    const plan = planScopedSettingsPatch(project, [machine, customized], {
+      worktreeCleanup: { mode: "custom", rules: { worktreeOnDelete: true } },
+    });
+    const settledPlan = planScopedSettingsPatch(project, [machine, customized], {
+      worktreeCleanup: { mode: "custom", rules: { worktreeSettledAfterDays: 0 } },
+    });
     expect(
       settledPlan.serverWrites.map((write) => write.patch.projectSettingsOverrides),
     ).toMatchObject([
@@ -474,45 +452,34 @@ describe("scoped settings writes", () => {
       },
     ]);
     expect(
-      planScopedSettingsClear(checkout, [customized], ["worktreeCleanup"], t).serverWrites[0]
-        ?.patch,
+      planScopedSettingsClear(checkout, [customized], ["worktreeCleanup"]).serverWrites[0]?.patch,
     ).toEqual({
       projectSettingsOverrides: { [projectId]: { defaultAutoPull: true } },
     });
     expect(
-      planScopedSettingsPatch(
-        project,
-        [machine, customized],
-        {
-          storageCleanup: { browserArtifactsAfterDays: 8 },
-        },
-        t,
-      ).serverWrites,
+      planScopedSettingsPatch(project, [machine, customized], {
+        storageCleanup: { browserArtifactsAfterDays: 8 },
+      }).serverWrites,
     ).toEqual([]);
   });
 
   // regression: #11541 device settings were written to the wrong scope
   it("scopes agent device access to projects while keeping hub and hosts environment-wide", () => {
-    const plan = planScopedSettingsPatch(
-      project,
-      [laptop, server],
-      {
-        enableAgentDeviceAccess: true,
-      },
-      t,
-    );
+    const plan = planScopedSettingsPatch(project, [laptop, server], {
+      enableAgentDeviceAccess: true,
+    });
     expect(plan.serverWrites.map((write) => write.patch)).toEqual([
       { projectSettingsOverrides: { [projectId]: { enableAgentDeviceAccess: true } } },
       { projectSettingsOverrides: { [laptopProjectId]: { enableAgentDeviceAccess: true } } },
     ]);
     for (const patch of [{ enableDeviceSupport: true }, { deviceHosts: [] }]) {
-      expect(planScopedSettingsPatch(project, environments, patch, t).serverWrites).toEqual([]);
+      expect(planScopedSettingsPatch(project, environments, patch).serverWrites).toEqual([]);
     }
   });
 
   it("refuses environment-wide keys at project scope", () => {
     expect(
-      planScopedSettingsPatch(project, environments, { enableProviderUpdateChecks: false }, t),
+      planScopedSettingsPatch(project, environments, { enableProviderUpdateChecks: false }),
     ).toMatchObject({
       serverWrites: [],
       unavailableReason: "This setting is environment-wide and cannot be overridden by a project.",
@@ -523,12 +490,9 @@ describe("scoped settings writes", () => {
   it("refuses client-only keys at project scope", () => {
     for (const scope of [project, checkout]) {
       expect(
-        planScopedSettingsPatch(
-          scope,
-          environments,
-          { browserDefaultViewport: { _tag: "freeform", width: 1440, height: 900 } },
-          t,
-        ),
+        planScopedSettingsPatch(scope, environments, {
+          browserDefaultViewport: { _tag: "freeform", width: 1440, height: 900 },
+        }),
       ).toMatchObject({
         clientPatch: {},
         hasClientWrite: false,
@@ -537,9 +501,12 @@ describe("scoped settings writes", () => {
           "This setting is environment-wide and cannot be overridden by a project.",
       });
       expect(
-        planScopedSettingsPatch(scope, environments, { fontSizeInterface: 15 }, t, {
-          deviceOnly: true,
-        }),
+        planScopedSettingsPatch(
+          scope,
+          environments,
+          { fontSizeInterface: 15 },
+          { deviceOnly: true },
+        ),
       ).toMatchObject({ clientPatch: { fontSizeInterface: 15 }, unavailableReason: null });
     }
   });
@@ -552,7 +519,7 @@ describe("scoped settings writes", () => {
         },
       },
     });
-    const plan = planScopedSettingsClear(checkout, [laptop, withOverrides], ["defaultAutoPull"], t);
+    const plan = planScopedSettingsClear(checkout, [laptop, withOverrides], ["defaultAutoPull"]);
     expect(plan.serverWrites).toEqual([
       {
         environmentId: server.environmentId,
@@ -566,19 +533,13 @@ describe("scoped settings writes", () => {
         checkout,
         [laptop, withOverrides],
         ["defaultAutoPull", "enableAgentBrowserAccess"],
-        t,
       ).serverWrites[0]?.patch,
     ).toEqual({ projectSettingsOverrides: { [projectId]: null } });
   });
 
   it("never substitutes an environment-default write for an invalid scope", () => {
-    const scope = resolveSettingsScope({ machine: "removed" }, [group], environments, t);
-    const plan = planScopedSettingsPatch(
-      scope,
-      environments,
-      { enableAgentBrowserAccess: false },
-      t,
-    );
+    const scope = resolveSettingsScope({ machine: "removed" }, [group], environments);
+    const plan = planScopedSettingsPatch(scope, environments, { enableAgentBrowserAccess: false });
     expect(plan.serverWrites).toEqual([]);
     expect(plan.hasClientWrite).toBe(false);
     expect(plan.unavailableReason).not.toBeNull();
@@ -588,7 +549,7 @@ describe("scoped settings writes", () => {
     const third = environment("Third");
     const fourth = environment("Fourth");
     const selected = [...environments, third, fourth];
-    const scope = resolveSettingsScope({}, [], selected, t);
+    const scope = resolveSettingsScope({}, [], selected);
     const persistServer = vi
       .fn()
       .mockResolvedValueOnce({ _tag: "Success" })
@@ -604,10 +565,9 @@ describe("scoped settings writes", () => {
       .mockRejectedValueOnce(new Error("Disconnected during save"))
       .mockResolvedValueOnce({ _tag: "Success" });
     const result = await persistScopedSettingsPatch(
-      planScopedSettingsPatch(scope, selected, { enableAgentBrowserAccess: false }, t),
+      planScopedSettingsPatch(scope, selected, { enableAgentBrowserAccess: false }),
       persistServer,
       vi.fn(),
-      t,
     );
     expect(result.savedEnvironmentCount).toBe(2);
     expect(result.savedEnvironments.map(({ label }) => label)).toEqual([
@@ -624,6 +584,129 @@ describe("scoped settings writes", () => {
     ]);
     expect(persistServer).toHaveBeenCalledTimes(4);
   });
+
+  describe("rapid project saves on one environment", () => {
+    const saving = (initial: ServerSettings) => {
+      let stored = initial;
+      const persistServer = vi.fn(async ({ input }: { input: { patch: ServerSettingsPatch } }) => {
+        stored = applyServerSettingsPatch(stored, input.patch);
+        return { _tag: "Success" as const, value: stored };
+      });
+      return { persistServer, stored: () => stored };
+    };
+
+    // regression: #18426 rapid project saves rebuilt overrides from a copy that trailed them
+    it("keeps every edit and reset while the client's copy trails its saves", async () => {
+      let copy: ServerSettings = {
+        ...DEFAULT_SERVER_SETTINGS,
+        projectSettingsOverrides: { [projectId]: { enableAgentBrowserAccess: false } },
+      };
+      const host = saving(copy);
+      // No config push arrives, so the client's copy stays as it was before the first save.
+      const write = createScopedSettingsWriter(() => copy);
+      const save = (plan: Parameters<typeof write>[1]) =>
+        write([environment("Server", { settings: copy })], plan, host.persistServer, vi.fn());
+      await Promise.all([
+        save((current) => planScopedSettingsPatch(checkout, current, { defaultAutoPull: true })),
+        save((current) => planScopedSettingsClear(checkout, current, ["enableAgentBrowserAccess"])),
+        save((current) =>
+          planScopedSettingsPatch(checkout, current, { removeAgentCreditsOnMerge: true }),
+        ),
+      ]);
+      expect(host.stored().projectSettingsOverrides[projectId]).toEqual({
+        defaultAutoPull: true,
+        removeAgentCreditsOnMerge: true,
+      });
+      // The first save's push arrives late, after the newer saves have finished.
+      copy = (await host.persistServer.mock.results[0]!.value).value;
+      await save((current) =>
+        planScopedSettingsPatch(checkout, current, { defaultThreadEnvMode: "worktree" }),
+      );
+      expect(host.stored().projectSettingsOverrides[projectId]).toEqual({
+        defaultAutoPull: true,
+        removeAgentCreditsOnMerge: true,
+        defaultThreadEnvMode: "worktree",
+      });
+    });
+
+    it.each(["remote", "previous save"] as const)(
+      "keeps the current base when a %s push arrives during a save",
+      async (push) => {
+        let copy: ServerSettings = DEFAULT_SERVER_SETTINGS;
+        const host = saving(copy);
+        const write = createScopedSettingsWriter(() => copy);
+        const edit = (patch: ServerSettingsPatch) =>
+          write(
+            [environment("Server", { settings: copy })],
+            (current) => planScopedSettingsPatch(checkout, current, patch),
+            host.persistServer,
+            vi.fn(),
+          );
+        await edit({ defaultAutoPull: true });
+        const previous = host.stored();
+        const persist = host.persistServer.getMockImplementation()!;
+        host.persistServer.mockImplementationOnce(async (request) => {
+          const response = await persist(request);
+          if (push === "remote") {
+            await persist({
+              input: {
+                patch: {
+                  projectSettingsOverrides: {
+                    [projectId]: { enableAgentBrowserAccess: false },
+                  },
+                },
+              },
+            });
+            copy = host.stored();
+          } else {
+            copy = { ...previous };
+          }
+          return response;
+        });
+        await edit({ removeAgentCreditsOnMerge: true });
+        await edit({ defaultThreadEnvMode: "worktree" });
+        expect(host.stored().projectSettingsOverrides[projectId]).toEqual(
+          push === "remote"
+            ? { enableAgentBrowserAccess: false, defaultThreadEnvMode: "worktree" }
+            : {
+                defaultAutoPull: true,
+                removeAgentCreditsOnMerge: true,
+                defaultThreadEnvMode: "worktree",
+              },
+        );
+      },
+    );
+
+    it("plans from a copy that changed after the last save, and saves again after a failure", async () => {
+      let copy: ServerSettings = DEFAULT_SERVER_SETTINGS;
+      const host = saving(copy);
+      const write = createScopedSettingsWriter(() => copy);
+      const edit = (patch: ServerSettingsPatch) =>
+        write(
+          [environment("Server", { settings: copy })],
+          (current) => planScopedSettingsPatch(checkout, current, patch),
+          host.persistServer,
+          vi.fn(),
+        );
+      host.persistServer.mockRejectedValueOnce(new Error("Disconnected"));
+      expect((await edit({ defaultAutoPull: true })).failedEnvironments).toMatchObject([
+        { message: "Disconnected" },
+      ]);
+      expect((await edit({ defaultAutoPull: true })).savedEnvironmentCount).toBe(1);
+      // Another client replaces the override, and its push reaches this client.
+      await host.persistServer({
+        input: {
+          patch: { projectSettingsOverrides: { [projectId]: { enableAgentBrowserAccess: false } } },
+        },
+      });
+      copy = host.stored();
+      await edit({ removeAgentCreditsOnMerge: true });
+      expect(host.stored().projectSettingsOverrides[projectId]).toEqual({
+        enableAgentBrowserAccess: false,
+        removeAgentCreditsOnMerge: true,
+      });
+    });
+  });
 });
 
 describe("scoped settings mixed values", () => {
@@ -637,6 +720,45 @@ describe("scoped settings mixed values", () => {
     const second = environment("Second", { settings: { sourceControlWritingStyle: { ...style } } });
     const targets = resolveScopedSettingsTargets(all, [first, second]);
     expect(scopedSettingsAreMixed(targets, ["sourceControlWritingStyle"])).toBe(false);
+  });
+
+  it("agrees while a save is in flight and follows the environment once it reports back", () => {
+    const patch = { defaultRuntimeMode: "auto" as const };
+    const saved = environment("Laptop", { settings: patch });
+    let waiting = environment("Server");
+    const save = {};
+    let writes: readonly PendingScopedWrite[] = [saved, waiting].map(({ environmentId }) => ({
+      save,
+      environmentId,
+      patch,
+    }));
+    const mixed = () =>
+      scopedSettingsAreMixed(
+        resolveScopedSettingsTargets(all, applyPendingScopedWrites([saved, waiting], writes)),
+        ["defaultRuntimeMode"],
+      );
+    const settle = (environmentId: EnvironmentId, result?: ServerSettings) => {
+      writes = settlePendingScopedWrites(
+        writes,
+        { save, environmentId },
+        (id) => [saved, waiting].find((env) => env.environmentId === id)?.serverConfig?.settings,
+        result,
+      );
+    };
+    expect(mixed()).toBe(false);
+
+    // Laptop already pushed its result; Server answers before its push arrives.
+    settle(saved.environmentId, saved.serverConfig!.settings);
+    settle(waiting.environmentId, applyServerSettingsPatch(waiting.serverConfig!.settings, patch));
+    expect(writes.map(({ environmentId }) => environmentId)).toEqual([waiting.environmentId]);
+    expect(mixed()).toBe(false);
+
+    waiting = environment("Server", { settings: { defaultRuntimeMode: "approval-required" } });
+    expect(mixed()).toBe(true);
+
+    writes = [{ save, environmentId: waiting.environmentId, patch }];
+    settle(waiting.environmentId);
+    expect(writes).toEqual([]);
   });
 });
 
@@ -670,7 +792,6 @@ describe("project overrides at environment scope", () => {
         { environmentId: laptop, projectId: t3 },
       ],
       ["defaultAutoPull"],
-      t,
     );
     expect(plan.serverWrites).toEqual([
       {
@@ -714,12 +835,12 @@ describe("null patches at project scope", () => {
       },
     ];
     expect(
-      planScopedSettingsPatch(scope, environments, { defaultThreadEnvMode: null }, t)
-        .serverWrites[0]?.patch,
+      planScopedSettingsPatch(scope, environments, { defaultThreadEnvMode: null }).serverWrites[0]
+        ?.patch,
     ).toEqual({ projectSettingsOverrides: { [projectId]: { defaultAutoPull: true } } });
     expect(
-      planScopedSettingsPatch(scope, environments, { defaultModelSelection: null }, t)
-        .serverWrites[0]?.patch,
+      planScopedSettingsPatch(scope, environments, { defaultModelSelection: null }).serverWrites[0]
+        ?.patch,
     ).toEqual({
       projectSettingsOverrides: {
         [projectId]: {
@@ -780,7 +901,6 @@ describe("partial object patches at project scope", () => {
         },
       ],
       { sourceControlWritingStyle: { customInstructions: "Be terse." } },
-      t,
     );
     expect(plan.serverWrites[0]?.patch).toEqual({
       projectSettingsOverrides: {
@@ -801,7 +921,7 @@ it("routes legacy model preference keys exclusively to the selected environment"
     favorites: [{ provider: ProviderInstanceId.make("codex"), model: "sol" }],
     providerModelPreferences: {},
   };
-  const plan = planScopedSettingsPatch(named, environments, patch, t);
+  const plan = planScopedSettingsPatch(named, environments, patch);
   expect(plan.clientPatch).toEqual({});
   expect(plan.hasClientWrite).toBe(false);
   expect(plan.serverWrites).toEqual([
@@ -837,17 +957,12 @@ describe("model selection patches at project scope", () => {
 
   // regression: #16581 changing a project's model kept the old model's options
   it("replaces old options when changing model selections", () => {
-    const plan = planScopedSettingsPatch(
-      checkout,
-      [customized],
-      {
-        defaultModelSelection: { instanceId: claude, model: "claude-opus-4-8" },
-        sourceControlWriterModelSelection: { instanceId: codex, model: "gpt-5.6-mini" },
-        reviewGuideModelSelection: { instanceId: codex, model: "gpt-5.6-mini" },
-        textGenerationModelSelection: { instanceId: claude, model: "claude-sonnet-4-6" },
-      },
-      t,
-    );
+    const plan = planScopedSettingsPatch(checkout, [customized], {
+      defaultModelSelection: { instanceId: claude, model: "claude-opus-4-8" },
+      sourceControlWriterModelSelection: { instanceId: codex, model: "gpt-5.6-mini" },
+      reviewGuideModelSelection: { instanceId: codex, model: "gpt-5.6-mini" },
+      textGenerationModelSelection: { instanceId: claude, model: "claude-sonnet-4-6" },
+    });
     expect(plan.serverWrites[0]?.patch.projectSettingsOverrides?.[projectId]).toEqual({
       defaultModelSelection: { instanceId: claude, model: "claude-opus-4-8" },
       sourceControlWriterModelSelection: { instanceId: codex, model: "gpt-5.6-mini" },
@@ -857,28 +972,18 @@ describe("model selection patches at project scope", () => {
   });
 
   it("completes partial text-generation selections without retaining old options", () => {
-    const modelPlan = planScopedSettingsPatch(
-      checkout,
-      [customized],
-      {
-        textGenerationModelSelection: { model: "gpt-5.6-mini" },
-      },
-      t,
-    );
+    const modelPlan = planScopedSettingsPatch(checkout, [customized], {
+      textGenerationModelSelection: { model: "gpt-5.6-mini" },
+    });
     expect(
       modelPlan.serverWrites[0]?.patch.projectSettingsOverrides?.[projectId]
         ?.textGenerationModelSelection,
     ).toEqual({ instanceId: codex, model: "gpt-5.6-mini" });
 
     const options = [{ id: "reasoningEffort", value: "low" }];
-    const optionsPlan = planScopedSettingsPatch(
-      checkout,
-      [customized],
-      {
-        textGenerationModelSelection: { options },
-      },
-      t,
-    );
+    const optionsPlan = planScopedSettingsPatch(checkout, [customized], {
+      textGenerationModelSelection: { options },
+    });
     expect(
       optionsPlan.serverWrites[0]?.patch.projectSettingsOverrides?.[projectId]
         ?.textGenerationModelSelection,

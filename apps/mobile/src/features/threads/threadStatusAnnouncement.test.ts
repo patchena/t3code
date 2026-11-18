@@ -2,7 +2,6 @@ import {
   nextThreadAnnouncement,
   type ThreadAnnouncementMemory,
 } from "@t3tools/client-runtime/state/thread-activity-announcement";
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { RunId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -34,12 +33,11 @@ const done: ThreadActivityInput = {
 };
 
 function announcements(frames: ReadonlyArray<ThreadActivityInput>): ReadonlyArray<string | null> {
-  const t = createI18n("en").getFixedT("en", "activity");
   let activity: ThreadActivityMemory | null = null;
   let memory: ThreadAnnouncementMemory | null = null;
   return frames.map((input) => {
     activity = nextThreadActivitySnapshot(activity, input);
-    const next = nextThreadAnnouncement(memory, activity.snapshot, t);
+    const next = nextThreadAnnouncement(memory, activity.snapshot);
     memory = next.memory;
     return next.announcement;
   });

@@ -1,5 +1,4 @@
 import "~/index.css";
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { EnvironmentId, ProviderDriverKind, ThreadId, TurnItemId } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import { expect, it, vi } from "vite-plus/test";
@@ -12,8 +11,6 @@ vi.mock(import("./CommandOutputPanel"), () => ({
 import { render } from "../../../test/render";
 import { backgroundWorkNowItem } from "./ThreadActivityBanners";
 import { ThreadNow } from "./ThreadNow";
-
-const tActivity = createI18n("en").getFixedT(null, "activity");
 
 it("opens full command details for short labels and keeps pending tasks current", async () => {
   const command = "python3 audit.py -j 6\n> scratch/audit.log 2>&1";
@@ -45,41 +42,37 @@ it("opens full command details for short labels and keeps pending tasks current"
       attention={null}
       syncPhase={null}
       goal={null}
-      work={backgroundWorkNowItem(
-        {
-          environmentId: EnvironmentId.make("test"),
-          threadId: ThreadId.make("thread"),
-          tasks: [
-            {
-              taskId: "native-task",
-              itemId: explicitItem ? TurnItemId.make("bash-1") : undefined,
-              kind: "command",
-              description,
-              command,
-              awaited: true,
+      work={backgroundWorkNowItem({
+        environmentId: EnvironmentId.make("test"),
+        threadId: ThreadId.make("thread"),
+        tasks: [
+          {
+            taskId: "native-task",
+            itemId: explicitItem ? TurnItemId.make("bash-1") : undefined,
+            kind: "command",
+            description,
+            command,
+            awaited: true,
+          },
+        ],
+        turnItems: [
+          commandItem(status),
+          {
+            ...commandItem("running"),
+            id: TurnItemId.make("native-match"),
+            nativeItemRef: {
+              driver: ProviderDriverKind.make("codex"),
+              nativeId: "native-task",
+              strength: "strong",
             },
-          ],
-          turnItems: [
-            commandItem(status),
-            {
-              ...commandItem("running"),
-              id: TurnItemId.make("native-match"),
-              nativeItemRef: {
-                driver: ProviderDriverKind.make("codex"),
-                nativeId: "native-task",
-                strength: "strong",
-              },
-              ordinal: 2,
-            },
-          ],
-          stopDisabled: false,
-          stopping: false,
-          onStop: async () => undefined,
-          onOpenThread: () => undefined,
-        },
-        tActivity,
-        "en",
-      )}
+            ordinal: 2,
+          },
+        ],
+        stopDisabled: false,
+        stopping: false,
+        onStop: async () => undefined,
+        onOpenThread: () => undefined,
+      })}
     />
   );
   await using screen = await render(view("Audit"));

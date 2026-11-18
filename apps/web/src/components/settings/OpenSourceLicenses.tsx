@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { ChevronRightIcon, ExternalLinkIcon, SearchIcon } from "lucide-react";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import * as Cause from "effect/Cause";
@@ -7,15 +7,18 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { FetchHttpClient, HttpClient } from "effect/http";
 import { Atom } from "effect/reactivity";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { useState } from "react";
 
 import {
   decodeThirdPartyLicenseManifest,
   filterThirdPartyLicenseEntries,
+  formatLicenseBundles,
   thirdPartyLicenseEntryKey,
   type ThirdPartyLicenseEntry,
 } from "@t3tools/shared/thirdPartyLicenses";
 
+import { m } from "../../i18n/messages";
 import { Button } from "../ui/button";
 import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "../ui/input-group";
@@ -24,10 +27,7 @@ import { SettingsPageContainer, SettingsSection } from "./settingsLayout";
 
 class LicenseManifestLoadError extends Schema.TaggedError<LicenseManifestLoadError>()(
   "LicenseManifestLoadError",
-  {
-    kind: Schema.Literals(["status", "decode", "request", "timeout"]),
-    detail: Schema.String,
-  },
+  { message: Schema.String },
 ) {}
 
 // Not keepAlive: a failed load must not stick for the session, so each visit to the page loads
@@ -39,27 +39,37 @@ const licenseManifestAtom = Atom.make(
     );
     if (response.status < 200 || response.status >= 300) {
       return yield* new LicenseManifestLoadError({
-        kind: "status",
-        detail: String(response.status),
+        message: m(
+          msg("The license manifest request failed with status {status}.", {
+            status: String(response.status),
+          }),
+        ),
       });
     }
     const body = yield* response.json;
     return yield* Effect.try({
-      try: () => decodeThirdPartyLicenseManifest(body),
+      try: () => decodeThirdPartyLicenseManifest(body, m),
       catch: (error) =>
         new LicenseManifestLoadError({
-          kind: "decode",
-          detail: error instanceof Error ? error.message : String(error),
+          message:
+            error instanceof Error
+              ? (thrownErrorMessage(error, m) ?? error.message)
+              : m(msg("The license manifest could not load.")),
         }),
     });
   }).pipe(
     Effect.catchTags({
       HttpClientError: (error) =>
-        Effect.fail(new LicenseManifestLoadError({ kind: "request", detail: error.message })),
+        Effect.fail(new LicenseManifestLoadError({ message: error.message })),
     }),
     Effect.timeoutOrElse({
       duration: "30 seconds",
-      orElse: () => Effect.fail(new LicenseManifestLoadError({ kind: "timeout", detail: "" })),
+      orElse: () =>
+        Effect.fail(
+          new LicenseManifestLoadError({
+            message: m(msg("The license manifest took too long to load.")),
+          }),
+        ),
     }),
     Effect.provide(FetchHttpClient.layer),
   ),
@@ -74,17 +84,8 @@ function LicenseNoticeRow({
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 }) {
-  const { t } = useTranslation("settings");
-  const bundleLabels: Readonly<Record<string, string>> = {
-    android: t(($) => $.extra.licenses.bundleAndroid),
-    assets: t(($) => $.extra.licenses.bundleAssets),
-    desktop: t(($) => $.extra.licenses.bundleDesktop),
-    "device-tools": t(($) => $.extra.licenses.bundleDeviceTools),
-    ios: t(($) => $.extra.licenses.bundleIos),
-    mobile: t(($) => $.extra.licenses.bundleMobile),
-    server: t(($) => $.extra.licenses.bundleServer),
-    web: t(($) => $.extra.licenses.bundleWeb),
-  };
+  const gt = useGT();
+  const messages = useMessages();
   return (
     <Collapsible open={open} onOpenChange={onOpenChange}>
       <article>
@@ -101,17 +102,16 @@ function LicenseNoticeRow({
               ) : null}
             </span>
             <span className="max-w-[42%] shrink-0 truncate text-xs text-muted-foreground">
-              {entry.license} ·{" "}
-              {entry.bundles.map((bundle) => bundleLabels[bundle] ?? bundle).join(", ")}
+              {entry.license} · {formatLicenseBundles(entry.bundles, messages)}
             </span>
           </CollapsibleTrigger>
           {entry.sourceUrl ? (
             <Button
-              aria-label={t(($) => $.extra.licenses.sourceLabel, { name: entry.name })}
+              aria-label={gt("View project source for {name}", { name: entry.name })}
               className="me-3 shrink-0 sm:me-4"
               render={<a href={entry.sourceUrl} rel="noreferrer noopener" target="_blank" />}
               size="icon-micro"
-              title={t(($) => $.extra.licenses.source)}
+              title={gt("Project source")}
               variant="ghost-muted"
             >
               <ExternalLinkIcon aria-hidden className="size-3" />
@@ -139,12 +139,17 @@ function LicenseCount({
   filteredCount: number;
   totalCount: number;
 }) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   return (
     <p className="whitespace-nowrap text-xs font-normal text-muted-foreground tabular-nums">
       {filteredCount === totalCount
-        ? t(($) => $.extra.licenses.notices, { count: totalCount })
-        : t(($) => $.extra.licenses.filtered, { filtered: filteredCount, total: totalCount })}
+        ? gt("{count, plural, one {{count} notices} other {{count} notices}}", {
+            count: totalCount,
+          })
+        : gt("{filtered} of {total}", {
+            filtered: String(filteredCount),
+            total: String(totalCount),
+          })}
     </p>
   );
 }
@@ -164,7 +169,7 @@ function LicenseHeaderAction({
   filteredCount: number;
   totalCount: number;
 }) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   if (!searchOpen) {
     return (
       <div className="flex items-center gap-1.5">
@@ -173,7 +178,7 @@ function LicenseHeaderAction({
           <TooltipTrigger
             render={
               <Button
-                aria-label={t(($) => $.extra.licenses.search)}
+                aria-label={gt("Search open-source licenses")}
                 onClick={() => onSearchOpenChange(true)}
                 size="icon-micro"
                 type="button"
@@ -183,7 +188,9 @@ function LicenseHeaderAction({
               </Button>
             }
           />
-          <TooltipPopup side="top">{t(($) => $.extra.licenses.searchPlaceholder)}</TooltipPopup>
+          <TooltipPopup side="top">
+            <T>Search licenses</T>
+          </TooltipPopup>
         </Tooltip>
       </div>
     );
@@ -199,7 +206,7 @@ function LicenseHeaderAction({
           <SearchIcon aria-hidden className="size-3" />
         </InputGroupAddon>
         <InputGroupInput
-          aria-label={t(($) => $.extra.licenses.search)}
+          aria-label={gt("Search open-source licenses")}
           autoFocus
           onBlur={() => {
             if (query.length === 0) onSearchOpenChange(false);
@@ -211,7 +218,7 @@ function LicenseHeaderAction({
             onQueryChange("");
             onSearchOpenChange(false);
           }}
-          placeholder={t(($) => $.extra.licenses.searchPlaceholder)}
+          placeholder={gt("Search licenses")}
           size="sm"
           type="search"
           value={query}
@@ -222,26 +229,25 @@ function LicenseHeaderAction({
 }
 
 function LicenseManifestError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  const { t } = useTranslation("settings");
   return (
     <div className="flex flex-col items-start gap-3 px-3 py-5 sm:px-4">
       <div className="flex flex-col gap-1">
         <h3 className="text-sm font-medium text-foreground">
-          {t(($) => $.extra.licenses.unavailable)}
+          <T>Open-source notices are unavailable</T>
         </h3>
         <p className="max-w-[70ch] text-pretty text-xs leading-normal text-muted-foreground/80">
           {message}
         </p>
       </div>
       <Button type="button" size="xs" variant="outline" onClick={onRetry}>
-        {t(($) => $.extra.licenses.retry)}
+        <T>Try again</T>
       </Button>
     </div>
   );
 }
 
 export function OpenSourceLicensesPanel() {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   const result = useAtomValue(licenseManifestAtom);
   const retry = useAtomRefresh(licenseManifestAtom);
   const [query, setQuery] = useState("");
@@ -253,20 +259,15 @@ export function OpenSourceLicensesPanel() {
   const errorMessage =
     result._tag === "Failure" && !result.waiting
       ? Option.match(Cause.findErrorOption(result.cause), {
-          onNone: () => t(($) => $.extra.licenses.loadError),
-          onSome: (error) =>
-            error.kind === "status"
-              ? t(($) => $.extra.licenses.statusError, { status: error.detail })
-              : error.kind === "timeout"
-                ? t(($) => $.extra.licenses.timeout)
-                : t(($) => $.extra.licenses.diagnostic, { detail: error.detail }),
+          onNone: () => gt("The license manifest could not load."),
+          onSome: (error) => error.message,
         })
       : null;
 
   return (
     <SettingsPageContainer>
       <SettingsSection
-        title={t(($) => $.extra.licenses.title)}
+        title={gt("Third-party notices")}
         headerAction={
           manifest ? (
             <LicenseHeaderAction
@@ -296,7 +297,7 @@ export function OpenSourceLicensesPanel() {
               })
             ) : (
               <p className="px-3 py-8 text-center text-sm/6 text-muted-foreground sm:px-4">
-                {t(($) => $.extra.licenses.noMatches)}
+                <T>No licenses match that search.</T>
               </p>
             )}
           </div>
@@ -304,7 +305,7 @@ export function OpenSourceLicensesPanel() {
           <LicenseManifestError message={errorMessage} onRetry={retry} />
         ) : (
           <p className="px-3 py-5 text-sm/6 text-muted-foreground sm:px-4">
-            {t(($) => $.extra.licenses.loading)}
+            <T>Loading open-source notices…</T>
           </p>
         )}
       </SettingsSection>

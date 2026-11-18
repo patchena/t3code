@@ -1,19 +1,12 @@
-import { useTranslation } from "react-i18next";
-import { Tooltip, TooltipTrigger, TooltipPopup } from "~/components/ui/tooltip";
+import { Tooltip, TooltipTrigger, TooltipPopup } from "../ui/tooltip";
 import type { EnvironmentId, PullRequestRef, PullRequestStackMembership } from "@t3tools/contracts";
+import { T, useGT, Var } from "gt-react";
 import { useState } from "react";
 import { usePullRequestStack } from "~/state/usePullRequestStack";
-import {
-  Menu,
-  MenuTrigger,
-  MenuPopup,
-  MenuGroup,
-  MenuGroupLabel,
-  MenuItem,
-} from "~/components/ui/menu";
-import { PullRequestStackLayers } from "~/components/pullRequest/PullRequestStackLayers";
-import { PullRequestStackHeader } from "~/components/pullRequest/PullRequestStackHeader";
-import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
+import { Menu, MenuTrigger, MenuPopup, MenuGroup, MenuGroupLabel, MenuItem } from "../ui/menu";
+import { PullRequestStackLayers } from "./PullRequestStackLayers";
+import { PullRequestStackHeader } from "./PullRequestStackHeader";
+import { PullRequestGlyph } from "./pullRequestIcons";
 
 // Mount only on open to avoid per-row stack fetches.
 function StackBody({
@@ -27,7 +20,7 @@ function StackBody({
   onSelect: (reference: PullRequestRef) => void;
   stackNumber: number;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const query = usePullRequestStack(environmentId, reference);
   if (query.data !== null) {
     return (
@@ -38,7 +31,9 @@ function StackBody({
           stale={!!query.error}
         />
         {query.error ? (
-          <MenuItem onClick={query.refresh}>{t(($) => $.git.retryStackRefresh)}</MenuItem>
+          <MenuItem onClick={query.refresh}>
+            <T>Retry stack refresh</T>
+          </MenuItem>
         ) : null}
         <PullRequestStackLayers stack={query.data} reference={reference} onSelect={onSelect} />
       </>
@@ -49,7 +44,9 @@ function StackBody({
       <PullRequestStackHeader number={stackNumber} />
       <MenuGroupLabel>
         {query.error ??
-          (query.isPending ? t(($) => $.git.loadingStack) : t(($) => $.git.noLongerStacked))}
+          (query.isPending
+            ? gt("Loading stack…")
+            : gt("This pull request is no longer in a stack."))}
       </MenuGroupLabel>
     </>
   );
@@ -66,7 +63,7 @@ export function PullRequestStackPopover({
   membership: PullRequestStackMembership;
   onSelect: (reference: PullRequestRef) => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const [open, setOpen] = useState(false);
   return (
     <Menu open={open} onOpenChange={setOpen}>
@@ -82,10 +79,10 @@ export function PullRequestStackPopover({
                   className="inline-flex shrink-0 cursor-pointer items-center gap-1 text-xs font-normal text-muted-foreground"
                 />
               }
-              aria-label={t(($) => $.git.stackPosition, {
+              aria-label={gt("Stack {number}, layer {position} of {size}", {
                 number: membership.number,
                 position: membership.position,
-                total: membership.size,
+                size: membership.size,
               })}
               onClick={(event) => event.stopPropagation()}
               onKeyDown={(event) => event.stopPropagation()}
@@ -96,11 +93,10 @@ export function PullRequestStackPopover({
           }
         />
         <TooltipPopup>
-          {t(($) => $.git.viewStackPosition, {
-            number: membership.number,
-            position: membership.position,
-            total: membership.size,
-          })}
+          <T>
+            View stack #<Var>{membership.number}</Var>, layer <Var>{membership.position}</Var> of{" "}
+            <Var>{membership.size}</Var>
+          </T>
         </TooltipPopup>
       </Tooltip>
       <MenuPopup

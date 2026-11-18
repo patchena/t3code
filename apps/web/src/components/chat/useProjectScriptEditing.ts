@@ -1,3 +1,6 @@
+import { msg } from "gt-react";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { m } from "~/i18n/messages";
 import type {
   KeybindingCommand,
   ProjectId,
@@ -16,7 +19,6 @@ import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import { resolveProjectScripts } from "@t3tools/shared/projectScripts";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
-import { useTranslation } from "react-i18next";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import {
   decodeProjectScriptKeybindingRule,
@@ -44,7 +46,6 @@ export function useProjectScriptEditing(input: {
   readonly scripts: ReadonlyArray<ProjectScript>;
   readonly settings: UnifiedSettings;
 }) {
-  const { t } = useTranslation("chat");
   const { environmentId, project, scripts, settings } = input;
   const allProjects = useProjects();
   const updateProjectScriptSettings = useAtomCommand(serverEnvironment.updateSettings, {
@@ -81,7 +82,7 @@ export function useProjectScriptEditing(input: {
         Cause.fail(
           new EnvironmentAuthorizationError({
             requiredScope: AuthSettingsWriteScope,
-            message: t(($) => $.terminal.cannotChangeShortcuts),
+            message: m(msg("This connection cannot change keyboard shortcuts.")),
           }),
         ),
       );
@@ -126,8 +127,16 @@ export function useProjectScriptEditing(input: {
           new EnvironmentAuthorizationError({
             requiredScope: AuthSettingsWriteScope,
             message: isDeletingScript
-              ? t(($) => $.terminal.deletedShortcutDenied)
-              : t(($) => $.terminal.savedShortcutDenied),
+              ? m(
+                  msg(
+                    "The script was deleted, but its keyboard shortcut could not be removed because permission changed.",
+                  ),
+                )
+              : m(
+                  msg(
+                    "The script was saved, but this connection can no longer change keyboard shortcuts.",
+                  ),
+                ),
           }),
         ),
       );
@@ -215,7 +224,7 @@ export function useProjectScriptEditing(input: {
     }
     const existingScript = scripts.find((script) => script.id === scriptId);
     if (!existingScript) {
-      return AsyncResult.failure(Cause.fail(new Error(t(($) => $.terminal.scriptMissing))));
+      return AsyncResult.failure(Cause.fail(new Error(m(msg("Script not found.")))));
     }
 
     const updatedScript = buildProjectScript(existingScript.id, input);
@@ -253,18 +262,20 @@ export function useProjectScriptEditing(input: {
     if (result._tag === "Success") {
       toastManager.add({
         type: "success",
-        title:
-          deletedName === undefined
-            ? t(($) => $.terminal.deletedUnknownAction)
-            : t(($) => $.terminal.deletedAction, { name: deletedName }),
+        title: m(
+          msg('Deleted action "{name}"', {
+            name:
+              deletedName ?? m(msg("Unknown", { $context: "fallback name of a deleted action" })),
+          }),
+        ),
       });
     } else if (!isAtomCommandInterrupted(result)) {
       const error = squashAtomCommandFailure(result);
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: t(($) => $.terminal.deleteActionFailed),
-          description: error instanceof Error ? error.message : t(($) => $.ui.unexpectedError),
+          title: m(msg("Could not delete action")),
+          description: thrownErrorMessage(error, m) ?? m(msg("An unexpected error occurred.")),
         }),
       );
     }

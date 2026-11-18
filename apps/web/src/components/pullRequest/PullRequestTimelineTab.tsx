@@ -1,15 +1,10 @@
-import { systemLocale } from "~/timestampFormat";
-import { useTranslation } from "react-i18next";
 import {
   parsePullRequestAnchor,
   pullRequestAnchorMatchesUrl,
   resolvePullRequestReviewAnchor,
 } from "@t3tools/shared/pullRequestAnchor";
-import { holdLinkedNodeInView } from "~/components/pullRequest/holdLinkedNodeInView";
-import {
-  capitalizeTerm,
-  sourceControlClients,
-} from "@t3tools/client-runtime/source-control-clients";
+import { holdLinkedNodeInView } from "./holdLinkedNodeInView";
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { useAtomCommand } from "~/state/use-atom-command";
 import type {
   EnvironmentId,
@@ -28,6 +23,9 @@ import {
   MessageSquareIcon,
   MessageSquarePlusIcon,
 } from "lucide-react";
+import { msg, T, useGT, useMessages, Var } from "gt-react";
+
+import { m } from "~/i18n/messages";
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 
 import { cn } from "~/lib/utils";
@@ -35,11 +33,11 @@ import { readLocalApi } from "~/localApi";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { RelativeTime } from "~/components/RelativeTime";
 
-import { Button } from "~/components/ui/button";
-import { PullRequestEditButton } from "~/components/pullRequest/PullRequestEditButton";
-import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "~/components/ui/collapsible";
-import { toastManager } from "~/components/ui/toast";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { Button } from "../ui/button";
+import { PullRequestEditButton } from "./PullRequestEditButton";
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
+import { toastManager } from "../ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   buildPullRequestTimeline,
   groupPullRequestTimelineConversations,
@@ -52,13 +50,14 @@ import {
   type PullRequestReviewOutcome,
   type PullRequestTimelineEvent,
   type PullRequestTimelineThread,
-} from "~/components/pullRequest/pullRequestDetail.logic";
+} from "./pullRequestDetail.logic";
 import { canEditPullRequestComment } from "@t3tools/client-runtime/pull-request-editing";
-import { PullRequestMarkdown } from "~/components/pullRequest/PullRequestMarkdown";
-import { PullRequestMoreReplies } from "~/components/pullRequest/PullRequestMoreReplies";
-import { PullRequestMarkdownEditor } from "~/components/pullRequest/PullRequestMarkdownEditor";
-import { PullRequestReactionBar } from "~/components/pullRequest/PullRequestReactions";
-import { PullRequestResolveThreadButton } from "~/components/pullRequest/PullRequestResolveThreadButton";
+import { PullRequestMarkdown } from "./PullRequestMarkdown";
+import { PullRequestMoreReplies } from "./PullRequestMoreReplies";
+import { PullRequestMarkdownEditor } from "./PullRequestMarkdownEditor";
+import { PullRequestReactionBar } from "./PullRequestReactions";
+import { canReactPullRequestComment } from "@t3tools/client-runtime/pull-request-reactions";
+import { PullRequestResolveThreadButton } from "./PullRequestResolveThreadButton";
 import {
   PullRequestActorAvatar,
   PullRequestDiffStat,
@@ -67,17 +66,19 @@ import {
   pullRequestReviewOutcomeLabel,
   pullRequestReviewOutcomeStaleLabel,
   pullRequestReviewOutcomeToneClassName,
-} from "~/components/pullRequest/pullRequestPresentation";
-import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
+} from "./pullRequestPresentation";
+import { PullRequestGlyph } from "./pullRequestIcons";
 import {
   type PullRequestCompletionScope,
   pullRequestCompletionScope,
-} from "~/components/pullRequest/PullRequestMarkdownTextarea";
+} from "./PullRequestMarkdownTextarea";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
+
+import { changeRequestTermKind, type ChangeRequestTermKind } from "./changeRequestTerm";
 
 interface ReactionSurface {
   revealAnchor?: string | null;
-  readonly canReact: boolean;
+  readonly canReact: (event: PullRequestTimelineEvent) => boolean;
   /** Absent where there is no composer beside the panel to add a remark to. */
   readonly onAddToChat?: ((comment: PullRequestComment) => void) | undefined;
   readonly environmentId: EnvironmentId;
@@ -194,7 +195,7 @@ function AddToChatButton({
   comment: PullRequestComment;
   reactions: ReactionSurface;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const onAddToChat = reactions.onAddToChat;
   return onAddToChat === undefined ? null : (
     <Tooltip>
@@ -204,26 +205,28 @@ function AddToChatButton({
             size="icon-xs"
             variant="ghost-muted"
             className="-mt-1 shrink-0"
-            aria-label={t(($) => $.git.addToChat)}
+            aria-label={gt("Add to chat")}
             onClick={() => onAddToChat(comment)}
           />
         }
       >
         <MessageSquarePlusIcon className="size-3" />
       </TooltipTrigger>
-      <TooltipPopup>{t(($) => $.git.addToChat)}</TooltipPopup>
+      <TooltipPopup>
+        <T>Add to chat</T>
+      </TooltipPopup>
     </Tooltip>
   );
 }
 
 function OpenOnHostButton({ url, onOpen }: { url: string | null; onOpen: (url: string) => void }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   return url === null ? null : (
     <Button
       size="icon-xs"
       variant="ghost-muted"
       className="-mr-1 shrink-0"
-      aria-label={t(($) => $.git.openActivity)}
+      aria-label={gt("Open activity on host")}
       onClick={() => onOpen(url)}
     >
       <ExternalLinkIcon className="size-3" />
@@ -239,6 +242,7 @@ function ConversationCard({
   reactions,
   showPath = true,
   reply = false,
+  resolveButton = null,
 }: {
   event: PullRequestTimelineEvent;
   editable: PullRequestComment | null;
@@ -248,8 +252,10 @@ function ConversationCard({
   showPath?: boolean;
   /** A reply goes with its conversation, from the card that heads it. */
   reply?: boolean;
+  resolveButton?: ReactNode;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
+  const canReact = reactions.canReact(event);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const updateComment = useAtomCommand(pullRequestEnvironment.updateComment, {
@@ -265,7 +271,7 @@ function ConversationCard({
     });
     setSaving(false);
     if (result._tag === "Failure") {
-      toastManager.add({ type: "error", title: t(($) => $.git.commentSaveFailure) });
+      toastManager.add({ type: "error", title: m(msg("Could not save the comment")) });
       return;
     }
     setEditing(false);
@@ -279,7 +285,8 @@ function ConversationCard({
         ? {
             "data-pr-link-target": true,
             tabIndex: -1,
-            className: "group rounded-lg py-2 ring-1 ring-primary/40 outline-none",
+            // Inset: the collapsible panel clips an outer ring's left and right edges.
+            className: "group rounded-lg py-2 ring-1 ring-inset ring-primary/40 outline-none",
           }
         : { className: "group py-2" })}
     >
@@ -287,8 +294,26 @@ function ConversationCard({
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
-              <ActorName actor={event.actor} />
-              <span className="text-muted-foreground">{event.title}</span>
+              {event.kind === "review" ? (
+                <T>
+                  <Var>
+                    <ActorName actor={event.actor} />
+                  </Var>{" "}
+                  <span className="text-muted-foreground">reviewed</span>
+                </T>
+              ) : event.kind === "comment" ? (
+                <T>
+                  <Var>
+                    <ActorName actor={event.actor} />
+                  </Var>{" "}
+                  <span className="text-muted-foreground">commented</span>
+                </T>
+              ) : (
+                <>
+                  <ActorName actor={event.actor} />
+                  <span className="text-muted-foreground">{event.title}</span>
+                </>
+              )}
               {event.reviewState ? <ReviewStateBadge state={event.reviewState} /> : null}
             </div>
             <PullRequestMetaLine className="mt-1 flex-wrap text-2xs text-muted-foreground">
@@ -305,18 +330,19 @@ function ConversationCard({
           </div>
           {editable !== null && !editing ? (
             <PullRequestEditButton
-              aria-label={t(($) => $.git.editComment)}
+              aria-label={gt("Edit comment")}
               onClick={() => setEditing(true)}
             />
           ) : null}
+          {resolveButton}
           {event.body && event.comment && !reply ? (
             <AddToChatButton comment={event.comment} reactions={reactions} />
           ) : null}
-          {reactions.canReact || event.reactions.length > 0 ? (
+          {canReact || event.reactions.length > 0 ? (
             <PullRequestReactionBar
               className="ml-auto justify-end"
               reactions={event.reactions}
-              canReact={reactions.canReact}
+              canReact={canReact}
               subjectId={event.id}
               environmentId={reactions.environmentId}
               reference={reactions.reference}
@@ -334,7 +360,7 @@ function ConversationCard({
             environmentId={reactions.environmentId}
             completionScope={reactions.completionScope}
             threadRef={reactions.threadRef}
-            label={t(($) => $.git.editComment)}
+            label={gt("Edit comment")}
             saving={saving}
             onSave={(body) => void save(body)}
             onCancel={() => setEditing(false)}
@@ -379,12 +405,12 @@ function ConversationGroup({
   onOpen: (url: string) => void;
   reactions: ReactionSurface;
 }) {
-  const { t } = useTranslation("workspace");
   const [open, setOpen] = useState(
     () =>
       revealAnchor != null &&
       events.some((event) => pullRequestAnchorMatchesUrl(revealAnchor, event.url)),
   );
+  const gt = useGT();
   const actors = uniqueConversationActors(events);
   const first = events[0];
   if (first === undefined) return null;
@@ -407,15 +433,15 @@ function ConversationGroup({
           >
             <span className="min-w-0 flex-1">
               <span className="block text-xs font-semibold">
-                {t(($) => $.git.commentCount, {
+                {gt("{count, plural, one {{formatted} comment} other {{formatted} comments}}", {
                   count: events.length,
-                  value: events.length.toLocaleString(systemLocale),
+                  formatted: events.length.toLocaleString(),
                 })}
               </span>
               <span className="block truncate text-3xs text-muted-foreground">
-                {t(($) => $.git.authorCount, {
+                {gt("{count, plural, one {{formatted} author} other {{formatted} authors}}", {
                   count: actors.length,
-                  value: actors.length.toLocaleString(systemLocale),
+                  formatted: actors.length.toLocaleString(),
                 })}{" "}
                 · <RelativeTime timestamp={first.at} />
               </span>
@@ -470,7 +496,7 @@ function ReviewThreadEvent({
   onOpen: (url: string) => void;
   reactions: ReactionSurface;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const dismissed = pullRequestReviewOutcome(event.reviewState) === "dismissed";
   const [expanded, setExpanded] = useState(
     () =>
@@ -490,68 +516,60 @@ function ReviewThreadEvent({
         fallback={<MessageSquareIcon className="size-3.5" />}
         muted={!expanded}
       />
-      <div className="flex min-w-0 items-center gap-1">
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left text-2xs text-muted-foreground hover:text-foreground"
-          aria-expanded={expanded}
-          onClick={() => setExpanded((current) => !current)}
-        >
-          {thread.path === null ? (
-            <span className="min-w-0 truncate">{t(($) => $.git.overview)}</span>
-          ) : (
-            <>
-              <FileCode2Icon aria-hidden className="size-3 shrink-0" />
-              <span className="min-w-0 truncate font-mono">
-                {thread.line === null ? thread.path : `${thread.path}:${thread.line}`}
-              </span>
-            </>
-          )}
-          {thread.isResolved ? (
-            <span className="inline-flex shrink-0 items-center gap-1 font-medium text-success-foreground">
-              <CircleCheckIcon aria-hidden className="size-3" />
-              {t(($) => $.git.resolved)}
+      <button
+        type="button"
+        className="flex w-full min-w-0 items-center gap-2 px-2 py-2 text-left text-2xs text-muted-foreground hover:text-foreground"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((current) => !current)}
+      >
+        {thread.path === null ? (
+          <span className="min-w-0 truncate">
+            <T context="review thread without a file">Overview</T>
+          </span>
+        ) : (
+          <>
+            <FileCode2Icon aria-hidden className="size-3 shrink-0" />
+            <span className="min-w-0 truncate font-mono">
+              {thread.line === null ? thread.path : `${thread.path}:${thread.line}`}
             </span>
-          ) : null}
-          {dismissed ? (
-            <span className="shrink-0 font-medium">{t(($) => $.git.reviewDismissed)}</span>
-          ) : null}
-          {thread.isOutdated ? (
-            <span className="shrink-0 font-medium">{t(($) => $.git.outdated)}</span>
-          ) : null}
-          {expanded ? null : (
-            <span className="shrink-0">
-              · {event.actor?.login ?? "ghost"}
-              {replyCount > 0 ? (
-                <>
-                  {" "}
-                  ·{" "}
-                  {t(($) => $.git.replyCount, {
-                    count: replyCount,
-                    value: replyCount.toLocaleString(systemLocale),
-                  })}
-                </>
-              ) : null}
-            </span>
-          )}
-          <ChevronDownIcon
-            aria-hidden
-            className={cn(
-              "ml-auto size-3.5 shrink-0 transition-transform",
-              expanded && "rotate-180",
-            )}
-          />
-        </button>
-        {expanded ? (
-          <PullRequestResolveThreadButton
-            environmentId={reactions.environmentId}
-            reference={reactions.reference}
-            detail={detail}
-            thread={thread}
-            onRefresh={reactions.onRefresh}
-          />
+          </>
+        )}
+        {thread.isResolved ? (
+          <span className="inline-flex shrink-0 items-center gap-1 font-medium text-success-foreground">
+            <CircleCheckIcon aria-hidden className="size-3" />
+            <T context="review thread state">Resolved</T>
+          </span>
         ) : null}
-      </div>
+        {dismissed ? (
+          <span className="shrink-0 font-medium">
+            <T>Review dismissed</T>
+          </span>
+        ) : null}
+        {thread.isOutdated ? (
+          <span className="shrink-0 font-medium">
+            <T context="review thread state">Outdated</T>
+          </span>
+        ) : null}
+        {expanded ? null : (
+          <span className="shrink-0">
+            · {event.actor?.login ?? "ghost"}
+            {replyCount > 0 ? (
+              <>
+                {" "}
+                ·{" "}
+                {gt("{count, plural, one {{formatted} reply} other {{formatted} replies}}", {
+                  count: replyCount,
+                  formatted: replyCount.toLocaleString(),
+                })}
+              </>
+            ) : null}
+          </span>
+        )}
+        <ChevronDownIcon
+          aria-hidden
+          className={cn("ml-auto size-3.5 shrink-0 transition-transform", expanded && "rotate-180")}
+        />
+      </button>
       {expanded ? (
         <>
           <ConversationCard
@@ -561,6 +579,15 @@ function ReviewThreadEvent({
             onOpen={onOpen}
             reactions={reactions}
             showPath={false}
+            resolveButton={
+              <PullRequestResolveThreadButton
+                environmentId={reactions.environmentId}
+                reference={reactions.reference}
+                detail={detail}
+                thread={thread}
+                onRefresh={reactions.onRefresh}
+              />
+            }
           />
           {thread.replies.length > 0 ? (
             <div className="ml-2 space-y-1 border-l border-border/60 pl-3">
@@ -596,12 +623,12 @@ function CommitEvent({
   event: PullRequestTimelineEvent;
   onOpen: (oid: string) => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   return (
     <button
       type="button"
       className="group relative mb-5 block w-full cursor-pointer rounded-sm pl-12 text-left outline-none [contain-intrinsic-block-size:48px] [content-visibility:auto] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-      aria-label={t(($) => $.git.viewCommit, { commit: event.id })}
+      aria-label={gt("View commit {sha}", { sha: event.id })}
       onClick={() => onOpen(event.id)}
     >
       <ActorTimelineMarker
@@ -611,7 +638,7 @@ function CommitEvent({
       <div className="flex min-w-0 items-center gap-2.5 py-1.5">
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-semibold text-foreground transition-colors group-hover:text-primary">
-            {event.body ?? t(($) => $.git.untitledCommit)}
+            {event.body ?? gt("Untitled commit")}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs text-muted-foreground">
             <code className="font-mono">{event.id.slice(0, 7)}</code>
@@ -632,23 +659,37 @@ function CommitEvent({
   );
 }
 
-function LifecycleEvent({ event, term }: { event: PullRequestTimelineEvent; term: string }) {
-  const { t } = useTranslation("workspace");
-  const title = capitalizeTerm(term);
+function LifecycleEvent({
+  event,
+  term,
+}: {
+  event: PullRequestTimelineEvent;
+  term: ChangeRequestTermKind;
+}) {
+  const gt = useGT();
   const presentation =
     event.kind === "opened"
       ? {
           icon: <PullRequestGlyph.pullRequest className="size-3.5" />,
-          label: t(($) => $.git.requestOpened, { term: title }),
+          label: gt(
+            "{term, select, mr {Merge request} cr {Change request} other {Pull request}} opened",
+            { term },
+          ),
         }
       : event.kind === "merged"
         ? {
             icon: <PullRequestGlyph.merged className="size-3.5" />,
-            label: t(($) => $.git.requestMerged, { term: title }),
+            label: gt(
+              "{term, select, mr {Merge request} cr {Change request} other {Pull request}} merged",
+              { term },
+            ),
           }
         : {
             icon: <PullRequestGlyph.closed className="size-3.5" />,
-            label: t(($) => $.git.requestClosed, { term: title }),
+            label: gt(
+              "{term, select, mr {Merge request} cr {Change request} other {Pull request}} closed",
+              { term },
+            ),
           };
 
   return (
@@ -667,6 +708,20 @@ function LifecycleEvent({ event, term }: { event: PullRequestTimelineEvent; term
   );
 }
 
+function staleReviewOutcomeLabel(
+  outcome: PullRequestReviewOutcome,
+  gt: ReturnType<typeof useGT>,
+): string {
+  switch (outcome) {
+    case "approved":
+      return gt("Approved, before the latest commits");
+    case "changes-requested":
+      return gt("Changes requested, before the latest commits");
+    case "dismissed":
+      return gt("Review dismissed, before the latest commits");
+  }
+}
+
 function ReviewVerdictEvent({
   event,
   outcome,
@@ -682,7 +737,9 @@ function ReviewVerdictEvent({
   onOpen: (url: string) => void;
   reactions: ReactionSurface;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
+  const resolve = useMessages();
+  const canReact = reactions.canReact(event);
   return (
     <div className="group relative mb-5 pl-12 [contain-intrinsic-block-size:48px] [content-visibility:auto]">
       <ActorTimelineMarker
@@ -707,12 +764,16 @@ function ReviewVerdictEvent({
                   />
                 }
               >
-                {pullRequestReviewOutcomeLabel(outcome, t)}
                 {stale ? (
-                  <span className="sr-only">{t(($) => $.git.beforeLatestCommits)}</span>
-                ) : null}
+                  <>
+                    <span aria-hidden>{pullRequestReviewOutcomeLabel(outcome, resolve)}</span>
+                    <span className="sr-only">{staleReviewOutcomeLabel(outcome, gt)}</span>
+                  </>
+                ) : (
+                  pullRequestReviewOutcomeLabel(outcome, resolve)
+                )}
               </TooltipTrigger>
-              <TooltipPopup>{pullRequestReviewOutcomeStaleLabel(outcome, t)}</TooltipPopup>
+              <TooltipPopup>{pullRequestReviewOutcomeStaleLabel(outcome, resolve)}</TooltipPopup>
             </Tooltip>
           </div>
           <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -732,11 +793,11 @@ function ReviewVerdictEvent({
         {event.body && event.comment ? (
           <AddToChatButton comment={event.comment} reactions={reactions} />
         ) : null}
-        {reactions.canReact || event.reactions.length > 0 ? (
+        {canReact || event.reactions.length > 0 ? (
           <PullRequestReactionBar
             className="ml-auto justify-end"
             reactions={event.reactions}
-            canReact={reactions.canReact}
+            canReact={canReact}
             subjectId={event.id}
             environmentId={reactions.environmentId}
             reference={reactions.reference}
@@ -784,8 +845,8 @@ export function PullRequestTimelineTab({
   onAddToChat?: (subject: PullRequestChatSubject) => void;
   onRefresh: () => void;
 }) {
-  const { t } = useTranslation("workspace");
-  const events = buildPullRequestTimeline(detail, t);
+  const resolve = useMessages();
+  const events = buildPullRequestTimeline(detail, resolve);
   const location = parsePullRequestAnchor(revealUrl);
   const revealAnchor = location?.kind === "timeline" ? location.anchor : null;
   // The linked item stays marked and open after it is shown, until another link replaces it.
@@ -805,11 +866,12 @@ export function PullRequestTimelineTab({
   const matches = (event: PullRequestTimelineEvent) =>
     anchor !== null && pullRequestTimelineEventMatches(event, anchor);
 
-  const term = sourceControlClients.get(detail.provider).changeRequest.singular;
+  const term = changeRequestTermKind(sourceControlClients.get(detail.provider).changeRequest);
   const newestCommitAt = newestPullRequestCommitAt(detail.commits);
   const reactions: ReactionSurface = {
     revealAnchor: anchor,
-    canReact: detail.capabilities.reactions === true,
+    canReact: (event) =>
+      event.comment !== undefined && canReactPullRequestComment(detail, event.comment),
     onAddToChat: onAddToChat && ((comment) => onAddToChat({ kind: "comment", comment })),
     environmentId,
     threadRef,
@@ -912,7 +974,9 @@ export function PullRequestTimelineTab({
       <div ref={scrollerRef} className="scrollbar-gutter-both h-full overflow-y-auto px-4 py-5">
         <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
           <PullRequestGlyph.pullRequest className="mb-2 size-5" />
-          <p className="text-xs">{t(($) => $.git.noActivity)}</p>
+          <p className="text-xs">
+            <T>No activity yet.</T>
+          </p>
         </div>
       </div>
     );
@@ -936,7 +1000,7 @@ export function PullRequestTimelineTab({
       ListHeaderComponent={
         anchor !== null && targetIndex < 0 && revealUrl === undefined ? (
           <p role="status" className="py-4 text-xs text-muted-foreground">
-            {t(($) => $.git.linkedItemNotLoaded)}
+            <T>The linked item is not in the loaded activity.</T>
           </p>
         ) : (
           <div className="h-5" />

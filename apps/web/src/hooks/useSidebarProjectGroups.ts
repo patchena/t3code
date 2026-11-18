@@ -1,4 +1,3 @@
-import { useTranslation } from "react-i18next";
 import { orderItemsByPreferredIds, sortSidebarV2ProjectGroups } from "../components/Sidebar.logic";
 import {
   getProjectOrderKey,
@@ -11,7 +10,6 @@ import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore"
 import { useClientSettings } from "./useSettings";
 
 export function useSidebarProjectGroups() {
-  const { t: tCommon } = useTranslation("common");
   const projects = useProjects();
   // Activity order lags a running thread's streaming ticks until its next
   // real change; reading every tick re-rendered the whole sidebar with it.
@@ -34,15 +32,12 @@ export function useSidebarProjectGroups() {
   const labels = new Map(
     environments.map((environment) => [environment.environmentId, environment.label] as const),
   );
-  const unsortedGroups = buildSidebarProjectSnapshots(
-    {
-      projects: sortOrder === "manual" ? orderedProjects : projects,
-      groupScratchProjects: true,
-      settings: groupingSettings,
-      primaryEnvironmentId,
-      resolveEnvironmentLabel: (environmentId) => labels.get(environmentId) ?? null,
-    },
-    tCommon,
-  );
+  const unsortedGroups = buildSidebarProjectSnapshots({
+    projects: sortOrder === "manual" ? orderedProjects : projects,
+    groupScratchProjects: true,
+    settings: groupingSettings,
+    primaryEnvironmentId,
+    resolveEnvironmentLabel: (environmentId) => labels.get(environmentId) ?? null,
+  });
   return sortSidebarV2ProjectGroups(unsortedGroups, threads, sortOrder, delegatedUnderParent);
 }

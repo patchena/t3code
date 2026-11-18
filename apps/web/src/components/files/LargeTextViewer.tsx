@@ -1,21 +1,13 @@
-import { systemLocale } from "~/timestampFormat";
-import { decodeFileWorkerError } from "~/components/files/fileWorkerError";
-import {
-  FilePreviewFailure,
-  fileFailure,
-  fileFailureText,
-  type FileFailure,
-} from "~/components/files/fileFailure";
-import { useTranslation } from "react-i18next";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { useEffect, useImperativeHandle, useRef, useState, type RefObject } from "react";
+import { m } from "~/i18n/messages";
 import { parseDelimitedPreview } from "@t3tools/shared/delimitedPreview";
 import { formatAttachmentSize } from "@t3tools/client-runtime/state/attachments";
 import { useClientSettings } from "~/hooks/useSettings";
 import { FileSurfaceFailure, FileSurfaceLoading, FileSurfaceNotice } from "./fileSurfaceChrome";
 import { PREVIEW_PAGE_ROWS, type TextPreviewResult } from "./largeTextProtocol";
-import { VirtualTablePreview } from "~/components/files/VirtualTablePreview";
-
-const numberFormat = new Intl.NumberFormat(systemLocale);
+import { previewFailureText } from "./previewFailureMessages";
+import VirtualTablePreview from "./VirtualTablePreview";
 
 const FIRST_SCREEN_BYTES = 16 * 1024;
 
@@ -37,7 +29,7 @@ function firstScreen(text: string, delimiter: "," | "\t" | null, complete: boole
   return rows.slice(0, PREVIEW_PAGE_ROWS * 2);
 }
 
-export function LargeTextViewer(props: {
+export default function LargeTextViewer(props: {
   readonly name: string;
   readonly src?: string;
   readonly text?: string;
@@ -50,10 +42,11 @@ export function LargeTextViewer(props: {
   /** A preview's own wrap toggle; omitted follows the word wrap setting. */
   readonly wordWrap?: boolean;
 }) {
-  const { t } = useTranslation("files");
+  const gt = useGT();
+  const messages = useMessages();
   const [meta, setMeta] = useState<Extract<TextPreviewResult, { type: "meta" }> | null>(null);
   const [pages, setPages] = useState(new Map<number, string[][]>());
-  const [error, setError] = useState<FileFailure | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const worker = useRef<Worker | null>(null);
   const copyPending = useRef<{
     resolve: (text: string) => void;
@@ -105,12 +98,9 @@ export function LargeTextViewer(props: {
           copyPending.current?.resolve(result.text);
           copyPending.current = null;
         } else if (result.type === "error") {
-          copyPending.current?.reject(decodeFileWorkerError(result));
+          copyPending.current?.reject(new Error(previewFailureText(result)));
           copyPending.current = null;
-          if (result.operation !== "copy")
-            setError(
-              fileFailure(decodeFileWorkerError(result), (t) => t(($) => $.document.readFailed)),
-            );
+          if (result.operation !== "copy") setError(previewFailureText(result));
         } else if (result.type === "meta") {
           indexed = true;
           if (prefetched) {
@@ -141,11 +131,9 @@ export function LargeTextViewer(props: {
         }
       });
       engine.addEventListener("error", () => {
-        copyPending.current?.reject(
-          new FilePreviewFailure({ describe: (t) => t(($) => $.text.stopped) }),
-        );
+        copyPending.current?.reject(new Error(m(msg("The text viewer stopped."))));
         copyPending.current = null;
-        setError(new FilePreviewFailure({ describe: (t) => t(($) => $.text.loadFailed) }));
+        setError(m(msg("Could not load the text viewer. Close the file and try again.")));
       });
       engine.postMessage(
         {
@@ -197,9 +185,7 @@ export function LargeTextViewer(props: {
     } else startWorker();
     return () => {
       controller.abort();
-      copyPending.current?.reject(
-        new FilePreviewFailure({ describe: (t) => t(($) => $.text.closed) }),
-      );
+      copyPending.current?.reject(new Error(m(msg("Preview closed."))));
       copyPending.current = null;
       worker.current?.terminate();
       worker.current = null;
@@ -211,11 +197,11 @@ export function LargeTextViewer(props: {
     () => () =>
       new Promise<string>((resolve, reject) => {
         if (!worker.current) {
-          reject(new FilePreviewFailure({ describe: (t) => t(($) => $.document.unavailable) }));
+          reject(new Error(m(msg("The file is unavailable."))));
           return;
         }
         if (copyPending.current) {
-          reject(new FilePreviewFailure({ describe: (t) => t(($) => $.text.copyInProgress) }));
+          reject(new Error(m(msg("Another copy is in progress."))));
           return;
         }
         copyPending.current = { resolve, reject };
@@ -225,13 +211,12 @@ export function LargeTextViewer(props: {
   );
   if (error)
     return (
-      <FileSurfaceFailure
-        message={fileFailureText(error, t)}
-        {...(props.onRetry ? { onRetry: props.onRetry } : {})}
-      />
+      <FileSurfaceFailure message={error} {...(props.onRetry ? { onRetry: props.onRetry } : {})} />
     );
   if (!meta || (meta.count > 0 && !pages.has(0))) return <FileSurfaceLoading />;
   const header = props.delimiter ? pages.get(0)?.[0] : undefined;
+  const rowCount = Math.max(0, meta.count - 1);
+  const columnCount = meta.count ? meta.columns : 0;
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div
@@ -239,30 +224,32 @@ export function LargeTextViewer(props: {
         role="status"
       >
         {props.delimiter
-          ? t(($) => $.document.rows, {
-              count: Math.max(0, meta.count - (meta.count ? 1 : 0)),
-              value: numberFormat.format(Math.max(0, meta.count - (meta.count ? 1 : 0))),
-              suffix: "",
-            })
-          : t(($) => $.document.lines, {
+          ? `${gt("{count, plural, one {{formatted} row} other {{formatted} rows}}", {
+              count: rowCount,
+              formatted: rowCount.toLocaleString(),
+            })} · ${gt("{count, plural, one {{formatted} column} other {{formatted} columns}}", {
+              count: columnCount,
+              formatted: columnCount.toLocaleString(),
+            })}`
+          : gt("{count, plural, one {{formatted} line} other {{formatted} lines}}", {
               count: meta.count,
-              value: numberFormat.format(meta.count),
-              suffix: "",
+              formatted: meta.count.toLocaleString(),
             })}
-        {props.delimiter
-          ? ` · ${t(($) => $.document.columns, { count: meta.count ? meta.columns : 0, value: numberFormat.format(meta.count ? meta.columns : 0), suffix: "" })}`
-          : ""}
         {meta.complete && meta.sizeBytes !== undefined
-          ? ` · ${meta.sizeBytes === 0 ? t(($) => $.document.bytes, { count: 0 }) : formatAttachmentSize(meta.sizeBytes)}`
-          : ` · ${t(($) => $.text.indexing)}`}
+          ? ` · ${meta.sizeBytes === 0 ? gt("0 bytes") : formatAttachmentSize(meta.sizeBytes, messages)}`
+          : ` · ${gt("Indexing…")}`}
       </div>
       {!meta.complete ? (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20">
-          <FileSurfaceNotice>{t(($) => $.text.loadingRest)}</FileSurfaceNotice>
+          <FileSurfaceNotice>
+            <T>Loading the rest of the file…</T>
+          </FileSurfaceNotice>
         </div>
       ) : null}
       {meta.columns === 1024 ? (
-        <FileSurfaceNotice>{t(($) => $.text.columnLimit)}</FileSurfaceNotice>
+        <FileSurfaceNotice>
+          <T>Showing the first 1,024 columns. Source and Save retain every column.</T>
+        </FileSurfaceNotice>
       ) : null}
       {meta.count > 0 ? (
         <VirtualTablePreview
@@ -283,7 +270,7 @@ export function LargeTextViewer(props: {
         />
       ) : (
         <div className="flex flex-1 items-center justify-center p-6 text-xs text-muted-foreground">
-          {t(($) => $.text.empty)}
+          <T>This file is empty.</T>
         </div>
       )}
     </div>

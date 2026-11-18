@@ -1,4 +1,3 @@
-import { useTranslation } from "react-i18next";
 import {
   SecretReference,
   type EnvironmentId,
@@ -7,9 +6,11 @@ import {
   type SecretProviderKind,
 } from "@t3tools/contracts";
 import { builtInSecretProviderDefinitions } from "@t3tools/secret-provider-definitions/registry";
+import { invalidSecretReferenceText } from "@t3tools/client-runtime/secret-request";
 import { useAtomValue } from "@effect/atom-react";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import { useGT, useMessages } from "gt-react";
 import { AlertTriangleIcon, CheckIcon, KeyRoundIcon, RefreshCwIcon, TypeIcon } from "lucide-react";
 import { useState, type ComponentProps, type ComponentType, type ReactNode } from "react";
 
@@ -73,12 +74,12 @@ export function SecretSourceSelect(props: {
   readonly disabled?: boolean;
   readonly onValueChange: (provider: SecretProviderId | null) => void;
 }) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   const { value, sources } = props;
   const known = value === null || sources.some((source) => source.id === value);
   const title =
     value === null
-      ? t(($) => $.providers.value)
+      ? gt("Value", { $context: "secret source: a value typed in directly" })
       : (sources.find((source) => source.id === value)?.label ?? value);
   return (
     <Select
@@ -93,7 +94,7 @@ export function SecretSourceSelect(props: {
       <SelectTrigger
         size="sm"
         className="w-auto min-w-0 shrink-0"
-        aria-label={t(($) => $.providers.secretSource, { label: props.label })}
+        aria-label={gt("{label} source", { label: props.label })}
         title={title}
       >
         <SelectValue>
@@ -102,7 +103,10 @@ export function SecretSourceSelect(props: {
       </SelectTrigger>
       <SelectPopup align="start" alignItemWithTrigger={false}>
         <SelectItem value={STORED_VALUE}>
-          <SourceLabel icon={TypeIcon} label={t(($) => $.providers.value)} />
+          <SourceLabel
+            icon={TypeIcon}
+            label={gt("Value", { $context: "secret source: a value typed in directly" })}
+          />
         </SelectItem>
         {sources.map((source) => (
           <SelectItem key={source.id} value={source.id}>
@@ -131,7 +135,7 @@ function SecretCheckButton(props: {
   readonly label: string;
   readonly disabled?: boolean | undefined;
 }) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   const { environmentId, secret } = props;
   const supported = useAtomValue(
     serverEnvironment.configValueAtom(environmentId),
@@ -151,7 +155,7 @@ function SecretCheckButton(props: {
     const response = await checkSecretSource({ environmentId, input: { source: secret } });
     const next: SecretCheck =
       response._tag !== "Success"
-        ? { status: "failed", detail: t(($) => $.providers.secretCheckUnreachable) }
+        ? { status: "failed", detail: gt("Could not reach the server") }
         : response.value._tag === "Resolved"
           ? { status: "resolved" }
           : { status: "failed", detail: response.value.detail };
@@ -162,13 +166,13 @@ function SecretCheckButton(props: {
 
   if (!supported) return null;
   const description = !canCheck
-    ? t(($) => $.providers.secretCheckNotAllowed)
+    ? gt("You cannot check secrets on this environment")
     : state === undefined
-      ? t(($) => $.providers.secretCheckIdle)
+      ? gt("Check that the secret resolves")
       : state.status === "checking"
-        ? t(($) => $.providers.secretChecking)
+        ? gt("Checking the secret")
         : state.status === "resolved"
-          ? t(($) => $.providers.secretResolved)
+          ? gt("Secret resolved")
           : state.detail;
   return (
     <Tooltip>
@@ -183,12 +187,9 @@ function SecretCheckButton(props: {
               onClick={() => void run()}
               aria-label={
                 state?.status === "failed"
-                  ? t(($) => $.providers.secretCheckFailed, {
-                      label: props.label,
-                      detail: state.detail,
-                    })
+                  ? gt("{label} failed: {detail}", { label: props.label, detail: state.detail })
                   : state?.status === "resolved"
-                    ? t(($) => $.providers.secretCheckResolved, { label: props.label })
+                    ? gt("{label} resolved", { label: props.label })
                     : props.label
               }
             >
@@ -235,8 +236,9 @@ export function SecretSourceInput({
   children,
   ...rest
 }: SecretSourceInputProps) {
-  const { t } = useTranslation("settings");
   // A provider picked here applies once a reference for it is committed.
+  const gt = useGT();
+  const messages = useMessages();
   const [pendingProvider, setPendingProvider] = useState<SecretProviderId | null>(null);
   const [rejectedReference, setRejectedReference] = useState<string | null>(null);
   const secret = typeof value === "string" ? undefined : value;
@@ -245,7 +247,7 @@ export function SecretSourceInput({
   const reference = secret !== undefined && secret.provider === provider ? secret.reference : "";
   const providerSource = sources.find((source) => source.id === provider);
   const definition = providerSource && builtInSecretProviderDefinitions.find(providerSource.kind);
-  const label = input["aria-label"] ?? t(($) => $.providers.secret);
+  const label = input["aria-label"] ?? gt("Secret");
   const source =
     sources.length === 0 && provider === null ? null : (
       <SecretSourceSelect
@@ -302,7 +304,7 @@ export function SecretSourceInput({
             autoComplete="off"
             placeholder={definition?.referencePlaceholder}
             spellCheck={false}
-            aria-label={t(($) => $.providers.secretReference, { label })}
+            aria-label={gt("{label} reference", { label })}
             aria-invalid={rejectedReference !== null}
           />
           {environmentId !== undefined &&
@@ -312,16 +314,16 @@ export function SecretSourceInput({
             <SecretCheckButton
               environmentId={environmentId}
               secret={secret}
-              label={t(($) => $.providers.secretCheck, { label })}
+              label={gt("Check {label}", { label })}
               disabled={input.disabled}
             />
           ) : null}
         </div>
         {rejectedReference !== null ? (
           <p className="text-2xs text-destructive">
-            {definition?.kind === "one_password"
-              ? t(($) => $.providers.onePasswordReference)
-              : t(($) => $.providers.invalidSecretReference)}
+            {definition
+              ? invalidSecretReferenceText(definition.invalidReferenceMessage, messages)
+              : gt("Enter a valid secret reference.")}
           </p>
         ) : null}
       </div>

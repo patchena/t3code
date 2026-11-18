@@ -1,12 +1,13 @@
 import * as Dialog from "../../components/ui/Dialog";
 import type { NavigationState, PartialState } from "@react-navigation/native";
 import { EnvironmentId, ThreadId, type ScopedThreadRef } from "@t3tools/contracts";
-import { parseThreadLinkPrompt, type LinkedPrompt } from "@t3tools/shared/promptLinks";
-import { formatPromptLinkError } from "@t3tools/client-runtime/prompt-links";
-import { mobileI18n } from "~/i18n";
+import type { LinkedPrompt } from "@t3tools/shared/promptLinks";
+import { parseThreadLinkPrompt } from "@t3tools/shared/promptLinksCopy";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/reactivity";
+import { msg } from "gt-react-native";
 
+import { m } from "../../i18n/messages";
 import { findStackRoute } from "../../lib/appLinking";
 import { rootNavigationRef } from "../../lib/rootNavigation";
 import { scopedThreadKey } from "../../lib/scopedEntities";
@@ -57,12 +58,9 @@ export function takeThreadPromptLink(
   const environmentId = firstString(params.environmentId);
   const threadId = firstString(params.threadId);
   if (environmentId === null || threadId === null) return nextState;
-  const parsed = parseThreadLinkPrompt(search);
+  const parsed = parseThreadLinkPrompt(search, m);
   if (!parsed.ok) {
-    Dialog.alert(
-      "Could not open link",
-      formatPromptLinkError(parsed.error, mobileI18n.getFixedT(null, "chat")),
-    );
+    Dialog.alert(m(msg("Could not open link")), parsed.error);
     return nextState;
   }
   if (parsed.value !== null) {

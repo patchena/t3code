@@ -1,12 +1,9 @@
 import { runAtomCommand } from "@t3tools/client-runtime/state/runtime";
-import { createElement } from "react";
-import {
-  ProviderAuthFailureTitle,
-  ProviderAuthFailureDescription,
-} from "~/components/ProviderAuthFailure";
 import { readCodexAuthDelivery } from "@t3tools/shared/codexAuthHandoff";
+import { msg } from "gt-react";
 
 import { toastManager } from "./components/ui/toast";
+import { m } from "./i18n/messages";
 import { appAtomRegistry } from "./rpc/atomRegistry";
 import { environmentPresentations } from "./state/presentation";
 import { serverEnvironment } from "./state/server";
@@ -58,15 +55,15 @@ async function completeProviderAuth(delivery: ProviderAuthDelivery): Promise<voi
     if (result._tag === "Failure") {
       toastManager.add({
         type: "error",
-        title: createElement(ProviderAuthFailureTitle),
-        description: createElement(ProviderAuthFailureDescription, { reconnect: false }),
+        title: m(msg("ChatGPT sign-in couldn't finish")),
+        description: m(msg("Return to the provider and try again.")),
       });
     }
   } catch {
     toastManager.add({
       type: "error",
-      title: createElement(ProviderAuthFailureTitle),
-      description: createElement(ProviderAuthFailureDescription, { reconnect: true }),
+      title: m(msg("ChatGPT sign-in couldn't finish")),
+      description: m(msg("Reconnect to the environment and try again.")),
     });
   }
 }

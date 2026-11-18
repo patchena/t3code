@@ -1,70 +1,19 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
-import {
-  SourceControlProviderKind,
-  type GitRunStackedActionResult,
-  type VcsStatusResult,
-} from "@t3tools/contracts";
-import { EMPTY_VCS_ACTION_STATE } from "@t3tools/client-runtime/state/vcs";
+import { SourceControlProviderKind, type VcsStatusResult } from "@t3tools/contracts";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { resolveAutoFeatureBranchName } from "@t3tools/shared/git";
 import { assert, describe, it } from "vite-plus/test";
 import {
   buildMenuItems,
+  type DefaultBranchConfirmableAction,
   hasUsableGitMenuContent,
   requiresDefaultBranchConfirmation,
   resolveChangesTotals,
   resolveDefaultBranchActionDialogCopy,
+  resolveFeatureBranchUnavailableReason,
   resolveLiveThreadBranchUpdate,
   resolveQuickAction,
-  resolveGitActionResultPresentation,
-  resolveGitActionProgressPresentation,
-} from "~/components/GitActionsControl.logic";
-
-const t = createI18n("en").getFixedT(null, "workspace");
-
-it("localizes structured Git results and phases without changing diagnostic text", async () => {
-  const instance = createI18n("en");
-  const translate = instance.getFixedT(null, "workspace");
-  const terminology = sourceControlClients.get(
-    SourceControlProviderKind.make("github"),
-  ).changeRequest;
-  const result: GitRunStackedActionResult = {
-    action: "commit_push",
-    branch: { status: "skipped_not_requested" },
-    commit: { status: "created", commitSha: "abcdef012345", subject: "Unchanged subject" },
-    push: { status: "pushed", branch: "feature/ref" },
-    pr: { status: "skipped_not_requested" },
-    toast: {
-      title: "Server presentation text",
-      description: "Unchanged subject",
-      cta: { kind: "none" },
-    },
-  };
-  expectResult("Pushed abcdef0 to feature/ref");
-  await instance.changeLanguage("de");
-  expectResult("abcdef0 nach feature/ref gepusht");
-  assert.deepEqual(
-    resolveGitActionProgressPresentation(
-      {
-        ...EMPTY_VCS_ACTION_STATE,
-        isRunning: true,
-        operation: "run_change_request",
-        currentPhase: "commit",
-        lastOutputLine: "Unchanged diagnostic",
-      },
-      terminology,
-      translate,
-    ),
-    { status: "Commit wird erstellt...", output: "Unchanged diagnostic", startedAtMs: null },
-  );
-
-  function expectResult(title: string) {
-    assert.deepEqual(resolveGitActionResultPresentation(result, terminology, translate), {
-      title,
-      description: "Unchanged subject",
-    });
-  }
-});
+  getMenuActionDisabledReason,
+} from "./GitActionsControl.logic";
 
 function status(overrides: Partial<VcsStatusResult> = {}): VcsStatusResult {
   return {
@@ -86,6 +35,12 @@ function status(overrides: Partial<VcsStatusResult> = {}): VcsStatusResult {
   };
 }
 
+function pushDisabledReason(gitStatus: VcsStatusResult): string | null {
+  const item = buildMenuItems(gitStatus, false).find((menuItem) => menuItem.id === "push");
+  assert.isDefined(item);
+  return getMenuActionDisabledReason({ item, gitStatus, isBusy: false, hasPrimaryRemote: true });
+}
+
 describe("when: ref is clean, ahead, and has an open PR", () => {
   it("resolveQuickAction prefers push", () => {
     const quick = resolveQuickAction(
@@ -101,9 +56,6 @@ describe("when: ref is clean, ahead, and has an open PR", () => {
         },
       }),
       false,
-      false,
-      true,
-      t,
     );
     assert.deepInclude(quick, { kind: "run_action", action: "push", label: "Push" });
   });
@@ -118,7 +70,7 @@ describe("when: ref is clean, up to date, and has no open PR", () => {
       pr: null,
     });
 
-    const quick = resolveQuickAction(syncedFeature, false, false, true, t);
+    const quick = resolveQuickAction(syncedFeature, false);
     assert.deepInclude(quick, {
       label: "Create PR",
       disabled: false,
@@ -126,14 +78,15 @@ describe("when: ref is clean, up to date, and has no open PR", () => {
       action: "create_pr",
     });
 
-    const items = buildMenuItems(syncedFeature, false, true, t);
+    const items = buildMenuItems(syncedFeature, false);
     assert.equal(items.find((item) => item.id === "pr")?.disabled, false);
 
     const dirtyFeature = { ...syncedFeature, hasWorkingTreeChanges: true };
     assert.equal(
-      buildMenuItems(dirtyFeature, false, true, t).find((item) => item.id === "pr")?.disabled,
+      buildMenuItems(dirtyFeature, false).find((item) => item.id === "pr")?.disabled,
       false,
     );
+    assert.equal(pushDisabledReason(dirtyFeature), "No local commits to push.");
   });
 
   it("offers the actions menu only when something in it is usable", () => {
@@ -142,7 +95,7 @@ describe("when: ref is clean, up to date, and has no open PR", () => {
       overrides: Partial<Parameters<typeof hasUsableGitMenuContent>[0]> = {},
     ) =>
       hasUsableGitMenuContent({
-        menuItems: buildMenuItems(gitStatus, false, gitStatus.hasPrimaryRemote, t),
+        menuItems: buildMenuItems(gitStatus, false, gitStatus.hasPrimaryRemote),
         canWriteSourceControl: true,
         canPublishRepository: false,
         hasNotice: false,
@@ -166,8 +119,6 @@ describe("when: on default ref without open PR", () => {
       status({ refName: "main", hasWorkingTreeChanges: true }),
       false,
       true,
-      true,
-      t,
     );
     assert.deepInclude(quick, {
       kind: "run_action",
@@ -175,6 +126,16 @@ describe("when: on default ref without open PR", () => {
       label: "Commit & push",
       disabled: false,
     });
+  });
+
+  it("offers a feature branch only to actions that commit the changes", () => {
+    const reason = (action: DefaultBranchConfirmableAction, hasWorkingTreeChanges: boolean) =>
+      resolveFeatureBranchUnavailableReason({ action, branchName: "main", hasWorkingTreeChanges });
+    assert.isNull(reason("commit_push", true));
+    assert.isNull(reason("commit_push_pr", true));
+    assert.isNotNull(reason("commit_push", false));
+    assert.isNotNull(reason("push", true));
+    assert.isNotNull(reason("create_pr", true));
   });
 });
 
@@ -187,7 +148,11 @@ describe("when: local changes are behind upstream", () => {
       kind: "run_action",
       action: "commit",
     } as const;
-    assert.deepEqual(resolveQuickAction(behind, false, false, true, t), commit);
+    assert.deepEqual(resolveQuickAction(behind, false), commit);
+    assert.equal(
+      pushDisabledReason({ ...behind, aheadCount: 1 }),
+      "Branch is behind upstream. Pull/rebase before pushing.",
+    );
     assert.deepEqual(
       resolveQuickAction(
         {
@@ -202,9 +167,6 @@ describe("when: local changes are behind upstream", () => {
           },
         },
         false,
-        false,
-        true,
-        t,
       ),
       commit,
     );
@@ -220,9 +182,6 @@ describe("when: ref has no upstream configured", () => {
         pr: null,
       }),
       false,
-      false,
-      true,
-      t,
     );
     assert.deepInclude(quick, {
       kind: "run_action",
@@ -242,7 +201,6 @@ describe("when: ref has no upstream configured", () => {
       false,
       false,
       false,
-      t,
     );
     assert.deepEqual(quick, {
       kind: "open_publish",
@@ -263,26 +221,19 @@ describe("when: the ref is on GitLab", () => {
 
   it("names merge requests in actions and the default-ref dialog", () => {
     const ahead = status({ ...gitLab, hasUpstream: false, aheadCount: 2 });
-    assert.equal(resolveQuickAction(ahead, false, false, true, t).label, "Push & create MR");
+    assert.equal(resolveQuickAction(ahead, false).label, "Push & create MR");
     assert.equal(
-      resolveQuickAction(status({ ...gitLab, hasWorkingTreeChanges: true }), false, false, true, t)
-        .label,
+      resolveQuickAction(status({ ...gitLab, hasWorkingTreeChanges: true }), false).label,
       "Commit, push & MR",
     );
-    assert.equal(
-      buildMenuItems(ahead, false, true, t).find((item) => item.id === "pr")?.label,
-      "Create MR",
-    );
+    assert.equal(buildMenuItems(ahead, false).find((item) => item.id === "pr")?.label, "Create MR");
 
-    const copy = resolveDefaultBranchActionDialogCopy(
-      {
-        action: "create_pr",
-        branchName: "main",
-        includesCommit: false,
-        terminology: sourceControlClients.get("gitlab").changeRequest,
-      },
-      t,
-    );
+    const copy = resolveDefaultBranchActionDialogCopy({
+      action: "create_pr",
+      branchName: "main",
+      includesCommit: false,
+      terminology: sourceControlClients.get("gitlab").changeRequest,
+    });
     assert.equal(copy.title, "Push & create MR from default ref?");
     assert.include(copy.description, "create a merge request on");
   });
@@ -354,13 +305,26 @@ describe("resolveChangesTotals", () => {
           hasWorkingTreeChanges: true,
           branchChanges: { baseRef: "main", insertions: 0, deletions: 0 },
           workingTree: {
-            files: [{ path: "a.ts", insertions: 5, deletions: 1 }],
+            files: [
+              { path: "a.ts", insertions: 4, deletions: 1 },
+              { path: "README.md", insertions: 1, deletions: 0 },
+            ],
             insertions: 5,
             deletions: 1,
           },
         }),
       ),
-      { insertions: 5, deletions: 1 },
+      {
+        insertions: 5,
+        deletions: 1,
+        breakdown: {
+          code: { additions: 4, deletions: 1 },
+          tests: { additions: 0, deletions: 0 },
+          mocks: { additions: 0, deletions: 0 },
+          generated: { additions: 0, deletions: 0 },
+          docs: { additions: 1, deletions: 0 },
+        },
+      },
     );
   });
 
@@ -376,7 +340,7 @@ describe("resolveChangesTotals", () => {
           },
         }),
       ),
-      { insertions: 20, deletions: 3, baseRef: "origin/master" },
+      { insertions: 20, deletions: 3, baseRef: "origin/master", breakdown: null },
     );
   });
 
@@ -399,15 +363,27 @@ describe("resolveChangesTotals", () => {
         ...source,
         files: [
           { path: "a.ts", previousPath: null, additions: 4, deletions: 1 },
-          { path: "b.ts", previousPath: null, additions: 2, deletions: 0 },
+          { path: "a.test.ts", previousPath: null, additions: 2, deletions: 0 },
         ],
       }),
-      { insertions: 6, deletions: 1, baseRef: "release" },
+      {
+        insertions: 6,
+        deletions: 1,
+        baseRef: "release",
+        breakdown: {
+          code: { additions: 4, deletions: 1 },
+          tests: { additions: 2, deletions: 0 },
+          mocks: { additions: 0, deletions: 0 },
+          generated: { additions: 0, deletions: 0 },
+          docs: { additions: 0, deletions: 0 },
+        },
+      },
     );
     assert.deepEqual(resolveChangesTotals(dirty, source), {
       insertions: 20,
       deletions: 3,
       baseRef: "main",
+      breakdown: null,
     });
   });
 

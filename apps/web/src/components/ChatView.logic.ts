@@ -1,5 +1,6 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { toServerClock } from "@t3tools/client-runtime/clock";
+import { msg } from "gt-react";
+import { m, type MessageResolver } from "../i18n/messages";
 import { type OrchestrationV2ProviderTurn, type RunAttemptId } from "@t3tools/contracts";
 import {
   deriveLatestThreadRun,
@@ -16,7 +17,7 @@ import * as Option from "effect/Option";
 import type { SetStateAction } from "react";
 import { applyClaudePromptEffortPrefix, resolvePromptInjectedEffort } from "@t3tools/shared/model";
 import { getProviderModelCapabilities } from "../providerModels";
-import { sanitizeThreadErrorMessage } from "@t3tools/client-runtime/errors";
+import { sanitizeThreadErrorMessage, thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import type { EnvironmentThread, ThreadStructure } from "@t3tools/client-runtime/state/shell";
 import {
   ANTIGRAVITY_DEFAULT_MODEL,
@@ -53,6 +54,7 @@ import {
   squashAtomCommandFailure,
   type AtomCommandResult,
 } from "@t3tools/client-runtime/state/runtime";
+import { readComposerImageBytes } from "./chat/composerAttachmentFiles";
 import { videoMimeType } from "@t3tools/shared/video";
 import {
   appendCodexArtifactTemplateUsePrompt,
@@ -74,6 +76,7 @@ import {
   type DraftThreadState,
 } from "../composerDraftStore";
 import * as Schema from "effect/Schema";
+import { threadHasStarted } from "../lib/chatThreadActions";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { environmentThreadDetails } from "../state/threads";
 import {
@@ -115,6 +118,7 @@ export const ENVIRONMENT_RECONNECT_WARNING_GRACE_MS = 2_000;
 export function agentControlledBrowserCloseConfirmation(
   surfaces: readonly RightPanelSurface[],
   desktopByTabId: Readonly<Record<string, Pick<DesktopPreviewOverlay, "controller"> | undefined>>,
+  resolve: MessageResolver = m,
 ): string | null {
   const activeBrowserCount = surfaces.filter(
     (surface) =>
@@ -125,13 +129,26 @@ export function agentControlledBrowserCloseConfirmation(
   if (activeBrowserCount === 0) return null;
   if (activeBrowserCount === 1) {
     return [
-      "Close browser while the agent is using it?",
-      "The agent is actively controlling this browser. Closing it may interrupt the current browser action.",
+      resolve(msg("Close browser while the agent is using it?")),
+      resolve(
+        msg(
+          "The agent is actively controlling this browser. Closing it may interrupt the current browser action.",
+        ),
+      ),
     ].join("\n");
   }
   return [
-    `Close ${activeBrowserCount} browsers while the agent is using them?`,
-    "The agent is actively controlling these browsers. Closing them may interrupt the current browser actions.",
+    resolve(
+      msg(
+        "{count, plural, one {Close {count} browsers while the agent is using them?} other {Close {count} browsers while the agent is using them?}}",
+        { count: activeBrowserCount },
+      ),
+    ),
+    resolve(
+      msg(
+        "The agent is actively controlling these browsers. Closing them may interrupt the current browser actions.",
+      ),
+    ),
   ].join("\n");
 }
 
@@ -436,12 +453,13 @@ export function buildLocalDraftThread(
   threadId: ThreadId,
   draftThread: DraftThreadState,
   fallbackModelSelection: ModelSelection,
+  resolve: MessageResolver = m,
 ): Thread {
   const timestamp = DateTime.makeUnsafe(draftThread.createdAt);
   return presentThreadShell(draftThread.environmentId, {
     id: threadId,
     projectId: draftThread.projectId,
-    title: "New thread",
+    title: resolve(msg("New thread")),
     providerInstanceId: fallbackModelSelection.instanceId,
     modelSelection: fallbackModelSelection,
     runtimeMode: draftThread.runtimeMode,
@@ -533,27 +551,27 @@ export function getAntigravitySendBlockReason(
     | null
     | undefined,
   model: string,
-  t: TFunction<"chat">,
+  resolve: MessageResolver = m,
 ): string | null {
   if (provider?.driver !== "antigravity") return null;
   if (!provider.installed) {
-    return t(($) => $.composer.installAntigravity);
+    return resolve(msg("Install Antigravity in provider settings before sending."));
   }
   if (provider.auth.status === "unauthenticated") {
-    return t(($) => $.composer.signInAntigravity);
+    return resolve(msg("Sign in to Antigravity in provider settings before sending."));
   }
   const slug = model.trim();
-  if (slug.length === 0) return t(($) => $.composer.chooseAntigravityModel);
+  if (slug.length === 0) return resolve(msg("Choose an Antigravity model before sending."));
   if (provider.auth.status === "unknown") return null;
   if (provider.models.length === 0) {
-    return t(($) => $.composer.refreshAntigravityModels);
+    return resolve(msg("Refresh Antigravity models in provider settings before sending."));
   }
   if (
     provider.status === "ready" &&
     slug !== ANTIGRAVITY_DEFAULT_MODEL &&
     !provider.models.some((entry) => entry.slug === slug || entry.aliases?.includes(slug))
   ) {
-    return t(($) => $.composer.antigravityModelGone);
+    return resolve(msg("That Antigravity model is no longer available. Choose another model."));
   }
   return null;
 }
@@ -600,18 +618,15 @@ export function resolveTerminalWorktreePath(input: {
   return input.threadWorktreePath;
 }
 
-export async function resolveFileAttachmentUrl(
-  input: {
-    attachment: ChatFileAttachment;
+export async function resolveFileAttachmentUrl(input: {
+  attachment: ChatFileAttachment;
+  environmentId: EnvironmentId;
+  httpBaseUrl: string;
+  createAssetUrl: (input: {
     environmentId: EnvironmentId;
-    httpBaseUrl: string;
-    createAssetUrl: (input: {
-      environmentId: EnvironmentId;
-      input: AssetCreateUrlInput;
-    }) => Promise<AtomCommandResult<AssetCreateUrlResult, unknown>>;
-  },
-  t: TFunction<"chat">,
-): Promise<string> {
+    input: AssetCreateUrlInput;
+  }) => Promise<AtomCommandResult<AssetCreateUrlResult, unknown>>;
+}): Promise<string> {
   const { attachment } = input;
   const result = await input.createAssetUrl({
     environmentId: input.environmentId,
@@ -626,23 +641,20 @@ export async function resolveFileAttachmentUrl(
   });
   if (result._tag === "Failure") throw squashAtomCommandFailure(result);
   const url = resolveAssetUrl(input.httpBaseUrl, result.value.relativeUrl);
-  if (url === null) throw new Error(t(($) => $.composer.invalidAttachmentUrl));
+  if (url === null) throw new Error(m(msg("The environment returned an invalid attachment URL.")));
   return url;
 }
 
-export async function prepareRevertedMessageAttachments(
-  input: {
-    message: ChatMessage;
-    environmentId: EnvironmentId;
-    httpBaseUrl: string;
-    createAssetUrl: Parameters<typeof resolveFileAttachmentUrl>[0]["createAssetUrl"];
-  },
-  t: TFunction<"chat">,
-): Promise<File[]> {
+export async function prepareRevertedMessageAttachments(input: {
+  message: ChatMessage;
+  environmentId: EnvironmentId;
+  httpBaseUrl: string;
+  createAssetUrl: Parameters<typeof resolveFileAttachmentUrl>[0]["createAssetUrl"];
+}): Promise<File[]> {
   return Promise.all(
     (input.message.attachments ?? []).map(async (attachment) => {
       if (attachment.type !== "image" && attachment.type !== "file") {
-        throw new Error(t(($) => $.composer.unrestorableAttachment));
+        throw new Error(m(msg("This message has an attachment that cannot be restored.")));
       }
       const result = await input.createAssetUrl({
         environmentId: input.environmentId,
@@ -657,11 +669,16 @@ export async function prepareRevertedMessageAttachments(
       });
       if (result._tag === "Failure") throw squashAtomCommandFailure(result);
       const url = resolveAssetUrl(input.httpBaseUrl, result.value.relativeUrl);
-      if (url === null) throw new Error(t(($) => $.composer.invalidAttachmentUrl));
+      if (url === null)
+        throw new Error(m(msg("The environment returned an invalid attachment URL.")));
       const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
       if (!response.ok)
-        throw new Error(t(($) => $.composer.restoreAttachmentFailed, { name: attachment.name }));
-      return new File([await response.blob()], attachment.name, { type: attachment.mimeType });
+        throw new Error(m(msg("Could not restore attachment: {name}", { name: attachment.name })));
+      const file = new File([await response.blob()], attachment.name, {
+        type: attachment.mimeType,
+      });
+      if (attachment.type === "image") await readComposerImageBytes(file);
+      return file;
     }),
   );
 }
@@ -761,18 +778,39 @@ export function deriveComposerSendState(options: {
 export function buildExpiredTerminalContextToastCopy(
   expiredTerminalContextCount: number,
   variant: "omitted" | "empty",
-  t: TFunction<"chat">,
+  resolve: MessageResolver = m,
 ): { title: string; description: string } {
   const count = Math.max(1, Math.floor(expiredTerminalContextCount));
-  return variant === "empty"
-    ? {
-        title: t(($) => $.composer.expiredTerminalEmpty, { count }),
-        description: t(($) => $.composer.expiredTerminalEmptyDescription, { count }),
-      }
-    : {
-        title: t(($) => $.composer.expiredTerminalOmitted, { count }),
-        description: t(($) => $.composer.expiredTerminalOmittedDescription, { count }),
-      };
+  if (variant === "empty") {
+    return {
+      title: resolve(
+        msg(
+          "{count, plural, =1 {Expired terminal context won't be sent} other {Expired terminal contexts won't be sent}}",
+          { count },
+        ),
+      ),
+      description: resolve(
+        msg(
+          "{count, plural, =1 {Remove it or re-add it to include terminal output.} other {Remove them or re-add them to include terminal output.}}",
+          { count },
+        ),
+      ),
+    };
+  }
+  return {
+    title: resolve(
+      msg(
+        "{count, plural, =1 {Expired terminal context omitted from message} other {Expired terminal contexts omitted from message}}",
+        { count },
+      ),
+    ),
+    description: resolve(
+      msg(
+        "{count, plural, =1 {Re-add it if you want that terminal output included.} other {Re-add them if you want that terminal output included.}}",
+        { count },
+      ),
+    ),
+  };
 }
 
 export function branchMismatchKey(
@@ -832,10 +870,6 @@ export function recallCheckoutIsRepo(
     : sessionCheckoutIsRepo.get(checkoutIsRepoKey(environmentId, cwd));
 }
 
-function threadHasStarted(thread: Thread | null | undefined): boolean {
-  return Boolean(thread && (thread.latestRun !== null || thread.itemCount > 0 || thread.runtime));
-}
-
 // Imported history lacks a session until its first prompt; resolve its instance before locking the driver.
 export function deriveLockedProvider(input: {
   thread: Thread | null | undefined;
@@ -872,7 +906,7 @@ export function getStartedThreadModelChangeBlockReason(
     currentProviderInstanceId?: ModelSelection["instanceId"] | null | undefined;
     nextModelSelection: ModelSelection;
   },
-  t: TFunction<"chat">,
+  resolve: MessageResolver = m,
 ): { title: string; description: string } | null {
   if (!input.hasStartedSession) {
     return null;
@@ -888,8 +922,10 @@ export function getStartedThreadModelChangeBlockReason(
     return null;
   }
   return {
-    title: t(($) => $.composer.switchProviderNewChat),
-    description: t(($) => $.composer.threadCannotSwitchProvider),
+    title: resolve(msg("Start a new chat to switch providers")),
+    description: resolve(
+      msg("This thread does not support switching providers after it has started."),
+    ),
   };
 }
 
@@ -898,7 +934,6 @@ export async function waitForRevertedMessage(
   turnCount: number,
   requestId: CommandId,
   revert: () => Promise<void>,
-  t: TFunction<"chat">,
   timeoutMs = 120_000,
 ): Promise<void> {
   const threadAtom = environmentThreadDetails.stateAtom(threadRef);
@@ -922,7 +957,7 @@ export async function waitForRevertedMessage(
     return latest === undefined || run.ordinal > latest.ordinal ? run : latest;
   }, undefined);
   if (witness === undefined) {
-    throw new Error(t(($) => $.composer.threadChangedRewind));
+    throw new Error(m(msg("The thread has changed. Select a message to rewind again.")));
   }
   return new Promise<void>((resolve, reject) => {
     let settled = false;
@@ -964,7 +999,7 @@ export async function waitForRevertedMessage(
     };
     unsubscribe = appAtomRegistry.subscribe(threadAtom, inspect);
     timeout = globalThis.setTimeout(() => {
-      finish(new Error(t(($) => $.composer.rewindTimeout)));
+      finish(new Error(m(msg("Timed out waiting for the thread to rewind."))));
     }, timeoutMs);
     Promise.resolve()
       .then(revert)
@@ -1028,6 +1063,25 @@ export function deriveCommittedServerUserMessageIds(
   );
 }
 
+/**
+ * The server checks the full history, but the first page of an
+ * agent-started thread or a long turn can hold no user message.
+ */
+export function hasCompactableConversation(input: {
+  readonly visibleTurnItems: ReadonlyArray<ThreadStructureRow>;
+  readonly hasMoreHistory: boolean;
+  readonly latestUserMessageAt: string | null;
+}): boolean {
+  return (
+    input.visibleTurnItems.some(
+      ({ item }) =>
+        item.type === "user_message" &&
+        (item.text.trim().toLowerCase() !== "/compact" || item.attachments.length > 0),
+    ) ||
+    (input.hasMoreHistory && input.latestUserMessageAt !== null)
+  );
+}
+
 export function hasServerAcknowledgedLocalDispatch(input: {
   localDispatch: LocalDispatchSnapshot | null;
   phase: SessionPhase;
@@ -1086,15 +1140,17 @@ export function hasServerAcknowledgedLocalDispatch(input: {
   );
 }
 
-// Window return puts the caret in the composer unless focus is deliberate: another text field,
-// a terminal, an open dialog, menu, or popup, a region, timeline, or sidebar row reached from the
-// keyboard, or a region with its own keys (aria-keyshortcuts). A plain focused button or a clicked
-// row yields to the composer.
+// Window return puts the caret in the composer unless focus or a selection is deliberate: another
+// text field, a terminal, an open dialog, menu, or popup, a region, timeline, or sidebar row reached
+// from the keyboard, a region with its own keys (aria-keyshortcuts), or selected text the composer
+// would clear. A plain focused button or a clicked row yields to the composer.
 export function shouldRefocusComposerOnWindowFocus(
   activeElement:
     | (Pick<Element, "tagName" | "closest" | "getAttribute"> & { isContentEditable?: boolean })
     | null,
+  selection: Pick<Selection, "isCollapsed"> | null,
 ): boolean {
+  if (selection !== null && !selection.isCollapsed) return false;
   if (activeElement === null || activeElement.tagName === "BODY") return true;
   if (
     activeElement.tagName === "INPUT" ||
@@ -1182,8 +1238,8 @@ export type LocalThreadErrorEntry = {
   readonly at: number;
 };
 
-export function chatActionErrorMessage(error: unknown, t: TFunction<"chat">): string {
-  return error instanceof Error ? error.message : t(($) => $.composer.errorOccurred);
+export function chatActionErrorMessage(error: unknown, resolve: MessageResolver = m): string {
+  return thrownErrorMessage(error, resolve) ?? resolve(msg("An error occurred."));
 }
 
 export function releaseChatTimelineAnchor<T extends { readonly messageId: MessageId | null }>(
@@ -1245,18 +1301,19 @@ export function makeModelDisabledReason(
     Parameters<typeof getStartedThreadModelChangeBlockReason>[0],
     "nextModelSelection"
   > | null,
-  t: TFunction<"chat">,
+  resolve: MessageResolver = m,
 ) {
   return (instanceId: ProviderInstanceId, model: string): string | null => {
     if (!context) return null;
     const reason = getStartedThreadModelChangeBlockReason(
-      {
-        ...context,
-        nextModelSelection: { instanceId, model },
-      },
-      t,
+      { ...context, nextModelSelection: { instanceId, model } },
+      resolve,
     );
-    return reason ? t(($) => $.composer.newThreadForModel) : null;
+    return reason
+      ? resolve(
+          msg("{reason} Start a new thread to use this model.", { reason: reason.description }),
+        )
+      : null;
   };
 }
 
@@ -1312,6 +1369,22 @@ export function snapshotComposerSend(contents: ComposerSendContents) {
 
 export type ComposerSendSnapshot = ReturnType<typeof snapshotComposerSend>;
 
+/** Derived from the persisted run phase, so a starting run still reads as work after a reload. */
+export function deriveTimelineWorking(input: {
+  readonly phase: SessionPhase;
+  readonly isSendBusy: boolean;
+  readonly isCompacting: boolean;
+  readonly runlessWorkStartedAt: string | null;
+}): boolean {
+  return (
+    input.phase === "connecting" ||
+    input.phase === "running" ||
+    input.isSendBusy ||
+    input.isCompacting ||
+    input.runlessWorkStartedAt !== null
+  );
+}
+
 /** How a composer send dispatches: where it runs and whether it waits behind other work. */
 export function planComposerTurn(input: {
   readonly messageText: string;
@@ -1321,6 +1394,8 @@ export function planComposerTurn(input: {
   readonly sendEnvMode: DraftThreadEnvMode;
   readonly worktreePath: string | null;
   readonly activeThreadBranch: string | null;
+  /** The server launches a No project worktree request at its root, so it needs no base. */
+  readonly isScratchProject: boolean;
   readonly resumeCompactionTokens: number | null;
   readonly keepFullHistory: boolean;
   readonly phase: SessionPhase;
@@ -1347,7 +1422,8 @@ export function planComposerTurn(input: {
   return {
     // In worktree mode, require an explicit base branch so we don't silently
     // fall back to local execution when branch selection is missing.
-    missingWorktreeBaseBranch: shouldCreateWorktree && !input.activeThreadBranch,
+    missingWorktreeBaseBranch:
+      shouldCreateWorktree && !input.activeThreadBranch && !input.isScratchProject,
     baseBranchForWorktree: shouldCreateWorktree ? input.activeThreadBranch : null,
     compactBeforeSend,
     turnDispatchMode:
@@ -1411,14 +1487,24 @@ export function optimisticMessageAttachments(
 }
 
 /** Fallback title sources for a message with no text of its own. */
-export function sendTitleFallbackLabels(snapshot: ComposerSendSnapshot) {
+export function sendTitleFallbackLabels(
+  snapshot: ComposerSendSnapshot,
+  resolve: MessageResolver = m,
+) {
   const terminalContext = snapshot.terminalContexts[0];
   const reviewComment = snapshot.reviewComments[0];
   const previewAnnotation = snapshot.previewAnnotations[0];
   return [
     terminalContext ? formatTerminalContextLabel(terminalContext) : undefined,
-    reviewComment ? `Review: ${reviewCommentContextLabel(reviewComment)}` : undefined,
-    previewAnnotation ? previewAnnotationContextLabel(previewAnnotation) : undefined,
+    reviewComment
+      ? resolve(
+          msg("Review: {label}", {
+            label: reviewCommentContextLabel(reviewComment, resolve),
+            $context: "title seed for a new thread started from a review comment",
+          }),
+        )
+      : undefined,
+    previewAnnotation ? previewAnnotationContextLabel(previewAnnotation, resolve) : undefined,
   ];
 }
 

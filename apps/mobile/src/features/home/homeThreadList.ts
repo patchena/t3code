@@ -3,7 +3,6 @@ import {
   pickableProjectGroups,
   resolveScratchProjectScopeKey,
 } from "@t3tools/client-runtime/state/project-grouping";
-import { mobileI18n } from "~/i18n";
 import type {
   EnvironmentProject,
   EnvironmentThreadShell,
@@ -21,6 +20,7 @@ import type {
 import * as Arr from "effect/Array";
 import * as Order from "effect/Order";
 
+import { m, type MessageResolver } from "../../i18n/messages";
 import { scopedProjectKey } from "../../lib/scopedEntities";
 import type { PendingNewTask } from "../../state/use-pending-new-tasks";
 
@@ -47,11 +47,14 @@ function getProjectSortTimestamp(
         Number.NEGATIVE_INFINITY);
 }
 
-export function buildHomeProjectScopes(input: {
-  readonly projects: ReadonlyArray<EnvironmentProject>;
-  readonly environmentId: EnvironmentId | null;
-  readonly projectGroupingMode: SidebarProjectGroupingMode;
-}): ReadonlyArray<HomeProjectScope> {
+export function buildHomeProjectScopes(
+  input: {
+    readonly projects: ReadonlyArray<EnvironmentProject>;
+    readonly environmentId: EnvironmentId | null;
+    readonly projectGroupingMode: SidebarProjectGroupingMode;
+  },
+  resolve: MessageResolver = m,
+): ReadonlyArray<HomeProjectScope> {
   const projects = input.projects.filter(
     (project) => input.environmentId === null || project.environmentId === input.environmentId,
   );
@@ -64,7 +67,7 @@ export function buildHomeProjectScopes(input: {
         sidebarProjectGroupingOverrides: {},
       },
     },
-    mobileI18n.getFixedT(null, "common"),
+    resolve,
   ).map((group) => {
     return {
       key: group.key,

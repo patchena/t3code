@@ -1,6 +1,7 @@
+import { useGT } from "gt-react";
+
 import { InlineButton } from "../ui/button";
 import { useId, useState } from "react";
-import { useTranslation } from "react-i18next";
 
 import { cn } from "../../lib/utils";
 
@@ -17,7 +18,7 @@ export function ExpandableText({
   collapsedClassName?: string;
   expandLabel?: string;
 }) {
-  const { t } = useTranslation("common");
+  const gt = useGT();
   const textId = useId();
   const [expanded, setExpanded] = useState(false);
   const canExpand = collapsedText !== text || text.length > 180 || text.includes("\n");
@@ -41,7 +42,7 @@ export function ExpandableText({
           className="mt-1"
           onClick={() => setExpanded((value) => !value)}
         >
-          {expanded ? t(($) => $.misc.showLess) : (expandLabel ?? t(($) => $.misc.showFullError))}
+          {expanded ? gt("Show less") : (expandLabel ?? gt("Show full error"))}
         </InlineButton>
       ) : null}
     </div>

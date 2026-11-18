@@ -1,4 +1,4 @@
-import { useRelativeTimeState } from "~/hooks/useRelativeTimeState";
+import { useRelativeTimeState } from "../hooks/useRelativeTimeState";
 
 // Use a live clock because the compiler caches inline formatting on the timestamp.
 export function RelativeTime(props: { timestamp: string }) {

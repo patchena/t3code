@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+import { T, useGT, useMessages } from "gt-react";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
 
@@ -35,24 +35,21 @@ export function ComposerCodeBlockLanguagePicker(props: {
   disabled: boolean;
   onChange: (language: string) => void;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
+  const messages = useMessages();
   const [query, setQuery] = useState("");
-  const languageLabel = (id: string) =>
-    codeLanguageEntry(id)?.id === "" ? t(($) => $.composer.plainText) : codeLanguageLabel(id);
   const current = codeLanguageEntry(props.language)?.id ?? props.language;
-  const items: CodeBlockLanguage[] = CODE_BLOCK_LANGUAGES.some((entry) => entry.id === current)
-    ? CODE_BLOCK_LANGUAGES.map((entry) => ({ ...entry, label: languageLabel(entry.id) }))
-    : [
-        { id: current, label: current },
-        ...CODE_BLOCK_LANGUAGES.map((entry) => ({ ...entry, label: languageLabel(entry.id) })),
-      ];
+  const languages = CODE_BLOCK_LANGUAGES.map((entry) => ({
+    ...entry,
+    label: messages(entry.label),
+  }));
+  const items: CodeBlockLanguage[] = languages.some((entry) => entry.id === current)
+    ? languages
+    : [{ id: current, label: current }, ...languages];
   const needle = query.trim().toLowerCase();
   const filteredItems = needle
     ? items.filter(
-        (entry) =>
-          entry.label.toLowerCase().includes(needle) ||
-          codeLanguageLabel(entry.id).toLowerCase().includes(needle) ||
-          entry.id.includes(needle),
+        (entry) => entry.label.toLowerCase().includes(needle) || entry.id.includes(needle),
       )
     : items;
   const selected = items.find((entry) => entry.id === current) ?? null;
@@ -80,24 +77,26 @@ export function ComposerCodeBlockLanguagePicker(props: {
               variant="ghost-muted"
               size="xs"
               disabled={props.disabled}
-              aria-label={t(($) => $.composer.codeLanguage, {
-                language: languageLabel(props.language),
+              aria-label={gt("Code language: {language}", {
+                language: codeLanguageLabel(props.language, messages),
               })}
             />
           }
         >
           <LanguageIcon language={current} theme={props.theme} />
-          <span className="max-w-40 truncate">{languageLabel(props.language)}</span>
+          <span className="max-w-40 truncate">{codeLanguageLabel(props.language, messages)}</span>
           <ChevronDownIcon className="opacity-60" />
         </ComboboxTrigger>
         <ComboboxPopup align="start" className="w-56">
           <ComboboxSearchInput
-            aria-label={t(($) => $.composer.searchLanguages)}
-            placeholder={t(($) => $.composer.searchLanguages)}
+            aria-label={gt("Search languages")}
+            placeholder={gt("Search languages")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
-          <ComboboxEmpty>{t(($) => $.composer.noLanguages)}</ComboboxEmpty>
+          <ComboboxEmpty>
+            <T>No matching languages.</T>
+          </ComboboxEmpty>
           <ComboboxList>
             {(entry: CodeBlockLanguage) => (
               <ComboboxItem key={entry.id || "plain"} value={entry}>

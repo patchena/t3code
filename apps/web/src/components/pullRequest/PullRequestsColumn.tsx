@@ -1,23 +1,23 @@
-import { useTranslation } from "react-i18next";
 import type { PullRequestInvolvement, PullRequestListState } from "@t3tools/contracts";
+import { T, useGT, useMessages } from "gt-react";
 import { Plug2Icon, SearchIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { isElectron } from "~/env";
 import { cn } from "~/lib/utils";
-import { Button } from "~/components/ui/button";
-import { RefreshIcon } from "~/components/ui/refresh-icon";
+import { Button } from "../ui/button";
+import { RefreshIcon } from "../ui/refresh-icon";
 import {
   WorkspaceBreadcrumb,
   WorkspaceBreadcrumbItem,
   WorkspaceBreadcrumbSeparator,
-} from "~/components/WorkspaceBreadcrumb";
-import { WorkspacePageContainer } from "~/components/WorkspacePageContainer";
-import { WorkspacePageHeader } from "~/components/WorkspacePageHeader";
-import { workspaceAreaProps } from "~/lib/workspaceFocus";
-import { PullRequestCompactFilterMenu } from "~/components/pullRequest/PullRequestCompactFilterMenu";
-import type { PullRequestFilterOption } from "~/components/pullRequest/PullRequestListFilters";
-import { INVOLVEMENT_TABS, STATE_TABS } from "~/components/pullRequest/pullRequestListOptions";
+} from "../WorkspaceBreadcrumb";
+import { WorkspacePageContainer } from "../WorkspacePageContainer";
+import { WorkspacePageHeader } from "../WorkspacePageHeader";
+import { workspaceAreaProps } from "../../lib/workspaceFocus";
+import { PullRequestCompactFilterMenu } from "./PullRequestCompactFilterMenu";
+import type { PullRequestFilterOption } from "./PullRequestListFilters";
+import { INVOLVEMENT_TABS, resolveFilterOptions, STATE_TABS } from "./pullRequestListOptions";
 
 function ExpandableSearch({
   searchInput,
@@ -36,7 +36,7 @@ function ExpandableSearch({
    */
   onFocusWithin?: (focused: boolean) => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const containerRef = useRef<HTMLDivElement | null>(null);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- focuses the search input DOM node when the topbar search opens
   useEffect(() => {
@@ -62,7 +62,7 @@ function ExpandableSearch({
     <Button
       size="icon-sm"
       variant="ghost"
-      aria-label={t(($) => $.git.searchPullRequests)}
+      aria-label={gt("Search pull requests")}
       onClick={() => onOpenChange(true)}
     >
       <SearchIcon className="size-4" />
@@ -84,6 +84,7 @@ export function PullRequestsColumn({
   searchInput,
   sortMenu,
   filtersMenu,
+  savedViewsMenu,
   rightPanelControl,
   titlebarControls,
   rightPanelOpen,
@@ -104,6 +105,7 @@ export function PullRequestsColumn({
   searchInput: ReactNode;
   sortMenu: ReactNode;
   filtersMenu: ReactNode;
+  savedViewsMenu: ReactNode;
   rightPanelControl: ReactNode;
   titlebarControls: ReactNode;
   rightPanelOpen: boolean;
@@ -111,12 +113,9 @@ export function PullRequestsColumn({
   listBody: ReactNode;
   scrollRef: RefObject<HTMLDivElement | null>;
 }) {
-  const { t } = useTranslation("workspace");
-  const contentArea = workspaceAreaProps(
-    "pull-requests",
-    1,
-    t(($) => $.git.pullRequests),
-  );
+  const gt = useGT();
+  const resolve = useMessages();
+  const contentArea = workspaceAreaProps("pull-requests", 1, gt("Pull requests"));
   const markerRef = useRef<HTMLDivElement | null>(null);
   const [condensed, setCondensed] = useState(false);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- IntersectionObserver on the scroll marker condenses the topbar
@@ -181,31 +180,30 @@ export function PullRequestsColumn({
       >
         {titlebarControls}
         {condensed ? (
-          <WorkspaceBreadcrumb
-            ariaLabel={t(($) => $.git.pullRequestScope)}
-            className="overflow-hidden"
-          >
+          <WorkspaceBreadcrumb ariaLabel={gt("Pull request scope")} className="overflow-hidden">
             <WorkspaceBreadcrumbItem current className={cn(searchExpanded && "sr-only")}>
-              <h1 className="truncate">{t(($) => $.git.pullRequests)}</h1>
+              <h1 className="truncate">
+                <T>Pull requests</T>
+              </h1>
             </WorkspaceBreadcrumbItem>
             {searchExpanded ? null : <WorkspaceBreadcrumbSeparator />}
             <WorkspaceBreadcrumbItem className="shrink gap-1.5">
               <PullRequestCompactFilterMenu
-                label={t(($) => $.git.filterState)}
+                label={gt("Filter by state")}
                 value={state}
-                options={STATE_TABS(t)}
+                options={resolveFilterOptions(STATE_TABS, resolve)}
                 onChange={onState}
                 className="shrink-0"
               />
               <PullRequestCompactFilterMenu
-                label={t(($) => $.git.filterInvolvement)}
+                label={gt("Filter by involvement")}
                 value={involvement}
-                options={INVOLVEMENT_TABS(t)}
+                options={resolveFilterOptions(INVOLVEMENT_TABS, resolve)}
                 onChange={onInvolvement}
               />
               {hostMenuOptions.length > 2 ? (
                 <PullRequestCompactFilterMenu
-                  label={t(($) => $.git.filterHost)}
+                  label={gt("Filter by host")}
                   value={host ?? ""}
                   options={hostMenuOptions}
                   onChange={(next) => onHost(next === "" ? undefined : next)}
@@ -214,9 +212,11 @@ export function PullRequestsColumn({
             </WorkspaceBreadcrumbItem>
           </WorkspaceBreadcrumb>
         ) : (
-          <WorkspaceBreadcrumb ariaLabel={t(($) => $.git.pullRequestBreadcrumb)}>
+          <WorkspaceBreadcrumb ariaLabel={gt("Pull requests breadcrumb")}>
             <WorkspaceBreadcrumbItem current>
-              <h1 className="truncate">{t(($) => $.git.pullRequests)}</h1>
+              <h1 className="truncate">
+                <T>Pull requests</T>
+              </h1>
             </WorkspaceBreadcrumbItem>
           </WorkspaceBreadcrumb>
         )}
@@ -250,12 +250,13 @@ export function PullRequestsColumn({
               </div>
               {sortMenu}
               {filtersMenu}
+              {savedViewsMenu}
               <PullRequestCompactFilterMenu
-                label={t(($) => $.git.filterProvider)}
+                label={gt("Filter by provider")}
                 outlined
                 iconOnly={host !== undefined}
                 triggerIcon={<Plug2Icon aria-hidden className="size-4" />}
-                triggerLabel={t(($) => $.git.all)}
+                triggerLabel={gt("All", { $context: "all providers" })}
                 value={host ?? ""}
                 options={hostMenuOptions}
                 onChange={(next) => onHost(next === "" ? undefined : next)}
@@ -283,12 +284,12 @@ function PullRequestRefreshControl({
   refreshing: boolean;
   onRefresh: () => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   return (
     <Button
       size={compact ? "icon-sm" : "icon"}
       variant={compact ? "ghost" : "outline"}
-      aria-label={t(($) => $.git.refreshPullRequests)}
+      aria-label={gt("Refresh pull requests")}
       onClick={onRefresh}
       disabled={refreshing}
     >

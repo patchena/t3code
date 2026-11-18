@@ -1,6 +1,5 @@
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { RegistryContext } from "@effect/atom-react";
-import { useTranslation } from "react-i18next";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { availableScratchWorkspaceRoot } from "@t3tools/client-runtime/operations/projects";
 import {
@@ -11,9 +10,11 @@ import {
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId } from "@t3tools/contracts";
 import type { AtomRegistry } from "effect/reactivity";
+import { msg } from "gt-react";
 import { useContext } from "react";
 
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
+import { m } from "~/i18n/messages";
 import {
   type EnvironmentPresentation,
   useEnvironments,
@@ -22,12 +23,12 @@ import {
 import { projectEnvironment } from "~/state/projects";
 import { type NewThreadHandler, useNewThreadHandler } from "./useHandleNewThread";
 
-function reportScratchFailure(title: string, error: unknown, t: TFunction<"common">) {
+function reportScratchFailure(title: string, error: unknown) {
   toastManager.add(
     stackedThreadToast({
       type: "error",
       title,
-      description: error instanceof Error ? error.message : t(($) => $.operations.error),
+      description: thrownErrorMessage(error, m) ?? m(msg("An error occurred.")),
     }),
   );
 }
@@ -41,7 +42,6 @@ export function createScratchProjectActions(input: {
   readonly primaryEnvironmentId: () => EnvironmentId | null;
   readonly registry: AtomRegistry.AtomRegistry;
   readonly handleNewThread: NewThreadHandler;
-  readonly t: TFunction<"common">;
 }) {
   const scratchWorkspaceRootFor = (environmentId: EnvironmentId | null): string | null => {
     let environment: ScratchEnvironment | undefined;
@@ -64,7 +64,7 @@ export function createScratchProjectActions(input: {
 
   const openScratchProject = async (
     environmentId: EnvironmentId,
-    failureTitle: string = input.t(($) => $.operations.scratchFailed),
+    failureTitle = m(msg("Could not start without a project")),
   ): Promise<EnvironmentProject | null> => {
     const command = projectEnvironment.openScratch;
     const result = await runAtomCommand(
@@ -75,7 +75,7 @@ export function createScratchProjectActions(input: {
     );
     if (result._tag === "Success") return result.value;
     if (!isAtomCommandInterrupted(result)) {
-      reportScratchFailure(failureTitle, squashAtomCommandFailure(result), input.t);
+      reportScratchFailure(failureTitle, squashAtomCommandFailure(result));
     }
     return null;
   };
@@ -86,11 +86,7 @@ export function createScratchProjectActions(input: {
       await input
         .handleNewThread(scopeProjectRef(project.environmentId, project.id))
         .catch((error: unknown) =>
-          reportScratchFailure(
-            input.t(($) => $.operations.scratchFailed),
-            error,
-            input.t,
-          ),
+          reportScratchFailure(m(msg("Could not start without a project")), error),
         );
     }
   };
@@ -99,7 +95,6 @@ export function createScratchProjectActions(input: {
 }
 
 export function useScratchProject() {
-  const { t } = useTranslation("common");
   const { environments } = useEnvironments();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const registry = useContext(RegistryContext);
@@ -109,6 +104,5 @@ export function useScratchProject() {
     primaryEnvironmentId: () => primaryEnvironmentId,
     registry,
     handleNewThread,
-    t,
   });
 }

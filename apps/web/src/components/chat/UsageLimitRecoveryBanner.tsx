@@ -1,3 +1,6 @@
+import { T, msg, useGT } from "gt-react";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { m, type MessageResolver } from "~/i18n/messages";
 import {
   type OrchestrationV2LimitRecovery,
   type OrchestrationV2LimitRecoveryUpdate,
@@ -12,8 +15,6 @@ import {
 } from "@t3tools/shared/usageLimits";
 import { GaugeIcon } from "lucide-react";
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { useDeadlinePassed } from "../../hooks/useDeadline";
 import { OpenAI } from "../Icons";
 import { ChatGptUsageButton } from "../settings/ChatGptUsageButton";
@@ -38,8 +39,7 @@ type RecoveryProps = {
 
 export function usageLimitRecoveryBannerItem(
   props: RecoveryProps,
-  t: TFunction<"chat">,
-  tCommon: TFunction<"common">,
+  resolve: MessageResolver = m,
 ): ComposerBannerStackItem {
   const {
     runId,
@@ -66,22 +66,38 @@ export function usageLimitRecoveryBannerItem(
     resumes && resetAt && snoozedUntil && Date.parse(snoozedUntil) > Date.parse(resetAt)
       ? snoozedUntil
       : resetAt;
-  const displayTime = displayAt
-    ? formatUpcomingTimestamp(displayAt, timestampFormat, tCommon)
-    : null;
-  const resetDescription =
-    displayTime === null
-      ? t(($) => $.limits.resetUnavailable)
-      : resumes
-        ? t(($) => $.limits.resumes, { time: displayTime })
-        : t(($) => $.limits.resets, { time: displayTime });
+  const resetDescription = displayAt
+    ? resumes
+      ? resolve(
+          msg("Resumes {time}", {
+            time: formatUpcomingTimestamp(
+              displayAt,
+              timestampFormat,
+              undefined,
+              undefined,
+              resolve,
+            ),
+          }),
+        )
+      : resolve(
+          msg("Resets {time}", {
+            time: formatUpcomingTimestamp(
+              displayAt,
+              timestampFormat,
+              undefined,
+              undefined,
+              resolve,
+            ),
+          }),
+        )
+    : resolve(msg("Reset time unavailable; retry manually"));
   if (!chatGptLimit) {
     return {
       id: `usage-limit-recovery:${runId}`,
       variant: "warning",
       group: "environment",
       icon: <GaugeIcon />,
-      title: t(($) => $.limits.reached),
+      title: resolve(msg("Usage limit reached")),
       description: resetDescription,
       actions: recoveryActions,
     };
@@ -92,14 +108,18 @@ export function usageLimitRecoveryBannerItem(
     variant: "warning",
     group: "environment",
     icon: <OpenAI aria-hidden="true" />,
-    title: t(($) => $.errors.chatGptLimit),
-    description: workspaceLimit ? t(($) => $.limits.workspaceReached) : resetDescription,
+    title: resolve(msg("ChatGPT usage limit reached")),
+    description: workspaceLimit
+      ? resolve(
+          msg("You've reached your workspace's limit for using your ChatGPT plan in other apps."),
+        )
+      : resetDescription,
     actions: (
       <>
         {recoveryActions}
         {workspaceLimit ? (
-          <Button size="xs" variant="ghost" onClick={() => copyAdminRequest(t)}>
-            {t(($) => $.errors.copyAdminRequest)}
+          <Button size="xs" variant="ghost" onClick={copyAdminRequest}>
+            <T>Copy request for admin</T>
           </Button>
         ) : (
           <ChatGptUsageButton size="xs" variant="ghost" />
@@ -110,7 +130,7 @@ export function usageLimitRecoveryBannerItem(
 }
 
 function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: RecoveryProps) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const [pending, setPending] = useState(false);
 
   const scheduled =
@@ -125,8 +145,8 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
     if (action === "snooze" && !snoozed && Date.parse(resetAt) <= Date.now()) {
       toastManager.add({
         type: "error",
-        title: t(($) => $.limits.snoozeFailed),
-        description: t(($) => $.limits.resetPassed),
+        title: m(msg("Could not snooze thread")),
+        description: m(msg("The reset time has passed. Retry the thread manually.")),
       });
       // The deadline timer can lag after a throttled tab or sleep; disable now.
       deadlineStore(Date.parse(resetAt)).refresh();
@@ -144,9 +164,9 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
         type: "error",
         title:
           action === "resume"
-            ? t(($) => $.limits.autoResumeFailed)
-            : t(($) => $.limits.snoozeFailed),
-        description: cause instanceof Error ? cause.message : t(($) => $.ui.error),
+            ? m(msg("Could not change auto-resume"))
+            : m(msg("Could not snooze thread")),
+        description: thrownErrorMessage(cause, m) ?? m(msg("An error occurred.")),
       });
     }
     setPending(false);
@@ -155,22 +175,14 @@ function RecoveryActions({ runId, resetAt, recovery, snoozedUntil, onChange }: R
   return (
     <span className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
       <InlineButton touchTarget="padded" disabled={pending} onClick={() => void toggle("resume")}>
-        {pending
-          ? t(($) => $.ui.saving)
-          : scheduled
-            ? t(($) => $.limits.cancelResume)
-            : t(($) => $.limits.resumeAtReset)}
+        {pending ? gt("Saving...") : scheduled ? gt("Cancel auto-resume") : gt("Resume at reset")}
       </InlineButton>
       <InlineButton
         touchTarget="padded"
         disabled={pending || (!snoozed && resetPassed)}
         onClick={() => void toggle("snooze")}
       >
-        {pending
-          ? t(($) => $.ui.saving)
-          : snoozed
-            ? t(($) => $.limits.wake)
-            : t(($) => $.limits.snooze)}
+        {pending ? gt("Saving...") : snoozed ? gt("Wake now") : gt("Snooze until reset")}
       </InlineButton>
     </span>
   );

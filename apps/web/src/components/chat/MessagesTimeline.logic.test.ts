@@ -13,8 +13,8 @@ import {
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import {
-  deriveTimelineEntriesFromVisibleTurnItems as deriveTranslatedEntries,
-  deriveTimelineEntriesFromVisibleTurnItemsWithState as deriveTranslatedProjection,
+  deriveTimelineEntriesFromVisibleTurnItems,
+  deriveTimelineEntriesFromVisibleTurnItemsWithState,
   workEntryDisplayIndicatesToolFailure,
   type TimelineEntry,
 } from "../../session-logic";
@@ -28,36 +28,16 @@ import { describe, expect, it } from "vite-plus/test";
 import { MessageId, RunId } from "@t3tools/contracts";
 import {
   computeStableMessagesTimelineRows,
-  deriveMessagesTimelineRows as deriveTranslatedRows,
+  deriveMessagesTimelineRows,
   timelineTurnFoldRunIdsByEntryId,
   liveAnswerPreview,
-  deriveMessagesTimelineRowsWithState as deriveTranslatedRowState,
+  deriveMessagesTimelineRowsWithState,
+  isTimelineMinimapTurnVisible,
   resolveAssistantMessageCopyState,
   type MessagesTimelineRow,
-  workEntryDisplayLabel as translatedWorkEntryLabel,
+  workEntryDisplayLabel,
 } from "./MessagesTimeline.logic";
-
-import { createI18n } from "@t3tools/client-runtime/i18n";
-
-const projectionT = createI18n("en").getFixedT("en", "activity");
-const deriveTimelineEntriesFromVisibleTurnItems = (
-  input: Parameters<typeof deriveTranslatedEntries>[0],
-) => deriveTranslatedEntries(input, projectionT);
-const deriveTimelineEntriesFromVisibleTurnItemsWithState = (
-  input: Parameters<typeof deriveTranslatedProjection>[0],
-  previous?: Parameters<typeof deriveTranslatedProjection>[2],
-) => deriveTranslatedProjection(input, projectionT, previous);
-
-const deriveMessagesTimelineRows = (input: Parameters<typeof deriveTranslatedRows>[0]) =>
-  deriveTranslatedRows(input, projectionT, "en");
-const deriveMessagesTimelineRowsWithState = (
-  input: Parameters<typeof deriveTranslatedRowState>[0],
-  previous?: Parameters<typeof deriveTranslatedRowState>[3],
-) => deriveTranslatedRowState(input, projectionT, "en", previous);
-const workEntryDisplayLabel = (
-  entry: Parameters<typeof translatedWorkEntryLabel>[0],
-  workspaceRoot: Parameters<typeof translatedWorkEntryLabel>[1],
-) => translatedWorkEntryLabel(entry, workspaceRoot, projectionT);
+import { workEntryIconName } from "./TimelineWorkEntryRow.logic";
 
 describe("resolveAssistantMessageCopyState", () => {
   it("copies the rendered representation of Codex directives", () => {
@@ -537,6 +517,49 @@ describe("deriveMessagesTimelineRows", () => {
     },
   );
 
+  it.each(["info", "warning", "error", undefined] as const)(
+    "renders %s notices with compatible severity",
+    (level) => {
+      const fixture = makeStreamingTimelineFixture();
+      const message = "TPS 227.1 tok/s · TTFT 3.4s";
+      const id = TurnItemId.make("info-notice");
+      const [notice] = deriveTimelineEntriesFromVisibleTurnItems({
+        visibleTurnItems: [
+          {
+            ...fixture.visibleTurnItems[0]!,
+            sourceItemId: id,
+            item: {
+              id,
+              threadId: fixture.threadId,
+              runId: fixture.runId,
+              nodeId: null,
+              providerThreadId: null,
+              providerTurnId: null,
+              nativeItemRef: null,
+              parentItemId: null,
+              ordinal: 1,
+              startedAt: DateTime.makeUnsafe(fixture.time(1)),
+              completedAt: DateTime.makeUnsafe(fixture.time(1)),
+              updatedAt: DateTime.makeUnsafe(fixture.time(1)),
+              type: "system_notice",
+              message,
+              ...(level === undefined ? {} : { level }),
+              title: message,
+              status: "completed",
+            },
+          },
+        ],
+        optimisticMessages: [],
+      });
+      if (notice?.kind !== "work") throw new Error("Expected a notice work entry");
+      expect(notice.entry.sourceActivityKind).toBe(
+        level === "info" ? undefined : "runtime.warning",
+      );
+      expect(workEntryIconName(notice.entry)).toBe(level === "info" ? "zap" : "circle-alert");
+      expect(workEntryDisplayLabel(notice.entry, undefined)).toBe(message);
+    },
+  );
+
   it.each([false, true])(
     "gives live compaction the activity slot and restores Thinking (runless: %s)",
     (runless) => {
@@ -663,7 +686,7 @@ describe("deriveMessagesTimelineRows", () => {
           active: true,
           label: "Compacting before the cache expires…",
         },
-        "Context automatically compacted before cache expiry",
+        "Auto-compacted before cache expiry",
       ],
       ["onReturn", { kind: "working", compacting: true }, "Context compacted before sending"],
       [undefined, { kind: "context-compaction", active: true }, undefined],
@@ -5122,5 +5145,16 @@ describe("subagent continued by a later turn", () => {
       `turn-fold:${run2}`,
       "closing-2",
     ]);
+  });
+});
+
+describe("isTimelineMinimapTurnVisible", () => {
+  it("keeps a turn lit while only its reply is on screen", () => {
+    // Turn rows 10..499, viewport inside the reply.
+    expect(isTimelineMinimapTurnVisible(10, 500, 200, 210)).toBe(true);
+    expect(isTimelineMinimapTurnVisible(500, undefined, 600, 610)).toBe(true);
+    expect(isTimelineMinimapTurnVisible(500, undefined, 200, 210)).toBe(false);
+    expect(isTimelineMinimapTurnVisible(10, 500, 500, 510)).toBe(false);
+    expect(isTimelineMinimapTurnVisible(10, 500, null, null)).toBe(false);
   });
 });

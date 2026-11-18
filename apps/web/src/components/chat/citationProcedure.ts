@@ -1,12 +1,14 @@
 import { useAtomValue } from "@effect/atom-react";
 import { type AtomCommandSuccess, runAtomCommand } from "@t3tools/client-runtime/state/runtime";
+import { sentMessageFromToolItem } from "@t3tools/shared/toolOutput";
 import { Atom, type AtomRegistry } from "effect/reactivity";
+import { msg } from "gt-react";
+import { m } from "../../i18n/messages";
 import type { TimelineEntry } from "../../session-logic";
 import { environmentThreadDetails, threadEnvironment } from "../../state/threads";
 import { toastManager } from "../ui/toast";
 import type { AssistantCitationRequest } from "./AssistantCitationSource";
 import type { MessagesTimelineRow } from "./MessagesTimeline.logic";
-import { appI18n } from "~/i18n";
 
 /** Whether the cited response is in the loaded history, after paging toward it. */
 export type CitedHistory =
@@ -28,7 +30,7 @@ export interface CitedThreadSnapshot {
 
 export type CitedHistoryOutcome =
   | { readonly _tag: "found" }
-  | { readonly _tag: "failed"; readonly reason: "load" | "unavailable" | "notAssistant" }
+  | { readonly _tag: "failed"; readonly title: string; readonly description: string }
   | { readonly _tag: "aborted" };
 
 type HistoryPageResult = AtomCommandSuccess<
@@ -36,15 +38,21 @@ type HistoryPageResult = AtomCommandSuccess<
 >;
 
 const MAX_CITATION_PAGES = 20;
+const HISTORY_COMMAND_LABEL = "load cited thread history";
+const HISTORY_LOAD_ERROR = "Could not load history.";
 
 const COULD_NOT_LOAD = {
   _tag: "failed",
-  reason: "load",
+  title: msg("Could not load the cited response"),
+  description: msg(
+    "Load earlier turns, then click the citation to try again. Your saved quote is unchanged.",
+  ),
 } as const;
 
 const UNAVAILABLE = {
   _tag: "failed",
-  reason: "unavailable",
+  title: msg("The cited response is unavailable"),
+  description: msg("It may have been removed. The selected text is still saved in your citation."),
 } as const;
 
 /**
@@ -66,7 +74,8 @@ export async function loadCitedHistory(input: {
     if (thread.message === "other") {
       return {
         _tag: "failed",
-        reason: "notAssistant",
+        title: msg("The citation does not refer to an assistant response"),
+        description: msg("The selected text is still saved in your citation."),
       };
     }
     if (!thread.hasMoreHistory) return UNAVAILABLE;
@@ -89,13 +98,17 @@ export function resolveCitationPhase(input: {
 }): CitationPhase {
   if (input.history._tag === "failed") return { _tag: "failed" };
   const source = input.entries.find(
-    (entry) => entry.kind === "message" && entry.message.id === input.messageId,
+    (entry) =>
+      (entry.kind === "message" && entry.message.id === input.messageId) ||
+      (entry.kind === "sent-message" && entry.id === input.messageId),
   );
   // The history store can hold the message a render before the entries do.
   if (!source) return { _tag: "loading" };
-  if (source.kind !== "message" || source.message.role !== "assistant") return { _tag: "failed" };
+  if (source.kind === "message" && source.message.role !== "assistant") return { _tag: "failed" };
   const row = input.rows.find(
-    (candidate) => candidate.kind === "message" && candidate.message.id === input.messageId,
+    (candidate) =>
+      (candidate.kind === "message" && candidate.message.id === input.messageId) ||
+      (candidate.kind === "sent-message" && candidate.id === input.messageId),
   );
   if (row) return { _tag: "ready", rowId: row.id };
   return { _tag: "expanding" };
@@ -124,12 +137,16 @@ export function citedThreadSnapshot(input: {
   }
   // Older pages merge into the visible turn items, not the message list.
   const item = input.thread.projection.visibleTurnItems.find(
-    (row) =>
-      (row.item.type === "assistant_message" || row.item.type === "user_message") &&
-      row.item.messageId === input.messageId,
+    ({ item }) =>
+      ((item.type === "assistant_message" || item.type === "user_message") &&
+        item.messageId === input.messageId) ||
+      (item.type === "dynamic_tool" &&
+        item.id === input.messageId &&
+        item.status === "completed" &&
+        sentMessageFromToolItem(item) !== undefined),
   )?.item;
   return {
-    message: item === undefined ? null : item.type === "assistant_message" ? "assistant" : "other",
+    message: item === undefined ? null : item.type === "user_message" ? "other" : "assistant",
     hasMoreHistory: input.history.hasMoreHistory,
   };
 }
@@ -199,36 +216,19 @@ const citedHistoryAtom = Atom.family(
             get.registry,
             threadEnvironment.loadEarlierHistory,
             { environmentId, input: { threadId, throughEntryId: messageId } },
-            { label: "load cited thread history", reportFailure: false },
+            { label: HISTORY_COMMAND_LABEL, reportFailure: false },
           );
           return result._tag === "Success"
             ? result.value
-            : {
-                _tag: "error",
-                message: appI18n.getFixedT(null, "chat")(($) => $.citation.historyFailed),
-              };
+            : { _tag: "error", message: HISTORY_LOAD_ERROR };
         },
       }).then((outcome) => {
         if (outcome._tag === "aborted") return;
         if (outcome._tag === "failed") {
-          const t = appI18n.getFixedT(null, "chat");
-          const messages = {
-            load: {
-              title: t(($) => $.citation.couldNotLoad),
-              description: t(($) => $.citation.loadEarlier),
-            },
-            unavailable: {
-              title: t(($) => $.citation.unavailable),
-              description: t(($) => $.citation.removed),
-            },
-            notAssistant: {
-              title: t(($) => $.citation.notAssistant),
-              description: t(($) => $.citation.saved),
-            },
-          };
           toastManager.add({
             type: "warning",
-            ...messages[outcome.reason],
+            title: m(outcome.title),
+            description: m(outcome.description),
           });
         }
         get.setSelf({ _tag: outcome._tag });

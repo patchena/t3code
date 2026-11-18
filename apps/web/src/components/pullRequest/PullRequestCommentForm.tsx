@@ -1,22 +1,26 @@
-import { useTranslation } from "react-i18next";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { useAtomCommand } from "~/state/use-atom-command";
 import type { EnvironmentId, PullRequestDetailView, PullRequestRef } from "@t3tools/contracts";
 import { SendIcon } from "lucide-react";
+import { msg, T, useGT } from "gt-react";
 import { useEffect, useState, type RefObject } from "react";
+
+import { m } from "~/i18n/messages";
 
 import { TextFieldSpeechControls, useTextFieldSpeech } from "~/speech/useTextFieldSpeech";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 
-import { Button } from "~/components/ui/button";
-import { toastManager } from "~/components/ui/toast";
-import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
+import { Button } from "../ui/button";
+import { toastManager } from "../ui/toast";
+import { PullRequestGlyph } from "./pullRequestIcons";
 import {
   PullRequestMarkdownTextarea,
   pullRequestCompletionScope,
-} from "~/components/pullRequest/PullRequestMarkdownTextarea";
-import { pullRequestReviewKey } from "~/components/pullRequest/pullRequestReviewStore";
-import { useInlineActionConfirm } from "~/components/pullRequest/useInlineActionConfirm";
+} from "./PullRequestMarkdownTextarea";
+import { pullRequestReviewKey } from "./pullRequestReviewStore";
+import { useInlineActionConfirm } from "./useInlineActionConfirm";
+
+import { changeRequestTermKind } from "./changeRequestTerm";
 
 export function PullRequestCommentForm({
   environmentId,
@@ -43,7 +47,7 @@ export function PullRequestCommentForm({
   onCommented: () => void;
   onClose: () => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState<"comment" | "close" | "reopen" | null>(null);
   const locked = submitting !== null || actionPending;
@@ -98,7 +102,7 @@ export function PullRequestCommentForm({
     });
     if (result._tag === "Failure") {
       setSubmitting(null);
-      toastManager.add({ type: "error", title: t(($) => $.git.postCommentFailed) });
+      toastManager.add({ type: "error", title: m(msg("Could not post the comment")) });
       return;
     }
     setBody("");
@@ -121,10 +125,13 @@ export function PullRequestCommentForm({
         readOnly={speech.freezesEditor}
         value={body}
         rows={3}
-        placeholder={t(($) => $.git.leaveComment)}
-        aria-label={t(($) => $.git.commentOnRequest, {
-          term: sourceControlClients.get(detail.provider).changeRequest.singular,
-        })}
+        placeholder={gt("Leave a comment")}
+        aria-label={gt(
+          "Comment on this {term, select, mr {merge request} cr {change request} other {pull request}}",
+          {
+            term: changeRequestTermKind(sourceControlClients.get(detail.provider).changeRequest),
+          },
+        )}
         onValueChange={setBody}
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing || event.keyCode === 229) return;
@@ -160,20 +167,20 @@ export function PullRequestCommentForm({
               // The longest label holds the width, so the confirming click lands on the button.
               <span className="inline-grid">
                 <span aria-hidden className="invisible col-start-1 row-start-1">
-                  {t(($) => $.git.closeWithComment)}
+                  <T>Close with comment</T>
                 </span>
                 <span className="col-start-1 row-start-1">
                   {submitting === "close"
-                    ? t(($) => $.git.closing)
+                    ? gt("Closing...")
                     : inlineConfirm.isArmed("close")
-                      ? t(($) => $.git.confirmClose)
-                      : t(($) => $.git.closeWithComment)}
+                      ? gt("Confirm close?")
+                      : gt("Close with comment")}
                 </span>
               </span>
             ) : submitting === "reopen" ? (
-              t(($) => $.git.reopening)
+              gt("Reopening...")
             ) : (
-              t(($) => $.git.reopenWithComment)
+              gt("Reopen with comment")
             )}
           </Button>
         )}
@@ -184,7 +191,9 @@ export function PullRequestCommentForm({
           onClick={() => submitAfterDictation("comment")}
         >
           <SendIcon className="size-3.5" />
-          {submitting === "comment" ? t(($) => $.git.posting) : t(($) => $.git.comment)}
+          {submitting === "comment"
+            ? gt("Posting...")
+            : gt("Comment", { $context: "verb, submit button" })}
         </Button>
       </div>
     </div>

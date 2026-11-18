@@ -1,5 +1,4 @@
-import { FileWorkerError, encodeFileWorkerError } from "~/components/files/fileWorkerError";
-import { parseDelimitedPreview } from "@t3tools/shared/delimitedPreview";
+import { csvPreviewDelimiter, parseDelimitedPreview } from "@t3tools/shared/delimitedPreview";
 import {
   LARGE_TEXT_MAX_BYTES,
   LARGE_TEXT_MAX_ROWS,
@@ -8,12 +7,13 @@ import {
   type TextPreviewRequest,
   type TextPreviewResult,
 } from "./largeTextProtocol";
+import { PreviewError, previewFailure } from "./previewFailure";
 
 const chunks: { start: number; blob: Blob }[] = [];
 const offsets: Uint32Array[] = [new Uint32Array(65536)];
 let entries = 1;
 let size = 0;
-let delimiter: "," | "\t" | null = null;
+let delimiter: "," | ";" | "\t" | null = null;
 let complete = false;
 let columns = 1;
 function reply(value: TextPreviewResult) {
@@ -52,6 +52,7 @@ async function page(index: number) {
         maxRows: PREVIEW_PAGE_ROWS,
         maxColumns: LARGE_TEXT_MAX_COLUMNS,
         maxCellLength: 1024 * 1024,
+        detectCsv: false,
       }).rows
     : text
         .replace(/\r?\n$|\r$/, "")
@@ -74,20 +75,13 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
     await response.body?.cancel();
     response = new Response(new Blob([]));
   }
-  if (!response.ok || !response.body)
-    throw new FileWorkerError({
-      message: "The file could not be loaded. Close it and try again.",
-      code: "fileDownload",
-    });
+  if (!response.ok || !response.body) throw new PreviewError({ code: "file-load-failed" });
   const total = Number(
     response.headers.get("content-range")?.split("/")[1] ?? response.headers.get("content-length"),
   );
   if (total > LARGE_TEXT_MAX_BYTES) {
     await response.body.cancel();
-    throw new FileWorkerError({
-      message: "Text previews support files up to 256 MB.",
-      code: "textSizeLimit",
-    });
+    throw new PreviewError({ code: "text-too-large" });
   }
   const reader = response.body.getReader();
   let state = 0;
@@ -96,14 +90,33 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
   let rowColumns = 1;
   let first = false;
   try {
+    let prefix: Uint8Array<ArrayBuffer> | undefined;
+    if (delimiter === ",") {
+      const parts: Uint8Array<ArrayBuffer>[] = [];
+      let length = 0;
+      let quoted = false;
+      let breaks = 0;
+      let previous = 0;
+      while (length <= 1024 * 1024 && breaks < 2) {
+        const next = await reader.read();
+        if (next.done) break;
+        parts.push(next.value);
+        length += next.value.length;
+        for (const byte of next.value) {
+          if (byte === 34) quoted = !quoted;
+          else if (!quoted && (byte === 13 || (byte === 10 && previous !== 13))) breaks++;
+          previous = byte;
+        }
+      }
+      prefix = new Uint8Array(await new Blob(parts).arrayBuffer());
+      delimiter = csvPreviewDelimiter(new TextDecoder().decode(prefix));
+    }
     while (true) {
-      const { value, done } = await reader.read();
+      const { value, done } = prefix ? { value: prefix, done: false } : await reader.read();
+      prefix = undefined;
       if (done) break;
       if (size + value.length > LARGE_TEXT_MAX_BYTES)
-        throw new FileWorkerError({
-          message: "Text previews support files up to 256 MB.",
-          code: "textSizeLimit",
-        });
+        throw new PreviewError({ code: "text-too-large" });
       chunks.push({ start: size, blob: new Blob([value]) });
       for (let i = 0; i < value.length; i++) {
         const byte = value[i]!;
@@ -114,16 +127,9 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
           (pos === 2 && byte === 191)
         )
           continue;
-        if (byte === 0)
-          throw new FileWorkerError({
-            message: "This file contains binary data.",
-            code: "textBinary",
-          });
+        if (byte === 0) throw new PreviewError({ code: "text-binary" });
         if (pos - at(entries - 1) > 1024 * 1024)
-          throw new FileWorkerError({
-            message: "A line or record exceeds the 1 MB preview limit.",
-            code: "textRecordLimit",
-          });
+          throw new PreviewError({ code: "text-line-too-long" });
         if (cr) {
           cr = false;
           if (byte === 10) {
@@ -155,11 +161,7 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
           }
         }
         if (byte === 10 || byte === 13) {
-          if (entries > LARGE_TEXT_MAX_ROWS)
-            throw new FileWorkerError({
-              message: "Text previews support up to 5 million rows.",
-              code: "textRowLimit",
-            });
+          if (entries > LARGE_TEXT_MAX_ROWS) throw new PreviewError({ code: "text-too-many-rows" });
           set(entries++, pos + 1);
           columns = Math.min(LARGE_TEXT_MAX_COLUMNS, Math.max(columns, rowColumns));
           rowColumns = 1;
@@ -174,17 +176,9 @@ async function open(input: Extract<TextPreviewRequest, { type: "open" }>) {
         first = true;
       }
     }
-    if (total > 0 && size !== total)
-      throw new FileWorkerError({
-        message: "The file download was incomplete. Close it and try again.",
-        code: "downloadIncomplete",
-      });
+    if (total > 0 && size !== total) throw new PreviewError({ code: "text-download-incomplete" });
     if (size > at(entries - 1)) {
-      if (entries > LARGE_TEXT_MAX_ROWS)
-        throw new FileWorkerError({
-          message: "Text previews support up to 5 million rows.",
-          code: "textRowLimit",
-        });
+      if (entries > LARGE_TEXT_MAX_ROWS) throw new PreviewError({ code: "text-too-many-rows" });
       set(entries++, size);
       columns = Math.min(LARGE_TEXT_MAX_COLUMNS, Math.max(columns, rowColumns));
     }
@@ -204,17 +198,12 @@ self.addEventListener("message", (event: MessageEvent<TextPreviewRequest>) => {
         ? page(input.index)
         : complete
           ? read(0, size).then((text) => reply({ type: "copy", text }))
-          : Promise.reject(
-              new FileWorkerError({
-                message: "Wait for the file to finish loading before copying.",
-                code: "copyBeforeLoaded",
-              }),
-            )
+          : Promise.reject(new PreviewError({ code: "text-copy-before-loaded" }))
   ).catch((cause: unknown) =>
     reply({
       type: "error",
       operation: input.type,
-      ...encodeFileWorkerError(cause),
+      ...previewFailure(cause, "read-failed"),
     }),
   );
 });

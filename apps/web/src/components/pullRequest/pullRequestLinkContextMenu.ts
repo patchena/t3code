@@ -1,69 +1,68 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { ContextMenuItem } from "@t3tools/contracts";
 import {
   type SourceControlDefinition,
   UNKNOWN_SOURCE_CONTROL_CLIENT,
 } from "@t3tools/client-runtime/source-control-clients";
 
+import { msg } from "gt-react";
+
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
+import { m, type MessageResolver } from "~/i18n/messages";
 import { readLocalApi } from "~/localApi";
 
-import { toastManager } from "~/components/ui/toast";
+import { toastManager } from "../ui/toast";
 
 export type PullRequestLinkContextMenuAction = "copy-link" | "open-external";
 
 export const openOnHostLabel = (
   host: SourceControlDefinition,
-  t: TFunction<"workspace">,
+  resolve: MessageResolver = m,
 ): string =>
   host === UNKNOWN_SOURCE_CONTROL_CLIENT
-    ? t(($) => $.git.openOnHost)
-    : t(($) => $.git.openOnProvider, { provider: host.label });
+    ? resolve(msg("Open on host"))
+    : resolve(msg("Open on {host}", { host: host.label }));
 
 function pullRequestLinkContextMenuItems(
   openLabel: string,
-  t: TFunction<"workspace">,
 ): readonly ContextMenuItem<PullRequestLinkContextMenuAction>[] {
   return [
-    { id: "copy-link", label: t(($) => $.git.copyLink), icon: "copy" },
+    { id: "copy-link", label: m(msg("Copy link")), icon: "copy" },
     { id: "open-external", label: openLabel },
   ];
 }
 
-export async function showPullRequestLinkContextMenu(
-  {
-    url,
-    openLabel,
-    position,
-  }: {
-    readonly url: string;
-    readonly openLabel: string;
-    readonly position: { readonly x: number; readonly y: number };
-  },
-  t: TFunction<"workspace">,
-): Promise<void> {
+export async function showPullRequestLinkContextMenu({
+  url,
+  openLabel,
+  position,
+}: {
+  readonly url: string;
+  readonly openLabel: string;
+  readonly position: { readonly x: number; readonly y: number };
+}): Promise<void> {
   const api = readLocalApi();
   if (!api) return;
-  const items = pullRequestLinkContextMenuItems(openLabel, t);
   let action: PullRequestLinkContextMenuAction | null = null;
   try {
-    action = await api.contextMenu.show(items, position);
-  } catch (error) {
-    toastManager.add({
-      type: "error",
-      title: t(($) => $.git.contextMenuFailed),
-      description: error instanceof Error ? error.message : String(error),
-    });
+    action = await api.contextMenu.show(pullRequestLinkContextMenuItems(openLabel), position);
+  } catch {
     return;
   }
   try {
-    if (action === "copy-link") await writeTextToClipboard(url, "link");
+    if (action === "copy-link")
+      await writeTextToClipboard(url, {
+        target: "link",
+        unavailableMessage: msg("Clipboard API is unavailable while copying link."),
+        failureMessage: msg("Failed to copy link to the clipboard."),
+      });
     else if (action === "open-external") await api.shell.openExternal(url);
   } catch {
     toastManager.add({
       type: "error",
       title:
-        action === "copy-link" ? t(($) => $.git.copyLinkFailed) : t(($) => $.git.openLinkFailed),
+        action === "copy-link"
+          ? m(msg("Could not copy the link"))
+          : m(msg("Could not open the link")),
     });
   }
 }

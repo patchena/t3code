@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import {
   TurnItemId,
   NodeId,
@@ -38,7 +37,6 @@ import {
   presentProviderGoal,
   presentRunStop,
   threadRuntimeHasInterruptibleRun,
-  providerStartingText,
 } from "./threadExecution.ts";
 
 const now = DateTime.makeUnsafe("2026-07-28T10:00:00.000Z");
@@ -342,10 +340,10 @@ describe("thread execution presentation", () => {
     };
     const starting = { ...v2Projection, runs: [openRun], providerSessions: [session] };
 
-    expect(deriveThreadActivityRun(starting)?.providerStarting).toEqual({ provider: "Claude" });
+    expect(deriveThreadActivityRun(starting)?.providerStartingLabel).toBe("Starting Claude");
     expect(
-      deriveThreadActivityRun({ ...starting, providerSessions: [] })?.providerStarting,
-    ).toEqual({ provider: null });
+      deriveThreadActivityRun({ ...starting, providerSessions: [] })?.providerStartingLabel,
+    ).toBe("Starting");
     expect(
       deriveThreadActivityRun({
         ...starting,
@@ -362,17 +360,8 @@ describe("thread execution presentation", () => {
             completedAt: null,
           },
         ],
-      })?.providerStarting,
+      })?.providerStartingLabel,
     ).toBeUndefined();
-    for (const language of ["en", "de"] as const) {
-      const t = createI18n(language).getFixedT(language, "activity");
-      expect(providerStartingText({ provider: "Claude" }, t)).toBe(
-        language === "en" ? "Starting Claude" : "Claude wird gestartet",
-      );
-      expect(providerStartingText({ provider: null }, t)).toBe(
-        language === "en" ? "Starting" : "Wird gestartet",
-      );
-    }
   });
 
   it("presents a held queue as the stopped run instead of queued work", () => {
@@ -733,12 +722,10 @@ describe("isBackgroundWorkStopPending", () => {
 
 describe("presentProviderGoal", () => {
   it("rolls token counts that round to 1000k over to 1m", () => {
-    const t = createI18n("en").getFixedT("en", "activity");
     const usage = (tokensUsed: number) =>
       presentProviderGoal(
         { objective: "Ship the feature", status: "active", tokensUsed, tokenBudget: 2_000_000 },
         true,
-        t,
       ).usage;
     expect(usage(999_499)).toBe("999k / 2m tokens");
     expect(usage(999_500)).toBe("1m / 2m tokens");
@@ -753,7 +740,6 @@ describe("presentProviderGoal", () => {
           tokenBudget: 999_500,
         },
         false,
-        t,
       ).usage,
     ).toBe("1m / 1m tokens");
   });
@@ -761,17 +747,13 @@ describe("presentProviderGoal", () => {
 
 describe("presentPendingBackgroundWork", () => {
   it("names a command by its script, not the shell that wraps it", () => {
-    const presentation = presentPendingBackgroundWork(
-      [
-        {
-          taskId: "call_1",
-          kind: "command",
-          description: `/bin/zsh -lc "mv a.ts b.ts\ncat > b.ts <<'EOF'\nexport {};\nEOF"`,
-        },
-      ],
-      createI18n("en").getFixedT("en", "activity"),
-      "en",
-    );
+    const presentation = presentPendingBackgroundWork([
+      {
+        taskId: "call_1",
+        kind: "command",
+        description: `/bin/zsh -lc "mv a.ts b.ts\ncat > b.ts <<'EOF'\nexport {};\nEOF"`,
+      },
+    ]);
     expect(presentation?.items[0]?.label).toBe("mv a.ts b.ts\ncat > b.ts <<'EOF'\nexport {};\nEOF");
   });
 });

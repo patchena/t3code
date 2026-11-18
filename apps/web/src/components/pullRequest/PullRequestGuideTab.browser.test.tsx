@@ -7,18 +7,16 @@ import {
 import { expect, it, vi } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 
-vi.mock(import("~/components/pullRequest/guide/useReviewGuideWriter"), () => ({
-  useReviewGuideWriter: vi.fn(),
-}));
-vi.mock(import("~/components/pullRequest/guide/useGuideDiffFiles"), () => ({
+vi.mock(import("./guide/useReviewGuideWriter"), () => ({ useReviewGuideWriter: vi.fn() }));
+vi.mock(import("./guide/useGuideDiffFiles"), () => ({
   useGuideDiffFiles: () => ({ files: new Map(), loading: false, error: null, retry: () => {} }),
 }));
 
 import { render } from "../../../test/render";
-import type { ChatComposerHandle } from "~/components/chat/ChatComposer";
-import { useChatShortcuts } from "~/components/chat/useChatShortcuts";
-import { useReviewGuideWriter } from "~/components/pullRequest/guide/useReviewGuideWriter";
-import { PullRequestGuideTab } from "~/components/pullRequest/PullRequestGuideTab";
+import type { ChatComposerHandle } from "../chat/ChatComposer";
+import { useChatShortcuts } from "../chat/useChatShortcuts";
+import { useReviewGuideWriter } from "./guide/useReviewGuideWriter";
+import { PullRequestGuideTab } from "./PullRequestGuideTab";
 
 const reference: PullRequestRef = {
   projectId: ProjectId.make("project"),

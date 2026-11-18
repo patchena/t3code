@@ -1,11 +1,11 @@
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { AssistantCitation, ResponseContextRecord } from "@t3tools/contracts";
-import { useTranslation } from "react-i18next";
 import {
   assistantCitationLabel,
   serializeAssistantCitation,
 } from "@t3tools/shared/assistantCitations";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useGT } from "gt-react";
 import { PencilIcon, QuoteIcon } from "lucide-react";
 import {
   useEffect,
@@ -123,7 +123,7 @@ export function AssistantCitationEmbed({
   leading: boolean;
   trailing: boolean;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const wholeResponse = citation.prefix === "" && citation.suffix === "";
   const { comment, ...quoted } = citation;
   return (
@@ -131,7 +131,7 @@ export function AssistantCitationEmbed({
       citation={citation}
       copyMarkdown={serializeAssistantCitation(citation)}
       cardCopyMarkdown={serializeAssistantCitation(quoted)}
-      label={t(($) => $.citation.goToQuoted, { label: assistantCitationLabel(quoted) })}
+      label={gt("Go to quoted response: {label}", { label: assistantCitationLabel(quoted) })}
       comment={comment}
       leading={leading}
       trailing={trailing}
@@ -164,12 +164,12 @@ export function ResponseReplyCard({
   leading: boolean;
   trailing: boolean;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   return (
     <ResponseCard
       citation={record.citation}
       copyMarkdown={copyMarkdown}
-      label={t(($) => $.citation.goToReplied, { label: record.label })}
+      label={gt("Go to the response this replies to: {label}", { label: record.label })}
       title={record.subagents?.map((subagent) => subagent.title).join(", ")}
       preview={flat(record.citation.text)}
       leading={leading}
@@ -195,7 +195,7 @@ export function AssistantCitationChip({
     onRestoreFocus?: () => void;
   };
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const sourceLinkProps = useCitationSourceLinkProps(citation);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const commentPopupRef = useRef<HTMLDivElement>(null);
@@ -260,7 +260,7 @@ export function AssistantCitationChip({
     <Link
       {...sourceLinkProps}
       className="inline-flex min-w-0 items-center gap-[0.2em] self-baseline text-inherit no-underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-current rounded-sm"
-      aria-label={t(($) => $.citation.view, { label })}
+      aria-label={gt("View cited assistant text: {label}", { label })}
     >
       <QuoteIcon aria-hidden="true" />
       <ContextChipLabel className="max-w-[16em]" dir={textDirection(label)}>
@@ -289,7 +289,7 @@ export function AssistantCitationChip({
         >
           <PopoverTrigger
             aria-label={
-              citation.comment ? t(($) => $.citation.edit) : t(($) => $.citation.addComment)
+              citation.comment ? gt("Edit citation comment") : gt("Add comment to citation")
             }
             data-citation-comment-trigger="true"
             render={<ContextChipAction />}
@@ -329,7 +329,7 @@ export function AssistantCitationChip({
                   : undefined
               }
               ref={commentPopupRef}
-              aria-label={t(($) => $.citation.edit)}
+              aria-label={gt("Edit citation comment")}
               width="md"
               padding="compact"
               onPointerDown={(event) => event.stopPropagation()}

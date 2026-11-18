@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useGT } from "gt-react";
 import { PackageCheckIcon, TriangleAlertIcon } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { parseThreadLinkHref } from "@t3tools/shared/threadLinks";
@@ -18,7 +18,7 @@ export function SidebarPatchCapsule({
   readonly state: PatchState;
   readonly onInstall: () => Promise<void>;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const navigate = useNavigate();
   const [pending, setPending] = useState(false);
   const failed = state.phase === "error";
@@ -26,15 +26,15 @@ export function SidebarPatchCapsule({
   const canInstall = state.phase === "ready";
   const canRetry = failed || state.phase === "cancelled";
   const label = {
-    idle: t(($) => $.updates.updateAvailable),
-    queued: t(($) => $.updates.patchQueued),
-    preparing: t(($) => $.updates.patchPreparing),
-    ready: t(($) => $.updates.patchReady),
-    authorizing: t(($) => $.updates.patchAuthorizing),
-    installing: t(($) => $.updates.patchInstalling),
-    installed: t(($) => $.updates.patchInstalled),
-    error: t(($) => $.updates.patchFailed),
-    cancelled: t(($) => $.updates.patchPostponed),
+    idle: gt("Update available"),
+    queued: gt("Waiting for patch preparation"),
+    preparing: gt("Preparing patches"),
+    ready: gt("Patched update ready"),
+    authorizing: gt("Waiting for authorization"),
+    installing: gt("Installing patched update"),
+    installed: gt("Patched update installed"),
+    error: gt("Patch preparation failed"),
+    cancelled: gt("Update postponed"),
   }[state.phase];
 
   const act = async (action: () => Promise<void>, exclusive = false) => {
@@ -47,7 +47,7 @@ export function SidebarPatchCapsule({
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: t(($) => $.updates.patchActionFailed),
+          title: gt("Could not complete the patch action"),
           description: error instanceof Error ? error.message : String(error),
         }),
       );
@@ -59,7 +59,7 @@ export function SidebarPatchCapsule({
     act(async () => {
       const link = parseThreadLinkHref(href);
       if (link === null || link.environmentId === null) {
-        throw new Error(t(($) => $.updates.patchThreadInvalid));
+        throw new Error(gt("The patch thread link is invalid."));
       }
       await navigate({
         to: "/$environmentId/$threadId",
@@ -99,7 +99,7 @@ export function SidebarPatchCapsule({
             onClick={() => void openThread(threadLink)}
             className="shrink-0 cursor-pointer px-3 text-xs underline underline-offset-3"
           >
-            {t(($) => $.updates.patchThread)}
+            {gt("Thread")}
           </button>
         )}
       </div>
@@ -129,17 +129,17 @@ export function SidebarPatchCapsule({
                 onClick={() =>
                   void act(async () => {
                     const bridge = getPatcherBridge();
-                    if (!bridge) throw new Error(t(($) => $.updates.patchUnavailable));
+                    if (!bridge) throw new Error(gt("The desktop patcher is unavailable."));
                     await bridge.cancel();
                   })
                 }
               >
-                {t(($) => $.updates.later)}
+                {gt("Later")}
               </Button>
             ) : null}
             {canInstall ? (
               <Button size="sm" disabled={pending} onClick={() => void act(onInstall, true)}>
-                {t(($) => $.updates.patchInstall)}
+                {gt("Install")}
               </Button>
             ) : null}
             {canRetry ? (
@@ -149,17 +149,17 @@ export function SidebarPatchCapsule({
                 onClick={() =>
                   void act(async () => {
                     const bridge = getPatcherBridge();
-                    if (!bridge) throw new Error(t(($) => $.updates.patchUnavailable));
+                    if (!bridge) throw new Error(gt("The desktop patcher is unavailable."));
                     if (await bridge.retry()) await onInstall();
                   }, true)
                 }
               >
-                {t(($) => $.updates.retry)}
+                {gt("Retry")}
               </Button>
             ) : null}
             {threadLink === null ? null : (
               <Button size="sm" variant="outline" onClick={() => void openThread(threadLink)}>
-                {t(($) => $.updates.openThread)}
+                {gt("Open thread")}
               </Button>
             )}
           </div>

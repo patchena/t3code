@@ -1,4 +1,3 @@
-import type { SettingsTranslation } from "~/components/settings/settingsSearch";
 import type {
   BackgroundActivityProfile,
   BackgroundActivitySettings,
@@ -22,6 +21,9 @@ import {
 } from "@t3tools/shared/backgroundActivitySettings";
 import * as Duration from "effect/Duration";
 import * as Equal from "effect/Equal";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "../../i18n/messages";
 
 export function isProjectGroupingEnabled(mode: SidebarProjectGroupingMode): boolean {
   return mode !== "separate";
@@ -91,24 +93,24 @@ type TypographySettings = Pick<
 
 export function getChangedTypographySettingLabels(
   settings: TypographySettings,
-  t: SettingsTranslation,
+  resolve: MessageResolver = m,
 ): string[] {
   return [
     ...(settings.fontFamilySans !== DEFAULT_UNIFIED_SETTINGS.fontFamilySans ||
     settings.fontSizeInterface !== DEFAULT_UNIFIED_SETTINGS.fontSizeInterface
-      ? [t(($) => $.restore.interfaceFont)]
+      ? [resolve(msg("Interface font"))]
       : []),
     ...(settings.fontFamilyComposer !== DEFAULT_UNIFIED_SETTINGS.fontFamilyComposer ||
     settings.fontSizePrompt !== DEFAULT_UNIFIED_SETTINGS.fontSizePrompt
-      ? [t(($) => $.restore.promptFont)]
+      ? [resolve(msg("Prompt font"))]
       : []),
     ...(settings.fontFamilyCode !== DEFAULT_UNIFIED_SETTINGS.fontFamilyCode ||
     settings.fontSizeCode !== DEFAULT_UNIFIED_SETTINGS.fontSizeCode
-      ? [t(($) => $.restore.codeFont)]
+      ? [resolve(msg("Code font"))]
       : []),
     ...(settings.fontFamilyTerminal !== DEFAULT_UNIFIED_SETTINGS.fontFamilyTerminal ||
     settings.fontSizeTerminal !== DEFAULT_UNIFIED_SETTINGS.fontSizeTerminal
-      ? [t(($) => $.restore.terminalFont)]
+      ? [resolve(msg("Terminal font"))]
       : []),
   ];
 }
@@ -142,7 +144,7 @@ function isSamePreviewViewport(
 
 export function getChangedBrowserSettingLabels(
   settings: BrowserDefaultSettings,
-  t: SettingsTranslation,
+  resolve: MessageResolver = m,
 ): string[] {
   return [
     ...(isSamePreviewViewport(
@@ -150,33 +152,31 @@ export function getChangedBrowserSettingLabels(
       DEFAULT_UNIFIED_SETTINGS.browserDefaultViewport,
     )
       ? []
-      : [t(($) => $.restore.browserViewport)]),
+      : [resolve(msg("Browser viewport"))]),
     ...(settings.browserDefaultZoomFactor !== DEFAULT_UNIFIED_SETTINGS.browserDefaultZoomFactor
-      ? [t(($) => $.restore.browserZoom)]
+      ? [resolve(msg("Browser zoom"))]
       : []),
     ...(settings.browserDefaultAppearance !== DEFAULT_UNIFIED_SETTINGS.browserDefaultAppearance
-      ? [t(($) => $.restore.browserAppearance)]
+      ? [resolve(msg("Browser appearance"))]
       : []),
     ...(settings.browserRecordingFrameRate !== DEFAULT_UNIFIED_SETTINGS.browserRecordingFrameRate
-      ? [t(($) => $.restore.recordingFrameRate)]
+      ? [resolve(msg("Recording frame rate"))]
       : []),
-    ...(settings.browserRecordingShowKeyPresses ? [t(($) => $.restore.recordingKeyPresses)] : []),
-    ...(settings.browserRecordingShowMousePresses
-      ? [t(($) => $.restore.recordingMousePresses)]
-      : []),
+    ...(settings.browserRecordingShowKeyPresses ? [resolve(msg("Recording key presses"))] : []),
+    ...(settings.browserRecordingShowMousePresses ? [resolve(msg("Recording mouse presses"))] : []),
     ...(settings.browserLinkTarget !== DEFAULT_UNIFIED_SETTINGS.browserLinkTarget
-      ? [t(($) => $.restore.openLinksIn)]
+      ? [resolve(msg("Open links in"))]
       : []),
     ...(settings.browserSearchEngine !== DEFAULT_UNIFIED_SETTINGS.browserSearchEngine ||
     settings.browserCustomSearchUrl !== DEFAULT_UNIFIED_SETTINGS.browserCustomSearchUrl
-      ? [t(($) => $.restore.searchEngine)]
+      ? [resolve(msg("Search engine"))]
       : []),
     ...(settings.browserAutoShowFloatingPreview !==
     DEFAULT_UNIFIED_SETTINGS.browserAutoShowFloatingPreview
-      ? [t(($) => $.restore.floatingPreview)]
+      ? [resolve(msg("Floating preview"))]
       : []),
     ...(settings.pullRequestLinksOpenInApp !== DEFAULT_UNIFIED_SETTINGS.pullRequestLinksOpenInApp
-      ? [t(($) => $.restore.openPullRequests)]
+      ? [resolve(msg("Open pull requests in T3 Code"))]
       : []),
   ];
 }

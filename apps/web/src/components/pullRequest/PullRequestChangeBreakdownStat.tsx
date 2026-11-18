@@ -1,25 +1,13 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { useTranslation } from "react-i18next";
-import { formatDiffCount } from "@t3tools/client-runtime/diff-count";
-import type { EnvironmentId, PullRequestChangeBreakdown, PullRequestRef } from "@t3tools/contracts";
+import type { EnvironmentId, PullRequestRef } from "@t3tools/contracts";
+import { T } from "gt-react";
 import { useState } from "react";
 
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { useEnvironmentQuery } from "~/state/query";
 
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
-import { PullRequestDiffStat } from "~/components/pullRequest/pullRequestPresentation";
-
-const KIND_LABELS = (t: TFunction<"workspace">) =>
-  ({
-    code: t(($) => $.git.code),
-    tests: t(($) => $.git.tests),
-    mocks: t(($) => $.git.mocks),
-    generated: t(($) => $.git.generated),
-    docs: t(($) => $.git.docs),
-  }) satisfies Record<keyof NonNullable<PullRequestChangeBreakdown>, string>;
-
-type DiffTotals = { additions: number; deletions: number };
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { ChangeBreakdownGrid } from "./ChangeBreakdownGrid";
+import { PullRequestDiffStat } from "./pullRequestPresentation";
 
 /**
  * The pull request's diff stat, with a hover split into code, tests, mocks, and generated files.
@@ -41,7 +29,6 @@ export function PullRequestChangeBreakdownStat({
   className: string;
   eager?: boolean;
 }) {
-  const { t } = useTranslation("workspace");
   const [requested, setRequested] = useState(eager);
   const query = useEnvironmentQuery(
     requested ? pullRequestEnvironment.changeBreakdown({ environmentId, input: reference }) : null,
@@ -68,7 +55,9 @@ export function PullRequestChangeBreakdownStat({
           <ChangeBreakdownGrid breakdown={breakdown} total={{ additions, deletions }} />
         </TooltipPopup>
       ) : query.isPending ? (
-        <TooltipPopup side="bottom">{t(($) => $.git.loadingBreakdown)}</TooltipPopup>
+        <TooltipPopup side="bottom">
+          <T>Loading breakdown</T>
+        </TooltipPopup>
       ) : null}
     </Tooltip>
   );
@@ -95,52 +84,5 @@ export function PullRequestChangeBreakdownRows({
     <div className={className}>
       <ChangeBreakdownGrid breakdown={query.data} />
     </div>
-  );
-}
-
-function ChangeBreakdownGrid({
-  breakdown,
-  total,
-}: {
-  breakdown: NonNullable<PullRequestChangeBreakdown>;
-  total?: DiffTotals;
-}) {
-  const { t } = useTranslation("workspace");
-  return (
-    <div className="grid grid-cols-[auto_auto_auto] justify-start gap-x-4 gap-y-1 py-0.5 font-mono tabular-nums">
-      {(Object.keys(KIND_LABELS(t)) as Array<keyof ReturnType<typeof KIND_LABELS>>).map((kind) => {
-        const { additions, deletions } = breakdown[kind];
-        return additions === 0 && deletions === 0 ? null : (
-          <BreakdownRow
-            key={kind}
-            label={KIND_LABELS(t)[kind]}
-            additions={additions}
-            deletions={deletions}
-          />
-        );
-      })}
-      {total ? (
-        <>
-          <div className="col-span-3 border-t border-border" />
-          <BreakdownRow
-            label={t(($) => $.git.total)}
-            additions={total.additions}
-            deletions={total.deletions}
-          />
-        </>
-      ) : null}
-    </div>
-  );
-}
-
-function BreakdownRow({ label, additions, deletions }: DiffTotals & { label: string }) {
-  return (
-    <>
-      <span className="font-sans">{label}</span>
-      <span className="text-right text-diff-addition-foreground">
-        +{formatDiffCount(additions)}
-      </span>
-      <span className="text-right text-diff-deletion">-{formatDiffCount(deletions)}</span>
-    </>
   );
 }

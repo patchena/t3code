@@ -1,7 +1,8 @@
-import { useTranslation } from "react-i18next";
+import { useGT } from "gt-react";
 import type {
   EditorId,
   EnvironmentId,
+  IssueTrackerKind,
   PreviewAnnotationPayload,
   ProjectId,
   ResolvedKeybindingsConfig,
@@ -11,7 +12,7 @@ import type {
 } from "@t3tools/contracts";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { lazy, Suspense } from "react";
-import { SideChatPane } from "./SideChatPane";
+import SideChatPane from "./SideChatPane";
 import type { ComposerImageAttachment, DraftId } from "../../composerDraftStore";
 import type { ShortcutMatchContext } from "../../keybindings";
 import type { SideChatParentPanel } from "../../lib/sideChatPane";
@@ -20,6 +21,7 @@ import {
   PersistentThreadTerminalPanel,
   type PersistentThreadTerminalPanelProps,
 } from "../PersistentThreadTerminals";
+import { IssueDetailPanel } from "../issue/IssueDetailPanel";
 import { pullRequestPanelContext } from "../pullRequest/pullRequestDetail.logic";
 import { PullRequestDetailPanel } from "../pullRequest/PullRequestDetailPanel";
 import { PullRequestDetailGhost } from "../pullRequest/PullRequestGhosts";
@@ -29,17 +31,11 @@ import { ThreadPullRequestsPanel } from "../pullRequest/ThreadPullRequestsPanel"
 const PreviewPanel = lazy(() =>
   import("../preview/PreviewPanel").then((module) => ({ default: module.PreviewPanel })),
 );
-const DiffPanel = lazy(() =>
-  import("../DiffPanel").then((module) => ({ default: module.DiffPanel })),
-);
+const DiffPanel = lazy(() => import("../DiffPanel"));
 const DevicePanel = lazy(() =>
   import("../device/DevicePanel").then((module) => ({ default: module.DevicePanel })),
 );
-const FilePreviewPanel = lazy(() =>
-  import("~/components/files/FilePreviewPanel").then((module) => ({
-    default: module.FilePreviewPanel,
-  })),
-);
+const FilePreviewPanel = lazy(() => import("../files/FilePreviewPanel"));
 
 type RightPanelTerminalProps = Omit<
   PersistentThreadTerminalPanelProps,
@@ -84,11 +80,12 @@ export function RightPanelSurfaceContent(props: {
   readonly onCloseSurface: (surface: RightPanelSurface) => void;
   readonly terminal: RightPanelTerminalProps;
   readonly pullRequest: RightPanelPullRequestProps;
+  readonly issuesSupported: boolean;
   readonly files: RightPanelFileProps;
   readonly sideChatParentPanel: SideChatParentPanel;
 }) {
-  const { t } = useTranslation("chat");
   const { surface, threadRef, visible, onCloseSurface } = props;
+  const gt = useGT();
   if (surface === null) return null;
   switch (surface.kind) {
     case "preview":
@@ -131,8 +128,8 @@ export function RightPanelSurfaceContent(props: {
       if (!pullRequest.supported) {
         return (
           <PullRequestsUnavailableState
-            title={t(($) => $.details.pullRequestsUnavailable)}
-            error={t(($) => $.details.updateServer)}
+            title={gt("Pull requests unavailable")}
+            error={gt("Update this environment's T3 Code server to browse pull requests.")}
           />
         );
       }
@@ -179,6 +176,40 @@ export function RightPanelSurfaceContent(props: {
         />
       );
     }
+    case "issue":
+      if (!props.pullRequest.capabilityKnown) return <PullRequestDetailGhost />;
+      if (!props.issuesSupported) {
+        return (
+          <PullRequestsUnavailableState
+            title={gt("Issues unavailable")}
+            error={gt("Update this environment's T3 Code server to browse issues.")}
+          />
+        );
+      }
+      return (
+        <IssueDetailPanel
+          key={`${surface.environmentId ?? props.environmentId}:${surface.id}`}
+          environmentId={
+            (surface.environmentId as EnvironmentId | undefined) ?? props.environmentId
+          }
+          reference={{
+            projectId: surface.projectId as ProjectId,
+            tracker: surface.tracker as IssueTrackerKind,
+            ...(surface.host ? { host: surface.host } : {}),
+            scope: surface.scope,
+            key: surface.key,
+          }}
+          threadRef={threadRef}
+          onSelectPullRequest={(reference) => {
+            useRightPanelStore.getState().openPullRequest(threadRef, {
+              projectId: reference.projectId,
+              repository: reference.repository,
+              number: reference.number,
+              ...(reference.host ? { host: reference.host } : {}),
+            });
+          }}
+        />
+      );
     case "pull-requests":
       return <ThreadPullRequestsPanel threadRef={threadRef} />;
     case "side-chat":

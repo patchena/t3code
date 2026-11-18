@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
@@ -73,7 +72,6 @@ describe("browserViewportActions", () => {
     await commitBrowserViewportChange(
       { threadRef, tabId: "tab-1", runtimeTabId: "runtime-tab-1" },
       viewport,
-      createI18n("en").getFixedT("en", "tools"),
     );
 
     expect(mocks.runAtomCommand).toHaveBeenCalledWith(

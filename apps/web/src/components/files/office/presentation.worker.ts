@@ -1,4 +1,3 @@
-import { FileWorkerError } from "~/components/files/fileWorkerError";
 // Adapted from opencode (MIT). Copyright (c) 2025 opencode. See LICENSE.opencode.
 import {
   initWasm,
@@ -16,6 +15,7 @@ import { maxImageSide, type VectorBitmap, type VectorRequest } from "./vector-pi
 import { deckText } from "./slide-text";
 import { officeImageBitmap } from "./image-bitmap";
 import { serveWorker, Transfer } from "./worker-rpc";
+import { PreviewError } from "../previewFailure";
 
 // One worker holds one open PowerPoint deck: its engine, fonts, laid-out slides, decoded pictures and painting. The
 // window terminates the worker when the deck closes, which is the only way the engine's memory is given back.
@@ -66,11 +66,7 @@ const state: WorkerState = { deck: undefined };
 
 serveWorker<SlideMethods>({
   open: async (input) => {
-    if (state.deck)
-      throw new FileWorkerError({
-        message: "The worker already holds a deck",
-        code: "workerHasDeck",
-      });
+    if (state.deck) throw new Error("The worker already holds a deck");
 
     await initWasm();
 
@@ -105,19 +101,14 @@ serveWorker<SlideMethods>({
 });
 
 function required() {
-  if (!state.deck)
-    throw new FileWorkerError({ message: "The worker holds no deck", code: "workerNoDeck" });
+  if (!state.deck) throw new Error("The worker holds no deck");
 
   return state.deck;
 }
 
 /** The worker's own font set, which its canvases draw text with. */
 function workerFonts() {
-  if (!("fonts" in self))
-    throw new FileWorkerError({
-      message: "This browser has no fonts in workers",
-      code: "workerNoFonts",
-    });
+  if (!("fonts" in self)) throw new PreviewError({ code: "presentation-no-worker-fonts" });
 
   // SAFETY: a worker's global scope is a FontFaceSource, whose `fonts` is a FontFaceSet (CSS Font Loading, exposed to
   // workers). The window's types declare it on documents only, and workers expose no FontFaceSet to check against.

@@ -1,7 +1,7 @@
-import { useTranslation } from "react-i18next";
 import DOMPurify from "dompurify";
 import { MinusIcon, PlusIcon, RotateCcwIcon } from "lucide-react";
 import { FileSurfaceAction } from "./fileSurfaceChrome";
+import { useGT } from "gt-react";
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "~/hooks/useTheme";
 import { observeResize } from "~/lib/observeResize";
@@ -71,13 +71,13 @@ function documentColors() {
   );
 }
 
-export function DocumentPages(props: {
+export default function DocumentPages(props: {
   readonly html: string;
   readonly name: string;
   readonly output?: boolean;
   readonly details?: string;
 }) {
-  const { t } = useTranslation("files");
+  const gt = useGT();
   const { theme, resolvedTheme, themeHalves } = useTheme();
   const [colors, setColors] = useState(documentColors);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Read the host DOM's applied theme tokens so the sandboxed document receives the current palette.
@@ -102,7 +102,7 @@ export function DocumentPages(props: {
             {props.details}
           </span>
           <FileSurfaceAction
-            label={t(($) => $.document.decreaseSize)}
+            label={gt("Decrease reading size")}
             disabled={zoom <= 0.5}
             onPress={() => setZoom((value) => Math.max(0.5, value - 0.25))}
           >
@@ -110,14 +110,14 @@ export function DocumentPages(props: {
           </FileSurfaceAction>
           <span className="min-w-10 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
           <FileSurfaceAction
-            label={t(($) => $.document.increaseSize)}
+            label={gt("Increase reading size")}
             disabled={zoom >= 2}
             onPress={() => setZoom((value) => Math.min(2, value + 0.25))}
           >
             <PlusIcon className="size-3.5" />
           </FileSurfaceAction>
           <FileSurfaceAction
-            label={t(($) => $.document.resetSize)}
+            label={gt("Reset reading size")}
             disabled={zoom === 1}
             onPress={() => setZoom(1)}
           >

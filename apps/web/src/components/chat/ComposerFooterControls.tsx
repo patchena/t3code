@@ -1,6 +1,6 @@
-import { useTranslation } from "react-i18next";
 import type { ModelSelection, ProviderInstanceId, RuntimeMode } from "@t3tools/contracts";
 import { createModelSelection } from "@t3tools/shared/model";
+import { T, useGT, useMessages } from "gt-react";
 import { type ComponentProps, memo, useId, useRef, useState } from "react";
 
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
@@ -11,14 +11,13 @@ import { focusRequestedPermission, useComposerMenuProps } from "./composerEventS
 import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { resolveModelPickerSelectedModel } from "./ModelPickerContent";
 import { ProviderModelPicker } from "./ProviderModelPicker";
-import { getRuntimeModeConfig } from "./runtimeModeConfig";
+import { resolveRuntimeModeOption, runtimeModeConfig } from "./runtimeModeConfig";
 import { useComposerMenuState } from "./useComposerMenuState";
 
 export type RuntimeModeOption = {
   mode: RuntimeMode;
   disabledReason?: string;
-} & ReturnType<typeof getRuntimeModeConfig>[RuntimeMode];
-
+} & (typeof runtimeModeConfig)[RuntimeMode];
 export const ComposerFooterModeControls = memo(function ComposerFooterModeControls(props: {
   runtimeMode: RuntimeMode;
   runtimeModeOptions: ReadonlyArray<RuntimeModeOption>;
@@ -30,11 +29,8 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
   emphasized?: boolean;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
 }) {
-  const { t } = useTranslation("chat");
-  const supervisedRuntimeModeOption: RuntimeModeOption = {
-    mode: "approval-required" as const,
-    ...getRuntimeModeConfig(t)["approval-required"],
-  };
+  const gt = useGT();
+  const messages = useMessages();
   const size = props.size ?? "sm";
   const accessDisplay = props.accessDisplay ?? "label";
   const composerFloatingLayerProps = useComposerMenuProps();
@@ -42,11 +38,11 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
   const permissionsChipRef = useRef<HTMLButtonElement>(null);
   const runtimeModeOption =
     props.runtimeModeOptions.find((option) => option.mode === props.runtimeMode) ??
-    supervisedRuntimeModeOption;
+    resolveRuntimeModeOption("approval-required", messages);
   const RuntimeModeIcon = runtimeModeOption.icon;
   // The chip opens the same Permissions toggle used in the model picker and the overflow menu.
-  const permissionsTooltip = t(($) => $.composer.permissionsDetail, {
-    label: runtimeModeOption.label,
+  const permissionsTooltip = gt("Permissions: {mode}. {description}", {
+    mode: runtimeModeOption.label,
     description: runtimeModeOption.description,
   });
   const permissionsChip = (
@@ -68,9 +64,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
                   size={size}
                   // Mirrors the model trigger's trailing pe-1 so the gaps on both sides of the chip match.
                   className="ps-1.5"
-                  aria-label={t(($) => $.composer.permissionsLabel, {
-                    label: runtimeModeOption.label,
-                  })}
+                  aria-label={gt("Permissions: {mode}", { mode: runtimeModeOption.label })}
                 />
               }
             />
@@ -115,25 +109,22 @@ export function ComposerPermissionsSection(props: {
   runtimeModeOptions: ReadonlyArray<RuntimeModeOption>;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
+  const messages = useMessages();
   // Hover or keyboard focus previews a mode's name and description before a pick.
-  const supervisedRuntimeModeOption: RuntimeModeOption = {
-    mode: "approval-required" as const,
-    ...getRuntimeModeConfig(t)["approval-required"],
-  };
   const [previewMode, setPreviewMode] = useState<RuntimeMode | null>(null);
   const shownMode = previewMode ?? props.runtimeMode;
   const shown =
     props.runtimeModeOptions.find((option) => option.mode === shownMode) ??
-    supervisedRuntimeModeOption;
+    resolveRuntimeModeOption("approval-required", messages);
   const descriptionId = useId();
   return (
     <div data-composer-permissions className="grid w-72 gap-1.5 px-2 py-1.5">
       <div className="font-medium text-muted-foreground text-xs">
-        {t(($) => $.composer.permissions)}
+        <T>Permissions</T>
       </div>
       <MenuPrimitive.RadioGroup
-        aria-label={t(($) => $.composer.permissions)}
+        aria-label={gt("Permissions")}
         value={props.runtimeMode}
         onValueChange={(value: RuntimeMode) => {
           if (value !== props.runtimeMode) props.onRuntimeModeChange(value);

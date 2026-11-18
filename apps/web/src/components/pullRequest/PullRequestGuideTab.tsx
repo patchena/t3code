@@ -1,24 +1,24 @@
-import { useTranslation } from "react-i18next";
 import type { EnvironmentId, PullRequestRef, PullRequestReviewGuideStop } from "@t3tools/contracts";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { ScrollTextIcon, TriangleAlertIcon } from "lucide-react";
 import { useEffect, useEffectEvent } from "react";
 
 import type { ReviewCommentContext } from "~/reviewCommentContext";
 
-import { Alert, AlertAction, AlertDescription } from "~/components/ui/alert";
-import { Button } from "~/components/ui/button";
-import { Spinner } from "~/components/ui/spinner";
-import type { ExcerptCommenting } from "~/components/pullRequest/guide/GuideExcerpt";
-import { GuideProseContext } from "~/components/pullRequest/guide/GuideProse";
-import { GuideTour } from "~/components/pullRequest/guide/GuideTour";
-import { useReviewGuideWriter } from "~/components/pullRequest/guide/useReviewGuideWriter";
+import { Alert, AlertAction, AlertDescription } from "../ui/alert";
+import { Button } from "../ui/button";
+import { Spinner } from "../ui/spinner";
+import type { ExcerptCommenting } from "./guide/GuideExcerpt";
+import { GuideProseContext } from "./guide/GuideProse";
+import { GuideTour } from "./guide/GuideTour";
+import { useReviewGuideWriter } from "./guide/useReviewGuideWriter";
 import {
   nextPendingReviewCommentId,
   pullRequestReviewKey,
   usePendingReviewComments,
   usePullRequestReviewStore,
-} from "~/components/pullRequest/pullRequestReviewStore";
-import type { PullRequestCompletionScope } from "~/components/pullRequest/PullRequestMarkdownTextarea";
+} from "./pullRequestReviewStore";
+import type { PullRequestCompletionScope } from "./PullRequestMarkdownTextarea";
 
 export function PullRequestGuideTab({
   environmentId,
@@ -51,7 +51,8 @@ export function PullRequestGuideTab({
   onOpenFile: (path: string) => void;
   onTourShown?: (() => void) | undefined;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
+  const resolve = useMessages();
   const { query, data, running, canWrite, write } = useReviewGuideWriter({
     environmentId,
     reference,
@@ -97,7 +98,7 @@ export function PullRequestGuideTab({
     canWrite ? (
       <Button size={size} variant="outline" disabled={running} onClick={() => void write()}>
         {running ? <Spinner /> : <ScrollTextIcon aria-hidden className="size-3.5" />}
-        {running ? t(($) => $.git.readingChange) : label}
+        {running ? gt("Reading the change...") : label}
       </Button>
     ) : null;
 
@@ -113,22 +114,24 @@ export function PullRequestGuideTab({
       <div className="scrollbar-gutter-both flex h-full flex-col items-center justify-center-safe gap-2 overflow-y-auto px-4 py-10 text-center">
         <p className="text-sm font-medium text-foreground">
           {running
-            ? t(($) => $.git.writingReviewGuide)
+            ? gt("Writing a review guide")
             : failure === null
-              ? t(($) => $.git.noReviewGuide)
-              : t(($) => $.git.writeReviewGuideFailed)}
+              ? gt("No review guide yet")
+              : gt("Could not write a review guide")}
         </p>
         <p className="max-w-md text-xs text-muted-foreground">
           {running
-            ? t(($) => $.git.writingGuideDescription)
+            ? gt(
+                "An agent is reading the change. A large one takes a few minutes. You can leave; you will be told when it is ready.",
+              )
             : failure === null
-              ? (query.error ?? t(($) => $.git.reviewGuideDescription))
-              : t(($) => $.git.checkGuideModel)}
+              ? (query.error ??
+                gt(
+                  "A guide is a tour of the change: stops through the code in reading order, with the calls only a maintainer can make.",
+                ))
+              : resolve(FAILURE_HINT)}
         </p>
-        {writeButton(
-          failure === null ? t(($) => $.git.writeGuide) : t(($) => $.git.tryAgain),
-          "sm",
-        )}
+        {writeButton(failure === null ? gt("Write guide") : gt("Try again"), "sm")}
         {failure === null || running ? null : <FailureDetails detail={failure} />}
       </div>
     );
@@ -140,23 +143,20 @@ export function PullRequestGuideTab({
         {running ? <Spinner /> : <TriangleAlertIcon />}
         <AlertDescription>
           {running ? (
-            t(($) => $.git.rewritingGuideDescription)
+            gt("Rewriting this guide. You will be told when the new one is ready.")
           ) : failure === null ? (
-            t(($) => $.git.guideBeforeLatestPush)
+            gt("Written before the latest push.")
           ) : (
             <>
-              {t(($) => $.git.rewriteGuideFailedDescription)}
+              {gt(
+                "Could not rewrite this guide. Check the review guide model in Settings → Source control.",
+              )}
               <FailureDetails detail={failure} />
             </>
           )}
         </AlertDescription>
         {!running && canWrite ? (
-          <AlertAction>
-            {writeButton(
-              t(($) => $.git.rewrite),
-              "xs",
-            )}
-          </AlertAction>
+          <AlertAction>{writeButton(gt("Rewrite"), "xs")}</AlertAction>
         ) : null}
       </Alert>
     ) : null;
@@ -185,12 +185,13 @@ export function PullRequestGuideTab({
   );
 }
 
+const FAILURE_HINT = msg("Check the review guide model in Settings → Source control & issues.");
+
 function FailureDetails({ detail }: { detail: string }) {
-  const { t } = useTranslation("workspace");
   return (
     <details className="w-full max-w-lg text-xs text-muted-foreground">
       <summary className="cursor-pointer rounded-sm -outline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
-        {t(($) => $.git.technicalDetails)}
+        <T>Technical details</T>
       </summary>
       <pre className="scrollbar-gutter-both mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/40 p-3 text-left font-mono text-xs">
         {detail}

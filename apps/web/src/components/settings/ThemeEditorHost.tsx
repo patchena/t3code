@@ -1,7 +1,8 @@
-import { useTranslation } from "react-i18next";
+import { msg } from "gt-react";
 import { lazy, Suspense, useSyncExternalStore } from "react";
 
 import { useTheme } from "../../hooks/useTheme";
+import { m } from "../../i18n/messages";
 import {
   getThemeDefinition,
   subscribeToCustomThemes,
@@ -24,7 +25,6 @@ function useThemeDefinition(id: string | null | undefined) {
 }
 
 export function ThemeEditorHost() {
-  const { t } = useTranslation("settings");
   const session = useThemeEditorStore((store) => store.session);
   const closeThemeEditor = useThemeEditorStore((store) => store.closeThemeEditor);
   const { theme, setTheme, themeHalves, refreshTheme } = useTheme();
@@ -40,24 +40,12 @@ export function ThemeEditorHost() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: t(($) => $.extra.themes.hostSaveFailed),
-            description: t(($) => $.extra.themes.storageUnavailable),
+            title: m(msg("Could not save your theme")),
+            description: m(msg("Browser storage is unavailable, so the change was not kept.")),
           }),
         );
         return false;
       }
-      toastManager.add(
-        stackedThreadToast({
-          type: "success",
-          title: t(($) => $.extra.themes.updated, { name: savedTheme.label }),
-          description: t(($) => $.extra.themes.paletteAdded, {
-            appearance:
-              mergedAppearance === "light"
-                ? t(($) => $.extra.themes.paletteLight)
-                : t(($) => $.extra.themes.paletteDark),
-          }),
-        }),
-      );
       return true;
     }
     if (!created) {
@@ -67,15 +55,6 @@ export function ThemeEditorHost() {
         themeHalves?.light === savedTheme.id ||
         themeHalves?.dark === savedTheme.id;
       if (wasActive) refreshTheme();
-      toastManager.add(
-        stackedThreadToast({
-          type: "success",
-          title: t(($) => $.extra.themes.saved, { name: savedTheme.label }),
-          description: wasActive
-            ? t(($) => $.extra.themes.changesActive)
-            : t(($) => $.extra.themes.changesSaved),
-        }),
-      );
       return true;
     }
 
@@ -83,19 +62,12 @@ export function ThemeEditorHost() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: t(($) => $.extra.themes.hostSaveFailed),
-          description: t(($) => $.extra.themes.storageUnavailable),
+          title: m(msg("Could not save your theme")),
+          description: m(msg("Browser storage is unavailable, so the change was not kept.")),
         }),
       );
       return false;
     }
-    toastManager.add(
-      stackedThreadToast({
-        type: "success",
-        title: t(($) => $.extra.themes.created, { name: savedTheme.label }),
-        description: t(($) => $.extra.themes.nowActive),
-      }),
-    );
     return true;
   };
 

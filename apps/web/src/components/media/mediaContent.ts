@@ -1,4 +1,6 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { msg } from "gt-react";
+
+import { m } from "~/i18n/messages";
 
 /** Resolves web references without inheriting the desktop renderer's custom app scheme. */
 export function resolveProtocolRelativeMediaUrl(src: string): string {
@@ -23,14 +25,14 @@ function decodePercentBytes(payload: string) {
 }
 
 /** Decodes inline media locally; desktop connect-src omits `data:`, so fetch() cannot read it. */
-function readDataUrlBlob(src: string, t: TFunction<"chat">): Blob {
+function readDataUrlBlob(src: string): Blob {
   // A fragment is never part of the payload; a literal `#` in data must be escaped as `%23`.
   const url = src.split("#", 1)[0] ?? src;
   const comma = url.indexOf(",");
   const [mimeType = "", ...parameters] = url.slice("data:".length, comma).split(";");
   const payload = url.slice(comma + 1);
   try {
-    if (comma < 0) throw new Error("Missing data URL payload.");
+    if (comma < 0) throw new Error(m(msg("Missing data URL payload.")));
     const isBase64 = parameters.some((parameter) => parameter.trim().toLowerCase() === "base64");
     // Base64 text is ASCII, so any escape that is not valid UTF-8 is malformed anyway.
     const bytes = isBase64
@@ -38,14 +40,11 @@ function readDataUrlBlob(src: string, t: TFunction<"chat">): Blob {
       : decodePercentBytes(payload);
     return new Blob([bytes], { type: mimeType || "text/plain" });
   } catch (cause) {
-    throw new Error(
-      t(($) => $.media.inlineDecodeFailed),
-      { cause },
-    );
+    throw new Error(m(msg("This inline media could not be decoded.")), { cause });
   }
 }
 
-async function fetchMediaBlob(src: string, t: TFunction<"chat">): Promise<Blob> {
+async function fetchMediaBlob(src: string): Promise<Blob> {
   const response = await fetch(src).catch(() => null);
   if (response?.ok) return response.blob();
   // An <img> can show media that fetch() may not read (CORS, CSP, cookies); desktop reads it natively.
@@ -56,25 +55,32 @@ async function fetchMediaBlob(src: string, t: TFunction<"chat">): Promise<Blob> 
     return new Blob([new Uint8Array(native.data)], { type: native.mimeType });
   }
   const status = native?.status ?? response?.status;
-  if (status !== undefined) throw new Error(t(($) => $.media.fetchHttpFailed, { status }));
-  throw new Error(desktop ? t(($) => $.media.fetchFailedDesktop) : t(($) => $.media.fetchFailed));
+  if (status !== undefined)
+    throw new Error(m(msg("The file could not be fetched (HTTP {status}).", { status })));
+  throw new Error(
+    desktop
+      ? m(msg("The file could not be fetched. Check the connection and try again."))
+      : m(
+          msg(
+            "The file could not be fetched. The host may block browser access (CORS), or the connection may be unavailable.",
+          ),
+        ),
+  );
 }
 
-async function readMediaBlob(src: string, t: TFunction<"chat">): Promise<Blob> {
-  if (/^data:/i.test(src)) return readDataUrlBlob(src, t);
-  const blob = await fetchMediaBlob(src, t);
+async function readMediaBlob(src: string): Promise<Blob> {
+  if (/^data:/i.test(src)) return readDataUrlBlob(src);
+  const blob = await fetchMediaBlob(src);
   if (blob.type.split(";", 1)[0] === "text/html") {
-    throw new Error(t(($) => $.media.returnedPage));
+    throw new Error(
+      m(msg("This link returned a web page instead of media. Open the original URL.")),
+    );
   }
   return blob;
 }
 
-export async function downloadMedia(
-  src: string,
-  name: string,
-  t: TFunction<"chat">,
-): Promise<void> {
-  const url = URL.createObjectURL(await readMediaBlob(src, t));
+export async function downloadMedia(src: string, name: string): Promise<void> {
+  const url = URL.createObjectURL(await readMediaBlob(src));
   try {
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -85,8 +91,8 @@ export async function downloadMedia(
   }
 }
 
-export async function readMediaPng(src: string, t: TFunction<"chat">): Promise<Blob> {
-  const blob = await readMediaBlob(src, t);
+export async function readMediaPng(src: string): Promise<Blob> {
+  const blob = await readMediaBlob(src);
   if (blob.type.split(";", 1)[0] === "image/png") return blob;
 
   const url = URL.createObjectURL(blob);
@@ -97,7 +103,7 @@ export async function readMediaPng(src: string, t: TFunction<"chat">): Promise<B
       await image.decode();
     } catch (cause) {
       throw new Error(
-        t(($) => $.media.decodeFailed),
+        m(msg("The browser could not decode this image for copying. Try saving it instead.")),
         {
           cause,
         },
@@ -105,17 +111,22 @@ export async function readMediaPng(src: string, t: TFunction<"chat">): Promise<B
     }
     const { naturalWidth: width, naturalHeight: height } = image;
     if (width <= 0 || height <= 0 || width * height > 64_000_000) {
-      throw new Error(t(($) => $.media.invalidDimensions));
+      throw new Error(
+        m(msg("This image is too large or has no usable dimensions. Try saving it instead.")),
+      );
     }
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d");
-    if (!context) throw new Error(t(($) => $.media.copyBrowserUnavailable));
+    if (!context) throw new Error(m(msg("Image copying is unavailable in this browser.")));
     context.drawImage(image, 0, 0);
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
-        (png) => (png ? resolve(png) : reject(new Error(t(($) => $.media.convertFailed)))),
+        (png) =>
+          png
+            ? resolve(png)
+            : reject(new Error(m(msg("The image could not be converted to PNG.")))),
         "image/png",
       );
     });

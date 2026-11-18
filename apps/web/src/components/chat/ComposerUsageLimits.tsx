@@ -1,9 +1,10 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { useTranslation } from "react-i18next";
 import type { EnvironmentId, UsageLimitsReport } from "@t3tools/contracts";
 import type { TimestampFormat } from "@t3tools/contracts/settings";
+import { limitsNotice } from "@t3tools/shared/usageLimitsCopy";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { GaugeIcon } from "lucide-react";
 
+import { m, type MessageResolver } from "../../i18n/messages";
 import { ensureLocalApi } from "../../localApi";
 import { formatUpcomingTimestamp } from "../../timestampFormat";
 import { Button } from "../ui/button";
@@ -25,7 +26,7 @@ function accountLabel(account: UsageLimitsReport["accounts"][number]): string {
 }
 
 function AccountSummary({ account }: { readonly account: UsageLimitsReport["accounts"][number] }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const label = accountLabel(account);
   return (
     <>
@@ -33,9 +34,9 @@ function AccountSummary({ account }: { readonly account: UsageLimitsReport["acco
         <RedactedSensitiveText
           key={label}
           value={label}
-          ariaLabel={t(($) => $.composer.toggleAccountVisibility)}
-          revealTooltip={t(($) => $.composer.revealAccount)}
-          hideTooltip={t(($) => $.composer.hideAccount)}
+          ariaLabel={gt("Toggle account label visibility")}
+          revealTooltip={gt("Click to reveal account")}
+          hideTooltip={gt("Click to hide account")}
           className="max-w-full truncate align-bottom font-sans text-xs leading-normal"
         />
       ) : (
@@ -51,22 +52,26 @@ export function usageLimitsBannerItem(
   report: UsageLimitsReport,
   environmentId: EnvironmentId,
   onDismiss: () => void,
-  t: TFunction<"chat">,
+  resolve: MessageResolver = m,
 ): ComposerBannerStackItem {
   const [first] = report.accounts;
   const single = report.accounts.length === 1 && first ? first : null;
   const summary = single ? (
     <AccountSummary account={single} />
   ) : (
-    t(($) => $.composer.accounts, { count: report.accounts.length })
+    resolve(
+      msg("{count, plural, one {{count} account} other {{count} accounts}}", {
+        count: report.accounts.length,
+      }),
+    )
   );
   return {
     id,
     variant: "info",
     icon: <GaugeIcon />,
-    title: t(($) => $.composer.usageLimits),
+    title: resolve(msg("Usage limits")),
     description: summary,
-    dismissLabel: t(($) => $.composer.dismissUsageLimits),
+    dismissLabel: resolve(msg("Dismiss usage limits")),
     onDismiss,
     children: <UsageLimitsBannerBody report={report} environmentId={environmentId} />,
   };
@@ -90,26 +95,33 @@ export function modelFallbackBannerItem(
     readonly onUseDefault: () => void;
     readonly onDismiss: () => void;
   },
-  t: TFunction<"chat">,
-  tCommon: TFunction<"common">,
+  resolve: MessageResolver = m,
 ): ComposerBannerStackItem {
   return {
     id: "fallback-model",
     variant: "info",
     icon: <GaugeIcon />,
-    title: t(($) => $.composer.usingModel, { model: fallbackModelName }),
+    title: resolve(msg("Using {model}", { model: fallbackModelName })),
     description: resetsAt
-      ? t(($) => $.composer.providerUsageResets, {
-          provider: defaultProviderName,
-          time: formatUpcomingTimestamp(resetsAt, timestampFormat, tCommon),
-        })
-      : t(($) => $.composer.providerOutOfUsage, { provider: defaultProviderName }),
+      ? resolve(
+          msg("{provider} is out of usage · resets {time}", {
+            provider: defaultProviderName,
+            time: formatUpcomingTimestamp(
+              resetsAt,
+              timestampFormat,
+              Date.now(),
+              undefined,
+              resolve,
+            ),
+          }),
+        )
+      : resolve(msg("{provider} is out of usage", { provider: defaultProviderName })),
     actions: (
       <Button size="xs" variant="ghost" onClick={onUseDefault}>
-        {t(($) => $.composer.useModel, { model: defaultModelName })}
+        {resolve(msg("Use {model}", { model: defaultModelName }))}
       </Button>
     ),
-    dismissLabel: t(($) => $.composer.dismissFallbackModel),
+    dismissLabel: resolve(msg("Dismiss fallback model notice")),
     onDismiss,
   };
 }
@@ -121,7 +133,7 @@ function UsageLimitsBannerBody({
   readonly report: UsageLimitsReport;
   readonly environmentId: EnvironmentId;
 }) {
-  const { t } = useTranslation("chat");
+  const messages = useMessages();
   const now = Date.parse(report.createdAt);
   return (
     <ComposerBanner.Scroll>
@@ -130,15 +142,7 @@ function UsageLimitsBannerBody({
           const resetCreditInput =
             account.resetCreditInput ??
             (account.instanceId ? { instanceId: account.instanceId } : undefined);
-          const unavailable = account.limits.unavailable;
-          const notice =
-            unavailable?.reason === "unsupported"
-              ? (unavailable.message ?? t(($) => $.composer.noSubscriptionLimits))
-              : unavailable?.reason === "probeFailed"
-                ? (unavailable.message ?? t(($) => $.composer.limitsReadFailed))
-                : account.limits.windows.length === 0
-                  ? t(($) => $.composer.noLimitsReported)
-                  : null;
+          const notice = limitsNotice(account.limits, messages);
           const externalUsage = account.limits.externalUsage;
           return (
             <div key={account.id} className="flex min-w-0 flex-col gap-1">
@@ -165,7 +169,7 @@ function UsageLimitsBannerBody({
                   className="self-start"
                   onClick={() => void ensureLocalApi().shell.openExternal(externalUsage.url)}
                 >
-                  {t(($) => $.composer.manageUsage)}
+                  <T>Manage usage</T>
                 </Button>
               ) : null}
               {resetCreditInput && account.limits.resetCredits ? (

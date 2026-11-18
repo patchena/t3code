@@ -3,10 +3,7 @@ import { type AssetResource, EnvironmentId } from "@t3tools/contracts";
 import { expect, it, vi } from "vite-plus/test";
 
 import { render } from "../../../test/render";
-import {
-  PullRequestMarkdown,
-  PullRequestMarkdownContext,
-} from "~/components/pullRequest/PullRequestMarkdown";
+import { PullRequestMarkdown, PullRequestMarkdownContext } from "./PullRequestMarkdown";
 
 const requested = vi.hoisted(() => [] as Array<AssetResource | null>);
 vi.mock(import("~/assets/assetUrls"), async (original) => ({

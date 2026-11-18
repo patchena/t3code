@@ -8,13 +8,10 @@ import { hasCloudPublicConfig } from "./cloud/publicConfig";
 import { isElectron } from "./env";
 import { startAppServices } from "./appInit";
 import { AppRoot } from "./AppRoot";
+import { whenLocaleReady } from "./i18n/runtime";
 import { reloadOnceForChunkLoadError } from "./lib/chunkReloadGuard";
-import { ensureClientSettingsHydrated, getClientSettings } from "~/hooks/useSettings";
-import { appI18n } from "~/i18n";
-import { InterfaceErrorBoundary } from "~/components/InterfaceErrorBoundary";
-import { startProviderAuthDelivery } from "~/providerAuthDelivery";
 
-startProviderAuthDelivery();
+const router = startAppServices();
 
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
@@ -26,36 +23,31 @@ window.addEventListener("vite:preloadError", (event) => {
   }
 });
 
+const app = <AppRoot router={router} />;
+
 // Split by runtime to keep Clerk out of local startup and clerk-js out of browser builds.
 const managedAuthShellModule =
   clerkPublishableKey && hasCloudPublicConfig()
     ? isElectron
-      ? import("./components/clerk/ElectronManagedAuthShell").then(
-          (module) => module.ElectronManagedAuthShell,
-        )
-      : import("./components/clerk/BrowserManagedAuthShell").then(
-          (module) => module.BrowserManagedAuthShell,
-        )
+      ? import("./components/clerk/ElectronManagedAuthShell")
+      : import("./components/clerk/BrowserManagedAuthShell")
     : null;
 
-export const startup = Promise.all([managedAuthShellModule, ensureClientSettingsHydrated()])
-  .then(async ([ManagedAuthShell]) => {
-    await appI18n.changeLanguage(getClientSettings().interfaceLanguage);
-    document.documentElement.lang = getClientSettings().interfaceLanguage;
-    const router = startAppServices();
-    const app = <AppRoot router={router} />;
-    await router.load();
+export const startup = Promise.all([
+  managedAuthShellModule?.then((module) => module.default) ?? null,
+  // Chained so settings have usually hydrated; English resolves without a chunk load.
+  router.load().then(whenLocaleReady),
+])
+  .then(([ManagedAuthShell]) => {
     // Route chunk failures resolve router.load() and surface later through the error boundary.
     if (reloadScheduled) return;
     ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       <React.StrictMode>
-        <InterfaceErrorBoundary>
-          {ManagedAuthShell && clerkPublishableKey ? (
-            <ManagedAuthShell publishableKey={clerkPublishableKey}>{app}</ManagedAuthShell>
-          ) : (
-            app
-          )}
-        </InterfaceErrorBoundary>
+        {ManagedAuthShell && clerkPublishableKey ? (
+          <ManagedAuthShell publishableKey={clerkPublishableKey}>{app}</ManagedAuthShell>
+        ) : (
+          app
+        )}
       </React.StrictMode>,
     );
   })

@@ -1,4 +1,6 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "~/i18n/messages";
 import {
   parseUsagePriceForm,
   usagePriceForm,
@@ -36,45 +38,41 @@ function modelAlias(target: UsagePriceTarget, model: string) {
   return target.aliases && Object.hasOwn(target.aliases, model) ? target.aliases[model] : undefined;
 }
 
+/** Components pass `useMessages()` so placeholders and errors follow a language switch. */
 export function usageAliasCell(
   targets: readonly UsagePriceTarget[],
   model: string,
-  t: TFunction<"files">,
+  resolve: MessageResolver = m,
 ) {
   if (targets.some((target) => target.aliases === null))
-    return { value: "", placeholder: t(($) => $.usage.unavailable), state: "unavailable" as const };
+    return { value: "", placeholder: resolve(msg("Unavailable")) };
   const values = targets.map((target) => modelAlias(target, model) ?? "");
   if (values.some((value) => value !== values[0]))
-    return { value: "", placeholder: t(($) => $.usage.prices.mixed), state: "mixed" as const };
-  return {
-    value: values[0] ?? "",
-    placeholder: t(($) => $.usage.prices.none),
-    state: "uniform" as const,
-  };
+    return { value: "", placeholder: resolve(msg("Mixed")) };
+  return { value: values[0] ?? "", placeholder: resolve(msg("None")) };
 }
 
 export function usagePriceCell(
   targets: readonly UsagePriceTarget[],
   model: string,
   field: UsagePriceField,
-  t: TFunction<"files">,
+  resolve: MessageResolver = m,
 ) {
   const optional = USAGE_PRICE_FIELDS.find((entry) => entry.key === field)!.optional;
   const values = targets.map((target) =>
     modelPrice(target, model) ? usagePriceForm(model, modelPrice(target, model))[field] : null,
   );
   if (targets.some((target) => target.prices === null))
-    return { value: "", placeholder: t(($) => $.usage.unavailable), state: "unavailable" as const };
+    return { value: "", placeholder: resolve(msg("Unavailable")) };
   if (values.some((value) => value !== values[0]))
-    return { value: "", placeholder: t(($) => $.usage.prices.mixed), state: "mixed" as const };
+    return { value: "", placeholder: resolve(msg("Mixed")) };
   return {
     value: values[0] ?? "",
-    state: "uniform" as const,
     placeholder:
       values[0] === null
-        ? t(($) => $.usage.prices.automatic)
+        ? resolve(msg("Automatic"))
         : optional
-          ? t(($) => $.usage.prices.inputRate)
+          ? resolve(msg("Input rate"))
           : "0.00",
   };
 }
@@ -82,7 +80,7 @@ export function usagePriceCell(
 export function usagePriceTableChanges(
   target: UsagePriceTarget,
   drafts: readonly UsagePriceDraft[],
-  t: TFunction<"files">,
+  resolve: MessageResolver = m,
 ) {
   const changes: UsagePriceChange[] = [];
   const errors = new Map<string, string>();
@@ -100,20 +98,16 @@ export function usagePriceTableChanges(
       if (draft.alias === undefined && Object.keys(draft.values).length > 0) {
         errors.set(
           draft.id,
-          t(($) => $.usage.prices.mappedElsewhere, { environment: target.label }),
+          resolve(
+            msg('{target} maps this model. Remove it from "Apply to" or clear its mapping first.', {
+              target: target.label,
+            }),
+          ),
         );
         continue;
       }
-      if (model === "")
-        errors.set(
-          draft.id,
-          t(($) => $.usage.prices.enterModel),
-        );
-      else if (alias === model)
-        errors.set(
-          draft.id,
-          t(($) => $.usage.prices.differentModel),
-        );
+      if (model === "") errors.set(draft.id, resolve(msg("Enter a model ID.")));
+      else if (alias === model) errors.set(draft.id, resolve(msg("Map to a different model.")));
       else {
         if (alias !== currentAlias) changes.push({ model, alias });
         if (modelPrice(target, model)) changes.push({ model, price: null });
@@ -138,13 +132,15 @@ export function usagePriceTableChanges(
       errors.set(
         draft.id,
         model === ""
-          ? t(($) => $.usage.prices.enterModel)
+          ? resolve(msg("Enter a model ID."))
           : missing
-            ? t(($) => $.usage.prices.requiredPrice, {
-                field: missing.label(t),
-                environment: target.label,
-              })
-            : t(($) => $.usage.prices.nonNegative),
+            ? resolve(
+                msg("{field} is required on {target}.", {
+                  field: resolve(missing.label),
+                  target: target.label,
+                }),
+              )
+            : resolve(msg("Use non-negative numbers for prices.")),
       );
       continue;
     }
@@ -167,7 +163,7 @@ export function usagePriceTableChanges(
       if (seen.has(model)) {
         errors.set(
           draft.id,
-          t(($) => $.usage.prices.cycle, { environment: target.label }),
+          resolve(msg("Model mappings cannot form a cycle on {target}.", { target: target.label })),
         );
         break;
       }
@@ -181,11 +177,11 @@ export function usagePriceTableChanges(
 export function usagePriceTableErrors(
   targets: readonly UsagePriceTarget[],
   drafts: readonly UsagePriceDraft[],
-  t: TFunction<"files">,
+  resolve: MessageResolver = m,
 ) {
   return new Map(
     targets
       .filter((target) => target.unavailable === null && target.prices !== null)
-      .flatMap((target) => [...usagePriceTableChanges(target, drafts, t).errors]),
+      .flatMap((target) => [...usagePriceTableChanges(target, drafts, resolve).errors]),
   );
 }

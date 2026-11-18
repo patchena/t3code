@@ -1,10 +1,10 @@
-import { useTranslation } from "react-i18next";
-import { isTranslationError } from "@t3tools/client-runtime/i18n";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { parsePullRequestAnchor } from "@t3tools/shared/pullRequestAnchor";
 import type { EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigate } from "@tanstack/react-router";
 import { type MouseEvent } from "react";
+import { msg } from "gt-react";
 
 import {
   resolveChangeRequestLinkTarget,
@@ -13,23 +13,24 @@ import {
 
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 
-import { canOpenLinksInApp } from "~/browser/browserLinkTarget";
-import { useOpenLink } from "~/browser/useOpenLink";
-import { useClientSettings } from "~/hooks/useSettings";
-import { stackedThreadToast, toastManager } from "~/components/ui/toast";
-import { useRightPanelStore } from "~/rightPanelStore";
+import { canOpenLinksInApp } from "../browser/browserLinkTarget";
+import { useOpenLink } from "../browser/useOpenLink";
+import { useClientSettings } from "../hooks/useSettings";
+import { stackedThreadToast, toastManager } from "../components/ui/toast";
+import { m } from "../i18n/messages";
+import { useRightPanelStore } from "../rightPanelStore";
 import {
   selectThreadBranchBaseRef,
   selectThreadDiffPanelSelection,
   useDiffPanelStore,
-} from "~/diffPanelStore";
+} from "../diffPanelStore";
 
-import { appAtomRegistry } from "~/rpc/atomRegistry";
-import { readProject, readProjects, readThreadShell, useProjects } from "~/state/entities";
-import { environmentServerConfigsAtom, serverEnvironment } from "~/state/server";
-import { usePrimaryEnvironmentId } from "~/state/environments";
-import { reviewEnvironment } from "~/state/review";
-import { useAtomQueryRunner } from "~/state/use-atom-query-runner";
+import { appAtomRegistry } from "../rpc/atomRegistry";
+import { readProject, readProjects, readThreadShell, useProjects } from "../state/entities";
+import { environmentServerConfigsAtom, serverEnvironment } from "../state/server";
+import { usePrimaryEnvironmentId } from "../state/environments";
+import { reviewEnvironment } from "../state/review";
+import { useAtomQueryRunner } from "../state/use-atom-query-runner";
 
 export function usePullRequestPreviewTarget(environmentId: EnvironmentId | null, url: string) {
   const projects = useProjects();
@@ -39,6 +40,27 @@ export function usePullRequestPreviewTarget(environmentId: EnvironmentId | null,
     projects,
     pullRequestsEnabled: serverConfig !== null,
     url,
+  });
+}
+
+/** Where a click on this link opens the in-app panel, read at call time as the click reads it. */
+export function pullRequestLinkPanelTarget(input: {
+  readonly url: string;
+  readonly environmentId: EnvironmentId | undefined;
+  readonly primaryEnvironmentId: EnvironmentId | null;
+  readonly lendHostProject: boolean;
+}) {
+  // Read at click time: every provider status push replaces the config map, and
+  // subscribing would hand every rendered link a new handler. Projects likewise, so a
+  // link can resolve against a snapshot that arrived after this handler was built.
+  const serverConfigs = appAtomRegistry.get(environmentServerConfigsAtom);
+  return resolveChangeRequestLinkTarget({
+    url: input.url,
+    projects: readProjects(),
+    configLoaded: (environmentId) => serverConfigs.has(environmentId),
+    environmentId: input.environmentId,
+    primaryEnvironmentId: input.primaryEnvironmentId,
+    lendHostProject: input.lendHostProject,
   });
 }
 
@@ -63,7 +85,6 @@ export function useOpenChangeRequestLink(
   targetEnvironmentId?: EnvironmentId,
   onCommitUnavailable?: () => void,
 ) => boolean {
-  const { t } = useTranslation("workspace");
   const navigate = useNavigate();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const openInApp = useClientSettings((settings) => settings.pullRequestLinksOpenInApp);
@@ -79,14 +100,8 @@ export function useOpenChangeRequestLink(
     const resolvedThreadRef = targetThreadRef ?? threadRef;
     const resolvedPanelRef = panelRef ?? resolvedThreadRef;
     const openPullRequest = () => {
-      // Read at click time: every provider status push replaces the config map, and
-      // subscribing would hand every rendered link a new handler. Projects likewise, so a
-      // link can resolve against a snapshot that arrived after this handler was built.
-      const serverConfigs = appAtomRegistry.get(environmentServerConfigsAtom);
-      const target = resolveChangeRequestLinkTarget({
+      const target = pullRequestLinkPanelTarget({
         url: targetUrl,
-        projects: readProjects(),
-        configLoaded: (environmentId) => serverConfigs.has(environmentId),
         environmentId: resolvedThreadRef?.environmentId ?? targetEnvironmentId,
         primaryEnvironmentId,
         lendHostProject: resolvedPanelRef !== undefined,
@@ -216,9 +231,9 @@ export function useOpenChangeRequestLink(
             const toastId = toastManager.add(
               stackedThreadToast({
                 type: "info",
-                title: t(($) => $.git.commitOutsideWorkspace),
+                title: m(msg("This commit is not in the thread's workspace")),
                 actionProps: {
-                  children: t(($) => $.git.openLink),
+                  children: m(msg("Open link")),
                   onClick: () => {
                     toastManager.close(toastId);
                     window.open(targetUrl, "_blank", "noopener,noreferrer");
@@ -233,16 +248,7 @@ export function useOpenChangeRequestLink(
             threadRef: resolvedThreadRef,
           });
         })
-        .catch((error: unknown) => {
-          if (isTranslationError(error)) throw error;
-          toastManager.add(
-            stackedThreadToast({
-              type: "error",
-              title: t(($) => $.git.commitPreviewFailed),
-              description: error instanceof Error ? error.message : String(error),
-            }),
-          );
-        });
+        .catch((error: unknown) => console.error(error));
       return true;
     }
     if (!openPullRequest()) return false;
@@ -253,7 +259,6 @@ export function useOpenChangeRequestLink(
 }
 
 export function useOpenPrLink(threadRef?: ScopedThreadRef) {
-  const { t } = useTranslation("workspace");
   const openChangeRequest = useOpenChangeRequestLink(threadRef);
   const openLink = useOpenLink(threadRef);
   return (event: MouseEvent<HTMLElement>, prUrl: string, targetThreadRef?: ScopedThreadRef) => {
@@ -269,13 +274,12 @@ export function useOpenPrLink(threadRef?: ScopedThreadRef) {
     if (!openInBrowser && openChangeRequest(event, prUrl, targetThreadRef)) return true;
 
     void openLink(prUrl, { event, threadRef: targetThreadRef }).catch((error: unknown) => {
-      if (isTranslationError(error)) throw error;
       console.error(error);
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: t(($) => $.git.openRequestLinkFailed),
-          description: error instanceof Error ? error.message : t(($) => $.git.errorOccurred),
+          title: m(msg("Unable to open pull request link")),
+          description: thrownErrorMessage(error, m) ?? m(msg("An error occurred.")),
         }),
       );
     });

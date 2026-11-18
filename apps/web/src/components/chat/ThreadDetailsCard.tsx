@@ -1,5 +1,5 @@
+import { useGT } from "gt-react";
 import { workspaceAreaProps } from "../../lib/workspaceFocus";
-import { useTranslation } from "react-i18next";
 import {
   useLayoutEffect,
   useState,
@@ -36,12 +36,8 @@ export function ThreadDetailsCard({
   onContextMenu?: MouseEventHandler<HTMLDivElement>;
   children: (density: "full" | "compact" | "essential") => ReactNode;
 }) {
-  const { t } = useTranslation("chat");
-  const detailsArea = workspaceAreaProps(
-    "details",
-    3,
-    t(($) => $.details.title),
-  );
+  const gt = useGT();
+  const detailsArea = workspaceAreaProps("details", 3, gt("Thread details"));
   const canvas = useChatCanvas();
   const preferredPlacement = canvas?.preferredDetailsCard ?? null;
   const placement = canvas?.detailsCardPlacement ?? null;

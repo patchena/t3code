@@ -1,5 +1,5 @@
-import { appI18n } from "~/i18n";
 import type { AnyRouter } from "@tanstack/react-router";
+import { msg } from "gt-react";
 
 import {
   dispatchCommandPalette,
@@ -7,10 +7,11 @@ import {
   useCommandPaletteStore,
 } from "../commandPaletteStore";
 import { overlayModeForCommand } from "../components/CommandPalette.logic";
-import { appearanceOptions, notifyThemeSaveFailure } from "../components/CommandPaletteThemeItems";
+import { APPEARANCE_OPTIONS, notifyThemeSaveFailure } from "../components/CommandPaletteThemeItems";
 import { toggleThemeEditorForTheme } from "../components/settings/themeEditorStore";
 import { toastManager } from "../components/ui/toast";
 import { getThemeSnapshot, setAppearanceMode } from "../hooks/useTheme";
+import { m } from "../i18n/messages";
 import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
 import { type CommandHandler, type CommandScopeOptions, registerCommands } from "./dispatcher";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
@@ -65,20 +66,21 @@ export function installCommandPaletteCommands(
       "appearance.cycle": (event) => {
         consume(event);
         if (event.repeat) return;
-        const t = appI18n.getFixedT(null, "workspace");
         const { appearanceMode } = getThemeSnapshot();
-        const nextMode =
-          appearanceMode === "system" ? "light" : appearanceMode === "light" ? "dark" : "system";
+        const index = APPEARANCE_OPTIONS.findIndex((option) => option.mode === appearanceMode);
+        const nextMode = APPEARANCE_OPTIONS[(index + 1) % APPEARANCE_OPTIONS.length]!.mode;
         if (!setAppearanceMode(nextMode)) {
-          notifyThemeSaveFailure(t);
+          notifyThemeSaveFailure();
           return;
         }
         toastManager.add({
           id: "appearance-cycle",
-          title: t(($) => $.palette.appearance, {
-            appearance:
-              appearanceOptions(t).find((option) => option.mode === nextMode)?.label ?? nextMode,
-          }),
+          title: m(
+            msg(
+              "{mode, select, system {Appearance: System} light {Appearance: Light} other {Appearance: Dark}}",
+            ),
+            { mode: nextMode },
+          ),
           timeout: 1500,
         });
       },

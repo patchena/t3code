@@ -1,5 +1,5 @@
 import type { EnvironmentId, PullRequestContextMetadata } from "@t3tools/contracts";
-import { useTranslation } from "react-i18next";
+import { useGT } from "gt-react";
 import { CircleDashedIcon, FilmIcon, ImageIcon } from "lucide-react";
 import {
   useEffect,
@@ -12,7 +12,7 @@ import {
 import { useAssetUrlState } from "~/assets/assetUrls";
 import { documentChipKindForFileName } from "~/pierre-icons";
 
-import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
+import { PULL_REQUEST_STATE_PRESENTATION } from "~/components/pullRequest/pullRequestIcons";
 import type { PullRequestContextDisplayState } from "~/lib/composerContextRecords";
 import { PierreEntryIcon } from "./chat/PierreEntryIcon";
 import { middleTruncateAttachmentName } from "./composerInlineChip";
@@ -72,7 +72,7 @@ export function ContextChipPopover(props: {
   accent?: string | undefined;
   children: ReactNode;
 }) {
-  const { t } = useTranslation("common");
+  const gt = useGT();
   return (
     <Popover>
       <PopoverTrigger
@@ -85,7 +85,7 @@ export function ContextChipPopover(props: {
                 : undefined
             }
             render={<button type="button" />}
-            aria-label={t(($) => $.context.showDetails, { label: props.accessibleLabel })}
+            aria-label={gt("{label}. Show details", { label: props.accessibleLabel })}
             data-markdown-copy={props.copyMarkdown}
           />
         }
@@ -110,17 +110,16 @@ export function PullRequestChip(props: {
   copyMarkdown?: string;
   onOpen: (event: MouseEvent<HTMLElement>, url: string) => void;
 }) {
-  const { t } = useTranslation("common");
+  const gt = useGT();
   const previewTarget = usePullRequestPreviewTarget(props.environmentId, props.metadata.url);
   const displayState =
     props.metadata.state === "open" && props.metadata.isDraft ? "draft" : props.metadata.state;
-  const StateIcon =
-    displayState === "open" ? PullRequestGlyph.pullRequest : PullRequestGlyph[displayState];
+  const StateIcon = PULL_REQUEST_STATE_PRESENTATION[displayState].Icon;
   const button = (
     <ContextChip
       kind={props.kind}
       render={<button type="button" />}
-      aria-label={t(($) => $.context.openPullRequest, {
+      aria-label={gt("Open {kind} {label}: {title}", {
         kind: props.kindLabel,
         label: props.label,
         title: props.metadata.title,
@@ -170,12 +169,12 @@ export function ImageChipButton({
   disabled?: boolean | undefined;
   onPreviewError?: (() => void) | undefined;
 }) {
-  const { t } = useTranslation("common");
+  const gt = useGT();
   return (
     <ContextChip
       kind="image"
       render={<button type="button" disabled={disabled} />}
-      aria-label={t(($) => $.context.imageAttachment, { name, size })}
+      aria-label={gt("Image attachment, {name}, {size}", { name, size })}
       {...props}
     >
       {previewUrl ? (
@@ -350,13 +349,13 @@ function FileChipContent(props: {
 }
 
 export function UnresolvedChip(props: { label: string; tooltip: string; copyMarkdown?: string }) {
-  const { t } = useTranslation("common");
+  const gt = useGT();
   return (
     <ContextChipShell
       icon={<CircleDashedIcon />}
       label={props.label}
       state="unresolved"
-      aria-label={t(($) => $.context.unavailable, { label: props.label })}
+      aria-label={gt("Unavailable context, {label}", { label: props.label })}
       data-markdown-copy={props.copyMarkdown}
       tooltip={props.tooltip}
     />

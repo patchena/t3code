@@ -1,7 +1,7 @@
-import { useTranslation } from "react-i18next";
 import type { PullRequestStack } from "@t3tools/contracts";
+import { useMessages } from "gt-react";
 import { cn } from "~/lib/utils";
-import { resolvePullRequestState } from "~/components/pullRequest/pullRequestPresentation";
+import { resolvePullRequestState } from "./pullRequestPresentation";
 
 export function PullRequestStackLayerContent({
   layer,
@@ -10,13 +10,13 @@ export function PullRequestStackLayerContent({
   layer: PullRequestStack["layers"][number];
   compact?: boolean;
 }) {
-  const { t } = useTranslation("workspace");
+  const messages = useMessages();
   const state = resolvePullRequestState(
     {
       state: layer.state,
       isDraft: layer.isDraft ?? false,
     },
-    t,
+    messages,
   );
   return (
     <>

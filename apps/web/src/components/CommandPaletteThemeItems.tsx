@@ -1,8 +1,8 @@
-import { useTranslation } from "react-i18next";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { BUILT_IN_THEMES } from "@t3tools/shared/themePalettes";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { MonitorIcon, MoonIcon, PaletteIcon, SunIcon } from "lucide-react";
 
+import { m } from "../i18n/messages";
 import { useCustomThemes } from "../hooks/useCustomThemes";
 import { useEnvironmentThemeDefinitions } from "../hooks/useEnvironmentTheme";
 import { useTheme } from "../hooks/useTheme";
@@ -21,19 +21,18 @@ import {
 } from "./settings/ThemePreviewCircles";
 import { stackedThreadToast, toastManager } from "./ui/toast";
 
-export const appearanceOptions = (t: TFunction<"workspace">) =>
-  [
-    { mode: "system", label: t(($) => $.palette.system), icon: MonitorIcon },
-    { mode: "light", label: t(($) => $.palette.light), icon: SunIcon },
-    { mode: "dark", label: t(($) => $.palette.dark), icon: MoonIcon },
-  ] as const;
+export const APPEARANCE_OPTIONS = [
+  { mode: "system", label: msg("System"), icon: MonitorIcon },
+  { mode: "light", label: msg("Light"), icon: SunIcon },
+  { mode: "dark", label: msg("Dark"), icon: MoonIcon },
+] as const;
 
-export function notifyThemeSaveFailure(t: TFunction<"workspace">): void {
+export function notifyThemeSaveFailure(): void {
   toastManager.add(
     stackedThreadToast({
       type: "error",
-      title: t(($) => $.palette.themeSaveFailed),
-      description: t(($) => $.palette.tryAgain),
+      title: m(msg("Couldn't save theme selection")),
+      description: m(msg("Try again.")),
     }),
   );
 }
@@ -57,7 +56,6 @@ function useThemeCards() {
 }
 
 export function useCommandPaletteThemeItems() {
-  const { t } = useTranslation("workspace");
   const {
     theme,
     themeHalves,
@@ -68,19 +66,21 @@ export function useCommandPaletteThemeItems() {
     setThemeHalf,
   } = useTheme();
   const themeCards = useThemeCards();
+  const gt = useGT();
+  const messages = useMessages();
 
   const changeThemeItem: CommandPaletteSubmenuItem = {
     kind: "submenu",
     value: "action:change-theme",
     searchTerms: ["change theme", "appearance", "colors", "palette"],
-    title: t(($) => $.palette.changeTheme),
+    title: gt("Change theme"),
     icon: <PaletteIcon className={ITEM_ICON_CLASS} />,
     addonIcon: <PaletteIcon className={ADDON_ICON_CLASS} />,
     shortcutCommand: "theme.select",
     groups: [
       {
         value: "themes",
-        label: t(($) => $.palette.changeTheme),
+        label: gt("Change theme"),
         items: themeCards.map(({ id, label, previews }) => ({
           kind: "action",
           value: id === null ? "theme:standard" : `theme:palette:${id}`,
@@ -88,8 +88,8 @@ export function useCommandPaletteThemeItems() {
           description:
             previews.length === 1
               ? previews[0]!.mode === "light"
-                ? t(($) => $.palette.lightMode)
-                : t(($) => $.palette.darkMode)
+                ? gt("For light mode")
+                : gt("For dark mode")
               : undefined,
           searchTerms: [label, "theme", "appearance"],
           icon: <PaletteIcon className={ITEM_ICON_CLASS} />,
@@ -97,7 +97,7 @@ export function useCommandPaletteThemeItems() {
             <span className="flex shrink-0 items-center gap-2">
               {(themeHalves?.[resolvedTheme] ?? getThemeDefinition(theme)?.id ?? null) === id ? (
                 <span className="text-xs text-muted-foreground/70">
-                  {t(($) => $.palette.current)}
+                  <T context="the theme or mode in use now">Current</T>
                 </span>
               ) : null}
               <span className="flex items-center gap-1" aria-hidden>
@@ -117,7 +117,7 @@ export function useCommandPaletteThemeItems() {
               previews.length === 1 && id !== null
                 ? setThemeHalf(previews[0]!.mode, id)
                 : setTheme(id ?? appearanceMode);
-            if (!saved) notifyThemeSaveFailure(t);
+            if (!saved) notifyThemeSaveFailure();
           },
         })),
       },
@@ -128,28 +128,28 @@ export function useCommandPaletteThemeItems() {
     kind: "submenu",
     value: "action:change-appearance",
     searchTerms: ["change appearance", "light", "dark", "system", "mode", "toggle"],
-    title: t(($) => $.palette.changeAppearance),
+    title: gt("Change appearance"),
     icon: <MonitorIcon className={ITEM_ICON_CLASS} />,
     addonIcon: <MonitorIcon className={ADDON_ICON_CLASS} />,
     shortcutCommand: "appearance.cycle",
     groups: [
       {
         value: "appearance",
-        label: t(($) => $.palette.changeAppearance),
-        items: appearanceOptions(t).map(({ mode, label, icon: Icon }) => ({
+        label: gt("Change appearance"),
+        items: APPEARANCE_OPTIONS.map(({ mode, label, icon: Icon }) => ({
           kind: "action",
           value: `appearance:${mode}`,
-          title: label,
-          searchTerms: [label, mode, "appearance", "mode"],
+          title: messages(label),
+          searchTerms: [messages(label), label, "appearance", "mode"],
           icon: <Icon className={ITEM_ICON_CLASS} />,
           titleTrailingContent:
             appearanceMode === mode ? (
               <span className="text-xs text-muted-foreground/70">
-                {t(($) => $.palette.current)}
+                <T context="the theme or mode in use now">Current</T>
               </span>
             ) : undefined,
           run: async () => {
-            if (!setAppearanceMode(mode)) notifyThemeSaveFailure(t);
+            if (!setAppearanceMode(mode)) notifyThemeSaveFailure();
           },
         })),
       },
@@ -160,7 +160,7 @@ export function useCommandPaletteThemeItems() {
     kind: "action",
     value: "action:theme-editor",
     searchTerms: ["theme", "appearance", "colors", "palette", "customize"],
-    title: t(($) => $.palette.themeEditor),
+    title: gt("Toggle theme editor"),
     icon: <PaletteIcon className={ITEM_ICON_CLASS} />,
     shortcutCommand: "themeEditor.toggle",
     run: async () => {

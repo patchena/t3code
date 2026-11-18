@@ -4,7 +4,7 @@ import { observeResize } from "~/lib/observeResize";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { PREVIEW_PAGE_ROWS } from "./largeTextProtocol";
 
-export function VirtualTablePreview(props: {
+export default function VirtualTablePreview(props: {
   readonly name: string;
   readonly count: number;
   readonly columns: number;

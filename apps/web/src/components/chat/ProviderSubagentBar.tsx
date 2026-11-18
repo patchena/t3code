@@ -3,9 +3,9 @@ import {
   type ProviderSubagentStatus,
 } from "@t3tools/client-runtime/state/thread-execution";
 import { isOrchestrationV2WorkActive } from "@t3tools/contracts";
+import { T, useGT, useMessages } from "gt-react";
 import { ArrowUpLeftIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { useTranslation } from "react-i18next";
 
 import { tickTextContent } from "~/lib/tickTextContent";
 import type { ProviderInstanceEntry } from "../../providerInstances";
@@ -21,16 +21,16 @@ export function ProviderSubagentBar(props: {
   readonly onOpenParent: (() => void) | null;
   readonly actions?: ReactNode;
 }) {
-  const { t } = useTranslation("chat");
-  const { t: tActivity } = useTranslation("activity");
   const { status } = props;
+  const gt = useGT();
+  const messages = useMessages();
   const live = status !== null && isOrchestrationV2WorkActive(status.status);
   const modelDescription =
     props.effortLabel === null ? props.modelLabel : `${props.modelLabel}, ${props.effortLabel}`;
   const announcement = formatProviderSubagentStatus(
     status === null ? null : { ...status, startedAt: null },
     0,
-    tActivity,
+    messages,
   );
 
   // Sized by the composer, not the viewport: a docked side panel narrows the
@@ -60,7 +60,7 @@ export function ProviderSubagentBar(props: {
         </span>
         <span
           ref={tickTextContent(
-            (nowMs) => formatProviderSubagentStatus(status, nowMs, tActivity),
+            (nowMs) => formatProviderSubagentStatus(status, nowMs, messages),
             live,
           )}
           aria-hidden
@@ -68,17 +68,17 @@ export function ProviderSubagentBar(props: {
         />
       </div>
       <span role="status" className="sr-only">
-        {t(($) => $.thread.subagentAnnouncement, { model: modelDescription, status: announcement })}
+        {gt("{model} subagent: {status}", { model: modelDescription, status: announcement })}
       </span>
       <span className="shrink-0 text-muted-foreground @max-[640px]/composer-surface:sr-only">
-        {t(($) => $.thread.runsIndependently)}
+        <T>Runs on its own</T>
       </span>
       {props.actions}
       {props.onOpenParent ? (
         <Button size="sm" variant="ghost" onClick={props.onOpenParent}>
           <ArrowUpLeftIcon />
           <span className="@max-[320px]/composer-surface:sr-only">
-            {t(($) => $.thread.openParent)}
+            <T>Open parent</T>
           </span>
         </Button>
       ) : null}

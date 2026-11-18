@@ -8,8 +8,10 @@ import {
 import { type AuthMcpApprovalDetails, EnvironmentId } from "@t3tools/contracts";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
+import { msg, T, useGT } from "gt-react";
 import { type ReactNode, useEffect, useEffectEvent, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
+
+import { m } from "../../i18n/messages";
 
 import { isElectron } from "../../env";
 import { runConnectMcpApproval } from "../../state/connectMcpApproval";
@@ -32,6 +34,7 @@ function readEnvironmentId(): EnvironmentId | null {
   return value ? EnvironmentId.make(value) : null;
 }
 
+/** Sends each call with the owner's T3 Connect session and remembers where the environment is. */
 function connectTransport(
   environmentId: EnvironmentId,
   onEnvironment: (environment: { readonly url: string; readonly label: string }) => void,
@@ -43,7 +46,9 @@ function connectTransport(
     if (Result.isFailure(result)) {
       return {
         kind: "error",
-        message: isUnavailable(result.failure) ? result.failure.message : null,
+        message: isUnavailable(result.failure)
+          ? result.failure.message
+          : m(msg("Could not reach this environment. Try again.")),
       };
     }
     onEnvironment({
@@ -67,10 +72,15 @@ function connectTransport(
   };
 }
 
+/**
+ * The consent screen for an agent sign-in on a T3 Connect environment: the owner signs in to
+ * T3 Connect here and approves with that session, so no sign-in code is needed.
+ */
 export function ApproveAgentSurface() {
-  const { t } = useTranslation("connect");
+  const gt = useGT();
   const [environmentId] = useState(readEnvironmentId);
   const [authorization] = useState(readAuthorizationRequest);
+  // Another site could frame this page and steer a click onto Approve.
   const [framed] = useState(() => window.top !== window.self);
   const [environment, setEnvironment] = useState<{
     readonly url: string;
@@ -98,23 +108,31 @@ export function ApproveAgentSurface() {
 
   if (environmentId === null || transport === null) {
     return (
-      <Message title={t(($) => $.agent.linkIncomplete)} description={t(($) => $.agent.restart)} />
+      <Message
+        title={gt("This sign-in link is incomplete")}
+        description={gt("Close this page and start the sign-in again from your agent.")}
+      />
     );
   }
 
   if (framed) {
-    return <Message title={t(($) => $.agent.ownWindow)} description={t(($) => $.agent.framed)} />;
+    return (
+      <Message
+        title={gt("Open this page in its own window")}
+        description={gt("For your safety, agent sign-ins cannot be approved inside another site.")}
+      />
+    );
   }
 
   if (loadFailed) {
     return (
       <Message
-        title="Could not load sign-in"
-        description="T3 Connect sign-in did not load. Check your connection, then try again."
+        title={gt("Could not load sign-in")}
+        description={gt("T3 Connect sign-in did not load. Check your connection, then try again.")}
       >
         <div className="mt-6">
           <Button type="button" onClick={retryClerkLoad}>
-            Retry sign-in
+            <T>Retry sign-in</T>
           </Button>
         </div>
       </Message>
@@ -125,9 +143,9 @@ export function ApproveAgentSurface() {
     return (
       <StandalonePage>
         <StandalonePageHeader
-          context={t(($) => $.agent.context)}
-          title={t(($) => $.agent.connecting)}
-          description={t(($) => $.agent.accountLoading)}
+          context={gt("Agent sign-in")}
+          title={gt("Connecting to T3 Connect")}
+          description={gt("One moment while your account loads.")}
         />
         <Spinner className="mt-6" size="lg" tone="muted" />
       </StandalonePage>
@@ -137,12 +155,12 @@ export function ApproveAgentSurface() {
   if (!isSignedIn) {
     return (
       <Message
-        title={t(($) => $.agent.signInToApprove)}
-        description={t(($) => $.agent.signInAccount)}
+        title={gt("Sign in to approve")}
+        description={gt("Sign in to T3 Connect with the account this environment is linked to.")}
       >
         <div className="mt-6">
           <Button type="button" onClick={openSignIn}>
-            {t(($) => $.actions.signIn)}
+            <T>Sign in</T>
           </Button>
         </div>
       </Message>
@@ -167,7 +185,7 @@ export function ApproveAgentSurface() {
                 <a href={`${new URL("/connect-agent", environment.url).toString()}?${search}`} />
               }
             >
-              {t(($) => $.agent.useCode)}
+              <T>Use a sign-in code instead</T>
             </Button>
           ) : null}
           <Button
@@ -176,7 +194,7 @@ export function ApproveAgentSurface() {
             onClick={() => void clerk.signOut({ redirectUrl: window.location.href })}
             type="button"
           >
-            {t(($) => $.agent.otherAccount)}
+            <T>Use another account</T>
           </Button>
         </div>
       }
@@ -193,14 +211,10 @@ function Message({
   readonly description: string;
   readonly children?: ReactNode;
 }) {
-  const { t } = useTranslation("connect");
+  const gt = useGT();
   return (
     <StandalonePage>
-      <StandalonePageHeader
-        context={t(($) => $.agent.context)}
-        title={title}
-        description={description}
-      />
+      <StandalonePageHeader context={gt("Agent sign-in")} title={title} description={description} />
       {children}
     </StandalonePage>
   );

@@ -1,7 +1,7 @@
 import { useAuth, useClerk } from "@clerk/react";
 import { readConnectAuthorizeRequest } from "@t3tools/shared/connectAuth";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
 
 import {
   buildConnectCliClerkAuthorizeUrl,
@@ -13,9 +13,18 @@ import { resolveClerkSignInProps } from "../clerk/authRedirect";
 import { retryClerkLoad, useClerkLoadFailed } from "../clerk/clerkLoadFailure";
 import { Button } from "../ui/button";
 
+const invalidLinkMessage = {
+  context: msg("Authorization request"),
+  title: msg("This connect link is incomplete"),
+  description: msg(
+    "The link is missing its authorization request. Re-run `t3 connect` in your terminal and open the freshly printed URL.",
+  ),
+} as const;
+
 export function ConnectCliAuthorizeSurface() {
-  const { t } = useTranslation("connect");
   const [request] = useState(() => readConnectAuthorizeRequest(new URL(window.location.href)));
+  const gt = useGT();
+  const m = useMessages();
   const clerk = useClerk();
   const { isLoaded, isSignedIn } = useAuth();
   const loadFailed = useClerkLoadFailed();
@@ -59,9 +68,9 @@ export function ConnectCliAuthorizeSurface() {
     return (
       <StandalonePage>
         <StandalonePageHeader
-          context={t(($) => $.cli.invalidContext)}
-          title={t(($) => $.cli.invalidTitle)}
-          description={t(($) => $.cli.invalidDescription)}
+          context={m(invalidLinkMessage.context)}
+          title={m(invalidLinkMessage.title)}
+          description={m(invalidLinkMessage.description)}
         />
       </StandalonePage>
     );
@@ -70,20 +79,24 @@ export function ConnectCliAuthorizeSurface() {
   return (
     <StandalonePage>
       <StandalonePageHeader
-        context={t(($) => $.cli.context)}
-        title={t(($) => $.cli.title)}
-        description={isSignedIn ? t(($) => $.cli.redirecting) : t(($) => $.cli.signIn)}
+        context={gt("Browser authorization")}
+        title={gt("Connecting your terminal")}
+        description={
+          isSignedIn
+            ? gt("Redirecting to authorize T3 Connect for your CLI…")
+            : gt("Sign in to continue authorizing T3 Connect for your CLI.")
+        }
       />
       {loadFailed ? (
         <div className="mt-6">
           <Button type="button" onClick={retryClerkLoad}>
-            Retry sign-in
+            <T>Retry sign-in</T>
           </Button>
         </div>
       ) : isLoaded && !isSignedIn ? (
         <div className="mt-6">
           <Button type="button" onClick={openSignIn}>
-            {t(($) => $.actions.signIn)}
+            <T>Sign in</T>
           </Button>
         </div>
       ) : null}

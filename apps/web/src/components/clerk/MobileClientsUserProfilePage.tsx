@@ -1,6 +1,6 @@
 import type { RelayClientDeviceRecord } from "@t3tools/contracts/relay";
+import { T, useGT, useMessages } from "gt-react";
 import { SmartphoneIcon } from "lucide-react";
-import { useTranslation } from "react-i18next";
 
 import { useManagedRelayDevices } from "../../cloud/managedRelayState";
 import { Badge } from "../ui/badge";
@@ -27,16 +27,19 @@ function MobileClientStatusBadge({
   readonly enabled: boolean;
   readonly label: string;
 }) {
-  const { t } = useTranslation("connect");
+  const gt = useGT();
   return (
     <Badge variant={enabled ? "success" : "outline"}>
-      {enabled ? t(($) => $.profile.enabled, { label }) : t(($) => $.profile.disabled, { label })}
+      {enabled
+        ? gt("{label}: On", { label, $context: "a setting is on" })
+        : gt("{label}: Off", { label, $context: "a setting is off" })}
     </Badge>
   );
 }
 
 function MobileClientRow({ device }: { readonly device: RelayClientDeviceRecord }) {
-  const { t, i18n } = useTranslation("connect");
+  const gt = useGT();
+  const m = useMessages();
   return (
     <ClerkUserProfileRow icon={<SmartphoneIcon className="size-4" />}>
       <div className="flex flex-col gap-0.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
@@ -49,30 +52,30 @@ function MobileClientRow({ device }: { readonly device: RelayClientDeviceRecord 
           </p>
         </div>
         <p className="shrink-0 text-2xs leading-4 text-muted-foreground/75">
-          {mobileClientUpdatedAtLabel(device.updatedAt, t, i18n.language)}
+          {mobileClientUpdatedAtLabel(device.updatedAt, m)}
         </p>
       </div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         <MobileClientStatusBadge
           enabled={device.notifications.enabled}
-          label={t(($) => $.profile.notifications)}
+          label={gt("Push notifications")}
         />
         <MobileClientStatusBadge
           enabled={device.liveActivities.enabled}
-          label={t(($) => $.profile.liveActivities)}
+          label={gt("Live Activities")}
         />
       </div>
       <p className="mt-1.5 text-xs leading-4.5 text-muted-foreground/80">
-        {mobileClientNotificationDetail(device, t)}
+        {mobileClientNotificationDetail(device, m)}
       </p>
     </ClerkUserProfileRow>
   );
 }
 
 function MobileClientsSkeleton() {
-  const { t } = useTranslation("connect");
+  const gt = useGT();
   return (
-    <div aria-label={t(($) => $.profile.mobileLoading)} className="divide-y border-t" role="status">
+    <div aria-label={gt("Loading mobile clients")} className="divide-y border-t" role="status">
       {MOBILE_CLIENT_SKELETON_ROWS.map((row) => (
         <div key={row} className="py-4">
           <div className="flex gap-3">
@@ -93,23 +96,29 @@ function MobileClientsSkeleton() {
 }
 
 function EmptyMobileClients() {
-  const { t } = useTranslation("connect");
   return (
     <Empty size="compact">
       <EmptyMedia variant="icon">
         <SmartphoneIcon />
       </EmptyMedia>
       <EmptyHeader>
-        <EmptyTitle>{t(($) => $.profile.mobileEmpty)}</EmptyTitle>
-        <EmptyDescription>{t(($) => $.profile.mobileEmptyDescription)}</EmptyDescription>
+        <EmptyTitle>
+          <T>No mobile clients</T>
+        </EmptyTitle>
+        <EmptyDescription>
+          <T>
+            Install T3 Code on your phone and sign in to T3 Connect to get push notifications and
+            Live Activities.
+          </T>
+        </EmptyDescription>
       </EmptyHeader>
     </Empty>
   );
 }
 
 export function MobileClientsUserProfilePage() {
-  const { t } = useTranslation("connect");
   const devicesState = useManagedRelayDevices();
+  const gt = useGT();
   const devices = devicesState.data ?? [];
   const isInitialLoad =
     !devicesState.accountId || (devicesState.data === null && !devicesState.error);
@@ -117,8 +126,8 @@ export function MobileClientsUserProfilePage() {
 
   return (
     <ClerkUserProfilePage
-      title={t(($) => $.profile.mobileClients)}
-      description={t(($) => $.profile.mobileDescription)}
+      title={gt("Mobile clients")}
+      description={gt("Mobile devices that get notifications from your environments.")}
       action={
         <ClerkUserProfileRefreshButton
           isPending={devicesState.isPending}
@@ -134,12 +143,12 @@ export function MobileClientsUserProfilePage() {
           >
             <div>
               <p className="font-medium text-destructive-foreground">
-                {t(($) => $.profile.mobileLoadFailed)}
+                <T>Could not load mobile clients</T>
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">{devicesState.error}</p>
             </div>
             <Button size="xs" variant="outline" onClick={devicesState.refresh}>
-              {t(($) => $.actions.retry)}
+              <T>Try again</T>
             </Button>
           </div>
         ) : null}

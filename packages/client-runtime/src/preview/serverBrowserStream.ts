@@ -1,4 +1,3 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 // @effect-diagnostics globalTimers:off globalFetch:off - This browser and WebView transport runs without an Effect runtime.
 import { type DeviceHubAccess, withDeviceHubQuery } from "../device/hubAccess.ts";
 import {
@@ -6,6 +5,8 @@ import {
   type PreviewStreamHostSetup,
   type PreviewViewportSetting,
 } from "@t3tools/contracts";
+import { mFallback, msg } from "gt-i18n";
+import type { MFunctionType } from "gt-i18n/types";
 
 export const PREVIEW_STREAM_BASE_PATH = "/api/preview-stream";
 
@@ -29,19 +30,21 @@ export interface PreviewStreamControl {
 
 export const previewStreamControlLabel = (
   control: PreviewStreamControl | null,
-  t: TFunction<"tools">,
+  resolve: MFunctionType = mFallback,
 ): string =>
   !control
-    ? t(($) => $.browserConnecting)
+    ? resolve(msg("Connecting..."))
     : !control.canOperate
-      ? t(($) => $.browserReadOnly)
+      ? resolve(msg("Read-only"))
       : control.controller === "you"
-        ? t(($) => $.browserYouControl)
+        ? resolve(msg("You have control"))
         : control.controller === "agent"
-          ? t(($) => $.browserAgentControl)
+          ? resolve(msg("Agent has control"))
           : control.controller === "another-viewer"
-            ? t(($) => $.browserOtherControl)
-            : t(($) => $.browserWatching);
+            ? resolve(msg("Another viewer has control"))
+            : resolve(
+                msg("Watching", { $context: "preview stream status, viewing without control" }),
+              );
 
 const isPreviewStreamDialog = (value: unknown): value is PreviewStreamControl["dialog"] =>
   value === null ||
@@ -470,5 +473,16 @@ const decodeHostSetup = (reason: string): PreviewStreamHostSetup => {
 
 export const previewStreamHostSetupMessage = (
   setup: PreviewStreamHostSetup,
-  t: TFunction<"tools">,
-) => (setup.need === "sandbox" ? t(($) => $.browserHostSandbox) : t(($) => $.browserHostLibraries));
+  resolve: MFunctionType = mFallback,
+) =>
+  setup.need === "sandbox"
+    ? resolve(
+        msg(
+          "This server's host blocks the sandbox its browser runs in. Run this once on the host, then try again:",
+        ),
+      )
+    : resolve(
+        msg(
+          "This server's host is missing libraries its browser needs. Run this once on the host, then try again:",
+        ),
+      );

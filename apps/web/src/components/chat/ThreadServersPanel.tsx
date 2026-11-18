@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import { useTranslation } from "react-i18next";
 import {
   AuthPreviewOperateScope,
   type DiscoveredLocalServer,
@@ -11,13 +11,9 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import {
-  GlobeIcon,
-  LoaderCircleIcon,
-  SquareIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-} from "lucide-react";
+import { T, useGT, Var } from "gt-react";
+import { m } from "~/i18n/messages";
+import { GlobeIcon, SquareIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { type MouseEvent, useState } from "react";
 
 import { resolveDiscoveredServerUrl } from "../../browser/browserTargetResolver";
@@ -29,6 +25,7 @@ import { previewEnvironment } from "../../state/preview";
 import { useEnvironmentScope } from "../../state/session";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { openDiscoveredPort } from "../preview/openDiscoveredPort";
+import { Spinner } from "../ui/spinner";
 import { stackedThreadToast, toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
@@ -50,7 +47,7 @@ export function ThreadServersPanel(props: ThreadServersPanelProps) {
 }
 
 function ThreadServersList(props: ThreadServersPanelProps) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const servers = useThreadDiscoveredPorts(props);
   const canOpen = useEnvironmentScope(props.environmentId, AuthPreviewOperateScope);
   const canStop = useAtomValue(
@@ -76,7 +73,7 @@ function ThreadServersList(props: ThreadServersPanelProps) {
       stackedThreadToast({
         type: "error",
         title,
-        description: error instanceof Error ? error.message : String(error),
+        description: thrownErrorMessage(error, m) ?? String(error),
       }),
     );
   };
@@ -89,20 +86,12 @@ function ThreadServersList(props: ThreadServersPanelProps) {
       const url = resolveDiscoveredServerUrl(props.environmentId, server.url);
       await readLocalApi()
         ?.shell.openExternal(url)
-        .catch((error: unknown) =>
-          reportFailure(
-            t(($) => $.details.openBrowserFailed),
-            error,
-          ),
-        );
+        .catch((error: unknown) => reportFailure(gt("Unable to open in browser"), error));
       return;
     }
     const result = await openDiscoveredPort({ threadRef, port: server, openPreview });
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      reportFailure(
-        t(($) => $.details.openPreviewFailed),
-        squashAtomCommandFailure(result),
-      );
+      reportFailure(gt("Unable to open preview"), squashAtomCommandFailure(result));
     }
   };
 
@@ -115,17 +104,14 @@ function ThreadServersList(props: ThreadServersPanelProps) {
     });
     setStoppingKey(null);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      reportFailure(
-        t(($) => $.details.stopServerFailed),
-        squashAtomCommandFailure(result),
-      );
+      reportFailure(gt("Could not stop server"), squashAtomCommandFailure(result));
     }
   };
 
   return (
     <ThreadDetailsSection
       headingId="thread-details-servers-heading"
-      title={t(($) => $.details.servers)}
+      title={gt("Servers", { $context: "thread details section: running dev servers" })}
     >
       <ul className="m-0 list-none p-0">
         {servers.slice(0, visibleCount).map((server, index) => {
@@ -161,8 +147,8 @@ function ThreadServersList(props: ThreadServersPanelProps) {
                     <span className="truncate text-2xs font-normal leading-4 text-muted-foreground">
                       {[
                         server.terminal === null
-                          ? t(($) => $.details.agent)
-                          : t(($) => $.details.terminal),
+                          ? gt("Agent", { $context: "who started a dev server" })
+                          : gt("Terminal", { $context: "who started a dev server" }),
                         server.processName,
                       ]
                         .filter(Boolean)
@@ -171,7 +157,9 @@ function ThreadServersList(props: ThreadServersPanelProps) {
                   </span>
                 </TooltipTrigger>
                 <TooltipPopup side="left">
-                  {t(($) => $.details.openServer, { shortcut: externalClickLabel })}
+                  <T>
+                    Open in the browser panel. <Var>{externalClickLabel}</Var> for your browser.
+                  </T>
                 </TooltipPopup>
               </Tooltip>
               {stoppable ? (
@@ -184,19 +172,21 @@ function ThreadServersList(props: ThreadServersPanelProps) {
                           variant="ghost"
                           part="icon"
                           tone="destructive"
-                          aria-label={t(($) => $.details.stopLocalhost, { port: server.port })}
+                          aria-label={gt("Stop localhost:{port}", { port: server.port })}
                           disabled={stoppingKey !== null}
                           onClick={() => void stop(server)}
                         />
                       }
                     >
                       {stoppingKey === key ? (
-                        <LoaderCircleIcon aria-hidden className="size-3 animate-spin" />
+                        <Spinner aria-hidden size="xs" />
                       ) : (
                         <SquareIcon aria-hidden className="size-3 fill-current" />
                       )}
                     </TooltipTrigger>
-                    <TooltipPopup side="left">{t(($) => $.details.stopServer)}</TooltipPopup>
+                    <TooltipPopup side="left">
+                      <T>Stop server</T>
+                    </TooltipPopup>
                   </Tooltip>
                 </div>
               ) : null}
@@ -220,11 +210,13 @@ function ThreadServersList(props: ThreadServersPanelProps) {
           ) : (
             <ChevronUpIcon aria-hidden className="size-4 shrink-0" />
           )}
-          {hiddenCount > 0
-            ? t(($) => $.thread.showMoreCount, {
-                count: Math.min(hiddenCount, SERVER_PAGE_COUNT),
-              })
-            : t(($) => $.ui.showLess)}
+          {hiddenCount > 0 ? (
+            <T>
+              Show <Var>{Math.min(hiddenCount, SERVER_PAGE_COUNT)}</Var> more
+            </T>
+          ) : (
+            <T>Show less</T>
+          )}
         </ThreadDetailsControl>
       ) : null}
     </ThreadDetailsSection>

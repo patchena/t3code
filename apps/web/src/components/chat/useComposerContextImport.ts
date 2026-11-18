@@ -1,4 +1,5 @@
-import { useTranslation } from "react-i18next";
+import { msg } from "gt-react";
+import { m } from "~/i18n/messages";
 import {
   ConnectionBlockedError,
   ConnectionTransientError,
@@ -44,6 +45,7 @@ import { collectInlineContextIds } from "../../lib/composerContextReferences";
 import { elementContextToPreviewAnnotation } from "../../lib/elementContext";
 import { orchestrationEnvironment } from "~/state/orchestration";
 import { pendingDraftWork } from "./pendingDraftWork";
+import { readComposerImageBytes } from "./composerAttachmentFiles";
 import { randomUUID } from "~/lib/utils";
 import { readPreparedConnection } from "~/state/session";
 import { resolveAssetUrl } from "~/assets/assetUrls";
@@ -93,7 +95,6 @@ export function useComposerContextImport(input: {
   readonly pendingThreadImportsRef: RefObject<Map<string, number>>;
   readonly addComposerFilesToDraft: (files: ComposerFileAttachment[]) => string[];
 }) {
-  const { t } = useTranslation("chat");
   const {
     environmentId,
     linkedEnvironments,
@@ -163,15 +164,15 @@ export function useComposerContextImport(input: {
     const fail = (reason: string) => {
       toastManager.add({
         type: "error",
-        title: t(($) => $.composer.bringContextFailed, { name: record.name }),
-        description: `${reason} Remove the chip or attach the file again.`,
+        title: m(msg("Couldn't bring {name} into this message", { name: record.name })),
+        description: m(msg("{reason} Remove the chip or attach the file again.", { reason })),
       });
     };
     let file = copiedComposerAttachmentFile(sourceEnvironmentId, record.attachmentId);
     if (!file) {
       const sourceConnection = readPreparedConnection(sourceEnvironmentId);
       if (!sourceConnection) {
-        fail(t(($) => $.composer.sourceNotConnected));
+        fail(m(msg("The environment it came from is not connected.")));
         return;
       }
       const result = await createAssetUrl({
@@ -186,16 +187,18 @@ export function useComposerContextImport(input: {
         const cause = result._tag === "Failure" ? Cause.squash(result.cause) : null;
         fail(
           isUnreachable(cause)
-            ? t(($) => $.composer.sourceNotReachable)
-            : t(($) => $.composer.originalAttachmentUnavailable),
+            ? m(msg("The environment it came from is not reachable right now."))
+            : m(msg("The original attachment is no longer available.")),
         );
         return;
       }
       const blob = await downloadAttachmentBlob(url);
       if (!blob) {
-        fail(t(($) => $.composer.sourceDownloadFailed));
+        fail(m(msg("Downloading it from the source failed.")));
         return;
       }
+      file = new File([blob], record.name, { type: record.mimeType || blob.type });
+      if (record.kind === "image") await readComposerImageBytes(file);
       // Question attachments have no inline reference; annotations can own their screenshots.
       const references = new Set(collectInlineContextIds(promptRef.current));
       if (
@@ -210,7 +213,6 @@ export function useComposerContextImport(input: {
         )
       )
         return;
-      file = new File([blob], record.name, { type: record.mimeType || blob.type });
     }
     // The draft these bytes belong to may have been sent or switched away from while they
     // downloaded. Dropping them here keeps them out of whatever draft is open now.
@@ -231,7 +233,7 @@ export function useComposerContextImport(input: {
       (pendingThreadImportsRef.current.get(importTargetKey) ?? 0) > 0 &&
       countReservedAttachments() >= PROVIDER_SEND_TURN_MAX_ATTACHMENTS
     ) {
-      fail(t(($) => $.composer.attachmentLimitReached));
+      fail(m(msg("The attachment limit has been reached.")));
       return;
     }
     if (record.kind === "image") {
@@ -246,6 +248,7 @@ export function useComposerContextImport(input: {
             sizeBytes: file.size,
             previewUrl: URL.createObjectURL(file),
             file,
+            ...(record.source ? { source: record.source } : {}),
           },
         ],
         {
@@ -255,7 +258,8 @@ export function useComposerContextImport(input: {
             ) ?? false,
         },
       );
-      if (!accepted.includes(localId)) fail(t(($) => $.composer.draftRejectedAttachment));
+      if (!accepted.includes(localId))
+        fail(m(msg("The draft rejected this attachment (duplicate or attachment limit reached).")));
     } else {
       const accepted = addComposerFilesToDraft([
         {
@@ -267,7 +271,8 @@ export function useComposerContextImport(input: {
           file,
         },
       ]);
-      if (!accepted.includes(localId)) fail(t(($) => $.composer.draftRejectedAttachment));
+      if (!accepted.includes(localId))
+        fail(m(msg("The draft rejected this attachment (duplicate or attachment limit reached).")));
     }
   };
   const importAttachmentRecord = async (
@@ -304,7 +309,7 @@ export function useComposerContextImport(input: {
     for (const candidate of orderedRecords) {
       // Producer ids fold into context ids, so two different excerpts can collide. Only skip
       // when the draft already holds the same payload; a colliding but different record is
-      // re-minted under a fresh id so both survive the paste.
+      // re-minted under a fresh id so both survive the paste. Threads resolve below.
       const record = asKnownContextRecord(candidate);
       if (!record) continue;
       // A reminted annotation needs its screenshot under the new annotation id.
@@ -345,7 +350,7 @@ export function useComposerContextImport(input: {
       if (
         existingRecord &&
         isSameComposerContextPayload(existingRecord, record) &&
-        (record.kind !== "thread" || threadDraftTarget === attachmentDraftTarget)
+        record.kind !== "thread"
       ) {
         if (record.kind === "preview-annotation" && record.screenshotContextId) {
           skippedDependentAttachmentIds.add(record.screenshotContextId);
@@ -398,10 +403,21 @@ export function useComposerContextImport(input: {
             !linkedEnvironments.has(record.environmentId)
           )
             break;
-          addComposerDraftThreadContexts(threadDraftTarget, [record], {
+          // Threads reuse their destination record by identity, reminting only on an ID collision.
+          const threads = getComposerDraft(threadDraftTarget)?.threadContexts ?? [];
+          const attached = threads.find(
+            (thread) =>
+              thread.environmentId === record.environmentId && thread.threadId === record.threadId,
+          );
+          const imported =
+            attached ??
+            (threads.some((thread) => thread.contextId === record.contextId)
+              ? { ...record, contextId: toKindScopedComposerContextId("thread", randomUUID()) }
+              : record);
+          addComposerDraftThreadContexts(threadDraftTarget, [imported], {
             appendReference: false,
           });
-          rewritten.set(record.contextId, record.contextId);
+          rewritten.set(record.contextId, imported.contextId);
           break;
         }
         case "environment": {

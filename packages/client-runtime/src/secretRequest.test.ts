@@ -6,7 +6,6 @@ import {
   TurnItemId,
 } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
-import { createI18n } from "@t3tools/client-runtime/i18n";
 
 import {
   secretRequestAnswerInput,
@@ -19,12 +18,11 @@ import {
 
 describe("secretRequestDisplay", () => {
   it("never offers the form for a request inherited from another thread", () => {
-    const t = createI18n("en").getFixedT("en", "chat");
-    expect(secretRequestDisplay({ secretStatus: "pending" }, "inherited", t)).toEqual({
+    expect(secretRequestDisplay({ secretStatus: "pending" }, "inherited")).toEqual({
       kind: "pending-elsewhere",
       label: "Waiting for an answer in the original thread",
     });
-    expect(secretRequestDisplay({ secretStatus: "saved" }, "inherited", t)).toMatchObject({
+    expect(secretRequestDisplay({ secretStatus: "saved" }, "inherited")).toMatchObject({
       outcome: "saved",
     });
   });
@@ -32,12 +30,8 @@ describe("secretRequestDisplay", () => {
 
 describe("secretRequestPrivacyNote", () => {
   it("does not promise to hide a value that the agent's commands can read", () => {
-    const t = createI18n("en").getFixedT("en", "chat");
-    expect(secretRequestPrivacyNote({}, t)).toBe("Stored securely, never shown to the agent");
-    expect(secretRequestPrivacyNote({ delivery: "file" }, t)).not.toContain("never shown");
-    const de = createI18n("de").getFixedT("de", "chat");
-    expect(secretRequestPrivacyNote({ delivery: "file" }, de)).toContain("24 Stunden");
-    expect(secretRequestPrivacyNote({ delivery: "file" }, de)).not.toContain("nie angezeigt");
+    expect(secretRequestPrivacyNote({})).toBe("Stored securely, never shown to the agent");
+    expect(secretRequestPrivacyNote({ delivery: "file" })).not.toContain("never shown");
   });
 });
 
@@ -85,16 +79,13 @@ describe("secretRequestLink", () => {
 
 describe("secretRequestFailureMessage", () => {
   it("passes through server errors but hides anything that could echo the payload", () => {
-    const t = createI18n("en").getFixedT("en", "chat");
     expect(
-      secretRequestFailureMessage(new SecretRequestError({ reason: "already_answered" }), t),
+      secretRequestFailureMessage(new SecretRequestError({ reason: "already_answered" })),
     ).toBe("This secret request was already answered.");
-    expect(secretRequestFailureMessage(new Error('Expected string, got "whsec_1"'), t)).toBe(
+    expect(secretRequestFailureMessage(new Error('Expected string, got "whsec_1"'))).toBe(
       "Could not answer the request. Try again.",
     );
-    expect(secretRequestFailureMessage(undefined, t)).toBe(
-      "Could not answer the request. Try again.",
-    );
+    expect(secretRequestFailureMessage(undefined)).toBe("Could not answer the request. Try again.");
   });
 });
 

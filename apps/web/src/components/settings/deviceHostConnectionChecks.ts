@@ -1,4 +1,4 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import {
   type DeviceHostSummary,
   type DevicePlatformAvailability,
@@ -6,6 +6,9 @@ import {
   SshDeviceHostConfig,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
+import { msg } from "gt-react";
+
+import { m } from "../../i18n/messages";
 
 export interface DeviceHostCheckTarget {
   environmentId: EnvironmentId;
@@ -20,27 +23,7 @@ export type DeviceHostCheck =
       platforms: ReadonlyArray<DevicePlatformAvailability>;
       tools?: DeviceHostSummary["tools"];
     }
-  | {
-      status: "failed";
-      error: { kind: "disconnected" | "permission" } | { kind: "diagnostic"; message: string };
-    };
-
-export class DeviceHostAccessError extends Schema.TaggedError<DeviceHostAccessError>()(
-  "DeviceHostAccessError",
-  {},
-) {}
-
-const isDeviceHostAccessError = Schema.is(DeviceHostAccessError);
-
-export function deviceHostCheckError(
-  error: Extract<DeviceHostCheck, { status: "failed" }>["error"],
-  t: TFunction<"settings">,
-): string {
-  if (error.kind === "diagnostic") return error.message;
-  return error.kind === "disconnected"
-    ? t(($) => $.providers.environmentDisconnected)
-    : t(($) => $.providers.cannotTestHosts);
-}
+  | { status: "failed"; error: string };
 
 const decodeDeviceHostDraft = Schema.decodeUnknownOption(SshDeviceHostConfig);
 
@@ -66,10 +49,7 @@ export async function checkDeviceHostConnections(
     targets.map(async (target) => {
       report(target.environmentId, { status: "pending" });
       try {
-        if (!target.connected) {
-          report(target.environmentId, { status: "failed", error: { kind: "disconnected" } });
-          return;
-        }
+        if (!target.connected) throw new Error(m(msg("Environment disconnected")));
         const result = await probe(target.environmentId, host);
         report(
           target.environmentId,
@@ -84,12 +64,10 @@ export async function checkDeviceHostConnections(
       } catch (error) {
         report(target.environmentId, {
           status: "failed",
-          error: isDeviceHostAccessError(error)
-            ? { kind: "permission" }
-            : {
-                kind: "diagnostic",
-                message: error instanceof Error ? error.message : String(error),
-              },
+          error:
+            error instanceof Error
+              ? (thrownErrorMessage(error, m) ?? error.message)
+              : String(error),
         });
       }
     }),

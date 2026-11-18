@@ -15,8 +15,8 @@ import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 import { PlusIcon } from "lucide-react";
+import { T, useGT, useMessages, Var } from "gt-react";
 import { useId, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
 
 import { requestConfirmDialog } from "~/confirmDialog";
 import { mintPairingCodeOn } from "~/state/peerPairingCode";
@@ -24,7 +24,7 @@ import { peerLinkEnvironment, useLinkableMachines } from "~/state/peerLinks";
 import { useEnvironmentQuery } from "~/state/query";
 import { useEnvironmentScope, usePreparedConnection } from "~/state/session";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { getAccessConfig } from "../auth/ConnectAgentSurface";
+import { accessConfig } from "../auth/ConnectAgentSurface";
 import { ConnectionStatusDot } from "../ConnectionStatusDot";
 import { Button } from "../ui/button";
 import {
@@ -44,8 +44,14 @@ import { ITEM_ROW_CLASSNAME, ITEM_ROW_INNER_CLASSNAME } from "./itemRows";
 import { LinkAccessPicker } from "./LinkAccessPicker";
 import { LinkAddressWarning, LinkMachineSelect } from "./LinkMachineSelect";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
+import { useLiveRefresh } from "../../hooks/useLiveRefresh";
+import { m as resolveMessage } from "../../i18n/messages";
 import { useNowMinute } from "../../hooks/useNowMinute";
-import { searchableSetting } from "./settingsSearch";
+import { useSearchableSetting } from "./settingsSearch";
+
+// Console log labels for the atom commands.
+const UNLINK_COMMAND_LABEL = "unlink environment";
+const LINK_COMMAND_LABEL = "link environment";
 
 const failureToast = (title: string, description: string) =>
   toastManager.add(stackedThreadToast({ type: "error", title, description }));
@@ -59,11 +65,27 @@ export function LinkedEnvironmentsSettings({
   readonly environmentLabel: string | null;
   readonly isSearchTarget: boolean;
 }) {
-  const { t } = useTranslation("connect");
-  const { t: tSettings } = useTranslation("settings");
-  const links = useEnvironmentQuery(peerLinkEnvironment.list({ environmentId, input: {} }));
+  const searchableSetting = useSearchableSetting();
+  const gt = useGT();
+  const links = useEnvironmentQuery(
+    peerLinkEnvironment.list({ environmentId, input: {} }),
+    useMessages(),
+  );
+  // Links made outside this client bump nothing the shared list reads, so showing the panel
+  // asks again. Listing probes every linked environment, too costly for a timer nobody asked for.
+  // A list still loading counts as read now, so the next return to the window asks again.
+  useLiveRefresh(
+    () => {
+      if (!links.isPending) links.refresh();
+    },
+    {
+      key: `linked-environments:${environmentId}`,
+      intervalMs: null,
+      refreshOnShow: true,
+    },
+  );
   const canLink = useAtomValue(peerLinkEnvironment.link.permissionAtom(environmentId));
-  const search = searchableSetting("linked-environments", tSettings);
+  const search = searchableSetting("linked-environments");
   return (
     <SettingsSection
       {...(isSearchTarget ? { id: search.id } : {})}
@@ -71,13 +93,15 @@ export function LinkedEnvironmentsSettings({
       headerAction={canLink ? <LinkEnvironmentAction environmentId={environmentId} /> : null}
     >
       {links.error ? (
-        <SettingsRow title={t(($) => $.links.loadFailed)} description={links.error} />
+        <SettingsRow title={gt("Could not load linked environments")} description={links.error} />
       ) : !links.data ? (
-        <SettingsRow title={t(($) => $.links.loading)} role="status" />
+        <SettingsRow title={gt("Loading linked environments…")} role="status" />
       ) : links.data.links.length === 0 ? (
         <SettingsRow
-          title={t(($) => $.links.empty)}
-          description={t(($) => $.links.emptyDescription)}
+          title={gt("No linked environments")}
+          description={gt(
+            "Link another machine running T3 Code, such as a VPS, so agents here can launch and drive threads there.",
+          )}
         />
       ) : (
         links.data.links.map((link) => (
@@ -99,16 +123,19 @@ function LinkedEnvironmentRow({
   readonly environmentId: EnvironmentId;
   readonly link: PeerLinkSummary;
 }) {
-  const { t } = useTranslation("connect");
-  const { t: tChat } = useTranslation("chat");
+  const gt = useGT();
+  const m = useMessages();
   const nowMinute = useNowMinute();
   const health = peerLinkHealth(link, DateTime.makeUnsafe(nowMinute));
-  const unlink = useAtomCommand(peerLinkEnvironment.unlink, { label: "unlink environment" });
+  const unlink = useAtomCommand(peerLinkEnvironment.unlink, { label: UNLINK_COMMAND_LABEL });
   const canUnlink = useAtomValue(peerLinkEnvironment.unlink.permissionAtom(environmentId));
   const [busy, setBusy] = useState(false);
   const forget = async () => {
     const confirmed = await (requestConfirmDialog(
-      t(($) => $.links.forgetConfirm, { environment: link.label }),
+      gt(
+        "Forget {label}? Agents here stop working there. Revoke \"T3 Code · …\" in {label}''s Sharing & access to end the session there too.",
+        { label: link.label },
+      ),
       { variant: "destructive" },
     ) ?? Promise.resolve(false));
     if (!confirmed) return;
@@ -116,22 +143,22 @@ function LinkedEnvironmentRow({
     const result = await unlink({ environmentId, input: { environmentId: link.environmentId } });
     setBusy(false);
     if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
-      failureToast(
-        t(($) => $.links.forgetFailed),
-        String(squashAtomCommandFailure(result)),
-      );
+      failureToast(gt("Could not forget the link"), String(squashAtomCommandFailure(result)));
     }
   };
   const status =
     health.kind === "expired"
-      ? t(($) => $.links.expired)
+      ? gt("Expired. Link it again with a new pairing code.")
       : health.kind === "unreachable"
-        ? (health.detail ?? t(($) => $.links.unreachable))
+        ? (health.detail ?? gt("Not answering right now."))
         : health.kind === "failing"
           ? health.detail
           : health.expiresInDays !== null
-            ? t(($) => $.links.expires, { count: health.expiresInDays })
-            : t(($) => $.links.reachable);
+            ? gt(
+                "{days, plural, one {Expires in {days} day. Link it again to renew.} other {Expires in {days} days. Link it again to renew.}}",
+                { days: health.expiresInDays },
+              )
+            : gt("Reachable");
   return (
     <div className={ITEM_ROW_CLASSNAME}>
       <div className={ITEM_ROW_INNER_CLASSNAME}>
@@ -153,7 +180,7 @@ function LinkedEnvironmentRow({
             <h3 className="text-sm font-medium text-foreground">{link.label}</h3>
           </div>
           <p className="text-xs text-muted-foreground">
-            {getAccessConfig(t, tChat)[link.access].label} · {status}
+            {m(accessConfig[link.access].label)} · {status}
           </p>
           <p className="truncate text-xs text-muted-foreground/80">{link.urls.join(", ")}</p>
         </div>
@@ -165,7 +192,7 @@ function LinkedEnvironmentRow({
               disabled={busy}
               onClick={() => void forget()}
             >
-              {busy ? t(($) => $.links.forgetting) : t(($) => $.links.forget)}
+              {busy ? gt("Forgetting…") : gt("Forget")}
             </Button>
           </div>
         ) : null}
@@ -175,8 +202,7 @@ function LinkedEnvironmentRow({
 }
 
 function LinkEnvironmentAction({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const { t } = useTranslation("connect");
-  const { t: tChat } = useTranslation("chat");
+  const gt = useGT();
   const [open, setOpen] = useState(false);
   const machines = useLinkableMachines(environmentId, open);
   // Null until the user picks; with no other machines known, only an address is left.
@@ -190,7 +216,7 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
   // Enter then a click can both run before a re-render; this guard is synchronous.
   const inFlight = useRef(false);
   const formId = useId();
-  const link = useAtomCommand(peerLinkEnvironment.link, { label: "link environment" });
+  const link = useAtomCommand(peerLinkEnvironment.link, { label: LINK_COMMAND_LABEL });
   const selected = choice ?? (machines.length === 0 ? ANOTHER_ADDRESS : null);
   const machine = machines.find((candidate) => candidate.environmentId === selected) ?? null;
   const targetId = machine?.environmentId ?? null;
@@ -228,8 +254,8 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
     if (Result.isSuccess(minted)) return minted.success;
     setMintFailed((failed) => new Set(failed).add(targetId));
     failureToast(
-      t(($) => $.links.failed),
-      linkRequestFailureMessage(minted.failure, tChat),
+      gt("Could not link the environment"),
+      linkRequestFailureMessage(minted.failure, resolveMessage),
     );
     return null;
   };
@@ -262,14 +288,11 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
     if (result._tag === "Success") {
       toastManager.add({
         type: "success",
-        title: t(($) => $.links.linked, { environment: result.value.label }),
+        title: gt("Linked {label}", { label: result.value.label }),
       });
       handleOpenChange(false);
     } else if (!isAtomCommandInterrupted(result)) {
-      failureToast(
-        t(($) => $.links.failed),
-        String(squashAtomCommandFailure(result)),
-      );
+      failureToast(gt("Could not link the environment"), String(squashAtomCommandFailure(result)));
     }
   };
   return (
@@ -284,14 +307,21 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
         render={
           <Button size="xs" variant="default">
             <PlusIcon className="size-3" />
-            {t(($) => $.links.link)}
+            {gt("Link", { $context: "verb, links an environment" })}
           </Button>
         }
       />
       <DialogPopup className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{t(($) => $.links.title)}</DialogTitle>
-          <DialogDescription>{t(($) => $.links.description)}</DialogDescription>
+          <DialogTitle>
+            <T>Link an environment</T>
+          </DialogTitle>
+          <DialogDescription>
+            <T>
+              Agents here can then launch, message and wait on threads there. It appears under
+              Authorized clients in that environment's Sharing & access, where it can be revoked.
+            </T>
+          </DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <form
@@ -312,12 +342,14 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
               />
             ) : null}
             {machine?.linked ? (
-              <p className="text-xs text-muted-foreground">{t(($) => $.links.renew)}</p>
+              <p className="text-xs text-muted-foreground">
+                <T>Already linked. Linking again renews it with the access you pick.</T>
+              </p>
             ) : null}
             {needsAddress ? (
               <label className="block space-y-1.5">
                 <span className="block text-xs font-medium text-foreground">
-                  {t(($) => $.links.address)}
+                  <T>Address</T>
                 </span>
                 <Input
                   value={address}
@@ -334,7 +366,10 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
                 />
                 {machine !== null ? (
                   <span className="block text-xs text-muted-foreground">
-                    {t(($) => $.links.addressDescription, { environment: machine.label })}
+                    <T>
+                      This app has no address for <Var>{machine.label}</Var> that another machine
+                      can reach. Enter its https or Tailscale address.
+                    </T>
                   </span>
                 ) : null}
               </label>
@@ -343,15 +378,15 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
             {selected === null || canMint ? null : (
               <label className="block space-y-1.5">
                 <span className="block text-xs font-medium text-foreground">
-                  {t(($) => $.agent.pairingCode)}
+                  <T>Pairing code</T>
                 </span>
                 <Input
                   value={pairingCode}
                   onChange={(event) => setPairingCode(event.target.value)}
                   placeholder={
                     machine === null
-                      ? t(($) => $.links.codeFromEnvironment)
-                      : t(($) => $.links.pasteCode)
+                      ? gt("From Sharing & access there, or t3 pair")
+                      : gt("Paste the code")
                   }
                   disabled={busy}
                   autoComplete="one-time-code"
@@ -360,7 +395,10 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
                 />
                 {machine !== null ? (
                   <span className="block text-xs text-muted-foreground">
-                    {t(($) => $.links.createCode, { environment: machine.label })}
+                    <T>
+                      Create a link on <Var>{machine.label}</Var>: Settings → Sharing & access →
+                      Authorized clients → Create link, then paste its code here.
+                    </T>
                   </span>
                 ) : null}
               </label>
@@ -370,10 +408,10 @@ function LinkEnvironmentAction({ environmentId }: { readonly environmentId: Envi
         </DialogPanel>
         <DialogFooter variant="bare">
           <DialogClose disabled={busy} render={<Button variant="outline" type="button" />}>
-            {t(($) => $.actions.cancel)}
+            <T>Cancel</T>
           </DialogClose>
           <Button form={formId} type="submit" disabled={busy || !ready}>
-            {busy ? t(($) => $.links.linking) : t(($) => $.links.link)}
+            {busy ? gt("Linking…") : gt("Link", { $context: "verb, links an environment" })}
           </Button>
         </DialogFooter>
       </DialogPopup>

@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { assert, describe, expect, it } from "vite-plus/test";
 import type { ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import {
@@ -19,8 +18,6 @@ import {
   whenAstToExpression,
 } from "./KeybindingsSettings.logic";
 
-const t = createI18n("en").getFixedT(null, "settings");
-
 describe("KeybindingsSettings.logic", () => {
   it("keeps sibling row identities when a saved binding moves to the end", () => {
     const bindings = compileResolvedKeybindingsConfig([
@@ -28,14 +25,11 @@ describe("KeybindingsSettings.logic", () => {
       { command: "terminal.toggle", key: "mod+j" },
       { command: "terminal.toggle", key: "mod+k", when: "terminalFocus" },
     ]);
-    const before = buildKeybindingRows(bindings, t);
-    const after = buildKeybindingRows(
-      [
-        ...bindings.slice(1),
-        ...compileResolvedKeybindingsConfig([{ command: "chat.new", key: "mod+shift+n" }]),
-      ],
-      t,
-    );
+    const before = buildKeybindingRows(bindings);
+    const after = buildKeybindingRows([
+      ...bindings.slice(1),
+      ...compileResolvedKeybindingsConfig([{ command: "chat.new", key: "mod+shift+n" }]),
+    ]);
 
     expect(after.filter((row) => row.command === "terminal.toggle").map((row) => row.id)).toEqual(
       before.filter((row) => row.command === "terminal.toggle").map((row) => row.id),
@@ -53,7 +47,7 @@ describe("KeybindingsSettings.logic", () => {
       { command: "terminal.toggle", key: "mod+j", when: "terminalFocus" },
       { command: "chat.new", key: "mod+esc", when: "terminalFocus" },
     ]);
-    const rows = buildKeybindingRows(bindings, t);
+    const rows = buildKeybindingRows(bindings);
     expect(rows.map(({ command, key, when }) => ({ command, key, when }))).toEqual([
       { command: "chat.new", key: "mod+esc", when: "terminalFocus" },
       { command: "terminal.toggle", key: "mod+esc", when: "terminalFocus" },
@@ -62,7 +56,7 @@ describe("KeybindingsSettings.logic", () => {
     ]);
     expect(new Set(rows.map((row) => row.id)).size).toBe(4);
     expect(rows.find((row) => row.command === "chat.new")?.conflicts).toEqual(["Terminal: Toggle"]);
-    expect(buildKeybindingRows(bindings.slice(1), t).map((row) => row.id)).toEqual(
+    expect(buildKeybindingRows(bindings.slice(1)).map((row) => row.id)).toEqual(
       rows.map((row) => row.id),
     );
   });
@@ -198,9 +192,7 @@ describe("KeybindingsSettings.logic", () => {
       }),
     ).toBe("editorFocus && !terminalFocus");
 
-    expect(
-      parseWhenExpressionDraft("editorFocus && (!terminalFocus || modelPickerOpen)", t),
-    ).toEqual({
+    expect(parseWhenExpressionDraft("editorFocus && (!terminalFocus || modelPickerOpen)")).toEqual({
       ok: true,
       value: {
         type: "and",
@@ -215,16 +207,16 @@ describe("KeybindingsSettings.logic", () => {
         },
       },
     });
-    const previewOpenDraft = parseWhenExpressionDraft("previewOpen && !previewFocus", t);
+    const previewOpenDraft = parseWhenExpressionDraft("previewOpen && !previewFocus");
     assert(previewOpenDraft.ok);
     expect(unknownWhenVariables(previewOpenDraft.value)).toEqual([]);
     expect(buildWhenVariableOptions()).toContain("previewOpen");
-    expect(parseWhenExpressionDraft("editorFocus &&", t)).toEqual({
+    expect(parseWhenExpressionDraft("editorFocus &&")).toEqual({
       ok: false,
       message: "Use variables with !, &&, ||, and parentheses.",
     });
 
-    expect(parseWhenExpressionDraft("!(terminalFocus || modelPickerOpen)", t)).toEqual({
+    expect(parseWhenExpressionDraft("!(terminalFocus || modelPickerOpen)")).toEqual({
       ok: true,
       value: {
         type: "not",
@@ -238,53 +230,52 @@ describe("KeybindingsSettings.logic", () => {
   });
 
   it("reports conflicting shortcuts that share an active when context", () => {
-    const rows = buildKeybindingRows(
-      [
-        {
-          command: "chat.new",
-          shortcut: {
-            key: "n",
-            modKey: true,
-            metaKey: false,
-            ctrlKey: false,
-            altKey: false,
-            shiftKey: false,
-          },
-          whenAst: {
-            type: "not",
-            node: { type: "identifier", name: "terminalFocus" },
-          },
+    const rows = buildKeybindingRows([
+      {
+        command: "chat.new",
+        shortcut: {
+          key: "n",
+          modKey: true,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
         },
-        {
-          command: "chat.newLocal",
-          shortcut: {
-            key: "n",
-            modKey: true,
-            metaKey: false,
-            ctrlKey: false,
-            altKey: false,
-            shiftKey: false,
-          },
-          whenAst: {
-            type: "not",
-            node: { type: "identifier", name: "terminalFocus" },
-          },
+        whenAst: {
+          type: "not",
+          node: { type: "identifier", name: "terminalFocus" },
         },
-      ] satisfies ResolvedKeybindingsConfig,
-      t,
-    );
+      },
+      {
+        command: "chat.newLocal",
+        shortcut: {
+          key: "n",
+          modKey: true,
+          metaKey: false,
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+        },
+        whenAst: {
+          type: "not",
+          node: { type: "identifier", name: "terminalFocus" },
+        },
+      },
+    ] satisfies ResolvedKeybindingsConfig);
 
     expect(rows[0]?.conflicts).toEqual(["Chat: New Local"]);
+    const disabledRows = buildKeybindingRows([
+      rows[0]!.binding,
+      { ...rows[1]!.binding, whenAst: { type: "identifier", name: "false" } },
+    ]);
+    expect(disabledRows.map((row) => row.conflicts)).toEqual([[], []]);
+
     expect(
-      keybindingConflictLabels(
-        rows,
-        {
-          rowId: rows[0]?.id ?? "",
-          key: "mod+n",
-          when: "",
-        },
-        t,
-      ),
+      keybindingConflictLabels(rows, {
+        rowId: rows[0]?.id ?? "",
+        key: "mod+n",
+        when: "",
+      }),
     ).toEqual(["Chat: New Local"]);
   });
 
@@ -299,7 +290,6 @@ describe("KeybindingsSettings.logic", () => {
         { command: "chat.newLocal", key: "ctrl+k" },
         { command: "thread.copyReference", key: "meta+k" },
       ]),
-      t,
       expected.platform,
     );
     const conflictsFor = (key: string) => rows.find((row) => row.key === key)?.conflicts;
@@ -307,12 +297,7 @@ describe("KeybindingsSettings.logic", () => {
     expect(conflictsFor("ctrl+k")).toEqual(expected.ctrl);
     expect(conflictsFor("meta+k")).toEqual(expected.meta);
     expect(
-      keybindingConflictLabels(
-        rows,
-        { rowId: "new", key: "ctrl+k", when: "" },
-        t,
-        expected.platform,
-      ),
+      keybindingConflictLabels(rows, { rowId: "new", key: "ctrl+k", when: "" }, expected.platform),
     ).toEqual(["Chat: New Local", ...expected.ctrl].toSorted());
   });
 
@@ -322,7 +307,6 @@ describe("KeybindingsSettings.logic", () => {
         { command: "chat.new", key: "mod+k", when: "!terminalFocus" },
         { command: "chat.newLocal", key: "ctrl+k", when: "terminalFocus" },
       ]),
-      t,
       "Linux x86_64",
     );
 

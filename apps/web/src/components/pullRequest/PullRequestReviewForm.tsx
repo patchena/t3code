@@ -1,54 +1,60 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { useTranslation } from "react-i18next";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { capitalizeTerm } from "@t3tools/client-runtime/source-control-clients";
 import type { EnvironmentId, PullRequestRef, PullRequestReviewVerdict } from "@t3tools/contracts";
 import { CheckIcon, MessageSquareIcon, XCircleIcon } from "lucide-react";
+import { msg, useGT, useMessages } from "gt-react";
 import { useEffect, useState, type ReactNode, type RefObject } from "react";
+
+import { m } from "~/i18n/messages";
 
 import { TextFieldSpeechControls, useTextFieldSpeech } from "~/speech/useTextFieldSpeech";
 import { pullRequestEnvironment } from "~/state/pullRequests";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 
-import { isCommentSubmitShortcut } from "~/components/diffs/commentSubmitShortcut";
-import { Button } from "~/components/ui/button";
-import { Select, SelectItem, SelectPopup, SelectTrigger } from "~/components/ui/select";
-import { toastManager } from "~/components/ui/toast";
-import { readableFailure } from "~/components/pullRequest/pullRequestDetail.logic";
+import { isCommentSubmitShortcut } from "../diffs/commentSubmitShortcut";
+import { Button } from "../ui/button";
+import { Select, SelectItem, SelectPopup, SelectTrigger } from "../ui/select";
+import { toastManager } from "../ui/toast";
+import { readableFailure } from "./pullRequestDetail.logic";
 import {
   pullRequestReviewKey,
   usePendingReviewComments,
   usePullRequestReviewStore,
-} from "~/components/pullRequest/pullRequestReviewStore";
+} from "./pullRequestReviewStore";
 import {
   PullRequestMarkdownTextarea,
   type PullRequestCompletionScope,
-} from "~/components/pullRequest/PullRequestMarkdownTextarea";
+} from "./PullRequestMarkdownTextarea";
 
-const VERDICTS = (
-  t: TFunction<"workspace">,
-): ReadonlyArray<{
+import type { ChangeRequestTermKind } from "./changeRequestTerm";
+
+const VERDICTS: ReadonlyArray<{
   readonly value: PullRequestReviewVerdict;
   readonly label: string;
-  readonly sent: (term: string) => string;
+  readonly sent: (term: ChangeRequestTermKind) => string;
   readonly icon: ReactNode;
-}> => [
+}> = [
   {
     value: "comment",
-    label: t(($) => $.git.comment),
-    sent: () => t(($) => $.git.reviewSubmitted),
+    label: msg("Comment", { $context: "review verdict" }),
+    sent: () => m(msg("Review submitted")),
     icon: <MessageSquareIcon className="size-3" />,
   },
   {
     value: "approve",
-    label: t(($) => $.git.approve),
-    sent: (term) => t(($) => $.git.requestApproved, { term: capitalizeTerm(term) }),
+    label: msg("Approve", { $context: "review verdict" }),
+    sent: (term) =>
+      m(
+        msg(
+          "{term, select, mr {Merge request} cr {Change request} other {Pull request}} approved",
+          { term },
+        ),
+      ),
     icon: <CheckIcon className="size-3" />,
   },
   {
     value: "request-changes",
-    label: t(($) => $.git.requestChanges),
-    sent: () => t(($) => $.git.changesRequested),
+    label: msg("Request changes"),
+    sent: () => m(msg("Changes requested")),
     icon: <XCircleIcon className="size-3" />,
   },
 ];
@@ -71,8 +77,7 @@ export function PullRequestReviewForm({
   active: boolean;
   reference: PullRequestRef;
   completionScope: PullRequestCompletionScope | null;
-  /** The host's word for a change request, as in "pull request". */
-  term: string;
+  term: ChangeRequestTermKind;
   verdicts: ReadonlyArray<PullRequestReviewVerdict>;
   requestChangesSummaryRequired: boolean;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
@@ -80,7 +85,8 @@ export function PullRequestReviewForm({
   onPendingChange: (pending: boolean) => void;
   onSubmitted: () => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
+  const resolve = useMessages();
   const [requestedVerdict, setRequestedVerdict] = useState<PullRequestReviewVerdict>("comment");
   const comments = usePendingReviewComments(reference);
   const reviewKey = pullRequestReviewKey(reference);
@@ -106,11 +112,11 @@ export function PullRequestReviewForm({
     reportFailure: false,
   });
 
-  const offered = VERDICTS(t).filter((verdict) => verdicts.includes(verdict.value));
+  const offered = VERDICTS.filter((verdict) => verdicts.includes(verdict.value));
   const selectedVerdict =
     offered.find((verdict) => verdict.value === requestedVerdict) ?? offered[0];
 
-  const submit = async (verdict: ReturnType<typeof VERDICTS>[number], text: string) => {
+  const submit = async (verdict: (typeof VERDICTS)[number], text: string) => {
     const submittedComments = usePullRequestReviewStore.getState().drafts[reviewKey] ?? [];
     if (pending || !canSubmit(verdict.value, text, submittedComments.length)) return;
     const submittedBody = text;
@@ -128,10 +134,10 @@ export function PullRequestReviewForm({
     if (result._tag === "Failure") {
       toastManager.add({
         type: "error",
-        title: t(($) => $.git.submitReviewFailed),
+        title: m(msg("The review could not be submitted")),
         description: readableFailure(
           squashAtomCommandFailure(result),
-          t(($) => $.git.reviewRefused),
+          m(msg("The host refused the review. Your draft is still here to try again.")),
         ),
       });
       return;
@@ -153,10 +159,10 @@ export function PullRequestReviewForm({
       : verdict === "approve" || summary.trim().length > 0 || commentCount > 0;
   const placeholder =
     selectedVerdict === undefined || canSubmit(selectedVerdict.value, "", comments.length)
-      ? t(($) => $.git.reviewSummaryOptional)
+      ? gt("Summarize your review (optional)")
       : selectedVerdict.value === "request-changes" && requestChangesSummaryRequired
-        ? t(($) => $.git.reviewSummaryRequired)
-        : t(($) => $.git.reviewSummaryOrComments);
+        ? gt("Summarize your review (required to request changes)")
+        : gt("Summarize your review or add line comments");
 
   return (
     <>
@@ -167,7 +173,7 @@ export function PullRequestReviewForm({
         readOnly={speech.freezesEditor}
         value={body}
         placeholder={placeholder}
-        aria-label={t(($) => $.git.reviewSummary)}
+        aria-label={gt("Review summary")}
         onValueChange={(next) => setSummary(reviewKey, next)}
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing || event.keyCode === 229 || event.repeat) return;
@@ -191,14 +197,10 @@ export function PullRequestReviewForm({
               if (value !== null) setRequestedVerdict(value);
             }}
           >
-            <SelectTrigger
-              size="xs"
-              className="w-auto min-w-0"
-              aria-label={t(($) => $.git.reviewVerdict)}
-            >
+            <SelectTrigger size="xs" className="w-auto min-w-0" aria-label={gt("Review verdict")}>
               <span className="flex items-center gap-1.5">
                 {selectedVerdict?.icon}
-                {selectedVerdict?.label}
+                {selectedVerdict ? resolve(selectedVerdict.label) : null}
               </span>
             </SelectTrigger>
             <SelectPopup side="top" alignItemWithTrigger={false}>
@@ -206,7 +208,7 @@ export function PullRequestReviewForm({
                 <SelectItem key={verdict.value} value={verdict.value}>
                   <span className="flex items-center gap-1.5">
                     {verdict.icon}
-                    {verdict.label}
+                    {resolve(verdict.label)}
                   </span>
                 </SelectItem>
               ))}
@@ -226,7 +228,7 @@ export function PullRequestReviewForm({
               speech.submitAfterDictation((text) => void submit(selectedVerdict, text));
           }}
         >
-          {pending ? t(($) => $.git.submitting) : t(($) => $.git.submitReview)}
+          {pending ? gt("Submitting...") : gt("Submit review")}
         </Button>
       </div>
     </>

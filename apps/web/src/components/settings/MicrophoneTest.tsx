@@ -1,15 +1,18 @@
+import { errorDisplayMessage } from "@t3tools/client-runtime/errors";
+import { m } from "~/i18n/messages";
+import { MICROPHONE_PERMISSION_ERROR } from "@t3tools/client-runtime/voice-input";
 import { MicIcon, PauseIcon, PlayIcon, RotateCcwIcon, SquareIcon, XIcon } from "lucide-react";
+import { T, useGT, useMessages } from "gt-react";
 import { useEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
 
 import { useStableCallback } from "~/hooks/useStableCallback";
-import { openMicrophone } from "../../speech/browserPcmCapture";
+import { requestMicrophone } from "../../speech/requestMicrophone";
 import workletUrl from "../../speech/pcmWorklet.ts?worker&url";
 import { VoiceWaveform } from "../chat/VoiceInputPill";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { SettingsRow } from "./settingsLayout";
-import { searchableSetting } from "./settingsSearch";
+import { useSearchableSetting } from "./settingsSearch";
 
 const LOOPBACK_SECONDS = 10;
 const formatTime = (seconds: number) =>
@@ -38,8 +41,9 @@ export function MicrophoneTest({
   /** Labels and device ids become readable once the browser grants access. */
   onMicrophoneAccess: () => void;
 }) {
-  const { t } = useTranslation("voice");
-  const { t: tSettings } = useTranslation("settings");
+  const searchableSetting = useSearchableSetting();
+  const gt = useGT();
+  const messages = useMessages();
   const [phase, setPhase] = useState<"idle" | "starting" | "recording" | "ready">("idle");
   const [recording, setRecording] = useState<{ url: string; duration: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -87,14 +91,16 @@ export function MicrophoneTest({
       typeof MediaRecorder === "undefined" ||
       typeof AudioWorkletNode === "undefined"
     ) {
-      setError(t(($) => $.microphone.testUnavailable));
+      setError(
+        gt("Microphone testing is unavailable in this browser. Use HTTPS or the desktop app."),
+      );
       setPhase("idle");
       return;
     }
     const current: Capture = {};
     capture.current = current;
     try {
-      const stream = await openMicrophone(microphoneId);
+      const stream = await requestMicrophone(microphoneId);
       if (capture.current !== current) {
         stream.getTracks().forEach((track) => track.stop());
         return;
@@ -115,7 +121,7 @@ export function MicrophoneTest({
         releaseCapture();
         setLevel(0);
         if (!blob.size) {
-          setError(t(($) => $.microphone.noAudio));
+          setError(gt("No audio was recorded. Try again."));
           setPhase("idle");
           return;
         }
@@ -127,7 +133,7 @@ export function MicrophoneTest({
         if (capture.current !== current) return;
         releaseCapture();
         setLevel(0);
-        setError(t(($) => $.microphone.recordFailed));
+        setError(gt("Could not record microphone audio. Try again."));
         setPhase("idle");
       };
       recorder.addEventListener("error", onRecordingError);
@@ -136,7 +142,7 @@ export function MicrophoneTest({
           "ended",
           () => {
             if (capture.current !== current) return;
-            setError(t(($) => $.errors.disconnected));
+            setError(gt("The microphone disconnected."));
             if (recorder.state !== "inactive") recorder.stop();
           },
           { once: true },
@@ -177,12 +183,12 @@ export function MicrophoneTest({
       const name = typeof cause === "object" && cause !== null && "name" in cause && cause.name;
       setError(
         name === "NotAllowedError"
-          ? t(($) => $.errors.microphonePermission)
+          ? messages(MICROPHONE_PERMISSION_ERROR)
           : name === "NotFoundError"
-            ? t(($) => $.microphone.notFound)
+            ? gt("No microphone found.")
             : cause instanceof Error
-              ? cause.message
-              : t(($) => $.microphone.accessFailed),
+              ? (errorDisplayMessage(cause, m) ?? cause.message)
+              : gt("Could not access the microphone."),
       );
     }
   };
@@ -197,7 +203,7 @@ export function MicrophoneTest({
       <Button
         size="sm"
         variant="outline"
-        aria-label={t(($) => $.microphone.stopRecording)}
+        aria-label={gt("Stop recording")}
         disabled={phase !== "recording"}
         onClick={() => {
           const recorder = capture.current?.recorder;
@@ -205,12 +211,12 @@ export function MicrophoneTest({
         }}
       >
         <SquareIcon />
-        {t(($) => $.microphone.stop)}
+        <T>Stop</T>
       </Button>
     ) : (
       <Button size="sm" variant="outline" onClick={() => void start()}>
         {phase === "ready" ? <RotateCcwIcon /> : <MicIcon />}
-        {phase === "ready" ? t(($) => $.input.recordAgain) : t(($) => $.microphone.record)}
+        {phase === "ready" ? gt("Record again") : gt("Record")}
       </Button>
     );
   const panel = error ? (
@@ -219,7 +225,7 @@ export function MicrophoneTest({
     </p>
   ) : phase === "starting" ? (
     <span role="status" className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-      {t(($) => $.microphone.opening)}
+      <T>Opening microphone…</T>
     </span>
   ) : phase === "recording" ? (
     <>
@@ -229,12 +235,12 @@ export function MicrophoneTest({
       </div>
       <span
         className="ms-auto shrink-0 text-xs tabular-nums text-muted-foreground"
-        aria-label={t(($) => $.microphone.recordingTime)}
+        aria-label={gt("Recording time")}
       >
         {formatTime(elapsed)} / {formatTime(LOOPBACK_SECONDS)}
       </span>
       <meter
-        aria-label={t(($) => $.microphone.inputLevel)}
+        aria-label={gt("Microphone input level")}
         min={0}
         max={1}
         value={level}
@@ -247,9 +253,9 @@ export function MicrophoneTest({
 
   return (
     <SettingsRow
-      {...searchableSetting("microphone-test", tSettings)}
-      title={t(($) => $.microphone.test)}
-      description={t(($) => $.microphone.testDescription)}
+      {...searchableSetting("microphone-test")}
+      title={gt("Test microphone")}
+      description={gt("Record ten seconds and play it back. The audio stays on this device.")}
       control={control}
     >
       {panel ? (
@@ -263,9 +269,7 @@ export function MicrophoneTest({
           <Button
             size="icon-sm"
             variant="ghost-muted"
-            aria-label={
-              phase === "ready" ? t(($) => $.microphone.discard) : t(($) => $.microphone.cancelTest)
-            }
+            aria-label={phase === "ready" ? gt("Discard recording") : gt("Cancel microphone test")}
             onClick={cancel}
           >
             <XIcon />
@@ -277,7 +281,7 @@ export function MicrophoneTest({
 }
 
 function MicrophonePlayback({ src, duration }: { src: string; duration: number }) {
-  const { t } = useTranslation("voice");
+  const gt = useGT();
   const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0);
@@ -315,19 +319,19 @@ function MicrophonePlayback({ src, duration }: { src: string; duration: number }
       <Button
         size="icon-sm-pill"
         variant="outline"
-        aria-label={playing ? t(($) => $.microphone.pause) : t(($) => $.microphone.play)}
+        aria-label={playing ? gt("Pause recording") : gt("Play recording")}
         onClick={() => void togglePlayback()}
       >
         {playing ? <PauseIcon /> : <PlayIcon />}
       </Button>
       {failed ? (
         <p role="alert" className="min-w-0 flex-1 text-xs text-destructive">
-          {t(($) => $.microphone.playFailed)}
+          <T>Could not play this recording. Try recording again.</T>
         </p>
       ) : (
         <input
           type="range"
-          aria-label={t(($) => $.microphone.playbackPosition)}
+          aria-label={gt("Recording playback position")}
           min={0}
           max={duration}
           step={0.01}

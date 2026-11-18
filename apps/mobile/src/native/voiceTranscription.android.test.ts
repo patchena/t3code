@@ -26,7 +26,6 @@ import {
   VoiceInputController,
   resetVoiceInputGlobalsForTests,
 } from "../../../../packages/client-runtime/src/voice-input/controller";
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { Platform } from "react-native";
 
 import { createLiveVoiceRecorder, getLocalVoiceTranscriber } from "./voiceTranscription.android";
@@ -81,7 +80,6 @@ it.each([
   };
   const prepareToRecordAsync = vi.fn(async () => {});
   const controller = new VoiceInputController({
-    t: createI18n("en").getFixedT("en", "voice"),
     recorder: {
       uri: "file:///acceptance.m4a",
       prepareToRecordAsync,

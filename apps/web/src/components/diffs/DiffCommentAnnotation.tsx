@@ -1,5 +1,6 @@
 import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
-import { useTranslation } from "react-i18next";
+import { T, useGT, useMessages } from "gt-react";
+import { reviewCommentRangeText } from "~/lib/composerContextRecords";
 import { MessageCircle, Trash2 } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
@@ -15,7 +16,7 @@ import {
 } from "~/speech/useTextFieldSpeech";
 import { textDirection } from "~/textDirection";
 
-import { isCommentSubmitShortcut } from "~/components/diffs/commentSubmitShortcut";
+import { isCommentSubmitShortcut } from "./commentSubmitShortcut";
 
 interface DiffCommentSecondaryAction {
   readonly label: string;
@@ -56,16 +57,15 @@ export function DiffCommentAnnotation({
   onCancel,
   onComment,
   onDelete,
-  placeholder: placeholderOverride,
-  submitLabel: submitLabelOverride,
+  placeholder,
+  submitLabel,
   pending = false,
   secondaryAction,
   focusOnMount = true,
   completionScope = null,
 }: DiffCommentAnnotationProps) {
-  const { t } = useTranslation("workspace");
-  const placeholder = placeholderOverride ?? t(($) => $.git.addComment);
-  const submitLabel = submitLabelOverride ?? t(($) => $.git.comment);
+  const gt = useGT();
+  const messages = useMessages();
   const [localDraftText, setLocalDraftText] = useState("");
   const displayedText = kind === "draft" && !onTextChange ? localDraftText : text;
   const trimmedText = displayedText.trim();
@@ -100,7 +100,7 @@ export function DiffCommentAnnotation({
             <Button
               variant="ghost-muted"
               size="icon-xs"
-              aria-label={t(($) => $.git.deleteComment)}
+              aria-label={gt("Delete comment")}
               onClick={onDelete}
             >
               <Trash2 className="size-3" />
@@ -139,8 +139,10 @@ export function DiffCommentAnnotation({
         size="sm"
         value={displayedText}
         dir={textDirection(displayedText)}
-        placeholder={placeholder}
-        aria-label={t(($) => $.git.commentLines, { range: rangeLabel })}
+        placeholder={placeholder ?? gt("Add a comment…")}
+        aria-label={gt("Comment on lines {rangeLabel}", {
+          rangeLabel: reviewCommentRangeText(rangeLabel, messages),
+        })}
         onValueChange={onTextChange ?? setLocalDraftText}
         onFocus={(event) => {
           const end = event.currentTarget.value.length;
@@ -160,11 +162,11 @@ export function DiffCommentAnnotation({
       />
       <div className="mt-1.5 flex flex-wrap items-center gap-1">
         <span className="mr-auto text-3xs text-muted-foreground/70">
-          {t(($) => $.git.sendShortcut)}
+          <T>⌘/Ctrl Enter to send</T>
         </span>
         {speech ? <TextFieldSpeechControls speech={speech} disabled={pending} /> : null}
         <Button variant="ghost-muted" size="xs" onClick={onCancel}>
-          {t(($) => $.git.cancel)}
+          <T>Cancel</T>
         </Button>
         {secondaryAction ? (
           <Button
@@ -186,7 +188,7 @@ export function DiffCommentAnnotation({
           disabled={speech?.preparing || pending || (!speech?.blocksSubmission && !trimmedText)}
           onClick={() => submit(speech, onComment)}
         >
-          {submitLabel}
+          {submitLabel ?? gt("Comment", { $context: "verb, submit button" })}
         </Button>
       </div>
     </div>

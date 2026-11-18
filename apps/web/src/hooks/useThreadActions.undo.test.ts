@@ -1,7 +1,6 @@
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { appI18n } from "~/i18n";
 
 import { useThreadActions } from "./useThreadActions";
 import { threadEnvironment } from "../state/threads";
@@ -19,6 +18,7 @@ const commands = vi.hoisted(() => ({
   unsettle: vi.fn(),
   snooze: vi.fn(),
   unsnooze: vi.fn(),
+  reorderActive: vi.fn(),
 }));
 const router = vi.hoisted(() => {
   const listeners = new Set<(event: { action: { type: string } }) => void>();
@@ -34,19 +34,6 @@ const router = vi.hoisted(() => {
     },
   };
 });
-vi.mock("~/i18n", async () => {
-  const { createI18n } = await import("@t3tools/client-runtime/i18n");
-  return { appI18n: createI18n("en") };
-});
-vi.mock("react-i18next", async () => {
-  const { appI18n } = await import("~/i18n");
-  return {
-    useTranslation: (namespace: "workspace" | "common") => ({
-      t: appI18n.getFixedT(null, namespace),
-    }),
-  };
-});
-
 vi.mock("../state/use-atom-query-runner", () => ({ useAtomQueryRunner: () => vi.fn() }));
 vi.mock("../state/session", async (original) => ({
   ...(await original<typeof import("../state/session")>()),
@@ -75,6 +62,8 @@ const threadShell = vi.hoisted(() => ({
   title: "Thread",
   pinOrderKey: "a0",
   pinnedAt: null as string | null,
+  activeOrderKey: null as string | null,
+  unsettledAt: null as string | null,
   snoozedUntil: null as string | null,
   projectId: "project",
   environmentId: "undo-env",
@@ -108,6 +97,8 @@ vi.mock("../state/use-atom-command", () => ({
         return commands.snooze;
       case threadEnvironment.unsnooze:
         return commands.unsnooze;
+      case threadEnvironment.reorderActive:
+        return commands.reorderActive;
       default:
         return vi.fn();
     }
@@ -133,32 +124,26 @@ beforeEach(() => {
   router.state.location.href = "/";
   router.state.matches[0]!.params = {};
   threadShell.pinnedAt = null;
+  threadShell.activeOrderKey = null;
+  threadShell.unsettledAt = null;
   threadShell.snoozedUntil = null;
   shellLoaded.current = true;
 });
-afterEach(async () => {
+afterEach(() => {
   vi.runAllTimers();
   vi.useRealTimers();
   vi.restoreAllMocks();
-  await appI18n.changeLanguage("en");
 });
 
 describe("concurrent thread action Undo", () => {
-  it.each(
-    (
-      [
-        ["settleThread", "settle", "unsettle", "Settled"],
-        ["snoozeThread", "snooze", "unsnooze", "Snoozed"],
-        ["unpinThread", "unpin", "pin", "Unpinned"],
-        ["archiveThread", "archive", "unarchive", "Archived"],
-      ] as const
-    ).flatMap(([handler, action, inverse, notice]) =>
-      (["en", "de"] as const).map((language) => ({ handler, action, inverse, notice, language })),
-    ),
-  )(
-    "$handler retains one undo for concurrent successful requests ($language)",
-    async ({ handler, action, inverse, notice, language }) => {
-      await appI18n.changeLanguage(language);
+  it.each([
+    ["settleThread", "settle", "unsettle", "Settled"],
+    ["snoozeThread", "snooze", "unsnooze", "Snoozed"],
+    ["unpinThread", "unpin", "pin", "Unpinned"],
+    ["archiveThread", "archive", "unarchive", "Archived"],
+  ] as const)(
+    "%s retains one undo for concurrent successful requests",
+    async (handler, action, inverse, notice) => {
       const actions = useThreadActions();
       const run = () =>
         handler === "snoozeThread"
@@ -331,6 +316,35 @@ describe("settle and snooze Undo", () => {
       environmentId: target.environmentId,
       input: { threadId: target.threadId, snoozedUntil },
     });
+  });
+
+  it("puts a manually ordered thread back in its active position", async () => {
+    threadShell.activeOrderKey = "b5";
+    await useThreadActions().settleThread(target);
+    await currentUndo()();
+    expect(commands.unsettle).toHaveBeenCalledOnce();
+    expect(commands.reorderActive).toHaveBeenCalledExactlyOnceWith({
+      environmentId: target.environmentId,
+      input: { threadId: target.threadId, orderKey: "b5" },
+    });
+    expect(commands.unsettle.mock.invocationCallOrder[0]).toBeLessThan(
+      commands.reorderActive.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it("puts an automatically ordered thread back at its Active anchor", async () => {
+    threadShell.unsettledAt = "2026-01-02T00:00:00.000Z";
+    await useThreadActions().settleThread(target);
+    await currentUndo()();
+    expect(commands.unsettle).toHaveBeenCalledExactlyOnceWith({
+      environmentId: target.environmentId,
+      input: {
+        threadId: target.threadId,
+        reason: "user",
+        restoreUnsettledAt: "2026-01-02T00:00:00.000Z",
+      },
+    });
+    expect(commands.reorderActive).not.toHaveBeenCalled();
   });
 
   it("stops settle restoration if restoring the pin fails", async () => {

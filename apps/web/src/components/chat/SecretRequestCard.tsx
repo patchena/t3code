@@ -1,7 +1,9 @@
+import { pipe } from "effect/Function";
 import {
+  SECRET_REQUEST_DEFAULT_PLACEHOLDER,
   secretRequestAnswerInput,
   secretRequestDisplay,
-  secretRequestFailureDetail,
+  secretRequestFailureMessage,
   secretRequestLink,
   secretRequestPrivacyNote,
   secretRequestReference,
@@ -20,9 +22,9 @@ import type {
   SecretProviderId,
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
+import { T, useMessages, Var } from "gt-react";
 import { CheckIcon, ExternalLinkIcon, LockIcon, MinusIcon, ShieldCheckIcon } from "lucide-react";
 import { useId, useRef, useState, type FormEvent } from "react";
-import { useTranslation } from "react-i18next";
 
 import { isSecretsFeatureEnabled } from "../../env";
 import { serverEnvironment } from "../../state/server";
@@ -37,9 +39,9 @@ export function SecretRequestCard(props: {
   readonly item: SecretRequestItem;
   readonly visibility: OrchestrationV2ProjectedTurnItem["visibility"];
 }) {
-  const { t } = useTranslation("chat");
   const { item } = props;
-  const display = secretRequestDisplay(item, props.visibility, t);
+  const messages = useMessages();
+  const display = secretRequestDisplay(item, props.visibility, messages);
   if (display.kind === "answered" || display.kind === "pending-elsewhere") {
     const Icon =
       display.kind === "pending-elsewhere"
@@ -66,8 +68,9 @@ const NO_SOURCES: ReadonlyArray<SecretRequestSource> = [];
 
 function useSecretRequestSources(environmentId: EnvironmentId) {
   const config = useAtomValue(serverEnvironment.configValueAtom(environmentId));
+  const messages = useMessages();
   return isSecretsFeatureEnabled
-    ? secretRequestSources(config, config?.settings.secretProviders ?? {})
+    ? secretRequestSources(config, config?.settings.secretProviders ?? {}, messages)
     : NO_SOURCES;
 }
 
@@ -75,8 +78,8 @@ function PendingSecretRequestForm(props: {
   readonly environmentId: EnvironmentId;
   readonly item: SecretRequestItem;
 }) {
-  const { t } = useTranslation("chat");
   const { item } = props;
+  const messages = useMessages();
   const inputId = useId();
   const errorId = useId();
   const privacyId = useId();
@@ -92,8 +95,7 @@ function PendingSecretRequestForm(props: {
   const [secret, setSecret] = useState("");
   const [reference, setReference] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [failure, setFailure] = useState<{ readonly message: string | null } | null>(null);
-  const error = failure === null ? null : (failure.message ?? t(($) => $.secret.answerFailed));
+  const [error, setError] = useState<string | null>(null);
   // Enter and click can both submit before a render.
   const inFlight = useRef(false);
 
@@ -102,7 +104,7 @@ function PendingSecretRequestForm(props: {
     if (input === null || inFlight.current) return;
     inFlight.current = true;
     setSubmitting(true);
-    setFailure(null);
+    setError(null);
     const result = await answer({ environmentId: props.environmentId, input }).finally(() => {
       inFlight.current = false;
       setSubmitting(false);
@@ -113,7 +115,11 @@ function PendingSecretRequestForm(props: {
       return;
     }
     if (!isAtomCommandInterrupted(result)) {
-      setFailure({ message: secretRequestFailureDetail(squashAtomCommandFailure(result)) });
+      pipe(
+        squashAtomCommandFailure(result),
+        (failure) => secretRequestFailureMessage(failure, messages),
+        setError,
+      );
     }
   };
 
@@ -122,7 +128,7 @@ function PendingSecretRequestForm(props: {
     if (source === null) {
       void send({ type: "save", secret });
     } else if (secretRequestReference(source, reference) === undefined) {
-      setFailure({ message: source.invalidReferenceMessage });
+      setError(source.invalidReferenceMessage);
     } else {
       void send({ type: "reference", source, reference });
     }
@@ -162,7 +168,9 @@ function PendingSecretRequestForm(props: {
             size="sm"
             render={<a href={link.href} target="_blank" rel="noopener noreferrer" />}
           >
-            {t(($) => $.ui.open, { name: link.host })}
+            <T>
+              Open <Var>{link.host}</Var>
+            </T>
             <ExternalLinkIcon aria-hidden />
           </Button>
           {/* A link found in the reason is already shown there. */}
@@ -180,7 +188,7 @@ function PendingSecretRequestForm(props: {
             disabled={submitting}
             onValueChange={(next) => {
               setSourceId(next);
-              setFailure(null);
+              setError(null);
             }}
           />
         ) : null}
@@ -197,7 +205,7 @@ function PendingSecretRequestForm(props: {
               data-1p-ignore
               data-lpignore="true"
               data-bwignore
-              placeholder={item.placeholder ?? t(($) => $.secret.placeholder)}
+              placeholder={item.placeholder ?? messages(SECRET_REQUEST_DEFAULT_PLACEHOLDER)}
               value={secret}
               disabled={submitting}
               aria-invalid={error !== null || undefined}
@@ -219,13 +227,13 @@ function PendingSecretRequestForm(props: {
               aria-describedby={describedBy}
               onChange={(event) => {
                 setReference(event.currentTarget.value);
-                setFailure(null);
+                setError(null);
               }}
             />
           )}
         </div>
         <Button type="submit" disabled={submitting || draft.trim().length === 0}>
-          {t(($) => $.secret.save)}
+          <T>Save securely</T>
         </Button>
       </div>
       {error !== null ? (
@@ -239,7 +247,7 @@ function PendingSecretRequestForm(props: {
           className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
         >
           <ShieldCheckIcon className="size-3.5 shrink-0" aria-hidden />
-          {secretRequestPrivacyNote(item, t)}
+          {secretRequestPrivacyNote(item, messages)}
         </p>
         <Button
           type="button"
@@ -248,7 +256,7 @@ function PendingSecretRequestForm(props: {
           disabled={submitting}
           onClick={() => void send({ type: "decline" })}
         >
-          {t(($) => $.secret.decline)}
+          <T>Decline</T>
         </Button>
       </div>
     </form>

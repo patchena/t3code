@@ -1,6 +1,5 @@
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
-import { useTranslation } from "react-i18next";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   type AtomCommandResult,
   isAtomCommandInterrupted,
@@ -8,9 +7,11 @@ import {
 } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useRouter } from "@tanstack/react-router";
+import { msg } from "gt-react";
 
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import { currentClientMetadata } from "~/connection/platform";
+import { m } from "~/i18n/messages";
 import { projectEnvironment } from "~/state/projects";
 import { serverEnvironment } from "~/state/server";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -20,11 +21,15 @@ import { useScratchProject } from "./useScratchProject";
 
 export const TRIAGE_CLI_COMMAND = "npx t3 triage";
 
-const copyTriageCliCommand = (t: TFunction<"common">) =>
-  writeTextToClipboard(TRIAGE_CLI_COMMAND, "command").catch(() =>
+const copyTriageCliCommand = () =>
+  writeTextToClipboard(TRIAGE_CLI_COMMAND, {
+    target: "command",
+    unavailableMessage: msg("Clipboard API is unavailable while copying command."),
+    failureMessage: msg("Failed to copy command to the clipboard."),
+  }).catch(() =>
     toastManager.add({
       type: "error",
-      title: t(($) => $.operations.triageCopyFailed, { command: TRIAGE_CLI_COMMAND }),
+      title: m(msg("Could not copy. Type {command} instead.", { command: TRIAGE_CLI_COMMAND })),
     }),
   );
 
@@ -35,7 +40,6 @@ const copyTriageCliCommand = (t: TFunction<"common">) =>
  * the problem.
  */
 export function useStartTriage() {
-  const { t } = useTranslation("common");
   const router = useRouter();
   const { scratchWorkspaceRootFor } = useScratchProject();
   const handleNewThread = useNewThreadHandler();
@@ -47,15 +51,17 @@ export function useStartTriage() {
     toastManager.add(
       stackedThreadToast({
         type: "error",
-        title: t(($) => $.operations.triageFailed),
-        description: t(($) => $.operations.triageRetry, {
-          error: description,
-          command: TRIAGE_CLI_COMMAND,
-        }),
+        title: m(msg("Could not start triage")),
+        description: m(
+          msg("{description} Run {command} in a terminal on that machine instead.", {
+            description,
+            command: TRIAGE_CLI_COMMAND,
+          }),
+        ),
         timeout: 0,
         actionProps: {
-          children: t(($) => $.operations.copyCommand),
-          onClick: () => void copyTriageCliCommand(t),
+          children: m(msg("Copy command")),
+          onClick: () => void copyTriageCliCommand(),
         },
         // "Copy command" is the copy that helps here, not the error text.
         data: { hideCopyButton: true },
@@ -66,7 +72,7 @@ export function useStartTriage() {
   ) => {
     if (isAtomCommandInterrupted(result)) return;
     const error = squashAtomCommandFailure(result);
-    fail(error instanceof Error ? error.message : t(($) => $.operations.error));
+    fail(thrownErrorMessage(error, m) ?? m(msg("An error occurred.")));
   };
 
   // `routeChanged` tells the steps the user went elsewhere while they waited;
@@ -83,12 +89,12 @@ export function useStartTriage() {
     // A null result means the user went elsewhere; only a throw is a failure.
     await handleNewThread(scopeProjectRef(project.value.environmentId, project.value.id), {
       prompt: prepared.value.prompt,
-    }).catch(() => fail(t(($) => $.operations.triageOpenFailed)));
+    }).catch(() => fail(m(msg("T3 Code could not open a new thread."))));
   };
 
   return async (environmentId: EnvironmentId) => {
     if (scratchWorkspaceRootFor(environmentId) === null) {
-      fail(t(($) => $.operations.triageUnsupported));
+      fail(m(msg("This machine cannot start threads without a project.")));
       return;
     }
     const requestingRouteHref = router.state.location.href;
@@ -98,7 +104,7 @@ export function useStartTriage() {
     const pendingTimer = setTimeout(() => {
       pendingToastId = toastManager.add({
         type: "loading",
-        title: t(($) => $.operations.triageStarting),
+        title: m(msg("Starting triage…")),
         timeout: 0,
       });
     }, 400);

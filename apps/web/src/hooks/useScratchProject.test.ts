@@ -1,5 +1,4 @@
 import type { EnvironmentId } from "@t3tools/contracts";
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { AtomRegistry } from "effect/reactivity";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -32,7 +31,6 @@ function actions(
     primaryEnvironmentId: () => primary,
     registry: AtomRegistry.make(),
     handleNewThread: async () => null,
-    t: createI18n("en").getFixedT(null, "common"),
   });
 }
 

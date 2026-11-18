@@ -1,17 +1,11 @@
-import { useTranslation } from "react-i18next";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
+import { T, useGT, Var } from "gt-react";
 import { PlusIcon, SearchIcon } from "lucide-react";
 
-import { openCommandPalette } from "~/commandPaletteBus";
-import { Button } from "~/components/ui/button";
-import { PullRequestListGhost } from "~/components/pullRequest/PullRequestGhosts";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "~/components/ui/empty";
+import { openCommandPalette } from "../../commandPaletteBus";
+import { Button } from "../ui/button";
+import { PullRequestListGhost } from "./PullRequestGhosts";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
 
 function BranchMark({ joined }: { joined: boolean }) {
   return (
@@ -75,19 +69,24 @@ export function PullRequestListEmptyState({
   onLoadMore: () => void;
   onRefresh: () => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
+  const shownQuery = query.length > 48 ? `${query.slice(0, 48)}…` : query;
   if (!hasProjects) {
     return (
       <Empty>
         <BranchMark joined={false} />
         <EmptyHeader>
-          <EmptyTitle>{t(($) => $.git.noProjects)}</EmptyTitle>
-          <EmptyDescription>{t(($) => $.git.addProjectDescription)}</EmptyDescription>
+          <EmptyTitle>
+            <T>No projects in this workspace</T>
+          </EmptyTitle>
+          <EmptyDescription>
+            <T>Add a project, and the pull requests from its repository appear here.</T>
+          </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button size="sm" onClick={() => openCommandPalette({ open: "add-project" })}>
             <PlusIcon className="size-3.5" />
-            {t(($) => $.git.addProject)}
+            <T>Add project</T>
           </Button>
         </EmptyContent>
       </Empty>
@@ -98,9 +97,7 @@ export function PullRequestListEmptyState({
     return (
       <PullRequestListGhost
         rows={5}
-        caption={t(($) => $.git.searchingHosts, {
-          query: query.length > 48 ? `${query.slice(0, 48)}…` : query,
-        })}
+        caption={gt("Searching every host for “{query}”", { query: shownQuery })}
       />
     );
   }
@@ -111,20 +108,25 @@ export function PullRequestListEmptyState({
         <BranchMark joined={false} />
         <EmptyHeader>
           <EmptyTitle>
-            {t(($) => $.git.noQueryMatches, {
-              query: query.length > 48 ? `${query.slice(0, 48)}…` : query,
-            })}
+            <T>
+              Nothing matches “<Var>{shownQuery}</Var>”
+            </T>
           </EmptyTitle>
-          <EmptyDescription>{t(($) => $.git.searchNoMatchDescription)}</EmptyDescription>
+          <EmptyDescription>
+            <T>
+              The hosts were searched for it. Try fewer words, or search by number, author or
+              branch.
+            </T>
+          </EmptyDescription>
         </EmptyHeader>
         <div className="flex flex-wrap justify-center gap-2">
           <Button size="sm" variant="outline" onClick={onClearQuery}>
             <SearchIcon className="size-3.5" />
-            {t(($) => $.git.clearSearch)}
+            <T>Clear search</T>
           </Button>
           <Button size="sm" variant="outline" disabled={refreshing} onClick={onRefresh}>
             <RefreshIcon size="sm" refreshing={refreshing} />
-            {refreshing ? t(($) => $.git.checking) : t(($) => $.git.checkAgain)}
+            {refreshing ? gt("Checking...") : gt("Check again")}
           </Button>
         </div>
       </Empty>
@@ -136,21 +138,23 @@ export function PullRequestListEmptyState({
       <BranchMark joined={false} />
       <EmptyHeader>
         <EmptyTitle>
-          {filtered ? t(($) => $.git.noFilteredResults) : t(($) => $.git.noPullRequests)}
+          {filtered ? gt("Nothing under these filters") : gt("No pull requests")}
         </EmptyTitle>
         <EmptyDescription>
-          {filtered ? t(($) => $.git.widenFilters) : t(($) => $.git.pullRequestsDescription)}
+          {filtered
+            ? gt("Widen the state, involvement or project filter to see more.")
+            : gt("Pull requests from every project in this workspace appear here.")}
         </EmptyDescription>
       </EmptyHeader>
       <div className="flex flex-wrap justify-center gap-2">
         {canLoadMore ? (
           <Button size="sm" variant="outline" disabled={loadingMore} onClick={onLoadMore}>
-            {loadingMore ? t(($) => $.git.loadingEllipsis) : t(($) => $.git.loadMorePullRequests)}
+            {loadingMore ? gt("Loading...") : gt("Load more pull requests")}
           </Button>
         ) : null}
         <Button size="sm" variant="outline" disabled={refreshing} onClick={onRefresh}>
           <RefreshIcon size="sm" refreshing={refreshing} />
-          {refreshing ? t(($) => $.git.checking) : t(($) => $.git.checkAgain)}
+          {refreshing ? gt("Checking...") : gt("Check again")}
         </Button>
       </div>
     </Empty>

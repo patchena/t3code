@@ -6,12 +6,13 @@ import type {
 } from "@t3tools/contracts";
 import {
   collectProviderUsageLimits,
-  formatDuration,
+  type LimitPace,
   paceOf,
   remainingPercent,
 } from "@t3tools/shared/usageLimits";
+import { formatDuration, limitsNotice } from "@t3tools/shared/usageLimitsCopy";
+import { msg, useGT, useLocale, useMessages } from "gt-react";
 import type { ReactNode } from "react";
-import { useTranslation } from "react-i18next";
 
 import { usePrimarySettings } from "../../hooks/useSettings";
 import { useNowMinute } from "../../hooks/useNowMinute";
@@ -22,6 +23,12 @@ import { formatUpcomingTimestamp } from "../../timestampFormat";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { formatContextWindowCompactionMessage } from "./compaction.logic";
 import { ThreadDetailsSection } from "./ThreadDetailsSection";
+
+const PACE_LABEL: Record<LimitPace, string> = {
+  ahead: msg("Ahead of pace"),
+  on: msg("On pace"),
+  under: msg("Under pace"),
+};
 
 export interface ThreadDetailsUsageInput {
   readonly providerInstanceId: ProviderInstanceId | null;
@@ -38,7 +45,8 @@ export function ThreadDetailsUsage({
   providers,
   sources,
 }: Omit<ThreadDetailsUsageInput, "contextWindow">) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
+  const m = useMessages();
   const nowMinute = useNowMinute();
   const now = Date.parse(`${nowMinute}:00Z`);
   const report =
@@ -51,28 +59,21 @@ export function ThreadDetailsUsage({
     report?.accounts.find((entry) => entry.instanceId === providerInstanceId)?.limits ??
     providers.find((provider) => provider.instanceId === providerInstanceId)?.usageLimits;
   if (!limits) return null;
-  const notice =
-    limits.unavailable?.reason === "unsupported"
-      ? (limits.unavailable.message ?? t(($) => $.details.noSubscriptionLimits))
-      : limits.unavailable?.reason === "probeFailed"
-        ? (limits.unavailable.message ?? t(($) => $.details.readLimitsFailed))
-        : limits.windows.length === 0
-          ? t(($) => $.details.noLimitsReported)
-          : null;
+  const notice = limitsNotice(limits, m);
 
   return (
     <ThreadDetailsSection
       headingId="thread-details-usage-heading"
-      title={t(($) => $.details.usage)}
+      title={gt("Usage limits")}
       showHeading={false}
     >
       <div className="grid grid-cols-[auto_minmax(3rem,1fr)_auto] gap-x-3 text-xs">
         {notice ? (
           <UsageRow
-            label={t(($) => $.details.limits)}
+            label={gt("Limits", { $context: "usage limits row label" })}
             fill={null}
             tone={null}
-            value={t(($) => $.ui.unavailable)}
+            value={gt("Unavailable")}
             tooltip={<span className="text-foreground">{notice}</span>}
           />
         ) : (
@@ -85,7 +86,6 @@ export function ThreadDetailsUsage({
 
 /** The thread's context window. The bar fills as context is used; the tick marks auto-compaction. */
 export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowSnapshot }) {
-  const { t } = useTranslation("chat");
   const maxTokens = usage.maxTokens != null && usage.maxTokens > 0 ? usage.maxTokens : null;
   const used =
     maxTokens !== null && usage.usedPercentage !== null
@@ -96,16 +96,19 @@ export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowS
     maxTokens !== null && threshold !== null && threshold > 0 && threshold < maxTokens
       ? (threshold / maxTokens) * 100
       : null;
+  const gt = useGT();
+  const m = useMessages();
+  const locale = useLocale();
   const usedTokens = formatContextWindowTokens(usage.usedTokens);
   return (
     <ThreadDetailsSection
       headingId="thread-details-context-heading"
-      title={t(($) => $.details.contextWindow)}
+      title={gt("Context window")}
       showHeading={false}
     >
       <div className="grid grid-cols-[auto_minmax(3rem,1fr)_auto] gap-x-3 text-xs">
         <UsageRow
-          label={t(($) => $.details.context)}
+          label={gt("Context", { $context: "context window row label" })}
           fill={used}
           tone={used === null ? null : used >= 90 ? "error" : used >= 80 ? "warning" : null}
           tick={tick}
@@ -117,27 +120,27 @@ export function ThreadDetailsContext({ usage }: { readonly usage: ContextWindowS
           }
           ariaValue={
             used !== null
-              ? t(($) => $.details.percentUsed, { percent: used })
-              : t(($) => $.details.tokensUsed, { tokens: usedTokens })
+              ? gt("{used}% used", { used })
+              : gt("{usedTokens} tokens used", { usedTokens })
           }
           tooltip={
             <>
               <span className="text-foreground">
                 {used !== null
-                  ? t(($) => $.details.contextPercentUsed, { percent: used })
-                  : t(($) => $.details.contextTokensUsed, { tokens: usedTokens })}
+                  ? gt("Context: {used}% used", { used })
+                  : gt("Context: {usedTokens} tokens used", { usedTokens })}
               </span>
               {maxTokens !== null ? (
                 <span className="text-muted-foreground">
-                  {t(($) => $.details.tokenCount, {
-                    used: usage.usedTokens.toLocaleString("en-US"),
-                    max: maxTokens.toLocaleString("en-US"),
+                  {gt("{used} of {max} tokens", {
+                    used: usage.usedTokens.toLocaleString(locale),
+                    max: maxTokens.toLocaleString(locale),
                   })}
                 </span>
               ) : null}
               {threshold !== null && threshold > 0 ? (
                 <span className="text-muted-foreground">
-                  {formatContextWindowCompactionMessage(threshold, t)}
+                  {formatContextWindowCompactionMessage(threshold, m)}
                 </span>
               ) : null}
             </>
@@ -155,13 +158,8 @@ function LimitRow({
   readonly window: ServerProviderUsageWindow;
   readonly now: number;
 }) {
-  const { t } = useTranslation("chat");
-  const { t: tCommon } = useTranslation("common");
-  const paceLabels = {
-    ahead: t(($) => $.details.aheadPace),
-    on: t(($) => $.details.onPace),
-    under: t(($) => $.details.underPace),
-  };
+  const gt = useGT();
+  const m = useMessages();
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
   const left = remainingPercent(window);
   const pace = paceOf(window, now);
@@ -172,21 +170,21 @@ function LimitRow({
       fill={left}
       tone={left <= 10 ? "error" : left <= 20 ? "warning" : null}
       value={`${left}%`}
-      ariaValue={t(($) => $.details.percentLeft, { percent: left })}
+      ariaValue={gt("{left}% left", { left })}
       tooltip={
         <>
           <span className="text-foreground">
-            {t(($) => $.details.windowPercentLeft, { window: window.label, percent: left })}
+            {gt("{label}: {left}% left", { label: window.label, left })}
           </span>
           {window.resetsAt && resetsAt > now ? (
             <span className="text-muted-foreground">
-              {t(($) => $.details.resetsIn, {
-                duration: formatDuration(resetsAt - now),
-                time: formatUpcomingTimestamp(window.resetsAt, timestampFormat, tCommon, now),
+              {gt("Resets in {duration} · {time}", {
+                duration: formatDuration(resetsAt - now, m),
+                time: formatUpcomingTimestamp(window.resetsAt, timestampFormat, now, undefined, m),
               })}
             </span>
           ) : null}
-          {pace ? <span className="text-muted-foreground">{paceLabels[pace]}</span> : null}
+          {pace ? <span className="text-muted-foreground">{m(PACE_LABEL[pace])}</span> : null}
         </>
       }
     />
@@ -215,13 +213,14 @@ function UsageRow({
   readonly tooltip: ReactNode;
   readonly muted?: boolean;
 }) {
+  const gt = useGT();
   return (
     <Tooltip>
       <TooltipTrigger
         render={
           <div
             tabIndex={0}
-            aria-label={`${label}: ${ariaValue}`}
+            aria-label={gt("{label}: {value}", { label, value: ariaValue })}
             className="col-span-3 grid h-6 cursor-default grid-cols-subgrid items-center rounded-lg px-2.5 outline-none hover:bg-black/[0.035] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-popup-open:bg-black/[0.035] dark:hover:bg-white/[0.08] dark:data-popup-open:bg-white/[0.08]"
           />
         }

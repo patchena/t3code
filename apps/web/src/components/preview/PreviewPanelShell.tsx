@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+import { useGT } from "gt-react";
 import {
   type CSSProperties,
   type FocusEvent,
@@ -69,12 +69,8 @@ function returnFocus(host: HTMLElement, origin: HTMLElement | null) {
 function PreviewPanelShellFrame(
   props: PreviewPanelShellProps & { inlineSize: PreviewPanelInlineSize },
 ) {
-  const { t } = useTranslation("tools");
-  const panelArea = workspaceAreaProps(
-    "panel",
-    4,
-    props.workspaceLabel ?? t(($) => $.previewWorkspacePanel),
-  );
+  const gt = useGT();
+  const panelArea = workspaceAreaProps("panel", 4, props.workspaceLabel ?? gt("Workspace panel"));
   const isInline = props.mode === "inline";
   const collapsible = isInline && props.open !== undefined;
   const open = props.open ?? true;

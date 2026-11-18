@@ -1,14 +1,15 @@
 import { collectComposerModelMentions } from "@t3tools/client-runtime/composer-model-mentions";
 import type { EnvironmentId, ScopedThreadRef, ServerProviderSkill } from "@t3tools/contracts";
 import { formatProviderSkillDisplayName } from "@t3tools/shared/inlineSkills";
+import { T, useGT } from "gt-react";
 import { Children, cloneElement, isValidElement, type ReactNode } from "react";
 import { matchInlineSkills } from "@t3tools/shared/inlineSkills";
-import { useTranslation } from "react-i18next";
 
 import { useRightPanelStore } from "~/rightPanelStore";
 import { SKILL_CHIP_ICON_SVG } from "../composerInlineChip";
 import { ContextChipPopover } from "../contextChipParts";
 import { Button } from "../ui/button";
+import { PopoverClose } from "../ui/popover";
 import { ModelMentionChip } from "./ModelMentionChip";
 
 function SkillInlineText(props: {
@@ -124,22 +125,25 @@ export function SkillChipPopover(props: {
   copyMarkdown?: string | undefined;
   onViewInstructions: (() => void) | undefined;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   return (
     <ContextChipPopover
       kind="skill"
       icon={<SkillChipIcon />}
       label={props.label}
-      accessibleLabel={t(($) => $.markdown.skillName, { name: props.label })}
+      accessibleLabel={gt("Skill {label}", { label: props.label })}
       copyMarkdown={props.copyMarkdown}
     >
       <div className="space-y-3 p-2 text-sm">
         <p className="font-medium">{props.label}</p>
-        <p>{props.description || t(($) => $.markdown.skillNoDescription)}</p>
+        <p>{props.description || gt("No description is available for this skill.")}</p>
         {props.onViewInstructions ? (
-          <Button variant="outline" size="sm" onClick={props.onViewInstructions}>
-            {t(($) => $.markdown.skillViewInstructions)}
-          </Button>
+          <PopoverClose
+            render={<Button variant="outline" size="sm" />}
+            onClick={props.onViewInstructions}
+          >
+            <T>View instructions</T>
+          </PopoverClose>
         ) : null}
       </div>
     </ContextChipPopover>

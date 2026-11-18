@@ -1,7 +1,7 @@
 // Menu typeahead consumes search keystrokes; use a combobox.
 import type { ReactNode } from "react";
 
-import { Button } from "~/components/ui/button";
+import { Button } from "../ui/button";
 import {
   Combobox,
   ComboboxSearchInput,
@@ -9,9 +9,9 @@ import {
   ComboboxList,
   ComboboxPopup,
   ComboboxTrigger,
-} from "~/components/ui/combobox";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
-import { PullRequestPeopleGhost } from "~/components/pullRequest/PullRequestGhosts";
+} from "../ui/combobox";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { PullRequestPeopleGhost } from "./PullRequestGhosts";
 
 export function PullRequestCandidatePicker<T>({
   icon,
@@ -32,7 +32,6 @@ export function PullRequestCandidatePicker<T>({
   truncated,
   truncatedLabel,
   candidateKey,
-  disabled,
   onSelect,
   children,
 }: {
@@ -54,7 +53,6 @@ export function PullRequestCandidatePicker<T>({
   truncated: boolean;
   truncatedLabel: string;
   candidateKey: (candidate: T) => string;
-  disabled: boolean;
   onSelect: (candidate: T) => void;
   children: (candidate: T) => ReactNode;
 }) {
@@ -123,13 +121,7 @@ export function PullRequestCandidatePicker<T>({
             </p>
           ) : (
             candidates.map((candidate, index) => (
-              <ComboboxItem
-                key={keys[index]}
-                hideIndicator
-                index={index}
-                value={keys[index]}
-                disabled={disabled}
-              >
+              <ComboboxItem key={keys[index]} hideIndicator index={index} value={keys[index]}>
                 {children(candidate)}
               </ComboboxItem>
             ))

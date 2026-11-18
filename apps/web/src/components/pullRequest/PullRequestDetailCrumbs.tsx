@@ -1,17 +1,15 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { useTranslation } from "react-i18next";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
+import { T, useGT } from "gt-react";
 import { ArrowLeftIcon, ExternalLinkIcon } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 
 import { cn } from "~/lib/utils";
 import { readLocalApi } from "~/localApi";
-import { Button } from "~/components/ui/button";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
-import {
-  openOnHostLabel,
-  showPullRequestLinkContextMenu,
-} from "~/components/pullRequest/pullRequestLinkContextMenu";
+import { Button } from "../ui/button";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { openOnHostLabel, showPullRequestLinkContextMenu } from "./pullRequestLinkContextMenu";
+
+import { changeRequestTermKind } from "./changeRequestTerm";
 
 interface CrumbsPullRequest {
   readonly url: string;
@@ -21,28 +19,21 @@ interface CrumbsPullRequest {
   readonly title: string;
 }
 
-const openNumberContextMenu = (
-  event: ReactMouseEvent,
-  detail: CrumbsPullRequest,
-  t: TFunction<"workspace">,
-): void => {
+const openNumberContextMenu = (event: ReactMouseEvent, detail: CrumbsPullRequest): void => {
   event.preventDefault();
   event.stopPropagation();
-  void showPullRequestLinkContextMenu(
-    {
-      url: detail.url,
-      openLabel: openOnHostLabel(sourceControlClients.get(detail.provider), t),
-      position: { x: event.clientX, y: event.clientY },
-    },
-    t,
-  );
+  void showPullRequestLinkContextMenu({
+    url: detail.url,
+    openLabel: openOnHostLabel(sourceControlClients.get(detail.provider)),
+    position: { x: event.clientX, y: event.clientY },
+  });
 };
 
 const ROW_CLASS_NAME =
   "col-start-1 row-start-1 flex min-w-0 items-center gap-1 text-sm text-muted-foreground transition-[opacity,transform] ease-out motion-reduce:transform-none motion-reduce:transition-none sm:text-xs";
 
 function BackButton({ onBack, focusable }: { onBack: () => void; focusable: boolean }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   return (
     <Tooltip>
       <TooltipTrigger
@@ -53,13 +44,15 @@ function BackButton({ onBack, focusable }: { onBack: () => void; focusable: bool
             {...(focusable ? {} : { tabIndex: -1 })}
             onClick={onBack}
             className="-ml-1.5"
-            aria-label={t(($) => $.git.backToThreadPullRequests)}
+            aria-label={gt("Back to this thread's pull requests")}
           >
             <ArrowLeftIcon aria-hidden className="size-3.5" />
           </Button>
         }
       />
-      <TooltipPopup side="top">{t(($) => $.git.backToPullRequests)}</TooltipPopup>
+      <TooltipPopup side="top">
+        <T>Back to pull requests</T>
+      </TooltipPopup>
     </Tooltip>
   );
 }
@@ -75,7 +68,7 @@ function NumberLink({
   openOnHostText: string;
   focusable: boolean;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   return (
     <Tooltip>
       <TooltipTrigger
@@ -87,15 +80,20 @@ function NumberLink({
             onAuxClick={(event) => {
               if (event.button === 1) void readLocalApi()?.shell.openExternal(detail.url);
             }}
-            onContextMenu={(event) => openNumberContextMenu(event, detail, t)}
+            onContextMenu={(event) => openNumberContextMenu(event, detail)}
             className={cn(
               "inline-flex shrink-0 cursor-pointer items-center gap-0.5 font-medium underline-offset-2 hover:underline",
               toneClassName,
             )}
-            aria-label={t(($) => $.git.openRequestOnHost, {
-              term: sourceControlClients.get(detail.provider).changeRequest.singular,
-              number: detail.number,
-            })}
+            aria-label={gt(
+              "Open {term, select, mr {merge request} cr {change request} other {pull request}} #{number} on host",
+              {
+                term: changeRequestTermKind(
+                  sourceControlClients.get(detail.provider).changeRequest,
+                ),
+                number: detail.number,
+              },
+            )}
           >
             #{detail.number}
             <ExternalLinkIcon aria-hidden className="size-2.5" />
@@ -126,7 +124,7 @@ export function PullRequestDetailCrumbs({
   openOnHostText: string;
   onBack: (() => void) | undefined;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const ready = detail !== null && toneClassName !== null;
   return (
     <div className="pl-4 grid h-7 min-w-0 items-center overflow-hidden">
@@ -163,7 +161,7 @@ export function PullRequestDetailCrumbs({
               />
               <TooltipPopup side="top">
                 {repositoryUrl
-                  ? t(($) => $.git.openRepository, { repository: detail.repository })
+                  ? gt("Open {repository} repository", { repository: detail.repository })
                   : detail.repository}
               </TooltipPopup>
             </Tooltip>

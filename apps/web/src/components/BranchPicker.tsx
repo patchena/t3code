@@ -1,14 +1,14 @@
-import { useTranslation } from "react-i18next";
 import { useLegendListRef } from "~/hooks/useLegendListRef";
 import type { VcsRef } from "@t3tools/contracts";
 import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { useId, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { T, useGT } from "gt-react";
 
-import { MiddleTruncate } from "~/components/ui/middle-truncate";
-import { cn } from "~/lib/utils";
-import { RefreshIcon } from "~/components/ui/refresh-icon";
-import { Switch } from "~/components/ui/switch";
-import { getVirtualizedScrollFadeClassName } from "~/components/ui/scroll-area";
+import { MiddleTruncate } from "./ui/middle-truncate";
+import { cn } from "../lib/utils";
+import { RefreshIcon } from "./ui/refresh-icon";
+import { Switch } from "./ui/switch";
+import { getVirtualizedScrollFadeClassName } from "./ui/scroll-area";
 import {
   Combobox,
   ComboboxEmpty,
@@ -17,8 +17,8 @@ import {
   ComboboxListVirtualized,
   ComboboxPopup,
   ComboboxStatus,
-} from "~/components/ui/combobox";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+} from "./ui/combobox";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
 export function BranchPicker({
   items,
@@ -59,7 +59,7 @@ export function BranchPicker({
   getItemType?: ((value: string) => string) | undefined;
   children: ReactNode;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const highlightedValueRef = useRef<string | null>(null);
   const startFromOriginSwitchId = useId();
   const handleOpenChange = (nextOpen: boolean) => {
@@ -107,7 +107,7 @@ export function BranchPicker({
       {children}
       <ComboboxPopup {...popupProps}>
         <ComboboxSearchInput
-          placeholder={t(($) => $.git.searchRefs)}
+          placeholder={gt("Search refs...")}
           value={query}
           onChange={(event) => {
             onQueryChange(event.target.value);
@@ -128,7 +128,9 @@ export function BranchPicker({
           }}
         />
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <ComboboxEmpty>{t(($) => $.git.noRefs)}</ComboboxEmpty>
+          <ComboboxEmpty>
+            <T>No refs found.</T>
+          </ComboboxEmpty>
           <div className="relative flex min-h-0 w-full max-h-56 flex-1 flex-col overflow-hidden">
             <ComboboxListVirtualized className="flex size-full min-h-0 min-w-0 flex-col">
               <LegendList<string>
@@ -166,20 +168,26 @@ export function BranchPicker({
                   >
                     <span className="flex min-w-0 items-center gap-1.5 font-medium text-muted-foreground">
                       <RefreshIcon aria-hidden="true" className="size-3 shrink-0" />
-                      <span className="truncate">{t(($) => $.git.startFromRemote)}</span>
+                      <span className="truncate">
+                        <T>Start from remote</T>
+                      </span>
                     </span>
                     <Switch
                       id={startFromOriginSwitchId}
                       checked={originControl.checked}
                       size="sm"
-                      aria-label={t(($) => $.git.startWorktreeRemote)}
+                      aria-label={gt("Start worktree from remote")}
                       onCheckedChange={(checked) => originControl.onCheckedChange(Boolean(checked))}
                     />
                   </label>
                 }
               />
               <TooltipPopup side="top" className="max-w-72 whitespace-normal">
-                {t(($) => $.git.startRemoteDescription)}
+                <T>
+                  Uses the latest commit of the base branch’s tracked remote branch, even if its
+                  name differs. Otherwise uses the same-named branch on origin. Uses your local
+                  branch if that remote branch is missing.
+                </T>
               </TooltipPopup>
             </Tooltip>
           ) : null}
@@ -208,18 +216,18 @@ export function BranchPickerRefItem({
   onClick: ComponentProps<typeof ComboboxItem>["onClick"];
   onContextMenu?: ComponentProps<typeof ComboboxItem>["onContextMenu"];
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const itemValue = refName.name;
   const hasSecondaryWorktree =
     refName.worktreePath && activeProjectCwd && refName.worktreePath !== activeProjectCwd;
   const badge = refName.current
-    ? t(($) => $.git.currentBadge)
+    ? gt("current", { $context: "git ref badge, the checked-out branch" })
     : hasSecondaryWorktree
-      ? t(($) => $.git.worktreeBadge)
+      ? gt("worktree", { $context: "git ref badge, checked out in another worktree" })
       : refName.isRemote
-        ? t(($) => $.git.remoteBadge)
+        ? gt("remote", { $context: "git ref badge, a remote branch" })
         : refName.isDefault
-          ? t(($) => $.git.defaultBadge)
+          ? gt("default", { $context: "git ref badge, the default branch" })
           : null;
   return (
     <ComboboxItem

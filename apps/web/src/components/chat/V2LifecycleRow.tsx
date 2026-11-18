@@ -1,6 +1,5 @@
+import { T, Var, msg, useGT, useMessages } from "gt-react";
 import { ThreadHoverCardPopup } from "../ThreadHoverCard";
-import { useTranslation } from "react-i18next";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { AgentElapsed } from "./AgentElapsed";
 import { projectedSubagentsToRuntime } from "@t3tools/client-runtime/state/subagentRuntime";
 import type { ReactNode } from "react";
@@ -22,7 +21,10 @@ import {
   type HandoffTimelineRun,
   resolveModelSwitchChange,
 } from "@t3tools/client-runtime/handoff";
-import { formatSubagentDisplayTitle } from "@t3tools/client-runtime/state/subagent-display";
+import {
+  formatSubagentDisplayTitle,
+  subagentCardDetail,
+} from "@t3tools/client-runtime/state/subagent-display";
 import {
   ProviderDriverKind,
   type ModelSelection,
@@ -55,6 +57,7 @@ import {
   applyProviderInstanceSettings,
   brandProviderInstanceEntries,
   deriveProviderInstanceEntries,
+  hasInstanceBadge,
   shouldShowInstanceBadge,
   type ProviderInstanceEntry,
 } from "../../providerInstances";
@@ -76,12 +79,12 @@ export function V2LifecycleRow(props: {
   readonly runs: ReadonlyArray<HandoffTimelineRun>;
   readonly onOpenThread: (threadId: ThreadId) => void;
 }) {
-  const { t } = useTranslation("chat");
   const { item } = props;
+  const gt = useGT();
   if (item.type === "run_interrupt_result") {
     return (
       <TimelineSystemDivider
-        label={t(($) => $.thread.interrupted)}
+        label={gt("Run interrupted")}
         detail={item.message}
         icon={CircleStopIcon}
         wrapDetail
@@ -101,13 +104,11 @@ export function V2LifecycleRow(props: {
     const relatedThreadId = item.source.type === "run" ? item.source.threadId : item.targetThreadId;
     return (
       <TimelineSystemDivider
-        label={item.source.type === "run" ? t(($) => $.thread.forkedFrom) : t(($) => $.thread.fork)}
-        icon={GitForkIcon}
-        actionLabel={
-          item.source.type === "run"
-            ? t(($) => $.thread.openSource)
-            : t(($) => $.thread.openForkAction)
+        label={
+          item.source.type === "run" ? gt("Forked from conversation") : gt("Conversation fork")
         }
+        icon={GitForkIcon}
+        actionLabel={item.source.type === "run" ? gt("Open source conversation") : gt("Open fork")}
         onAction={() => props.onOpenThread(relatedThreadId)}
       />
     );
@@ -123,19 +124,19 @@ export function V2LifecycleRow(props: {
             <MessageSquareIcon className="size-4 text-secondary-label" aria-hidden />
           </span>
           <span className="min-w-0 flex-1 truncate text-sm font-medium">
-            {item.title ?? t(($) => $.thread.created)}
+            {item.title ?? gt("Created thread")}
           </span>
           <Button
             size="xs"
             variant="outline"
             aria-label={
-              item.title
-                ? t(($) => $.ui.open, { name: item.title })
-                : t(($) => $.thread.openCreated)
+              item.title != null
+                ? gt("Open {title}", { title: item.title })
+                : gt("Open created thread")
             }
             onClick={() => props.onOpenThread(item.targetThreadId)}
           >
-            {t(($) => $.thread.openChat)}
+            <T>Open chat</T>
           </Button>
         </div>
       );
@@ -145,20 +146,24 @@ export function V2LifecycleRow(props: {
         data-v2-item-type={item.type}
         icon={<T3Wordmark className="size-4 text-icon-muted" aria-hidden />}
         label={
-          item.title
-            ? t(($) => $.thread.createdNamed, { title: item.title })
-            : t(($) => $.thread.created)
+          item.title ? (
+            <T>
+              Created thread · <Var>{item.title}</Var>
+            </T>
+          ) : (
+            <T>Created thread</T>
+          )
         }
         trailing={
           <InlineButton
             aria-label={
-              item.title
-                ? t(($) => $.ui.open, { name: item.title })
-                : t(($) => $.thread.openCreated)
+              item.title != null
+                ? gt("Open {title}", { title: item.title })
+                : gt("Open created thread")
             }
             onClick={() => props.onOpenThread(item.targetThreadId)}
           >
-            {t(($) => $.thread.openChat)}
+            <T>Open chat</T>
           </InlineButton>
         }
       />
@@ -173,7 +178,7 @@ export function V2LifecycleRow(props: {
         origin={item.origin}
         status={item.status}
         driver={item.driver}
-        title={formatSubagentDisplayTitle(item.title ?? "Subagent")}
+        title={formatSubagentDisplayTitle(item.title ?? gt("Subagent"))}
         result={item.result}
         progress={item.progress}
         startedAt={item.startedAt}
@@ -187,27 +192,28 @@ export function V2LifecycleRow(props: {
   return null;
 }
 
-const STATUS_VISUALS: Record<OrchestrationV2TurnItem["status"], string> = {
-  pending: "bg-info",
-  running: "bg-info",
-  waiting: "bg-info",
-  idle: "bg-muted-foreground/50",
-  completed: "bg-success",
-  failed: "bg-destructive",
-  cancelled: "bg-muted-foreground/60",
-  interrupted: "bg-muted-foreground/60",
+const STATUS_VISUALS: Record<
+  OrchestrationV2TurnItem["status"],
+  { dotClass: string; label: string }
+> = {
+  pending: { dotClass: "bg-info", label: msg("Queued", { $context: "subagent status" }) },
+  running: { dotClass: "bg-info", label: msg("Running", { $context: "subagent status" }) },
+  waiting: { dotClass: "bg-info", label: msg("Waiting", { $context: "subagent status" }) },
+  idle: {
+    dotClass: "bg-muted-foreground/50",
+    label: msg("Idle · resumable", { $context: "subagent status" }),
+  },
+  completed: { dotClass: "bg-success", label: msg("Completed", { $context: "subagent status" }) },
+  failed: { dotClass: "bg-destructive", label: msg("Failed", { $context: "subagent status" }) },
+  cancelled: {
+    dotClass: "bg-muted-foreground/60",
+    label: msg("Stopped", { $context: "subagent status" }),
+  },
+  interrupted: {
+    dotClass: "bg-muted-foreground/60",
+    label: msg("Stopped", { $context: "subagent status" }),
+  },
 };
-
-const subagentStatusLabels = (t: TFunction<"activity">) => ({
-  pending: t(($) => $.status.queued),
-  running: t(($) => $.status.running),
-  waiting: t(($) => $.status.waiting),
-  idle: t(($) => $.status.resumable),
-  completed: t(($) => $.status.completed),
-  failed: t(($) => $.status.failed),
-  cancelled: t(($) => $.status.stopped),
-  interrupted: t(($) => $.status.stopped),
-});
 
 function subagentStatusVisual(status: OrchestrationV2TurnItem["status"]) {
   return STATUS_VISUALS[status];
@@ -219,17 +225,6 @@ const SETTLED_SUBAGENT_STATUSES = new Set<OrchestrationV2TurnItem["status"]>([
   "cancelled",
   "interrupted",
 ]);
-
-const GENERIC_CHILD_END = /^Child task ended with status\b/i;
-
-function plainDetail(text: string): string {
-  return text
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/`/g, "")
-    .replace(/^[ \t]*[-*][ \t]+/gm, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 function isoOrNull(value: DateTime.Utc | null | undefined): string | null {
   return value ? DateTime.formatIso(value) : null;
@@ -245,6 +240,7 @@ function SubagentAvatar({
   iconUrl,
   accentColor,
   showBadge,
+  anyInstanceBadge,
   status,
   className,
 }: {
@@ -253,6 +249,7 @@ function SubagentAvatar({
   iconUrl?: string | undefined;
   accentColor?: string | undefined;
   showBadge: boolean;
+  anyInstanceBadge: boolean;
   status?: OrchestrationV2TurnItem["status"] | undefined;
   className?: string;
 }) {
@@ -281,9 +278,9 @@ function SubagentAvatar({
       {status ? (
         <span
           className={cn(
-            "absolute size-2 rounded-full ring-2 ring-background",
-            showBadge ? "-left-px -top-px" : "-right-px -bottom-px",
-            subagentStatusVisual(status),
+            "absolute -right-px size-2 rounded-full ring-2 ring-background",
+            anyInstanceBadge ? "-top-px" : "-bottom-px",
+            subagentStatusVisual(status).dotClass,
           )}
         />
       ) : null}
@@ -333,6 +330,9 @@ export function EnvironmentSubagentAvatar({
     const entry = all.find((candidate) => candidate.instanceId === providerInstanceId);
     return entry !== undefined && shouldShowInstanceBadge(entry, all);
   });
+  const anyInstanceBadge = useAtomValue(providersAtom, (providers) =>
+    hasInstanceBadge(entries(providers)),
+  );
   const iconUrl = useAtomValue(
     providersAtom,
     (providers) =>
@@ -346,6 +346,7 @@ export function EnvironmentSubagentAvatar({
       iconUrl={iconUrl}
       accentColor={accentColor}
       showBadge={showBadge}
+      anyInstanceBadge={anyInstanceBadge}
     />
   );
 }
@@ -361,13 +362,13 @@ const NOTIFICATION_OUTCOME_STATUS: Record<
   unknown: null,
 };
 
-const notificationOutcomeLabels = (t: TFunction<"activity">) => ({
-  completed: t(($) => $.status.finished),
-  failed: t(($) => $.status.failed),
-  cancelled: t(($) => $.status.stopped),
-  updated: t(($) => $.status.updated),
-  unknown: t(($) => $.status.finished),
-});
+const NOTIFICATION_OUTCOME_LABEL: Record<OrchestrationV2Notification["outcome"], string> = {
+  completed: msg("Finished", { $context: "subagent task outcome" }),
+  failed: msg("Failed", { $context: "subagent task outcome" }),
+  cancelled: msg("Stopped", { $context: "subagent task outcome" }),
+  updated: msg("Updated", { $context: "subagent task outcome" }),
+  unknown: msg("Finished", { $context: "subagent task outcome" }),
+};
 
 export function SubagentNotificationLink(props: {
   readonly parentRef: ScopedThreadRef;
@@ -379,7 +380,8 @@ export function SubagentNotificationLink(props: {
   readonly onOpenThread: (threadId: ThreadId) => void;
   readonly fallback: ReactNode;
 }) {
-  const { t } = useTranslation("activity");
+  const gt = useGT();
+  const m = useMessages();
   // Follow-up tasks share a child conversation; this notice reports a particular task result.
   const agent = useAtomValue(
     environmentThreadDetails.threadAtom(props.parentRef),
@@ -402,7 +404,7 @@ export function SubagentNotificationLink(props: {
       origin={agent.origin}
       status={agent.status}
       driver={agent.driver}
-      title={formatSubagentDisplayTitle(agent.title ?? "Subagent")}
+      title={formatSubagentDisplayTitle(agent.title ?? gt("Subagent"))}
       result={agent.result}
       progress={agent.progress}
       startedAt={agent.startedAt}
@@ -414,7 +416,7 @@ export function SubagentNotificationLink(props: {
         : {
             event: {
               status: NOTIFICATION_OUTCOME_STATUS[props.outcome],
-              label: notificationOutcomeLabels(t)[props.outcome],
+              label: m(NOTIFICATION_OUTCOME_LABEL[props.outcome]),
               timestamp: formatShortTimestamp(props.createdAt, props.timestampFormat),
             },
           })}
@@ -444,14 +446,14 @@ function SubagentTimelineLink(props: {
     readonly timestamp: string;
   };
 }) {
-  const { t } = useTranslation("chat");
-  const { t: tActivity } = useTranslation("activity");
   const agent = useAtomValue(
     environmentThreadDetails.threadAtom(props.parentRef),
     (thread) => thread?.projection.subagents.find((agent) => agent.id === props.subagentId) ?? null,
   );
   const remote = props.remote ?? agent?.remoteChild;
   const remoteEnvironment = useEnvironment(remote?.environmentId ?? null);
+  const gt = useGT();
+  const m = useMessages();
   const navigate = useNavigate();
   const threadId = props.threadId;
   // A task in a linked environment opens there, if this client is connected to it.
@@ -467,13 +469,12 @@ function SubagentTimelineLink(props: {
         : null;
   const liveStatus = agent?.status ?? props.status;
   const status = props.event ? props.event.status : liveStatus;
-  const statusLabel = props.event?.label ?? subagentStatusLabels(tActivity)[liveStatus];
+  const statusLabel = props.event?.label ?? m(subagentStatusVisual(liveStatus).label);
   const result = (agent?.result ?? props.result)?.trim();
   const progress = (agent?.progress ?? props.progress)?.trim();
   const settled = SETTLED_SUBAGENT_STATUSES.has(status ?? liveStatus);
   const rawDetail = settled ? result || progress : progress || result;
-  const detail =
-    rawDetail && !GENERIC_CHILD_END.test(rawDetail) ? plainDetail(rawDetail) || null : null;
+  const detail = subagentCardDetail(rawDetail);
   const failed = status === "failed";
   const timing = {
     status: liveStatus,
@@ -496,7 +497,7 @@ function SubagentTimelineLink(props: {
           </span>
           {remote !== undefined ? (
             <span className="shrink-0 text-xs text-muted-foreground">
-              {t(($) => $.thread.onEnvironment, { label: remote.label })}
+              {gt("on {environment}", { environment: remote.label })}
             </span>
           ) : null}
         </span>
@@ -548,7 +549,7 @@ function SubagentTimelineLink(props: {
             <button
               type="button"
               data-v2-item-type="subagent"
-              aria-label={t(($) => $.ui.open, { name: props.title })}
+              aria-label={gt("Open {title}", { title: props.title })}
               aria-description={statusLabel}
               onClick={open}
               className={cn(
@@ -632,8 +633,8 @@ function EnvironmentHandoffRow({
 
 /** Marks where `/clear` or an automation started a new provider session in this thread. */
 export function FreshSessionRow() {
-  const { t } = useTranslation("chat");
-  return <TimelineSystemDivider label={t(($) => $.composer.newSession)} icon={EraserIcon} />;
+  const gt = useGT();
+  return <TimelineSystemDivider label={gt("New session")} icon={EraserIcon} />;
 }
 
 /** A same-harness model or effort change. Shows only what changed. */
@@ -667,14 +668,14 @@ export function HandoffRow(props: {
   readonly pending?: boolean;
   readonly failed?: boolean;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const { from: fromEndpoints, to } = props.endpoints;
   const settings = useAtomValue(serverEnvironment.settingsValueAtom(props.environmentId));
   const derived = deriveProviderInstanceEntries(props.providers);
   const entries = settings ? applyProviderInstanceSettings(derived, settings, null) : derived;
   return (
     <TimelineSystemDivider
-      label={props.pending ? t(($) => $.thread.handoffPending) : t(($) => $.thread.handoff)}
+      label={props.pending ? gt("Context handoff pending") : gt("Context handoff")}
       icon={ArrowRightLeftIcon}
       showDetailSeparator={false}
       tone={props.failed ? "danger" : "neutral"}

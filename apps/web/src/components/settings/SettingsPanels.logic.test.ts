@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts";
 import * as Duration from "effect/Duration";
 import { describe, expect, it } from "vite-plus/test";
@@ -14,8 +13,6 @@ import {
   hasChangedBackgroundActivitySettings,
   syncAutoSettleDaysField,
 } from "./SettingsPanels.logic";
-
-const t = createI18n("en").getFixedT(null, "settings");
 
 describe("background activity settings restore", () => {
   it("detects legacy interval values even when the structured setting is at its default", () => {
@@ -91,13 +88,10 @@ describe("background activity settings restore", () => {
 describe("getChangedBrowserSettingLabels", () => {
   it("counts a retained custom search URL so restore clears it", () => {
     expect(
-      getChangedBrowserSettingLabels(
-        {
-          ...DEFAULT_UNIFIED_SETTINGS,
-          browserCustomSearchUrl: "https://search.example/?q=%s",
-        },
-        t,
-      ),
+      getChangedBrowserSettingLabels({
+        ...DEFAULT_UNIFIED_SETTINGS,
+        browserCustomSearchUrl: "https://search.example/?q=%s",
+      }),
     ).toEqual(["Search engine"]);
   });
 });

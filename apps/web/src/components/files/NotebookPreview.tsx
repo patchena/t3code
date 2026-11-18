@@ -1,12 +1,12 @@
-import { useTranslation } from "react-i18next";
 /* oxlint-disable react/no-array-index-key -- Notebook cells and outputs retain their saved source order. */
 import { formatAttachmentSize } from "@t3tools/client-runtime/state/attachments";
+import { T, useGT, useMessages } from "gt-react";
 import { useEffect, useRef, useState } from "react";
 import type { Root, RootContent } from "mdast";
-import { ChatMarkdown } from "~/components/ChatMarkdown";
+import ChatMarkdown from "~/components/ChatMarkdown";
 import { Button } from "~/components/ui/button";
-import { ReadOnlySourcePreview } from "~/components/files/ReadOnlySourcePreview";
-import { DocumentPages } from "~/components/files/DocumentPages";
+import ReadOnlySourcePreview from "./ReadOnlySourcePreview";
+import DocumentPages from "./DocumentPages";
 import { FileSurfaceNotice } from "./fileSurfaceChrome";
 import type { OfficeWorkerResult } from "./officePreviewProtocol";
 
@@ -42,11 +42,12 @@ function NotebookSource(props: { readonly name: string; readonly text: string })
   );
 }
 
-export function NotebookPreview(props: {
+export default function NotebookPreview(props: {
   readonly notebook: Extract<OfficeWorkerResult, { type: "notebook" }>;
   readonly sizeBytes?: number | undefined;
 }) {
-  const { t } = useTranslation("files");
+  const gt = useGT();
+  const messages = useMessages();
   const [visible, setVisible] = useState(20);
   const scroll = useRef<HTMLDivElement>(null);
   const [outputView, setOutputView] = useState(() => ({
@@ -100,21 +101,24 @@ export function NotebookPreview(props: {
         className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground tabular-nums"
         role="status"
       >
-        {t(($) => $.notebook.stats, {
+        {gt("{count, plural, one {{formatted} cell} other {{formatted} cells}}", {
           count: props.notebook.cells.length,
-          language: props.notebook.language,
-        })}
+          formatted: props.notebook.cells.length.toLocaleString(),
+        })}{" "}
+        · {props.notebook.language}
         {props.sizeBytes !== undefined
-          ? ` · ${props.sizeBytes === 0 ? t(($) => $.document.bytes, { count: 0 }) : formatAttachmentSize(props.sizeBytes)}`
+          ? ` · ${props.sizeBytes === 0 ? gt("0 bytes") : formatAttachmentSize(props.sizeBytes, messages)}`
           : ""}
       </div>
-      <FileSurfaceNotice>{t(($) => $.notebook.savedOutputs)}</FileSurfaceNotice>
+      <FileSurfaceNotice>
+        <T>Saved outputs only. Code is never executed.</T>
+      </FileSurfaceNotice>
       <div ref={scroll} className="scrollbar-gutter-both min-h-0 flex-1 overflow-auto">
         <div className="mx-auto max-w-4xl space-y-5 px-5 py-6">
           {props.notebook.cells.slice(0, visible).map((cell, index) => (
             <section
               key={index}
-              aria-label={t(($) => $.notebook.cell, { number: index + 1 })}
+              aria-label={gt("Cell {number}", { number: String(index + 1) })}
               className="min-w-0 overflow-hidden rounded-md border border-border/60"
             >
               <div className="border-b border-border/60 bg-muted/30 px-3 py-1.5 text-xs text-muted-foreground">
@@ -152,14 +156,14 @@ export function NotebookPreview(props: {
                     !outputView.mounted.has(`${index}-${outputIndex}`) ? null : (
                       <DocumentPages
                         html={output.text}
-                        name={t(($) => $.notebook.cellHtml, { number: index + 1 })}
+                        name={gt("Cell {number} HTML output", { number: String(index + 1) })}
                         output
                       />
                     )
                   ) : output.kind === "image" ? (
                     <img
                       src={output.text}
-                      alt={t(($) => $.notebook.cellOutput, { number: index + 1 })}
+                      alt={gt("Cell {number} output", { number: String(index + 1) })}
                       loading="lazy"
                       className="max-h-96 max-w-full p-4 object-contain"
                     />
@@ -173,11 +177,16 @@ export function NotebookPreview(props: {
             </section>
           ))}
           {props.notebook.cells.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t(($) => $.notebook.empty)}</p>
+            <p className="text-sm text-muted-foreground">
+              <T>This notebook is empty.</T>
+            </p>
           ) : null}
           {visible < props.notebook.cells.length ? (
             <Button variant="outline" size="sm" onClick={() => setVisible((count) => count + 20)}>
-              {t(($) => $.notebook.moreCells, { count: props.notebook.cells.length - visible })}
+              {gt(
+                "{count, plural, one {Show more cells ({count} remaining)} other {Show more cells ({count} remaining)}}",
+                { count: props.notebook.cells.length - visible },
+              )}
             </Button>
           ) : null}
         </div>

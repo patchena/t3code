@@ -1,6 +1,9 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import type { DesktopBridge, DesktopUpdateChannel, DesktopUpdateState } from "@t3tools/contracts";
 import { acceptsTrackSwitchRelease } from "@t3tools/shared/cliRelease";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "../../i18n/messages";
 
 type TrackSwitchBridge = Pick<DesktopBridge, "setUpdateChannel">;
 
@@ -15,7 +18,6 @@ export async function prepareLocalTrackSwitch(
     readonly version: string;
     readonly reinstall: boolean;
   },
-  t: TFunction<"settings">,
 ): Promise<
   | { readonly ok: true; readonly local: DesktopUpdateState | null }
   | { readonly ok: false; readonly message: string }
@@ -30,7 +32,10 @@ export async function prepareLocalTrackSwitch(
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : t(($) => $.extra.updates.trackUnchanged),
+      message:
+        error instanceof Error
+          ? (thrownErrorMessage(error, m) ?? error.message)
+          : m(msg("The update track did not change.")),
     };
   }
   if (!input.reinstall) return { ok: true, local: null };
@@ -46,8 +51,14 @@ export async function prepareLocalTrackSwitch(
     ok: false,
     message:
       found !== null
-        ? t(($) => $.extra.updates.olderBuild, { found, version: input.version })
-        : (local.message ?? t(($) => $.extra.updates.noBuild, { version: input.version })),
+        ? m(
+            msg(
+              "This app found {found}, which is older than {version}. Try again in a few minutes.",
+              { found, version: input.version },
+            ),
+          )
+        : (local.message ??
+          m(msg("This app found no build of {version} to install.", { version: input.version }))),
   };
 }
 
@@ -64,18 +75,31 @@ export function nothingToMove(
     readonly rows: ReadonlyArray<{ readonly skipped: string | null }>;
     readonly hasTargets: boolean;
   },
-  t: TFunction<"settings">,
+  resolve: MessageResolver = m,
 ): { readonly note: string | null; readonly disabledReason: string | null } {
   if (input.switchesLocal || input.rows.some((row) => row.skipped === null)) {
     return { note: null, disabledReason: null };
   }
-  const reason =
-    input.rows.length === 0 && !input.crossesLocal
-      ? t(($) => $.extra.updates.allOnChannel, { channel: input.label })
-      : t(($) => $.extra.updates.noMachineCanSwitch, { channel: input.label });
-  return !input.hasTargets && input.savedChannel === input.channel
-    ? { note: null, disabledReason: reason }
-    : { note: t(($) => $.extra.updates.onlySavesTrack, { reason }), disabledReason: null };
+  const label = input.label;
+  const allOnTrack = input.rows.length === 0 && !input.crossesLocal;
+  if (!input.hasTargets && input.savedChannel === input.channel) {
+    return {
+      note: null,
+      disabledReason: allOnTrack
+        ? resolve(msg("Every connected machine is already on {label}.", { label }))
+        : resolve(msg("No machine can switch to {label} now.", { label })),
+    };
+  }
+  return {
+    note: allOnTrack
+      ? resolve(
+          msg("Every connected machine is already on {label}. This only saves the track.", {
+            label,
+          }),
+        )
+      : resolve(msg("No machine can switch to {label} now. This only saves the track.", { label })),
+    disabledReason: null,
+  };
 }
 
 /**

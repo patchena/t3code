@@ -1,15 +1,14 @@
-import { systemLocale } from "~/timestampFormat";
-import { useTranslation } from "react-i18next";
 import type { PullRequestUpdateMethod } from "@t3tools/contracts";
+import { T, useGT } from "gt-react";
 import { TriangleAlertIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "~/lib/utils";
-import { Button } from "~/components/ui/button";
-import { MiddleTruncate } from "~/components/ui/middle-truncate";
-import { Popover, PopoverPopup, PopoverTrigger } from "~/components/ui/popover";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
-import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
+import { Button } from "../ui/button";
+import { MiddleTruncate } from "../ui/middle-truncate";
+import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { PullRequestGlyph } from "./pullRequestIcons";
 
 interface BaseFreshness {
   readonly behindBy: number | null;
@@ -33,15 +32,18 @@ function PullRequestBaseFreshnessWarning({
   readonly className?: string;
   readonly children?: ReactNode;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const summary =
     freshness.behindBy === null
-      ? t(($) => $.git.branchBehind, { branch: baseBranch })
-      : t(($) => $.git.branchBehindCount, {
-          branch: baseBranch,
-          count: freshness.behindBy,
-          value: freshness.behindBy.toLocaleString(systemLocale),
-        });
+      ? gt("This branch is out-of-date with {baseBranch}.", { baseBranch })
+      : gt(
+          "{count, plural, one {This branch is out-of-date with {baseBranch} by {formatted} commit.} other {This branch is out-of-date with {baseBranch} by {formatted} commits.}}",
+          {
+            count: freshness.behindBy,
+            formatted: freshness.behindBy.toLocaleString(),
+            baseBranch,
+          },
+        );
   return (
     <Popover>
       <PopoverTrigger
@@ -65,7 +67,7 @@ function PullRequestBaseFreshnessWarning({
       <PopoverPopup align="start" side="bottom" className="max-w-80" padding="compact">
         <p className="text-xs text-foreground">{summary}</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {t(($) => $.git.mergeableDescription)}
+          <T>Changes can be cleanly merged.</T>
         </p>
         {freshness.methods.length > 0 ? (
           <span className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -78,9 +80,7 @@ function PullRequestBaseFreshnessWarning({
                 onClick={() => onUpdate(method)}
               >
                 <PullRequestGlyph.merged aria-hidden className="size-3" />
-                {method === "rebase"
-                  ? t(($) => $.git.updateWithRebase)
-                  : t(($) => $.git.updateBranch)}
+                {method === "rebase" ? gt("Update with rebase") : gt("Update branch")}
               </Button>
             ))}
           </span>
@@ -106,12 +106,12 @@ export function PullRequestBaseBranch({
   readonly onUpdate: (method: PullRequestUpdateMethod) => void;
   readonly iconClassName?: string;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const label = (
     <>
       {stacked ? (
         <PullRequestGlyph.stack
-          aria-label={t(($) => $.git.stackedPullRequest)}
+          aria-label={gt("Stacked pull request")}
           className="size-3 shrink-0"
         />
       ) : null}
@@ -144,7 +144,7 @@ export function PullRequestBaseBranch({
         }
       />
       <TooltipPopup side="top">
-        {stacked ? t(($) => $.git.stackedOn, { branch: baseBranch }) : baseBranch}
+        {stacked ? gt("Stacked on {baseBranch}", { baseBranch }) : baseBranch}
       </TooltipPopup>
     </Tooltip>
   );

@@ -1,10 +1,9 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { useTranslation } from "react-i18next";
 import {
   type ProviderApprovalDecision,
   type ProviderApprovalOption,
   type RuntimeRequestId,
 } from "@t3tools/contracts";
+import { msg, useGT, useMessages } from "gt-react";
 import { memo } from "react";
 import { EllipsisIcon, TriangleAlertIcon } from "lucide-react";
 import { Button, InlineButton } from "../ui/button";
@@ -25,14 +24,21 @@ interface ComposerPendingApprovalActionsProps {
   ) => Promise<unknown>;
 }
 
-function defaultApprovalOptions(t: TFunction<"chat">): ReadonlyArray<ProviderApprovalOption> {
-  return [
-    { decision: "cancel", label: t(($) => $.composer.cancel) },
-    { decision: "decline", label: t(($) => $.composer.decline) },
-    { decision: "acceptForSession", label: t(($) => $.composer.allowSession) },
-    { decision: "accept", label: t(($) => $.composer.approve) },
-  ] satisfies ReadonlyArray<ProviderApprovalOption>;
-}
+const DEFAULT_APPROVAL_OPTIONS = [
+  {
+    decision: "cancel",
+    label: msg("Cancel", { $context: "verb, response to an approval request" }),
+  },
+  {
+    decision: "decline",
+    label: msg("Decline", { $context: "verb, response to an approval request" }),
+  },
+  { decision: "acceptForSession", label: msg("Always allow this session") },
+  {
+    decision: "accept",
+    label: msg("Approve", { $context: "verb, response to an approval request" }),
+  },
+] satisfies ReadonlyArray<ProviderApprovalOption>;
 
 export const ComposerPendingApprovalActions = memo(function ComposerPendingApprovalActions({
   presentation = "composer",
@@ -40,11 +46,13 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
   isResponding,
   canRespond,
   disabled = false,
-  options: suppliedOptions,
+  options = DEFAULT_APPROVAL_OPTIONS,
   onRespondToApproval,
 }: ComposerPendingApprovalActionsProps) {
-  const { t } = useTranslation("chat");
-  const options = suppliedOptions ?? defaultApprovalOptions(t);
+  const gt = useGT();
+  const m = useMessages();
+  // Provider options carry server-authored labels; only the built-in defaults are translated.
+  const optionLabel = (label: string) => (options === DEFAULT_APPROVAL_OPTIONS ? m(label) : label);
   const primaryOptions = options.filter(
     (option) => option.decision === "decline" || option.decision === "accept",
   );
@@ -68,7 +76,7 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
           <>
             {option.warning ? <TriangleAlertIcon className="size-3 shrink-0" /> : null}
             <span className={presentation === "inline" ? "whitespace-normal" : "max-w-40 truncate"}>
-              {option.label}
+              {optionLabel(option.label)}
             </span>
           </>
         );
@@ -106,17 +114,17 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
             disabled={disabled || isResponding || !canRespond}
             render={
               presentation === "inline" ? (
-                <InlineButton tone="muted" aria-label={t(($) => $.composer.moreApprovalOptions)} />
+                <InlineButton tone="muted" aria-label={gt("More approval options")} />
               ) : (
-                <Button
-                  size="icon-xs"
-                  variant="outline"
-                  aria-label={t(($) => $.composer.moreApprovalOptions)}
-                />
+                <Button size="icon-xs" variant="outline" aria-label={gt("More approval options")} />
               )
             }
           >
-            {presentation === "inline" ? t(($) => $.composer.more) : <EllipsisIcon />}
+            {presentation === "inline" ? (
+              gt("More", { $context: "button that opens more approval options" })
+            ) : (
+              <EllipsisIcon />
+            )}
           </MenuTrigger>
           <MenuPopup {...composerFloatingLayerProps} side="top" align="end" width="content">
             {moreOptions.map((option) => {
@@ -131,7 +139,9 @@ export const ComposerPendingApprovalActions = memo(function ComposerPendingAppro
                   }}
                 >
                   {option.warning ? <TriangleAlertIcon className="size-3 text-warning" /> : null}
-                  <span className="min-w-0 whitespace-normal wrap-break-word">{option.label}</span>
+                  <span className="min-w-0 whitespace-normal wrap-break-word">
+                    {optionLabel(option.label)}
+                  </span>
                 </MenuItem>
               );
               return option.warning ? (

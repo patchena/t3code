@@ -1,7 +1,7 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { isListedThreadLineage, isWebhookDedupeTemplate } from "@t3tools/contracts";
 import {
   EnvironmentId,
+  MAX_WEBHOOK_DELIVERY_AGE_MINUTES,
   type ProjectId,
   ScheduledTaskId,
   type ScheduledTask,
@@ -24,25 +24,23 @@ import {
   type WebhookFilterDraft,
 } from "@t3tools/client-runtime/scheduled-task-webhook";
 import { scheduleTimeZoneLabel } from "@t3tools/client-runtime/scheduled-task-time-zone";
+import { msg } from "gt-react";
 
 import {
   resolveProjectSettings,
   type LegacyProjectSettingsFields,
 } from "@t3tools/shared/projectSettings";
+import { getActiveLocale, m, type MessageResolver } from "../../i18n/messages";
 import type { ProviderInstanceEntry } from "../../providerInstances";
 
 import type { ResolvedSettingsScope } from "./settingsScope";
 
-export function weekdayLabels(t: TFunction<"settings">) {
-  return [
-    t(($) => $.extra.scheduled.sun),
-    t(($) => $.extra.scheduled.mon),
-    t(($) => $.extra.scheduled.tue),
-    t(($) => $.extra.scheduled.wed),
-    t(($) => $.extra.scheduled.thu),
-    t(($) => $.extra.scheduled.fri),
-    t(($) => $.extra.scheduled.sat),
-  ] as const;
+/** Abbreviated weekday name, 0 = Sunday. */
+export function weekdayShortLabel(day: number, locale: string = getActiveLocale()): string {
+  // 2024-01-07 was a Sunday.
+  return new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(
+    new Date(Date.UTC(2024, 0, 7 + day)),
+  );
 }
 
 const ONCE_FORMATTER = new Intl.DateTimeFormat(undefined, {
@@ -52,34 +50,40 @@ const ONCE_FORMATTER = new Intl.DateTimeFormat(undefined, {
 
 export function scheduleLabel(
   schedule: ScheduledTaskSchedule,
-  t: TFunction<"settings">,
   timeZone?: string,
   runAt?: string | null,
+  resolve: MessageResolver = m,
+  locale: string = getActiveLocale(),
 ): string {
-  if (schedule.type === "webhook") return t(($) => $.extra.scheduled.onWebhook);
-  if (schedule.type === "once")
-    return t(($) => $.extra.scheduled.onceAt, {
-      date: ONCE_FORMATTER.format(new Date(schedule.runAt)),
-    });
+  if (schedule.type === "webhook") return resolve(msg("On webhook"));
+  if (schedule.type === "once") {
+    return resolve(msg("Once, {time}", { time: ONCE_FORMATTER.format(new Date(schedule.runAt)) }));
+  }
   if (schedule.type === "interval") {
     const minutes = schedule.everyMs / 60_000;
     return Number.isInteger(minutes)
-      ? t(($) => $.extra.scheduled.everyMinutes, { minutes })
-      : t(($) => $.extra.scheduled.everySeconds, { seconds: Math.round(schedule.everyMs / 1000) });
+      ? resolve(msg("Every {minutes} min", { minutes }))
+      : resolve(msg("Every {seconds} sec", { seconds: Math.round(schedule.everyMs / 1000) }));
   }
   const weekdays = schedule.weekdays ?? [];
-  const labels = weekdayLabels(t);
-  const days =
-    weekdays.length === 0
-      ? t(($) => $.extra.scheduled.daily)
-      : weekdays.length === 5 && weekdays.every((day) => day >= 1 && day <= 5)
-        ? t(($) => $.extra.scheduled.weekdays)
-        : weekdays.map((day) => labels[day]).join(", ");
+  const time = schedule.timeOfDay;
   const zone = scheduleTimeZoneLabel(timeZone, runAt);
-  return t(($) => $.extra.scheduled.daysTime, {
-    days,
-    time: zone === undefined ? schedule.timeOfDay : `${schedule.timeOfDay} ${zone}`,
-  });
+  if (weekdays.length === 0) {
+    return zone === undefined
+      ? resolve(msg("Daily at {time}", { time }))
+      : resolve(msg("Daily at {time} {zone}", { time, zone }));
+  }
+  if (weekdays.length === 5 && weekdays.every((day) => day >= 1 && day <= 5)) {
+    return zone === undefined
+      ? resolve(msg("Weekdays at {time}", { time }))
+      : resolve(msg("Weekdays at {time} {zone}", { time, zone }));
+  }
+  const days = weekdays
+    .map((day) => (day >= 0 && day <= 6 ? weekdayShortLabel(day, locale) : ""))
+    .join(", ");
+  return zone === undefined
+    ? resolve(msg("{days} at {time}", { days, time }))
+    : resolve(msg("{days} at {time} {zone}", { days, time, zone }));
 }
 
 export function matchesScheduledTaskScope(
@@ -162,56 +166,77 @@ export function toDateTimeLocalValue(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export type ScheduleDraftError =
-  | "runAt"
-  | "runAtSkipped"
-  | "age"
-  | "replay"
-  | "coalesce"
-  | "window";
-
-export function scheduleDraftErrors(draft: DraftState): ReadonlyArray<ScheduleDraftError> {
+export function scheduleDraftErrors(draft: DraftState, resolve: MessageResolver = m) {
+  const invalidRunTime = (description: string) => [
+    { title: resolve(msg("Invalid run time")), description },
+  ];
   if (draft.scheduleMode === "once") {
     const runAt = new Date(draft.runAt);
-    if (Number.isNaN(runAt.getTime())) return ["runAt"];
+    if (Number.isNaN(runAt.getTime())) return invalidRunTime(resolve(msg("Pick a date and time.")));
     // A time skipped by a daylight saving change parses to a different clock time.
-    if (toDateTimeLocalValue(runAt) !== draft.runAt) return ["runAtSkipped"];
+    if (toDateTimeLocalValue(runAt) !== draft.runAt)
+      return invalidRunTime(resolve(msg("That time does not exist in your time zone.")));
     return [];
   }
+  if (draft.scheduleMode === "fixed" && !draft.timeOfDay)
+    return invalidRunTime(resolve(msg("Pick a time.")));
   if (draft.scheduleMode !== "webhook") return [];
-  if (parseMaxDeliveryAge(draft.maxDeliveryAgeMinutes) === undefined) return ["age"];
-  const errors: Array<"replay" | "coalesce" | "window"> = [];
-  for (const [kind, value] of [
-    ["replay", draft.replayKey],
-    ["coalesce", draft.coalesceKey],
+  if (parseMaxDeliveryAge(draft.maxDeliveryAgeMinutes) === undefined)
+    return [
+      {
+        title: resolve(msg("Invalid age limit")),
+        description: resolve(
+          msg("Enter whole minutes from 1 to {max}, or leave it blank.", {
+            max: MAX_WEBHOOK_DELIVERY_AGE_MINUTES,
+          }),
+        ),
+      },
+    ];
+  const errors: Array<{ title: string; description: string }> = [];
+  for (const [description, value] of [
+    [msg("Duplicate request key must contain a valid request placeholder."), draft.replayKey],
+    [msg("Coalesce key must contain a valid request placeholder."), draft.coalesceKey],
   ] as const) {
-    if (value.trim() && !isWebhookDedupeTemplate(value.trim())) errors.push(kind);
+    if (value.trim() && !isWebhookDedupeTemplate(value.trim()))
+      errors.push({
+        title: resolve(msg("Invalid webhook settings")),
+        description: resolve(description),
+      });
   }
   const window = draft.coalesceWindowSeconds.trim();
   if (window && (!Number.isInteger(Number(window)) || Number(window) < 10 || Number(window) > 3600))
-    errors.push("window");
+    errors.push({
+      title: resolve(msg("Invalid webhook settings")),
+      description: resolve(msg("Coalesce window must be whole seconds from 10 to 3600.")),
+    });
   return errors;
 }
 
+const WEBHOOK_DELIVERY_LABELS: Record<string, string> = {
+  dispatch_failed: msg("Run failed"),
+  duplicate: msg("Duplicate", { $context: "webhook delivery outcome" }),
+  coalesced: msg("Coalesced"),
+  filtered: msg("Filtered", { $context: "webhook delivery outcome" }),
+  rejected_signature: msg("Bad signature"),
+  disabled: msg("Task paused"),
+  rate_limited: msg("Rate limited"),
+  expired: msg("Too old"),
+};
+
 export function webhookDeliveryLabel(
-  delivery: { readonly outcome: string; readonly pendingWindow?: boolean | undefined },
-  t: TFunction<"settings">,
+  delivery: {
+    readonly outcome: string;
+    readonly pendingWindow?: boolean | undefined;
+  },
+  resolve: MessageResolver = m,
 ) {
-  if (delivery.outcome === "accepted")
+  if (delivery.outcome === "accepted") {
     return delivery.pendingWindow
-      ? t(($) => $.extra.scheduled.openedWindow)
-      : t(($) => $.extra.scheduled.ran);
-  const labels: Record<string, string> = {
-    dispatch_failed: t(($) => $.extra.scheduled.runFailed),
-    duplicate: t(($) => $.extra.scheduled.duplicate),
-    coalesced: t(($) => $.extra.scheduled.coalesced),
-    filtered: t(($) => $.extra.scheduled.filtered),
-    rejected_signature: t(($) => $.extra.scheduled.badSignature),
-    disabled: t(($) => $.extra.scheduled.taskPaused),
-    rate_limited: t(($) => $.extra.scheduled.rateLimited),
-    expired: t(($) => $.extra.scheduled.tooOld),
-  };
-  return labels[delivery.outcome] ?? delivery.outcome;
+      ? resolve(msg("Opened window"))
+      : resolve(msg("Ran", { $context: "webhook delivery outcome" }));
+  }
+  const label = WEBHOOK_DELIVERY_LABELS[delivery.outcome];
+  return label ? resolve(label) : delivery.outcome.replaceAll("_", " ");
 }
 
 export function scheduleFromDraft(draft: DraftState): ScheduledTaskUpsertSchedule | null {
@@ -278,7 +303,7 @@ export function scheduleFromDraft(draft: DraftState): ScheduledTaskUpsertSchedul
   const selectedEveryDay = draft.weekdays.size === 0 || draft.weekdays.size === 7;
   return {
     type: "fixed_time",
-    timeOfDay: draft.timeOfDay || "09:00",
+    timeOfDay: draft.timeOfDay,
     ...(selectedEveryDay ? {} : { weekdays: [...draft.weekdays].toSorted() }),
   };
 }

@@ -1,4 +1,5 @@
-import { Trans, useTranslation } from "react-i18next";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { m as resolveMessage } from "~/i18n/messages";
 import { useAtomValue } from "@effect/atom-react";
 import { AuthProvidersManageScope, ProviderDriverKind } from "@t3tools/contracts";
 import { readPreparedConnection, useEnvironmentScope } from "../../state/session";
@@ -27,6 +28,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { T, useGT, useMessages } from "gt-react";
 
 import { ensureLocalApi } from "../../localApi";
 import { managedInstanceLocks, useManagedPolicy } from "../../state/managedPolicy";
@@ -107,19 +109,21 @@ interface CodexSetupSectionProps {
 }
 
 export function CodexSetupSection(props: CodexSetupSectionProps) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
+  const m = useMessages();
   const [requested, setRequested] = useState(false);
   // A policy that owns Codex's launch settings also rules out ChatGPT's own runtime.
   const codexLocks = managedInstanceLocks(
     useManagedPolicy(props.environmentId),
     ProviderDriverKind.make("codex"),
+    m,
   );
   const chatGptDenial = codexLocks?.configKeys.has("setupMode") ? codexLocks.reason : undefined;
   const existingState = getOnboardingProviderState(props.provider);
   const existingReady = props.enabled && existingState === "ready";
   const existingAuthenticated = props.provider?.auth.status === "authenticated";
   const existingChecking = existingState === "checking";
-  const existingSummary = getProviderSummary(props.provider, t);
+  const existingSummary = getProviderSummary(props.provider, m);
   const content =
     props.mode === "existing" && props.presentation === "onboarding" ? (
       <CodexWelcomeCard
@@ -128,42 +132,38 @@ export function CodexSetupSection(props: CodexSetupSectionProps) {
           existingReady ? (
             props.provider?.auth.email?.trim() ? (
               <>
-                <Trans
-                  t={t}
-                  i18nKey={($) => $.providers.signedInAsSentence}
-                  components={{
-                    account: (
-                      <RedactedSensitiveText
-                        value={props.provider.auth.email.trim()}
-                        ariaLabel={t(($) => $.providers.toggleEmail)}
-                        revealTooltip={t(($) => $.providers.revealEmail)}
-                        hideTooltip={t(($) => $.providers.hideEmail)}
-                        className="break-all"
-                      />
-                    ),
-                  }}
-                />
+                <T>
+                  Signed in as{" "}
+                  <RedactedSensitiveText
+                    value={props.provider.auth.email.trim()}
+                    ariaLabel={gt("Toggle account email visibility")}
+                    revealTooltip={gt("Click to reveal email")}
+                    hideTooltip={gt("Click to hide email")}
+                    className="break-all"
+                  />
+                  .
+                </T>
               </>
             ) : (
-              t(($) => $.providers.connectedCodexCli)
+              gt("Connected with your Codex CLI.")
             )
           ) : existingChecking ? (
-            t(($) => $.providers.checkingCodexCli)
+            gt("Checking your Codex CLI...")
           ) : props.provider?.installed ? (
             existingSummary.headline
           ) : (
-            t(($) => $.providers.chatGptSubscription)
+            gt("Code with your ChatGPT subscription.")
           )
         }
         control={
           existingReady ? (
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success-foreground">
               <CheckIcon className="size-3.5" />
-              {t(($) => $.providers.ready)}
+              <T>Ready</T>
             </span>
           ) : existingChecking ? (
             <span className="text-xs text-muted-foreground">
-              {t(($) => $.providers.checkingDots)}
+              <T>Checking...</T>
             </span>
           ) : existingAuthenticated ? (
             <span className="text-xs text-muted-foreground">{existingSummary.headline}</span>
@@ -177,7 +177,7 @@ export function CodexSetupSection(props: CodexSetupSectionProps) {
                   props.onModeChange("managed");
                 }}
               >
-                {t(($) => $.providers.continueChatGpt)}
+                <T>Continue with ChatGPT</T>
               </ChatGptConnectionButton>
             </ManagedControl>
           )
@@ -190,7 +190,7 @@ export function CodexSetupSection(props: CodexSetupSectionProps) {
               disabled={props.existingCliDisabled}
               onClick={() => props.onModeChange("existing")}
             >
-              {t(($) => $.providers.useExistingCli)}
+              <T>Use existing CLI</T>
             </Button>
           ) : null
         }
@@ -202,20 +202,17 @@ export function CodexSetupSection(props: CodexSetupSectionProps) {
           description={<CodexSignInDescription />}
           control={
             <Button size="sm" variant="outline" className="min-w-44" disabled>
-              {t(($) => $.providers.openSignInPage)}
+              <T>Open sign-in page</T>
             </Button>
           }
           secondaryControl={
             <Button size="sm" variant="ghost-muted" disabled>
-              {t(($) => $.providers.cancel)}
+              <T>Cancel</T>
             </Button>
           }
         />
       ) : (
-        <SettingsRow
-          title={t(($) => $.providers.chatGptAccountTitle)}
-          description={t(($) => $.providers.preparingSignIn)}
-        />
+        <SettingsRow title={gt("ChatGPT account")} description={gt("Preparing sign-in.")} />
       )
     ) : (
       <ManagedCodexSetup
@@ -287,16 +284,20 @@ function ManagedCodexSetup({
   readonly onAutoStartConsumed: () => void;
   readonly allowExistingCli?: boolean;
 }) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   const target = { environmentId, input: { instanceId } };
-  const authQuery = useEnvironmentQuery(serverEnvironment.providerAuthState(target));
-  const installQuery = useEnvironmentQuery(serverEnvironment.providerInstallState(target));
+  const authQuery = useEnvironmentQuery(serverEnvironment.providerAuthState(target), useMessages());
+  const installQuery = useEnvironmentQuery(
+    serverEnvironment.providerInstallState(target),
+    useMessages(),
+  );
   const [handoff, setHandoff] = useState<{
     environmentId: EnvironmentId;
     input: ChatGptHandoffInput;
   } | null>(null);
   const handoffQuery = useEnvironmentQuery(
     handoff ? serverEnvironment.chatGptHandoffState(handoff) : null,
+    useMessages(),
   );
   const auth = handoffQuery.data?.phase === "auth" ? handoffQuery.data.state : authQuery.data;
   const [accountPickerOpen, setAccountPickerOpen] = useState(false);
@@ -338,20 +339,7 @@ function ManagedCodexSetup({
   const [pending, setPending] = useState(false);
   const [awaitingProvider, setAwaitingProvider] = useState<"sign-in" | "handoff" | null>(null);
   const pendingRef = useRef(false);
-  const [error, setError] = useState<
-    { message: string } | { kind: "setup" | "handoff" | "interrupted" | "local" } | null
-  >(null);
-  const errorText =
-    error === null
-      ? null
-      : "message" in error
-        ? error.message
-        : {
-            setup: t(($) => $.providers.codexSetupRetryError),
-            handoff: t(($) => $.providers.chatGptSignInError),
-            interrupted: t(($) => $.providers.chatGptSignInInterrupted),
-            local: t(($) => $.providers.localSignInError),
-          }[error.kind];
+  const [error, setError] = useState<string | null>(null);
   // The setup or sign-in this client started. Its follow-up steps (sign in
   // once the install lands, open the page once the flow waits) belong to it
   // alone, so Cancel, a new attempt, or unmounting abort them.
@@ -425,14 +413,18 @@ function ManagedCodexSetup({
       if (result._tag === "Failure") {
         if (!isAtomCommandInterrupted(result)) {
           const failure = squashAtomCommandFailure(result);
-          setError(failure instanceof Error ? { message: failure.message } : { kind: "setup" });
+          setError(
+            failure instanceof Error
+              ? (thrownErrorMessage(failure, resolveMessage) ?? failure.message)
+              : gt("Codex setup failed. Try again."),
+          );
         }
       } else {
         succeeded = true;
         onSuccess?.(result.value);
       }
     } catch {
-      setError({ kind: "setup" });
+      setError(gt("Codex setup failed. Try again."));
     }
     pendingRef.current = false;
     setPending(false);
@@ -472,10 +464,8 @@ function ManagedCodexSetup({
   ) {
     setError(
       handoffQuery.data?.phase === "auth"
-        ? handoffQuery.data.state.message === null
-          ? { kind: "handoff" }
-          : { message: handoffQuery.data.state.message }
-        : { kind: "interrupted" },
+        ? (handoffQuery.data.state.message ?? gt("ChatGPT sign-in could not finish. Try again."))
+        : gt("ChatGPT sign-in on the primary environment was interrupted. Try again."),
     );
     setHandoff(null);
   }
@@ -512,7 +502,7 @@ function ManagedCodexSetup({
         await ensureLocalApi().shell.openExternal(authorizationUrl);
       }
     } catch {
-      setError({ kind: "local" });
+      setError(gt("Could not finish sign-in on this computer. Try again."));
     }
   };
 
@@ -641,63 +631,57 @@ function ManagedCodexSetup({
   const runtimeDescription =
     installation?.phase === "downloading"
       ? installation.totalBytes === null
-        ? t(($) => $.providers.downloadingRuntime, {
+        ? gt("Downloading {downloaded} MB.", {
             downloaded: (installation.downloadedBytes / 1_000_000).toFixed(1),
           })
-        : t(($) => $.providers.codexDownloadingTotal, {
+        : gt("Downloading {downloaded} of {total} MB.", {
             downloaded: (installation.downloadedBytes / 1_000_000).toFixed(1),
             total: (installation.totalBytes / 1_000_000).toFixed(1),
           })
       : installation?.phase === "extracting"
-        ? t(($) => $.providers.installingCodex)
+        ? gt("Installing Codex.")
         : installation?.phase === "verifying"
-          ? t(($) => $.providers.checkingCodex)
+          ? gt("Checking Codex.")
           : installed
             ? installation?.installedVersion
-              ? installation.source === "local"
-                ? t(($) => $.providers.localCodexVersion, {
+              ? installation?.source === "local"
+                ? gt("Using your installed Codex · v{version}.", {
                     version: installation.installedVersion,
                   })
-                : t(($) => $.providers.managedCodexVersion, {
-                    version: installation.installedVersion,
-                  })
+                : gt("Managed by T3 Code · v{version}.", { version: installation.installedVersion })
               : installation?.source === "local"
-                ? t(($) => $.providers.localCodex)
-                : t(($) => $.providers.managedCodex)
-            : (installation?.message ?? t(($) => $.providers.manageCodexHint));
+                ? gt("Using your installed Codex.")
+                : gt("Managed by T3 Code.")
+            : (installation?.message ?? gt("T3 Code downloads and manages Codex for you."));
   const accountDescription = finishingSignIn ? (
-    t(($) => $.providers.finishingSignIn)
+    gt("Finishing sign-in...")
   ) : installActive ? (
     runtimeDescription
   ) : authActive || auth?.phase === "failed" || auth?.phase === "cancelled" ? (
     auth?.phase === "waiting" && requestedAccountEmail ? (
-      t(($) => $.providers.continueOpenAiAs, { email: requestedAccountEmail })
+      gt("Continue as {email} on OpenAI.", { email: requestedAccountEmail })
     ) : (
-      (auth?.message ?? t(($) => $.providers.finishBrowserSignIn))
+      (auth?.message ?? gt("Finish signing in in your browser."))
     )
   ) : authenticated ? (
     provider?.auth.email?.trim() ? (
       <>
-        <Trans
-          t={t}
-          i18nKey={($) => $.providers.signedInAsSentence}
-          components={{
-            account: (
-              <RedactedSensitiveText
-                value={provider.auth.email.trim()}
-                ariaLabel={t(($) => $.providers.toggleEmail)}
-                revealTooltip={t(($) => $.providers.revealEmail)}
-                hideTooltip={t(($) => $.providers.hideEmail)}
-              />
-            ),
-          }}
-        />
+        <T>
+          Signed in as{" "}
+          <RedactedSensitiveText
+            value={provider.auth.email.trim()}
+            ariaLabel={gt("Toggle account email visibility")}
+            revealTooltip={gt("Click to reveal email")}
+            hideTooltip={gt("Click to hide email")}
+          />
+          .
+        </T>
       </>
     ) : (
-      t(($) => $.providers.signedInChatGpt)
+      gt("Signed in with ChatGPT.")
     )
   ) : (
-    (reconnectEmail ?? t(($) => $.providers.useChatGptSubscription))
+    (reconnectEmail ?? gt("Use your ChatGPT subscription."))
   );
 
   const handoffUrl =
@@ -730,24 +714,26 @@ function ManagedCodexSetup({
       }}
     >
       {finishingSignIn
-        ? t(($) => $.providers.finishingSignIn)
+        ? gt("Finishing sign-in...")
         : handoffQuery.data?.phase === "finished"
           ? transferFailed
-            ? t(($) => $.providers.retryConnection)
-            : t(($) => $.providers.finishingSignIn)
+            ? gt("Retry connection")
+            : gt("Finishing sign-in...")
           : auth?.phase === "waiting"
             ? remoteWeb
-              ? t(($) => $.providers.openChatGptSignIn)
-              : t(($) => $.providers.openSignInPage)
+              ? gt("Open ChatGPT sign-in")
+              : gt("Open sign-in page")
             : presentation === "onboarding"
-              ? t(($) => $.providers.openSignInPage)
-              : t(($) => $.providers.signingIn)}
+              ? gt("Open sign-in page")
+              : gt("Signing in...")}
     </Button>
   );
   const callbackCompletion =
     !handoff && auth?.phase === "waiting" && url ? (
       <div className="flex w-full flex-col gap-3 text-xs leading-relaxed text-muted-foreground">
-        <p>{t(($) => $.providers.manualCallbackHint)}</p>
+        <p>
+          <T>If sign-in doesn't return to T3 Code, paste the URL from the final localhost page.</T>
+        </p>
         <form
           className="flex flex-col gap-2 sm:flex-row sm:items-center"
           onSubmit={(event) => {
@@ -767,10 +753,10 @@ function ManagedCodexSetup({
         >
           <div className="min-w-0 flex-1">
             <Input
-              aria-label={t(($) => $.providers.chatGptRedirect)}
+              aria-label={gt("ChatGPT sign-in redirect URL")}
               type="password"
               autoComplete="off"
-              placeholder={t(($) => $.providers.pasteSignInUrl)}
+              placeholder={gt("Paste the URL from the sign-in tab")}
               value={callbackUrl}
               maxLength={16_384}
               disabled={pending || readOnly}
@@ -784,7 +770,7 @@ function ManagedCodexSetup({
             type="submit"
             disabled={pending || readOnly || !callbackUrl.trim()}
           >
-            {t(($) => $.providers.connect)}
+            <T>Connect</T>
           </Button>
         </form>
         {!remoteWeb ? (
@@ -794,16 +780,18 @@ function ManagedCodexSetup({
               variant="ghost-muted"
               onClick={() => void ensureLocalApi().shell.openExternal(url)}
             >
-              {t(($) => $.providers.tryBrowserSignIn)}
+              <T>Try sign-in in your browser</T>
               <ExternalLinkIcon className="size-3.5" />
             </Button>
           </div>
         ) : null}
         {handoffUrl ? (
           <details>
-            <summary className="cursor-pointer">{t(($) => $.providers.otherConnectWays)}</summary>
+            <summary className="cursor-pointer">
+              <T>Other ways to connect</T>
+            </summary>
             <Button className="mt-2" size="sm" variant="outline" render={<a href={handoffUrl} />}>
-              {t(($) => $.providers.useDesktopReturn)}
+              <T>Use T3 desktop for automatic return</T>
             </Button>
           </details>
         ) : null}
@@ -820,7 +808,7 @@ function ManagedCodexSetup({
   ) : callbackCompletion ? (
     <div className="space-y-3 text-xs leading-relaxed text-muted-foreground">
       <CodexSignInDescription
-        label={t(($) => $.providers.signInTrouble)}
+        label={gt("Having trouble signing in?")}
         expanded={callbackHelpOpen}
         controls={callbackHelpId}
         onToggle={() => setCallbackHelpOpen((open) => !open)}
@@ -836,7 +824,7 @@ function ManagedCodexSetup({
       onClose={() => setAccountPickerOpen(false)}
       disabled={unavailable || busy}
       canRemove={canRemoveAuthMethod}
-      error={errorText}
+      error={error}
       onRemove={(methodId) => {
         void run(() => removeAuthMethod({ environmentId, input: { instanceId, methodId } }));
       }}
@@ -857,9 +845,9 @@ function ManagedCodexSetup({
   if (presentation === "onboarding") {
     const setupError =
       logoutWarning ??
-      errorText ??
+      error ??
       (authQuery.error || installQuery.error
-        ? t(($) => $.providers.setupStatusError)
+        ? gt("Could not read setup status. Reconnect and try again.")
         : installation?.phase === "failed"
           ? installation.message
           : null);
@@ -874,24 +862,20 @@ function ManagedCodexSetup({
             ) : authenticated ? (
               provider?.auth.email?.trim() ? (
                 <>
-                  <Trans
-                    t={t}
-                    i18nKey={($) => $.providers.signedInAsSentence}
-                    components={{
-                      account: (
-                        <RedactedSensitiveText
-                          value={provider.auth.email.trim()}
-                          ariaLabel={t(($) => $.providers.toggleEmail)}
-                          revealTooltip={t(($) => $.providers.revealEmail)}
-                          hideTooltip={t(($) => $.providers.hideEmail)}
-                          className="break-all"
-                        />
-                      ),
-                    }}
-                  />
+                  <T>
+                    Signed in as{" "}
+                    <RedactedSensitiveText
+                      value={provider.auth.email.trim()}
+                      ariaLabel={gt("Toggle account email visibility")}
+                      revealTooltip={gt("Click to reveal email")}
+                      hideTooltip={gt("Click to hide email")}
+                      className="break-all"
+                    />
+                    .
+                  </T>
                 </>
               ) : (
-                t(($) => $.providers.connectedChatGpt)
+                gt("Connected to ChatGPT.")
               )
             ) : callbackCompletion && !needsManualCallback ? (
               <CodexSignInDescription
@@ -908,14 +892,14 @@ function ManagedCodexSetup({
             ) : authActive || auth?.phase === "failed" || auth?.phase === "cancelled" ? (
               accountDescription
             ) : (
-              t(($) => $.providers.chatGptSubscription)
+              gt("Code with your ChatGPT subscription.")
             )
           }
           control={
             authenticated && !busy ? (
               <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success-foreground">
                 <CheckIcon className="size-3.5" />
-                {t(($) => $.providers.ready)}
+                <T>Ready</T>
               </span>
             ) : authActive ? (
               waitingControl
@@ -933,10 +917,10 @@ function ManagedCodexSetup({
                 }}
               >
                 {installActive || pending
-                  ? t(($) => $.providers.settingUp)
+                  ? gt("Setting up...")
                   : hasSavedAccount
-                    ? t(($) => $.providers.reconnectAccount)
-                    : t(($) => $.providers.continueChatGpt)}
+                    ? gt("Reconnect account")
+                    : gt("Continue with ChatGPT")}
               </ChatGptConnectionButton>
             )
           }
@@ -958,7 +942,7 @@ function ManagedCodexSetup({
                     );
                 }}
               >
-                {t(($) => $.providers.cancel)}
+                <T>Cancel</T>
               </Button>
             ) : !authActive && !authenticated && hasSavedAccount ? (
               <Button
@@ -967,7 +951,7 @@ function ManagedCodexSetup({
                 disabled={unavailable || busy}
                 onClick={() => void setup("chatgpt-change-account")}
               >
-                {t(($) => $.providers.differentAccount)}
+                <T>Use a different account</T>
               </Button>
             ) : !authActive && !authenticated && allowExistingCli ? (
               <Button
@@ -976,7 +960,7 @@ function ManagedCodexSetup({
                 disabled={readOnly || busy || existingCliDisabled}
                 onClick={() => onModeChange("existing")}
               >
-                {t(($) => $.providers.useExistingCli)}
+                <T>Use existing CLI</T>
               </Button>
             ) : null
           }
@@ -993,10 +977,10 @@ function ManagedCodexSetup({
   }
 
   return (
-    <section aria-label={t(($) => $.providers.codexSetup)} className="divide-y divide-border/50">
+    <section aria-label={gt("Codex setup")} className="divide-y divide-border/50">
       {accountPicker}
       <SettingsRow
-        title={t(($) => $.providers.chatGptAccountTitle)}
+        title={gt("ChatGPT account")}
         description={accountDescription}
         control={
           <div className="flex max-w-88 flex-wrap items-center justify-end gap-2">
@@ -1015,7 +999,7 @@ function ManagedCodexSetup({
                       onSignInCancelled?.();
                     }}
                   >
-                    {t(($) => $.providers.cancel)}
+                    <T>Cancel</T>
                   </Button>
                 )}
               </>
@@ -1035,7 +1019,7 @@ function ManagedCodexSetup({
                   );
                 }}
               >
-                {t(($) => $.providers.cancel)}
+                <T>Cancel</T>
               </Button>
             ) : authenticated ? (
               <>
@@ -1048,7 +1032,7 @@ function ManagedCodexSetup({
                       void run(() => startInstall({ environmentId, input: { instanceId } }))
                     }
                   >
-                    Update Codex
+                    <T>Update Codex</T>
                   </Button>
                 ) : null}
                 <Button
@@ -1057,7 +1041,7 @@ function ManagedCodexSetup({
                   disabled={unavailable || busy}
                   onClick={() => setAccountPickerOpen(true)}
                 >
-                  {t(($) => $.providers.changeAccount)}
+                  <T>Change account</T>
                 </Button>
                 <Button
                   size="sm"
@@ -1065,7 +1049,7 @@ function ManagedCodexSetup({
                   disabled={unavailable || busy}
                   onClick={() => void run(() => logoutAuth(target))}
                 >
-                  {t(($) => $.providers.disconnect)}
+                  <T>Disconnect</T>
                 </Button>
               </>
             ) : (
@@ -1083,10 +1067,10 @@ function ManagedCodexSetup({
                   }}
                 >
                   {pending
-                    ? t(($) => $.providers.settingUp)
+                    ? gt("Setting up...")
                     : hasSavedAccount
-                      ? t(($) => $.providers.reconnectAccount)
-                      : t(($) => $.providers.continueChatGpt)}
+                      ? gt("Reconnect account")
+                      : gt("Continue with ChatGPT")}
                 </ChatGptConnectionButton>
                 {hasSavedAccount ? (
                   <Button
@@ -1095,7 +1079,7 @@ function ManagedCodexSetup({
                     disabled={unavailable || busy}
                     onClick={() => void setup("chatgpt-change-account")}
                   >
-                    {t(($) => $.providers.differentAccount)}
+                    <T>Use a different account</T>
                   </Button>
                 ) : null}
                 {allowExistingCli ? (
@@ -1105,7 +1089,7 @@ function ManagedCodexSetup({
                     disabled={readOnly || busy}
                     onClick={() => onModeChange("existing")}
                   >
-                    {t(($) => $.providers.useExistingCli)}
+                    <T>Use existing CLI</T>
                   </Button>
                 ) : null}
               </>
@@ -1126,10 +1110,10 @@ function ManagedCodexSetup({
       {callbackFallback ? <div className="px-3 py-3 sm:px-4">{callbackFallback}</div> : null}
       {error || authQuery.error || installQuery.error || installation?.phase === "failed" ? (
         <p role="alert" className="px-3 py-2 text-xs text-destructive sm:px-4">
-          {errorText ??
+          {error ??
             (installation?.phase === "failed"
               ? installation.message
-              : t(($) => $.providers.codexStatusError))}
+              : gt("Could not read Codex setup status. Reconnect and try again."))}
         </p>
       ) : null}
     </section>
@@ -1145,29 +1129,28 @@ export function CodexManagedRuntimeFields({
   readonly instanceId: ProviderInstanceId;
   readonly provider: ServerProvider | undefined;
 }) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   const installation = useEnvironmentQuery(
     serverEnvironment.providerInstallState({
       environmentId,
       input: { instanceId },
     }),
+    useMessages(),
   );
   const executablePath = installation.data?.executablePath ?? "";
   return (
     <>
       <SettingsRow
-        title={t(($) => $.providers.binaryPath)}
-        description={t(($) => $.providers.selectedByT3)}
+        title={gt("Binary path")}
+        description={gt("Selected by T3 Code.")}
         control={
           <div className="w-full sm:w-80">
             <Input
-              aria-label={t(($) => $.providers.codexBinaryPath)}
+              aria-label={gt("Codex binary path")}
               value={executablePath}
               title={executablePath}
               placeholder={
-                installation.error
-                  ? t(($) => $.providers.runtimePathError)
-                  : t(($) => $.providers.notInstalledLabel)
+                installation.error ? gt("Could not read runtime path") : gt("Not installed")
               }
               disabled
             />
@@ -1175,34 +1158,38 @@ export function CodexManagedRuntimeFields({
         }
       />
       <SettingsRow
-        title={t(($) => $.providers.codexHomePath)}
-        description={t(($) => $.providers.codexHomeHint)}
+        title={gt("CODEX_HOME path")}
+        description={gt("Shared Codex config, sessions, and state.")}
         control={
           <div className="w-full sm:w-80">
             <Input
-              aria-label={t(($) => $.providers.codexHome)}
+              aria-label={gt("Codex home path")}
               value={provider?.runtimePaths?.homePath ?? ""}
               title={provider?.runtimePaths?.homePath}
-              placeholder={t(($) => $.providers.unavailable)}
+              placeholder={gt("Unavailable", { $context: "path cannot be read" })}
               disabled
             />
           </div>
         }
       />
       <SettingsRow
-        title={t(($) => $.providers.shadowHomePath)}
+        title={gt("Shadow home path")}
         description={
           provider?.runtimePaths?.shadowHomePath
-            ? t(($) => $.providers.shadowHomeHint)
-            : t(($) => $.providers.sharedHomeHint)
+            ? gt("Account-specific home sharing the Codex state above.")
+            : gt("This instance uses the shared Codex home directly.")
         }
         control={
           <div className="w-full sm:w-80">
             <Input
-              aria-label={t(($) => $.providers.codexShadowHome)}
+              aria-label={gt("Codex shadow home path")}
               value={provider?.runtimePaths?.shadowHomePath ?? ""}
               title={provider?.runtimePaths?.shadowHomePath ?? undefined}
-              placeholder={provider?.runtimePaths ? t(($) => $.providers.notUsed) : "Unavailable"}
+              placeholder={
+                provider?.runtimePaths
+                  ? gt("Not used")
+                  : gt("Unavailable", { $context: "path cannot be read" })
+              }
               disabled
             />
           </div>
@@ -1213,7 +1200,7 @@ export function CodexManagedRuntimeFields({
 }
 
 function CodexSignInDescription({
-  label,
+  label: labelOverride,
   expanded = false,
   controls,
   onToggle,
@@ -1223,19 +1210,19 @@ function CodexSignInDescription({
   readonly controls?: string;
   readonly onToggle?: () => void;
 }) {
-  const { t } = useTranslation("settings");
-  const text = label ?? t(($) => $.providers.completeBrowserSignIn);
-  if (!onToggle) return <div className="leading-relaxed">{text}</div>;
+  const gt = useGT();
+  const label = labelOverride ?? gt("Complete sign-in in your browser.");
+  if (!onToggle) return <div className="leading-relaxed">{label}</div>;
   return (
     <button
       type="button"
       className="inline-flex items-center gap-1.5 rounded-sm text-left leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-      aria-label={t(($) => $.providers.signInTrouble)}
+      aria-label={gt("Having trouble signing in?")}
       aria-expanded={expanded}
       aria-controls={controls}
       onClick={onToggle}
     >
-      {text}
+      {label}
       <ChevronRightIcon aria-hidden className={`size-3 shrink-0 ${expanded ? "rotate-90" : ""}`} />
     </button>
   );

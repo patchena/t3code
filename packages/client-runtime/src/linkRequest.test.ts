@@ -2,7 +2,6 @@ import { EnvironmentId, type ServerConfig, ThreadId, TurnItemId } from "@t3tools
 import type { RelayEnvironmentStatusResponse } from "@t3tools/contracts/relay";
 import * as Option from "effect/Option";
 import { describe, expect, it } from "vite-plus/test";
-import { createI18n } from "@t3tools/client-runtime/i18n";
 
 import { BearerConnectionProfile } from "./connection/catalog.ts";
 import { BearerConnectionTarget, RelayConnectionTarget } from "./connection/model.ts";
@@ -30,29 +29,25 @@ const accessLabel = (access: string) => `<${access}>`;
 
 describe("linkRequestDisplay", () => {
   it("names the environment linked and the access the user chose", () => {
-    const t = createI18n("en").getFixedT("en", "chat");
     expect(
       linkRequestDisplay(
         { ...asked, linkStatus: "linked", linkedLabel: "Box", linkedAccess: "auto" },
         "local",
         accessLabel,
-        t,
       ),
     ).toEqual({ kind: "answered", outcome: "linked", label: "Linked Box · <auto>" });
   });
 
   it("shows why a link failed, and never offers the actions outside the asking thread", () => {
-    const t = createI18n("en").getFixedT("en", "chat");
     expect(
       linkRequestDisplay(
         { ...asked, linkStatus: "failed", failure: "Pairing code expired." },
         "local",
         accessLabel,
-        t,
       ),
     ).toMatchObject({ outcome: "failed", label: "Could not link: Pairing code expired." });
     expect(
-      linkRequestDisplay({ ...asked, linkStatus: "pending" }, "inherited", accessLabel, t),
+      linkRequestDisplay({ ...asked, linkStatus: "pending" }, "inherited", accessLabel),
     ).toMatchObject({ kind: "pending-elsewhere" });
   });
 });
@@ -150,6 +145,7 @@ const presentation = (
               httpBaseUrl,
             })),
           } as unknown as ServerConfig),
+    refusedRouteIds: [],
   };
 };
 
@@ -420,7 +416,6 @@ describe("rankMachinesByHint", () => {
 });
 
 describe("linkRequestTarget", () => {
-  const t = createI18n("en").getFixedT("en", "chat");
   const box = {
     environmentId: EnvironmentId.make("environment-box"),
     label: "Box",
@@ -438,16 +433,16 @@ describe("linkRequestTarget", () => {
       environmentId: box.environmentId,
       label: "Box",
     };
-    expect(linkRequestTarget(unfamiliar, [box], null, t)).toEqual({ kind: "address" });
-    expect(linkRequestTarget(unfamiliar, [box], box.environmentId, t)).toEqual({ kind: "address" });
-    expect(linkRequestTargetName(unfamiliar, t)).toBe("https://other.example");
+    expect(linkRequestTarget(unfamiliar, [box], null)).toEqual({ kind: "address" });
+    expect(linkRequestTarget(unfamiliar, [box], box.environmentId)).toEqual({ kind: "address" });
+    expect(linkRequestTargetName(unfamiliar)).toBe("https://other.example");
     // A username in the address must not pass for the host the code goes to.
-    expect(linkRequestTargetName({ url: "https://box.t3connect.example@other.example/x" }, t)).toBe(
+    expect(linkRequestTargetName({ url: "https://box.t3connect.example@other.example/x" })).toBe(
       "https://other.example",
     );
     // A known address in another spelling is the box, linked at its own addresses only.
     expect(
-      linkRequestTarget({ url: "https://BOX.t3connect.example:443/mcp" }, [box], null, t),
+      linkRequestTarget({ url: "https://BOX.t3connect.example:443/mcp" }, [box], null),
     ).toEqual({
       kind: "machine",
       environmentId: box.environmentId,
@@ -455,39 +450,38 @@ describe("linkRequestTarget", () => {
       urls: box.urls,
       linked: false,
     });
-    expect(linkRequestTarget({ url: "http://box.t3connect.example" }, [box], null, t)).toEqual({
+    expect(linkRequestTarget({ url: "http://box.t3connect.example" }, [box], null)).toEqual({
       kind: "address",
     });
-    expect(linkRequestTarget({ url: "not a url" }, [box], null, t)).toEqual({ kind: "address" });
-    expect(
-      linkRequestTarget({ url: "blob:https://box.t3connect.example/1" }, [box], null, t),
-    ).toEqual({ kind: "address" });
+    expect(linkRequestTarget({ url: "not a url" }, [box], null)).toEqual({ kind: "address" });
+    expect(linkRequestTarget({ url: "blob:https://box.t3connect.example/1" }, [box], null)).toEqual(
+      { kind: "address" },
+    );
     // A private address two machines share names neither.
     const mini = { ...box, environmentId: EnvironmentId.make("environment-mini") };
-    expect(linkRequestTarget({ url: "http://10.0.0.2:3773" }, [box, mini], null, t)).toEqual({
+    expect(linkRequestTarget({ url: "http://10.0.0.2:3773" }, [box, mini], null)).toEqual({
       kind: "address",
     });
   });
 
   it("links the machine the agent named or the user picked, at the addresses this app has", () => {
-    expect(linkRequestTarget({ environmentId: box.environmentId }, [box], null, t)).toMatchObject({
+    expect(linkRequestTarget({ environmentId: box.environmentId }, [box], null)).toMatchObject({
       kind: "machine",
       label: "Box",
       urls: box.urls,
     });
-    expect(linkRequestTarget({}, [box], box.environmentId, t)).toMatchObject({ kind: "machine" });
-    expect(linkRequestTarget({}, [box], ANOTHER_ADDRESS, t)).toEqual({ kind: "address" });
-    expect(linkRequestTarget({}, [box], null, t)).toEqual({ kind: "none" });
+    expect(linkRequestTarget({}, [box], box.environmentId)).toMatchObject({ kind: "machine" });
+    expect(linkRequestTarget({}, [box], ANOTHER_ADDRESS)).toEqual({ kind: "address" });
+    expect(linkRequestTarget({}, [box], null)).toEqual({ kind: "none" });
   });
 });
 
 describe("linkRequestFailureMessage", () => {
   it("passes through only known user-facing errors", () => {
-    const t = createI18n("en").getFixedT("en", "chat");
     expect(
-      linkRequestFailureMessage({ _tag: "PeerLinkRequestError", message: "Already answered." }, t),
+      linkRequestFailureMessage({ _tag: "PeerLinkRequestError", message: "Already answered." }),
     ).toBe("Already answered.");
-    expect(linkRequestFailureMessage({ _tag: "SchemaError", message: "code=abc" }, t)).toBe(
+    expect(linkRequestFailureMessage({ _tag: "SchemaError", message: "code=abc" })).toBe(
       "Could not answer the request. Try again.",
     );
   });

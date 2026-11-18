@@ -1,44 +1,35 @@
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
+import { useGT, useMessages } from "gt-react";
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
 
 import {
   hasDesktopNotifications,
   hasNotificationSound,
+  NOTIFICATION_MODE_LABELS,
   unlockNotificationAudio,
 } from "../../threadNotifications";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { SettingsRow } from "./settingsLayout";
-import { searchableSetting } from "./settingsSearch";
+import { useSearchableSetting } from "./settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 
 export function NotificationSettings() {
-  const { t } = useTranslation("settings");
+  const searchableSetting = useSearchableSetting();
+  const gt = useGT();
+  const m = useMessages();
   const mode = useScopedSettings((settings) => settings.notificationMode);
   const updateSettings = useUpdateScopedSettings();
-  const [permissionError, setPermissionError] = useState<
-    "unsupported" | "unavailable" | "permission" | null
-  >(null);
+  const [permissionMessage, setPermissionMessage] = useState<string | null>(null);
   const [requesting, setRequesting] = useState(false);
-  const labels = {
-    off: t(($) => $.extra.notifications.off),
-    notifications: t(($) => $.extra.notifications.notifications),
-    sound: t(($) => $.extra.notifications.sound),
-    "notifications-and-sound": t(($) => $.extra.notifications.both),
-  };
-  const errors = {
-    unsupported: t(($) => $.extra.notifications.unsupported),
-    unavailable: t(($) => $.extra.notifications.unavailable),
-    permission: t(($) => $.extra.notifications.permission),
-  };
 
   return (
     <SettingsRow
-      {...searchableSetting("thread-notifications", t)}
+      {...searchableSetting("thread-notifications")}
       description={
-        permissionError === null
-          ? t(($) => $.extra.notifications.description)
-          : errors[permissionError]
+        permissionMessage ??
+        gt(
+          "System alerts when a thread finishes, fails, or needs input or approval. Applies to this device while T3 Code is open.",
+        )
       }
       control={
         <Select
@@ -52,22 +43,34 @@ export function NotificationSettings() {
               value !== "notifications-and-sound"
             )
               return;
-            setPermissionError(null);
+            setPermissionMessage(null);
             if (hasNotificationSound(value)) unlockNotificationAudio();
             if (hasDesktopNotifications(value)) {
               if (typeof Notification === "undefined" || !window.isSecureContext) {
-                setPermissionError("unsupported");
+                setPermissionMessage(
+                  gt(
+                    "Notifications need a supported browser over HTTPS, or the desktop app. Sound only is still available.",
+                  ),
+                );
                 return;
               }
               setRequesting(true);
               const permission = await settlePromise(() => Notification.requestPermission());
               setRequesting(false);
               if (permission._tag === "Failure") {
-                setPermissionError("unavailable");
+                setPermissionMessage(
+                  gt(
+                    "Notifications are unavailable in this browser. Sound only is still available.",
+                  ),
+                );
                 return;
               }
               if (permission.value !== "granted") {
-                setPermissionError("permission");
+                setPermissionMessage(
+                  gt(
+                    "Allow notifications in your browser or system settings, then choose this option again. Sound only is still available.",
+                  ),
+                );
                 return;
               }
             }
@@ -77,14 +80,14 @@ export function NotificationSettings() {
           <SelectTrigger
             size="sm"
             className="w-full sm:w-56"
-            aria-label={t(($) => $.extra.notifications.label)}
+            aria-label={gt("Thread notifications")}
           >
-            <SelectValue>{labels[mode]}</SelectValue>
+            <SelectValue>{m(NOTIFICATION_MODE_LABELS[mode])}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
-            {Object.entries(labels).map(([value, label]) => (
+            {Object.entries(NOTIFICATION_MODE_LABELS).map(([value, label]) => (
               <SelectItem key={value} hideIndicator value={value}>
-                {label}
+                {m(label)}
               </SelectItem>
             ))}
           </SelectPopup>

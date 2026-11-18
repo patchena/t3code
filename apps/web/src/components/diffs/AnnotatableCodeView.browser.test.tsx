@@ -47,8 +47,8 @@ vi.mock("./StyledDiffCodeView", () => ({
       )),
 }));
 
-import { AnnotatableCodeView } from "~/components/diffs/AnnotatableCodeView";
-import type { StyledDiffCodeView } from "~/components/diffs/StyledDiffCodeView";
+import { AnnotatableCodeView } from "./AnnotatableCodeView";
+import type { StyledDiffCodeView } from "./StyledDiffCodeView";
 
 const target = DraftId.make("diff-draft-test");
 const range: SelectedLineRange = { start: 1, end: 1, side: "additions" };
@@ -92,7 +92,7 @@ function view(
         options={{}}
         renderHeaderFilenameSuffix={() => null}
         renderHeaderPrefix={() => null}
-        onRevealSearchMatch={() => {}}
+        onFileCollapsedChange={() => {}}
       />
     </StrictMode>
   );

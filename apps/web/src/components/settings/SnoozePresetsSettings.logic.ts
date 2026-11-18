@@ -1,5 +1,5 @@
 import type { SnoozePresetSetting } from "@t3tools/contracts/settings";
-import { resolveSnoozePresetWake } from "@t3tools/client-runtime/state/thread-settled";
+import { resolveSnoozePreset } from "@t3tools/client-runtime/state/thread-settled";
 import * as Equal from "effect/Equal";
 
 /**
@@ -28,7 +28,7 @@ export function sortSnoozeRows<K>(
   const order = presets
     .map((preset, index) => ({
       index,
-      wake: resolveSnoozePresetWake(preset, now)?.toISOString() ?? null,
+      wake: resolveSnoozePreset(preset, now)?.snoozedUntil ?? null,
     }))
     .toSorted((a, b) =>
       a.wake === b.wake ? 0 : a.wake === null ? 1 : b.wake === null ? -1 : a.wake < b.wake ? -1 : 1,

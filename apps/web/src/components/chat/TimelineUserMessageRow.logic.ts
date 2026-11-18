@@ -1,13 +1,14 @@
 import { type ChatFileAttachment, type ChatImageAttachment } from "../../types";
 import type { ComposerContextRecord, KnownComposerContextRecord } from "@t3tools/contracts";
+import { msg } from "gt-react";
+import { m, type MessageResolver } from "~/i18n/messages";
 import { asKnownContextRecord } from "~/lib/composerContextRecords";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 
 export function userMessageFileLabel(
   file: Pick<ChatFileAttachment, "name" | "source">,
-  t: TFunction<"chat">,
+  resolve: MessageResolver = m,
 ) {
-  return file.source?._tag === "pasted-text" ? t(($) => $.media.pastedText) : file.name;
+  return file.source?._tag === "pasted-text" ? resolve(msg("Pasted text")) : file.name;
 }
 
 export function resolvePreviewAnnotationImage(input: {

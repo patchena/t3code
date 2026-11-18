@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { RunId, RuntimeRequestId } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
@@ -9,8 +8,6 @@ import {
   nextBackgroundThreadAnnouncement,
   resolveBackgroundThreadRequest,
 } from "./backgroundThreadAnnouncement";
-
-const t = createI18n("en").getFixedT(null, "activity");
 
 const firstRun = RunId.make("run-1");
 const secondRun = RunId.make("run-2");
@@ -46,7 +43,7 @@ function speak(
   let memory: BackgroundThreadMemory = new Map();
   const spoken: string[] = [];
   for (const frame of frames) {
-    const result = nextBackgroundThreadAnnouncement(memory, frame.threads, frame.open ?? null, t);
+    const result = nextBackgroundThreadAnnouncement(memory, frame.threads, frame.open ?? null);
     memory = result.memory;
     if (result.announcement !== null) spoken.push(result.announcement);
   }

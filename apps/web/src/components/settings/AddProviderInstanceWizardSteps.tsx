@@ -1,4 +1,5 @@
-import { useTranslation } from "react-i18next";
+import { useMessages } from "gt-react";
+
 import { WizardSteps } from "../ui/wizard";
 import {
   ADD_PROVIDER_WIZARD_STEPS,
@@ -30,24 +31,10 @@ export function AddProviderInstanceWizardSteps({
   onNavigation,
   disabled = false,
 }: AddProviderInstanceWizardStepsProps) {
-  const { t } = useTranslation("settings");
-  const labels = steps.map((step) => {
-    switch (step) {
-      case "provider":
-        return { id: step, label: t(($) => $.providers.provider) };
-      case "identity":
-        return { id: step, label: t(($) => $.providers.identity) };
-      case "config":
-        return { id: step, label: t(($) => $.providers.config) };
-      case "signIn":
-        return { id: step, label: t(($) => $.providers.signIn) };
-      default:
-        throw new Error(`Unknown provider wizard step: ${step}`);
-    }
-  });
+  const m = useMessages();
   return (
     <WizardSteps
-      steps={labels}
+      steps={steps.map((step) => m(step))}
       currentStep={currentStep}
       summaries={summaries}
       isStepDisabled={() => disabled}

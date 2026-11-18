@@ -2,35 +2,24 @@ import type {
   PreparedVoiceTranscription,
   VoiceRecorder,
   VoiceStreamingSession,
+  VoiceInputErrorCode,
   VoiceTranscriptionOptions,
 } from "@t3tools/client-runtime/voice-input";
-import { appI18n } from "~/i18n";
+import { requestMicrophone } from "./requestMicrophone";
 import workletUrl from "./pcmWorklet.ts?worker&url";
+import { msg } from "gt-react";
+import { m } from "../i18n/messages";
 
 type PreparedBrowserTranscription = PreparedVoiceTranscription & {
   readonly streaming?: VoiceStreamingSession & { readonly feed: (pcm: Float32Array) => void };
 };
-
-/** Opens a microphone. A saved device the browser can no longer find falls back to System default. */
-export async function openMicrophone(microphoneId: string): Promise<MediaStream> {
-  if (!microphoneId) return navigator.mediaDevices.getUserMedia({ audio: true });
-  try {
-    return await navigator.mediaDevices.getUserMedia({
-      audio: { deviceId: { exact: microphoneId } },
-    });
-  } catch (error) {
-    const name = typeof error === "object" && error !== null && "name" in error ? error.name : "";
-    if (name !== "OverconstrainedError" && name !== "NotFoundError") throw error;
-    return navigator.mediaDevices.getUserMedia({ audio: true });
-  }
-}
 
 export function createBrowserPcmCapture(
   input: {
     readonly getMicrophoneId: () => string | Promise<string>;
     readonly onLevel: (level: number) => void;
     readonly onDurationLimit: () => void;
-    readonly onError: (message: string) => void;
+    readonly onError: (message: string, code?: VoiceInputErrorCode) => void;
   },
   prepare: (options: VoiceTranscriptionOptions) => Promise<PreparedBrowserTranscription>,
 ) {
@@ -69,7 +58,7 @@ export function createBrowserPcmCapture(
     },
     prepareToRecordAsync: async () => {
       const captureSignal = signal;
-      if (!captureSignal) throw new Error("Voice transcription is not prepared.");
+      if (!captureSignal) throw new Error(m(msg("Voice transcription is not prepared.")));
       captureSignal.throwIfAborted();
       if (recordingUri) URL.revokeObjectURL(recordingUri);
       recordingUri = null;
@@ -78,7 +67,7 @@ export function createBrowserPcmCapture(
       captureSignal.throwIfAborted();
       const captured = await new Promise<MediaStream>((resolve, reject) => {
         const onAbort = () => reject(captureSignal.reason);
-        const permission = openMicrophone(microphoneId);
+        const permission = requestMicrophone(microphoneId, captureSignal);
         captureSignal.addEventListener("abort", onAbort, { once: true });
         void permission.then(
           (media) => {
@@ -124,15 +113,16 @@ export function createBrowserPcmCapture(
           else chunks.push(data);
         };
         node.onprocessorerror = () => {
-          const message = appI18n.t(($) => $.errors.processingFailed, { ns: "voice" });
-          stopped?.reject(new Error(message));
-          input.onError(message);
+          stopped?.reject(new Error(m(msg("Microphone processing failed."))));
+          input.onError(m(msg("Microphone processing failed.")), "microphone-failed");
         };
         for (const track of captured.getTracks())
           track.addEventListener(
             "ended",
-            () => input.onError(appI18n.t(($) => $.errors.disconnected, { ns: "voice" })),
-            { once: true },
+            () => input.onError(m(msg("The microphone disconnected.")), "microphone-disconnected"),
+            {
+              once: true,
+            },
           );
         context.createMediaStreamSource(captured).connect(node);
         // The processor emits silence, keeping the graph active without microphone playback.
@@ -159,7 +149,7 @@ export function createBrowserPcmCapture(
         stopped = { resolve, reject };
       });
       const timeout = setTimeout(
-        () => stopped?.reject(new Error("Microphone capture did not stop.")),
+        () => stopped?.reject(new Error(m(msg("Microphone capture did not stop.")))),
         5_000,
       );
       // oxlint-disable-next-line unicorn/require-post-message-target-origin -- AudioWorklet MessagePorts do not accept a target origin

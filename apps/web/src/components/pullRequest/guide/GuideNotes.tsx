@@ -1,9 +1,9 @@
-import { useTranslation } from "react-i18next";
+import { T, useGT } from "gt-react";
 import type { PullRequestReviewGuideNote } from "@t3tools/contracts";
 
 import { cn } from "~/lib/utils";
 
-import { GuideProse } from "~/components/pullRequest/guide/GuideProse";
+import { GuideProse } from "./GuideProse";
 
 export function GuideNoteMarker({ marker }: { marker: string }) {
   return (
@@ -23,14 +23,16 @@ export function GuideNotes({
   notes: ReadonlyArray<{ readonly marker: string; readonly note: PullRequestReviewGuideNote }>;
   className?: string;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   if (notes.length === 0) return null;
   return (
     <section className={cn("flex min-w-0 flex-col gap-2", className)}>
       <h4 className="flex items-baseline justify-between gap-2 text-xs font-medium text-foreground">
-        {t(($) => $.git.stopNotes)}
+        <T>Notes on this stop</T>
         <span className="font-normal text-muted-foreground tabular-nums">
-          {t(($) => $.git.noteCount, { count: notes.length })}
+          {gt("{count, plural, one {{count} note} other {{count} notes}}", {
+            count: notes.length,
+          })}
         </span>
       </h4>
       <ol className="flex flex-col gap-3">

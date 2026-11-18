@@ -1,13 +1,11 @@
+import { useGT } from "gt-react";
 import { lazy, memo, Suspense, useLayoutEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
 
 import { observeResize } from "../../lib/observeResize";
 
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 
-const MathTypeset = lazy(() =>
-  import("./MathTypeset").then((module) => ({ default: module.MathTypeset })),
-);
+const MathTypeset = lazy(() => import("./MathTypeset"));
 
 /**
  * One formula from `remark-math`. Shows its TeX until KaTeX loads, and
@@ -19,7 +17,7 @@ export const MarkdownMath = memo(function MarkdownMath(props: {
   display: boolean;
   focusable?: boolean;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const viewportRef = useRef<HTMLSpanElement>(null);
   const contentRef = useRef<HTMLSpanElement>(null);
   const [overflows, setOverflows] = useState(false);
@@ -51,8 +49,8 @@ export const MarkdownMath = memo(function MarkdownMath(props: {
         props.focusable === false
           ? undefined
           : props.display
-            ? t(($) => $.markdown.displayEquation)
-            : t(($) => $.markdown.inlineEquation)
+            ? gt("Display equation")
+            : gt("Inline equation")
       }
     >
       <span
@@ -63,8 +61,8 @@ export const MarkdownMath = memo(function MarkdownMath(props: {
           !scrollable
             ? undefined
             : props.display
-              ? t(($) => $.markdown.scrollDisplayEquation)
-              : t(($) => $.markdown.scrollInlineEquation)
+              ? gt("Scroll display equation")
+              : gt("Scroll inline equation")
         }
       >
         <span

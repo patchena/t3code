@@ -1,7 +1,7 @@
-import { useTranslation } from "react-i18next";
 import { useAuth } from "@clerk/react";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { Link } from "@tanstack/react-router";
+import { T } from "gt-react";
 import { CheckIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -21,7 +21,6 @@ import { WorkspacePageHeader } from "./WorkspacePageHeader";
 
 /** Home screen for the hosted app before any computer is added. */
 export function HostedEmptyState() {
-  const { t } = useTranslation("workspace");
   const cloudEnabled = hasCloudPublicConfig();
   const localEnvironmentOff = isLocalEnvironmentDisabled();
 
@@ -39,20 +38,22 @@ export function HostedEmptyState() {
         <Empty className="flex-1">
           <EmptyHeader>
             <EmptyTitle>
-              {localEnvironmentOff ? t(($) => $.home.computerOff) : t(($) => $.home.noComputer)}
+              {localEnvironmentOff ? <T>This computer is off</T> : <T>No computer connected</T>}
             </EmptyTitle>
             <EmptyDescription>
-              {localEnvironmentOff
-                ? t(($) => $.home.reconnect)
-                : cloudEnabled
-                  ? t(($) => $.home.agentsOnComputer)
-                  : t(($) => $.home.startOnComputer)}
+              {localEnvironmentOff ? (
+                <T>Turn it back on, or connect a different computer.</T>
+              ) : cloudEnabled ? (
+                <T>Your agents run on your computer.</T>
+              ) : (
+                <T>Your agents run on your computer. Start T3 Code there first.</T>
+              )}
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
             {localEnvironmentOff ? (
               <Button render={<Link to="/settings/connections" />} size="sm">
-                {t(($) => $.home.environments)}
+                <T>Open Environments</T>
               </Button>
             ) : (
               <ol className="w-full space-y-4 text-left">
@@ -67,7 +68,6 @@ export function HostedEmptyState() {
 }
 
 function T3ConnectSteps() {
-  const { t } = useTranslation("workspace");
   const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false });
   const loadFailed = useClerkLoadFailed();
   const { openAuthPrompt } = useT3ConnectAuthPrompt();
@@ -83,16 +83,16 @@ function T3ConnectSteps() {
       <SetupStep number={1}>
         {loadFailed ? (
           <Button size="sm" onClick={retryClerkLoad}>
-            Retry sign-in
+            <T>Retry sign-in</T>
           </Button>
         ) : isSignedIn ? (
           <p className="flex items-center gap-1.5 text-muted-foreground">
             <CheckIcon className="size-4" />
-            {t(($) => $.home.signedIn)}
+            <T>Signed in</T>
           </p>
         ) : (
           <Button size="sm" disabled={!isLoaded} onClick={openAuthPrompt}>
-            {t(($) => $.home.signIn)}
+            <T>Sign in</T>
           </Button>
         )}
       </SetupStep>
@@ -115,7 +115,11 @@ function T3ConnectSteps() {
                     return next;
                   }),
               }}
-              empty={<p className="text-xs text-muted-foreground">{t(($) => $.home.waiting)}</p>}
+              empty={
+                <p className="text-xs text-muted-foreground">
+                  <T>Waiting for your computer…</T>
+                </p>
+              }
             />
           </div>
         ) : null}
@@ -125,7 +129,6 @@ function T3ConnectSteps() {
 }
 
 function PairingSteps() {
-  const { t } = useTranslation("workspace");
   return (
     <>
       <SetupStep number={1}>
@@ -133,7 +136,7 @@ function PairingSteps() {
       </SetupStep>
       <SetupStep number={2}>
         <Button render={<Link to="/settings/connections" />} size="sm">
-          {t(($) => $.home.pairingLink)}
+          <T>Add pairing link</T>
         </Button>
       </SetupStep>
     </>
@@ -156,10 +159,11 @@ function SetupStep({
 }
 
 function RunOnComputer({ command }: { readonly command: string }) {
-  const { t } = useTranslation("workspace");
   return (
     <>
-      <p>{t(($) => $.home.runCommand)}</p>
+      <p>
+        <T>Run on your computer:</T>
+      </p>
       <InstallT3Commands command={command} className="mt-2" />
       <a
         className="mt-2 inline-block text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
@@ -167,7 +171,7 @@ function RunOnComputer({ command }: { readonly command: string }) {
         target="_blank"
         rel="noreferrer noopener"
       >
-        {t(($) => $.home.download)}
+        <T>Or download the desktop app</T>
       </a>
     </>
   );

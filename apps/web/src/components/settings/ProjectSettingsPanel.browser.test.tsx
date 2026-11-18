@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { RegistryContext } from "@effect/atom-react";
 import type {
   DeleteProjectInput,
@@ -220,15 +219,12 @@ function setup() {
 }
 
 function projectKey() {
-  return buildSidebarProjectSnapshots(
-    {
-      projects: state.projects,
-      settings: DEFAULT_CLIENT_SETTINGS,
-      primaryEnvironmentId: primaryId,
-      resolveEnvironmentLabel: (id) => id,
-    },
-    createI18n("en").getFixedT(null, "common"),
-  )[0]!.projectKey;
+  return buildSidebarProjectSnapshots({
+    projects: state.projects,
+    settings: DEFAULT_CLIENT_SETTINGS,
+    primaryEnvironmentId: primaryId,
+    resolveEnvironmentLabel: (id) => id,
+  })[0]!.projectKey;
 }
 
 async function mountPanel(search: Omit<SettingsScopeSearch, "project"> = {}) {
@@ -660,6 +656,33 @@ describe("project settings scope", () => {
     await userEvent.click(environmentMenu());
     await expect.element(primaryOption()).toBeVisible();
     await expect.element(remoteOption()).toBeVisible();
+  });
+
+  it("lists only the selected environment's projects and keeps it when one is opened", async () => {
+    setup();
+    const [primaryProject, remoteProject] = state.projects;
+    state.projects = [
+      primaryProject!,
+      {
+        ...remoteProject!,
+        title: "Remote only",
+        repositoryIdentity: null,
+      },
+    ];
+    await using screen = await mountSettings({ machine: primaryId });
+
+    await expect.element(page.getByRole("button", { name: /^Shared repo/ })).toBeVisible();
+    await expect
+      .element(page.getByRole("button", { name: /^Remote only/ }))
+      .not.toBeInTheDocument();
+
+    await userEvent.click(page.getByRole("button", { name: /^Shared repo/ }));
+    await vi.waitFor(() =>
+      expect(screen.router.state.location.search).toEqual({
+        project: projectKey(),
+        machine: primaryId,
+      }),
+    );
   });
 
   it("offers only the selected project's checkout environments", async () => {

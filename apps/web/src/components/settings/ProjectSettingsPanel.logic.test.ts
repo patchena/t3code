@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it } from "vite-plus/test";
 import { EnvironmentId, ProjectId, SourceControlProviderKind, ThreadId } from "@t3tools/contracts";
 import { planProjectRemoval } from "@t3tools/client-runtime/state/projects";
@@ -10,7 +9,6 @@ import {
   scopeProjectSettingsGroup,
 } from "./ProjectSettingsPanel.logic";
 
-const tCommon = createI18n("en").getFixedT(null, "common");
 const localEnvironmentId = EnvironmentId.make("local");
 const remoteEnvironmentId = EnvironmentId.make("remote");
 const customIcon = { kind: "lucide", name: "cloud", color: "red" } as const;
@@ -44,15 +42,12 @@ function makeProject(environmentId: EnvironmentId, overrides: Partial<Project> =
 }
 
 function projectGroup(projects: Project[]) {
-  return buildSidebarProjectSnapshots(
-    {
-      projects,
-      settings: { sidebarProjectGroupingMode: "repository", sidebarProjectGroupingOverrides: {} },
-      primaryEnvironmentId: localEnvironmentId,
-      resolveEnvironmentLabel: (id) => id,
-    },
-    tCommon,
-  )[0]!;
+  return buildSidebarProjectSnapshots({
+    projects,
+    settings: { sidebarProjectGroupingMode: "repository", sidebarProjectGroupingOverrides: {} },
+    primaryEnvironmentId: localEnvironmentId,
+    resolveEnvironmentLabel: (id) => id,
+  })[0]!;
 }
 
 describe("scopeProjectSettingsGroup", () => {

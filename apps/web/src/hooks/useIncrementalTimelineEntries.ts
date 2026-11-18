@@ -1,10 +1,10 @@
-import { useTranslation } from "react-i18next";
+import { useLocale, useMessages } from "gt-react";
 import { useState } from "react";
 import {
   deriveTimelineEntriesFromVisibleTurnItemsWithState,
   type TimelineEntriesInput,
   type TimelineEntriesProjection,
-} from "~/session-logic";
+} from "../session-logic";
 
 function sameInput(left: TimelineEntriesInput, right: TimelineEntriesInput): boolean {
   return (
@@ -20,25 +20,25 @@ function sameInput(left: TimelineEntriesInput, right: TimelineEntriesInput): boo
 
 export function useIncrementalTimelineEntries(
   threadKey: string | null,
-  input: TimelineEntriesInput,
+  timelineInput: TimelineEntriesInput,
 ): TimelineEntriesProjection["entries"] {
-  const { t } = useTranslation("activity");
+  // Keyed on the locale: without a GTProvider, useMessages() returns a new function every render.
+  const locale = useLocale();
+  const resolve = useMessages();
+  const input = { ...timelineInput, resolve: timelineInput.resolve ?? resolve };
   const [state, setState] = useState(() => ({
     threadKey,
-    projection: deriveTimelineEntriesFromVisibleTurnItemsWithState(input, t),
+    locale,
+    projection: deriveTimelineEntriesFromVisibleTurnItemsWithState(input),
   }));
-  if (
-    state.threadKey === threadKey &&
-    state.projection.translation === t &&
-    sameInput(state.projection.input, input)
-  ) {
+  const reusable = state.threadKey === threadKey && state.locale === locale;
+  if (reusable && sameInput(state.projection.input, input)) {
     return state.projection.entries;
   }
   const projection = deriveTimelineEntriesFromVisibleTurnItemsWithState(
     input,
-    t,
-    state.threadKey === threadKey ? state.projection : null,
+    reusable ? state.projection : null,
   );
-  setState({ threadKey, projection });
+  setState({ threadKey, locale, projection });
   return projection.entries;
 }

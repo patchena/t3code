@@ -1,5 +1,3 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { useTranslation } from "react-i18next";
 import { Spinner } from "~/components/ui/spinner";
 import type {
   EnvironmentId,
@@ -23,14 +21,15 @@ import {
   TagIcon,
   UserRoundIcon,
 } from "lucide-react";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { type ElementType, useState } from "react";
 
 import { getSourceControlPresentationForKind } from "~/sourceControlPresentation";
 import { useDebouncedValue } from "~/state/queries";
 import { type EnvironmentQueryTarget, usePullRequestFilterOptions } from "~/state/pullRequests";
-import { ProjectFavicon, type ProjectFaviconProject } from "~/components/ProjectFavicon";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "~/components/ui/input-group";
-import { Button } from "~/components/ui/button";
+import { ProjectFavicon, type ProjectFaviconProject } from "../ProjectFavicon";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "../ui/input-group";
+import { Button } from "../ui/button";
 
 import {
   Menu,
@@ -47,8 +46,8 @@ import {
   MenuSubPopup,
   MenuSubTrigger,
   MenuTrigger,
-} from "~/components/ui/menu";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+} from "../ui/menu";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   pullRequestAuthorChoices,
   selectedPullRequestAuthor,
@@ -56,9 +55,10 @@ import {
   pullRequestLabelColor,
   type PullRequestAuthorFacet,
   type PullRequestLabelFacet,
-} from "~/components/pullRequest/pullRequestList.logic";
-import { PullRequestActorAvatar } from "~/components/pullRequest/pullRequestPresentation";
-import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
+} from "./pullRequestList.logic";
+import { resolveFilterOptions } from "./pullRequestListOptions";
+import { PullRequestActorAvatar } from "./pullRequestPresentation";
+import { PullRequestGlyph } from "./pullRequestIcons";
 
 export interface PullRequestFilterOption<Value extends string> {
   readonly value: Value;
@@ -98,15 +98,18 @@ export function pullRequestHostLabel(
 export function PullRequestSearchInput({
   value,
   busy,
+  label,
+  placeholder,
   onChange,
   onSubmit,
 }: {
   value: string;
   busy?: boolean;
+  label: string;
+  placeholder: string;
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
 }) {
-  const { t } = useTranslation("workspace");
   const [draft, setDraft] = useState<string | null>(null);
   return (
     <InputGroup className="min-w-0 flex-1 **:[input]:h-9 sm:**:[input]:h-8">
@@ -130,8 +133,8 @@ export function PullRequestSearchInput({
             onSubmit(event.currentTarget.value);
           }
         }}
-        placeholder={t(($) => $.git.pullRequestSearchHint)}
-        aria-label={t(($) => $.git.searchPullRequests)}
+        placeholder={placeholder}
+        aria-label={label}
       />
     </InputGroup>
   );
@@ -147,28 +150,41 @@ export const pullRequestProjectKey = (project: {
   readonly environmentId: EnvironmentId;
 }) => JSON.stringify([project.environmentId, project.id]);
 
-const DRAFT_OPTIONS = (t: TFunction<"workspace">) =>
-  [
-    { value: UNFILTERED_VALUE, label: t(($) => $.git.all), Icon: LayersIcon },
-    { value: "only", label: t(($) => $.git.draftsOnly), Icon: PullRequestGlyph.draft },
-    { value: "hide", label: t(($) => $.git.hideDrafts), Icon: EyeOffIcon },
-  ] as const satisfies ReadonlyArray<PullRequestFilterOption<string>>;
+const DRAFT_OPTIONS = [
+  {
+    value: UNFILTERED_VALUE,
+    label: msg("All", { $context: "pull request filter" }),
+    Icon: LayersIcon,
+  },
+  { value: "only", label: msg("Drafts only"), Icon: PullRequestGlyph.draft },
+  { value: "hide", label: msg("Hide drafts"), Icon: EyeOffIcon },
+] as const satisfies ReadonlyArray<PullRequestFilterOption<string>>;
 
-const REVIEW_OPTIONS = (t: TFunction<"workspace">) =>
-  [
-    { value: UNFILTERED_VALUE, label: t(($) => $.git.all), Icon: LayersIcon },
-    { value: "approved", label: t(($) => $.git.approved), Icon: CircleCheckIcon },
-    { value: "changes-requested", label: t(($) => $.git.changesRequested), Icon: CircleXIcon },
-    { value: "review-required", label: t(($) => $.git.reviewRequired), Icon: CircleDashedIcon },
-    { value: "none", label: t(($) => $.git.noReviews), Icon: CircleSlashIcon },
-  ] as const satisfies ReadonlyArray<PullRequestFilterOption<string>>;
+const REVIEW_OPTIONS = [
+  {
+    value: UNFILTERED_VALUE,
+    label: msg("All", { $context: "pull request filter" }),
+    Icon: LayersIcon,
+  },
+  {
+    value: "approved",
+    label: msg("Approved", { $context: "review decision" }),
+    Icon: CircleCheckIcon,
+  },
+  { value: "changes-requested", label: msg("Changes requested"), Icon: CircleXIcon },
+  { value: "review-required", label: msg("Review required"), Icon: CircleDashedIcon },
+  { value: "none", label: msg("No reviews"), Icon: CircleSlashIcon },
+] as const satisfies ReadonlyArray<PullRequestFilterOption<string>>;
 
-const CHECKS_OPTIONS = (t: TFunction<"workspace">) =>
-  [
-    { value: UNFILTERED_VALUE, label: t(($) => $.git.all), Icon: LayersIcon },
-    { value: "passing", label: t(($) => $.git.passing), Icon: CircleCheckIcon },
-    { value: "failing", label: t(($) => $.git.failing), Icon: CircleXIcon },
-  ] as const satisfies ReadonlyArray<PullRequestFilterOption<string>>;
+const CHECKS_OPTIONS = [
+  {
+    value: UNFILTERED_VALUE,
+    label: msg("All", { $context: "pull request filter" }),
+    Icon: LayersIcon,
+  },
+  { value: "passing", label: msg("Passing", { $context: "checks filter" }), Icon: CircleCheckIcon },
+  { value: "failing", label: msg("Failing", { $context: "checks filter" }), Icon: CircleXIcon },
+] as const satisfies ReadonlyArray<PullRequestFilterOption<string>>;
 
 function PullRequestFilterRadioGroup<Value extends string>({
   label,
@@ -181,7 +197,7 @@ function PullRequestFilterRadioGroup<Value extends string>({
   options: ReadonlyArray<PullRequestFilterOption<Value>>;
   onChange: (value: Value) => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   return (
     <MenuRadioGroup
       value={value}
@@ -202,7 +218,9 @@ function PullRequestFilterRadioGroup<Value extends string>({
               <PullRequestFilterOptionIcon option={option} />
               <span className="min-w-0 flex-1 truncate">{option.label}</span>
               {option.unavailable ? (
-                <span className="shrink-0">{t(($) => $.git.unavailableMarker)}</span>
+                <span className="shrink-0">
+                  · {gt("Unavailable", { $context: "filter option" })}
+                </span>
               ) : null}
               <MenuRadioItemIndicator />
             </span>
@@ -220,7 +238,7 @@ function PullRequestFilterRadioGroup<Value extends string>({
   );
 }
 
-function PullRequestFilterRadioSubmenu<Value extends string>({
+export function PullRequestFilterRadioSubmenu<Value extends string>({
   label,
   value,
   options,
@@ -289,7 +307,7 @@ function PullRequestAuthorChoices({
   scope: ReadonlyArray<PullRequestFilterOptionScope>;
   onChange: (author: string | undefined) => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const [query, setQuery] = useState("");
   const hosted = useHostedFilterOptions(scope, "authors", query);
   const login = value?.toLowerCase() ?? "";
@@ -308,14 +326,14 @@ function PullRequestAuthorChoices({
         busy={hosted.isPending}
         value={query}
         onChange={(event) => setQuery(event.currentTarget.value)}
-        placeholder={t(($) => $.git.searchAuthors)}
-        aria-label={t(($) => $.git.searchAuthors)}
+        placeholder={gt("Search authors")}
+        aria-label={gt("Search authors")}
       />
       <MenuRadioGroup value={selected?.actor.login ?? value ?? ""} onValueChange={select}>
         <MenuRadioItem value="">
           <span className="flex min-w-0 items-center gap-2">
             <LayersIcon aria-hidden className="size-3.5" />
-            {t(($) => $.git.anyone)}
+            <T>Anyone</T>
           </span>
         </MenuRadioItem>
         {visible.map((option) => (
@@ -325,7 +343,7 @@ function PullRequestAuthorChoices({
               <span className="min-w-0 flex-1 truncate">{option.actor.login}</span>
               {option.mergedCount > 0 ? (
                 <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                  {t(($) => $.git.mergesLoaded, { count: option.mergedCount })}
+                  {option.mergedCount} {option.mergedCount === 1 ? "merge" : "merges"} loaded
                 </span>
               ) : null}
             </span>
@@ -334,8 +352,8 @@ function PullRequestAuthorChoices({
         {visible.length === 0 && !hosted.isPending ? (
           <MenuItem disabled>
             {hosted.error === null
-              ? t(($) => $.git.noAuthors)
-              : t(($) => $.git.searchAuthorsFailed)}
+              ? gt("No authors found")
+              : gt("Couldn't search authors on the host")}
           </MenuItem>
         ) : null}
       </MenuRadioGroup>
@@ -354,14 +372,16 @@ function PullRequestAuthorFilter({
   scope: ReadonlyArray<PullRequestFilterOptionScope>;
   onChange: (author: string | undefined) => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   return (
     <MenuSub>
       <MenuSubTrigger>
         <UserRoundIcon aria-hidden className="size-3.5" />
-        <span className="flex-1">{t(($) => $.git.author)}</span>
+        <span className="flex-1">
+          <T>Author</T>
+        </span>
         <span className="min-w-0 max-w-32 truncate text-xs text-muted-foreground">
-          {value ?? t(($) => $.git.anyone)}
+          {value ?? gt("Anyone")}
         </span>
       </MenuSubTrigger>
       <MenuSubPopup>
@@ -387,7 +407,7 @@ function PullRequestLabelChoices({
   scope: ReadonlyArray<PullRequestFilterOptionScope>;
   onChange: (labels: ReadonlyArray<string>) => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const [query, setQuery] = useState("");
   const hosted = useHostedFilterOptions(scope, "labels", query);
   const selected = new Set(value.map((name) => name.toLowerCase()));
@@ -405,12 +425,12 @@ function PullRequestLabelChoices({
         busy={hosted.isPending}
         value={query}
         onChange={(event) => setQuery(event.currentTarget.value)}
-        placeholder={t(($) => $.git.searchLabels)}
-        aria-label={t(($) => $.git.searchLabels)}
+        placeholder={gt("Search labels")}
+        aria-label={gt("Search labels")}
       />
       {visible.length === 0 && !hosted.isPending ? (
         <MenuItem disabled>
-          {hosted.error === null ? t(($) => $.git.noLabels) : t(($) => $.git.searchLabelsFailed)}
+          {hosted.error === null ? gt("No labels found") : gt("Couldn't search labels on the host")}
         </MenuItem>
       ) : null}
       {visible.map((option) => {
@@ -459,16 +479,20 @@ function PullRequestLabelFilter({
   scope: ReadonlyArray<PullRequestFilterOptionScope>;
   onChange: (labels: ReadonlyArray<string>) => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   return (
     <MenuSub>
       <MenuSubTrigger>
         <TagIcon aria-hidden className="size-3.5" />
-        <span className="flex-1">{t(($) => $.git.labels)}</span>
+        <span className="flex-1">
+          <T>Labels</T>
+        </span>
         <span className="text-xs text-muted-foreground">
           {value.length === 0
-            ? t(($) => $.git.any)
-            : t(($) => $.git.selectedCount, { count: value.length })}
+            ? gt("Any", { $context: "no label filter" })
+            : gt("{count, plural, one {{count} selected} other {{count} selected}}", {
+                count: value.length,
+              })}
         </span>
       </MenuSubTrigger>
       <MenuSubPopup>
@@ -532,7 +556,8 @@ export function PullRequestFiltersMenu({
   unavailable: ReadonlyMap<string, string>;
   onProject: (projectId: ProjectId | undefined, environmentId: EnvironmentId | undefined) => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
+  const resolve = useMessages();
   const selectedLabels = (filters.labels ?? []).flatMap((group) => group);
   const filterCount = [
     state !== "open",
@@ -561,7 +586,7 @@ export function PullRequestFiltersMenu({
       ? ALL_PROJECTS_VALUE
       : pullRequestProjectKey({ id: projectId, environmentId: projectEnvironmentId });
   const projectOptions: ReadonlyArray<PullRequestFilterOption<string>> = [
-    { value: ALL_PROJECTS_VALUE, label: t(($) => $.git.allProjects), Icon: LayersIcon },
+    { value: ALL_PROJECTS_VALUE, label: gt("All projects"), Icon: LayersIcon },
     ...projects
       .toSorted(
         (left, right) =>
@@ -582,7 +607,9 @@ export function PullRequestFiltersMenu({
     <Menu onOpenChange={onOpenChange}>
       <MenuTrigger render={<Button variant="outline" />}>
         <ListFilterIcon className="size-4" />
-        <span>{t(($) => $.git.filters)}</span>
+        <span>
+          <T>Filters</T>
+        </span>
         {filterCount > 0 ? (
           <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">
             {filterCount}
@@ -591,13 +618,13 @@ export function PullRequestFiltersMenu({
       </MenuTrigger>
       <MenuPopup align="end" side="bottom">
         <PullRequestFilterRadioSubmenu
-          label={t(($) => $.git.state)}
+          label={gt("State", { $context: "pull request filter" })}
           value={state}
           options={stateOptions}
           onChange={onState}
         />
         <PullRequestFilterRadioSubmenu
-          label={t(($) => $.git.involvement)}
+          label={gt("Involvement")}
           value={involvement}
           options={involvementOptions}
           onChange={onInvolvement}
@@ -620,28 +647,28 @@ export function PullRequestFiltersMenu({
           }
         />
         <PullRequestFilterRadioSubmenu
-          label={t(($) => $.git.draft)}
+          label={gt("Draft", { $context: "pull request filter" })}
           value={filters.draft ?? UNFILTERED_VALUE}
-          options={DRAFT_OPTIONS(t)}
+          options={resolveFilterOptions(DRAFT_OPTIONS, resolve)}
           onChange={(draft) => updateFilter("draft", draft)}
         />
         <PullRequestFilterRadioSubmenu
-          label={t(($) => $.git.review)}
+          label={gt("Review", { $context: "pull request filter" })}
           value={filters.review ?? UNFILTERED_VALUE}
-          options={REVIEW_OPTIONS(t)}
+          options={resolveFilterOptions(REVIEW_OPTIONS, resolve)}
           onChange={(review) => updateFilter("review", review)}
         />
         <PullRequestFilterRadioSubmenu
-          label={t(($) => $.git.checks)}
+          label={gt("Checks", { $context: "pull request filter" })}
           value={filters.checks ?? UNFILTERED_VALUE}
-          options={CHECKS_OPTIONS(t)}
+          options={resolveFilterOptions(CHECKS_OPTIONS, resolve)}
           onChange={(checks) => updateFilter("checks", checks)}
         />
         {hostOptions.length > 2 ? (
           <>
             <MenuSeparator />
             <PullRequestFilterRadioSubmenu
-              label={t(($) => $.git.host)}
+              label={gt("Host", { $context: "pull request filter" })}
               value={host ?? ALL_HOSTS_VALUE}
               options={hostOptions}
               onChange={(next) => onHost(next === ALL_HOSTS_VALUE ? undefined : next)}
@@ -652,7 +679,7 @@ export function PullRequestFiltersMenu({
           <>
             <MenuSeparator />
             <PullRequestFilterRadioSubmenu
-              label={t(($) => $.git.server)}
+              label={gt("Server", { $context: "pull request filter" })}
               value={server ?? ALL_SERVERS_VALUE}
               options={serverOptions}
               onChange={(next) =>
@@ -663,7 +690,7 @@ export function PullRequestFiltersMenu({
         ) : null}
         <MenuSeparator />
         <PullRequestFilterRadioSubmenu
-          label={t(($) => $.git.project)}
+          label={gt("Project", { $context: "pull request filter" })}
           value={projectValue}
           options={projectOptions}
           onChange={(next) => {

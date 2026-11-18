@@ -1,4 +1,3 @@
-import { useTranslation } from "react-i18next";
 import {
   AuthTerminalOperateScope,
   type EnvironmentId,
@@ -8,7 +7,8 @@ import {
 } from "@t3tools/contracts";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { projectScriptCwd, projectScriptRuntimeEnv } from "@t3tools/shared/projectScripts";
-import { resolveTerminalSessionLabel } from "~/terminalLabels";
+import { resolveTerminalSessionLabel } from "@t3tools/shared/terminalLabelsCopy";
+import { useMessages } from "gt-react";
 import { memo, useEffect } from "react";
 import { useComposerDraftStore } from "../composerDraftStore";
 import { useStableCallback } from "../hooks/useStableCallback";
@@ -25,7 +25,7 @@ import { useEnvironmentScope } from "../state/session";
 import { useKnownTerminalSessions } from "../state/terminalSessions";
 import { selectThreadTerminalUiState, useTerminalUiStateStore } from "../terminalUiStateStore";
 import { useThreadTerminalActions } from "./terminal/useThreadTerminalActions";
-import { ThreadTerminalDrawer } from "~/components/ThreadTerminalDrawer";
+import ThreadTerminalDrawer from "./ThreadTerminalDrawer";
 import { resolveTerminalWorktreePath } from "./ChatView.logic";
 
 /** Where a drawer or panel opens new terminals when a script run overrides the thread's own. */
@@ -101,7 +101,7 @@ export const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerm
   keybindings,
   onAddTerminalContext,
 }: PersistentThreadTerminalDrawerProps) {
-  const { t } = useTranslation("tools");
+  const messages = useMessages();
   const canOperateTerminal = useEnvironmentScope(threadRef.environmentId, AuthTerminalOperateScope);
   const terminalActions = useThreadTerminalActions(threadRef);
   const serverThread = useQuietThreadShell(threadRef);
@@ -133,7 +133,7 @@ export const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerm
   for (const session of drawerTerminalSessions) {
     terminalLabelsById.set(
       session.target.terminalId,
-      resolveTerminalSessionLabel(session.target.terminalId, session.state.summary, t),
+      resolveTerminalSessionLabel(session.target.terminalId, session.state.summary, messages),
     );
   }
   const terminalLaunchLocationsById = new Map<string, TerminalLaunchLocationWithEnv>();
@@ -320,7 +320,7 @@ export const PersistentThreadTerminalPanel = memo(function PersistentThreadTermi
   newShortcutLabel,
   closeShortcutLabel,
 }: PersistentThreadTerminalPanelProps) {
-  const { t } = useTranslation("tools");
+  const messages = useMessages();
   const serverThread = useQuietThreadShell(threadRef);
   const draftThread = useComposerDraftStore((store) => store.getDraftThreadByRef(threadRef));
   const projectRef = serverThread
@@ -355,7 +355,7 @@ export const PersistentThreadTerminalPanel = memo(function PersistentThreadTermi
     const summary =
       knownTerminalSessions?.find((session) => session.target.terminalId === terminalId)?.state
         .summary ?? null;
-    terminalLabelsById.set(terminalId, resolveTerminalSessionLabel(terminalId, summary, t));
+    terminalLabelsById.set(terminalId, resolveTerminalSessionLabel(terminalId, summary, messages));
     if (!project) continue;
     const terminalWorktreePath = resolveTerminalWorktreePath({
       launchContext,

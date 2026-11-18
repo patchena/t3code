@@ -1,10 +1,12 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { appSignInTargetForRemote } from "@t3tools/client-runtime/source-control-clients";
 import { runAtomCommand } from "@t3tools/client-runtime/state/runtime";
-import { appAtomRegistry } from "~/rpc/atomRegistry";
-import { sourceControlEnvironment } from "~/state/sourceControl";
-import { toastManager } from "~/components/ui/toast";
+import { msg } from "gt-react";
+
+import { m } from "../i18n/messages";
+import { appAtomRegistry } from "../rpc/atomRegistry";
+import { sourceControlEnvironment } from "../state/sourceControl";
+import { toastManager } from "./ui/toast";
 
 /**
  * After a clone, suggests installing the forge app on the repository's owner when the server is
@@ -13,7 +15,6 @@ import { toastManager } from "~/components/ui/toast";
 export async function suggestAppAccessForRemote(
   environmentId: EnvironmentId,
   remoteUrl: string,
-  t: TFunction<"workspace">,
 ): Promise<void> {
   const target = appSignInTargetForRemote(remoteUrl);
   if (target === null) return;
@@ -27,10 +28,15 @@ export async function suggestAppAccessForRemote(
   const owner = target.input.repository.split("/")[0] ?? target.input.repository;
   const id = toastManager.add({
     type: "info",
-    title: t(($) => $.git.appAccessTitle, { app: target.appSignIn.appName, owner: owner }),
-    description: t(($) => $.git.appAccessDescription, { repository: target.input.repository }),
+    title: m(msg("Give {appName} access to {owner}", { appName: target.appSignIn.appName, owner })),
+    description: m(
+      msg(
+        "It isn't installed there, so GitHub requests for {repository} use your own login and its lower rate limit.",
+        { repository: target.input.repository },
+      ),
+    ),
     actionProps: {
-      children: t(($) => $.git.install),
+      children: m(msg("Install")),
       onClick: () => {
         toastManager.close(id);
         window.open(target.appSignIn.installUrl, "_blank", "noopener,noreferrer");

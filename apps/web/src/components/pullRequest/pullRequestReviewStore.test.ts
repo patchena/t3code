@@ -5,7 +5,7 @@ import {
   type PendingReviewComment,
   pullRequestReviewKey,
   usePullRequestReviewStore,
-} from "~/components/pullRequest/pullRequestReviewStore";
+} from "./pullRequestReviewStore";
 
 function comment(id: string, body = id): PendingReviewComment {
   return { id, body, path: "src/app.ts", position: { kind: "added", newLine: 1 } };

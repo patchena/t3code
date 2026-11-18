@@ -1,23 +1,25 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import type { ThreadTitleRegenerationOutcome } from "@t3tools/contracts";
 import {
   type AtomCommandResult,
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
+import { msg } from "gt-react";
 
+import { m } from "../i18n/messages";
 import { stackedThreadToast } from "./ui/toast";
 
 type TitleRegenerationResult = AtomCommandResult<ThreadTitleRegenerationOutcome | null, unknown>;
 
-function failureMessage(result: TitleRegenerationResult, t: TFunction<"workspace">): string | null {
+function failureMessage(result: TitleRegenerationResult): string | null {
   if (result._tag === "Failure") {
     if (isAtomCommandInterrupted(result)) return null;
     const error = squashAtomCommandFailure(result);
-    return error instanceof Error ? error.message : t(($) => $.sidebar.titleRegenerationError);
+    return thrownErrorMessage(error, m) ?? m(msg("An error occurred."));
   }
   return result.value?.status === "failed"
-    ? (result.value.message ?? t(($) => $.sidebar.titleGenerationFailed))
+    ? (result.value.message ?? m(msg("Title generation failed.")))
     : null;
 }
 
@@ -25,12 +27,9 @@ function isKept(result: TitleRegenerationResult): boolean {
   return result._tag === "Success" && result.value?.status === "unchanged";
 }
 
-export function titleRegenerationToast(
-  t: TFunction<"workspace">,
-  results: ReadonlyArray<TitleRegenerationResult>,
-) {
+export function titleRegenerationToast(results: ReadonlyArray<TitleRegenerationResult>) {
   const failures = results.flatMap((result) => {
-    const message = failureMessage(result, t);
+    const message = failureMessage(result);
     return message === null ? [] : [message];
   });
   if (failures.length > 0) {
@@ -38,11 +37,16 @@ export function titleRegenerationToast(
       type: "error",
       title:
         results.length === 1
-          ? t(($) => $.sidebar.regenerateTitleFailed)
-          : t(($) => $.sidebar.regenerateTitlesFailed, {
-              failed: failures.length,
-              total: results.length,
-            }),
+          ? m(msg("Failed to regenerate thread title"))
+          : m(
+              msg(
+                "{total, plural, one {Failed to regenerate {failed} of {total} thread titles} other {Failed to regenerate {failed} of {total} thread titles}}",
+                {
+                  failed: failures.length,
+                  total: results.length,
+                },
+              ),
+            ),
       description: failures[0],
     });
   }
@@ -51,19 +55,24 @@ export function titleRegenerationToast(
   if (results.length === 1) {
     return stackedThreadToast({
       type: "info",
-      title: t(($) => $.sidebar.titleKept),
-      description: t(($) => $.sidebar.titleKeptDescription),
+      title: m(msg("Title kept")),
+      description: m(msg("The current title already fits this thread.")),
     });
   }
   return stackedThreadToast({
     type: "info",
     title:
       kept === results.length
-        ? t(($) => $.sidebar.titlesKept)
-        : t(($) => $.sidebar.titlesKeptPartial, { kept, total: results.length }),
+        ? m(msg("Titles kept"))
+        : m(
+            msg(
+              "{total, plural, one {Kept {kept} of {total} titles} other {Kept {kept} of {total} titles}}",
+              { kept, total: results.length },
+            ),
+          ),
     description:
       kept === results.length
-        ? t(($) => $.sidebar.titlesKeptDescription)
-        : t(($) => $.sidebar.titlesKeptPartialDescription),
+        ? m(msg("The current titles already fit these threads."))
+        : m(msg("Those titles already fit their threads.")),
   });
 }

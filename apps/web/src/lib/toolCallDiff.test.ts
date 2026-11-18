@@ -1,10 +1,6 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it } from "vite-plus/test";
 import { getRenderablePatch, resolveFileDiffPath } from "./diffRendering";
-import { toolCallDiff as localizedToolCallDiff } from "./toolCallDiff";
-
-const toolCallDiff = (input: Parameters<typeof localizedToolCallDiff>[0]) =>
-  localizedToolCallDiff(input, createI18n("en").getFixedT("en", "activity"));
+import { toolCallDiff } from "./toolCallDiff";
 
 describe("toolCallDiff", () => {
   it("renders recorded hunks without reading a repository, including renamed paths", () => {

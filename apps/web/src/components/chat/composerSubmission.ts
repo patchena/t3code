@@ -1,6 +1,8 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { PROVIDER_SEND_TURN_MAX_INPUT_CHARS } from "@t3tools/contracts";
 import { expandAssistantCitationsForProvider } from "@t3tools/shared/assistantCitations";
+import { msg } from "gt-react";
+
+import { getActiveLocale, m, type MessageResolver } from "../../i18n/messages";
 
 type ComposerSubmitEvent = { preventDefault: () => void };
 
@@ -12,7 +14,8 @@ type ComposerSubmissionInput = {
 
 export function getComposerPromptLengthValidationMessage(
   prompt: string,
-  t: TFunction<"chat">,
+  resolve: MessageResolver = m,
+  locale: string = getActiveLocale(),
 ): string | null {
   const normalizedPrompt = prompt.trim();
   const inputLength = Math.max(
@@ -22,19 +25,24 @@ export function getComposerPromptLengthValidationMessage(
   const excessCharacters = inputLength - PROVIDER_SEND_TURN_MAX_INPUT_CHARS;
   if (excessCharacters <= 0) return null;
 
-  return t(($) => $.composer.promptLength, {
-    count: excessCharacters,
-    excess: excessCharacters.toLocaleString("en-US"),
-    limit: PROVIDER_SEND_TURN_MAX_INPUT_CHARS.toLocaleString("en-US"),
-  });
+  return resolve(
+    msg(
+      "{count, plural, one {Prompt is {excess} character over the {limit}-character limit. Shorten or split it before sending.} other {Prompt is {excess} characters over the {limit}-character limit. Shorten or split it before sending.}}",
+      {
+        count: excessCharacters,
+        excess: excessCharacters.toLocaleString(locale),
+        limit: PROVIDER_SEND_TURN_MAX_INPUT_CHARS.toLocaleString(locale),
+      },
+    ),
+  );
 }
 
 export function getComposerSubmissionValidationMessage(
   options: ComposerSubmissionInput,
-  t: TFunction<"chat">,
+  resolve: MessageResolver = m,
 ): string | null {
   return options.submissionTarget === "provider-turn"
-    ? getComposerPromptLengthValidationMessage(options.providerInput ?? options.prompt, t)
+    ? getComposerPromptLengthValidationMessage(options.providerInput ?? options.prompt, resolve)
     : null;
 }
 
@@ -57,9 +65,8 @@ export function submitComposerDraft(
     event: ComposerSubmitEvent | undefined;
     onSend: (event?: ComposerSubmitEvent) => boolean | void;
   },
-  t: TFunction<"chat">,
 ): { validationMessage: string | null; didDispatch: boolean } {
-  const validationMessage = getComposerSubmissionValidationMessage(options, t);
+  const validationMessage = getComposerSubmissionValidationMessage(options);
   if (validationMessage) {
     options.event?.preventDefault();
     return { validationMessage, didDispatch: false };

@@ -1,11 +1,10 @@
 import {
-  fullAccessOverrideQuestion,
+  FULL_ACCESS_OVERRIDE_QUESTION,
   fullAccessOverrideExplanation,
 } from "@t3tools/client-runtime/state/thread-requests";
+import { msg, T, useMessages } from "gt-react";
 import { ShieldIcon } from "lucide-react";
 import { memo, use } from "react";
-import { useTranslation } from "react-i18next";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { type PendingApproval } from "../../session-logic";
 import { InlineButton } from "../ui/button";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
@@ -14,51 +13,46 @@ import { ToolActivityIconView, type WorkEntryIconName } from "./TimelineToolActi
 import { TimelineRowCtx } from "./timelineRowContext";
 import { WorkLogRow } from "./WorkLog";
 
-const approvalPresentation = (t: TFunction<"chat">) =>
-  ({
-    command: {
-      icon: "terminal",
-      label: t(($) => $.approval.command),
-      detailLabel: t(($) => $.approval.commandDetail),
-    },
-    "file-change": {
-      icon: "square-pen",
-      label: t(($) => $.approval.fileChange),
-      detailLabel: t(($) => $.approval.fileChangeDetail),
-    },
-    "file-read": {
-      icon: "eye",
-      label: t(($) => $.approval.fileRead),
-      detailLabel: t(($) => $.approval.fileReadDetail),
-    },
-    permission: {
-      icon: "wrench",
-      label: t(($) => $.approval.permission),
-      detailLabel: t(($) => $.approval.permissionDetail),
-    },
-    "mcp-elicitation": {
-      icon: "hammer",
-      label: t(($) => $.approval.access),
-      detailLabel: t(($) => $.approval.accessDetail),
-    },
-  }) satisfies Record<
-    PendingApproval["requestKind"],
-    { icon: WorkEntryIconName; label: string; detailLabel: string }
-  >;
+const APPROVAL_PRESENTATION = {
+  command: {
+    icon: "terminal",
+    label: msg("Command approval"),
+    detailLabel: msg("Command", { $context: "noun, shell command awaiting approval" }),
+  },
+  "file-change": {
+    icon: "square-pen",
+    label: msg("File change approval"),
+    detailLabel: msg("File change"),
+  },
+  "file-read": { icon: "eye", label: msg("File read approval"), detailLabel: msg("File to read") },
+  permission: {
+    icon: "wrench",
+    label: msg("App permission approval"),
+    detailLabel: msg("Permission request"),
+  },
+  "mcp-elicitation": {
+    icon: "hammer",
+    label: msg("App access approval"),
+    detailLabel: msg("App access request"),
+  },
+} satisfies Record<
+  PendingApproval["requestKind"],
+  { icon: WorkEntryIconName; label: string; detailLabel: string }
+>;
 
 export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalRow({
   approval,
 }: {
   approval: PendingApproval;
 }) {
-  const { t } = useTranslation("chat");
   const { respondingRequestIds, canOperateThread, onRespondToApproval } = use(TimelineRowCtx);
-  const presentation = approvalPresentation(t)[approval.requestKind];
+  const m = useMessages();
+  const presentation = APPROVAL_PRESENTATION[approval.requestKind];
   const canRespond = approval.responseCapability === "live";
   return (
     <WorkLogRow
       role="group"
-      aria-label={presentation.label}
+      aria-label={m(presentation.label)}
       data-v2-item-type="approval_request"
       wrapLabel
       icon={
@@ -71,12 +65,12 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
       }
       label={
         <code
-          aria-label={presentation.detailLabel}
+          aria-label={m(presentation.detailLabel)}
           className="block max-h-40 min-w-0 overflow-auto whitespace-pre-wrap font-mono text-xs leading-5 text-foreground select-text! wrap-anywhere [scrollbar-width:thin] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
           data-approval-detail="complete"
           tabIndex={0}
         >
-          {approval.detail || presentation.label}
+          {approval.detail || m(presentation.label)}
         </code>
       }
     >
@@ -92,7 +86,7 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
             <>
               <span className="inline-flex items-center gap-1 text-warning">
                 <ShieldIcon aria-hidden className="size-3 shrink-0" />
-                {t(($) => $.approval.waiting)}
+                <T>Waiting for approval</T>
               </span>
               {onRespondToApproval ? (
                 <>
@@ -112,20 +106,22 @@ export const TimelinePendingApprovalRow = memo(function TimelinePendingApprovalR
               ) : null}
             </>
           ) : (
-            <span className="text-warning">{t(($) => $.approval.processGone)}</span>
+            <span className="text-warning">
+              <T>Provider process is gone. Interrupt or restart the run to respond.</T>
+            </span>
           )}
           {approval.fullAccessOverride ? (
             <Popover>
               <PopoverTrigger openOnHover render={<InlineButton tone="muted" />}>
-                {fullAccessOverrideQuestion(t)}
+                {m(FULL_ACCESS_OVERRIDE_QUESTION)}
               </PopoverTrigger>
               <PopoverPopup
-                aria-label={fullAccessOverrideQuestion(t)}
+                aria-label={m(FULL_ACCESS_OVERRIDE_QUESTION)}
                 tooltipStyle
                 side="top"
                 className="max-w-[min(22rem,calc(100vw-2rem))] whitespace-normal"
               >
-                {fullAccessOverrideExplanation(approval.fullAccessOverride, t)}
+                {fullAccessOverrideExplanation(approval.fullAccessOverride, m)}
               </PopoverPopup>
             </Popover>
           ) : null}

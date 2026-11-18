@@ -1,8 +1,9 @@
-import { appI18n } from "~/i18n";
 import { AuthPreviewOperateScope, type EnvironmentId } from "@t3tools/contracts";
 import type { AnyRouter } from "@tanstack/react-router";
+import { msg } from "gt-react";
 
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
+import { m } from "~/i18n/messages";
 import { isPreviewAvailableFor } from "../browser/previewRuntime";
 import { isCommandPaletteOpen, openCommandPalette } from "../commandPaletteBus";
 import { useComposerDraftStore } from "../composerDraftStore";
@@ -42,7 +43,6 @@ const CHAT_ROUTE_ID = "/_chat";
 export function installChatRouteCommands(router: AnyRouter): () => void {
   const handleNewThread = createNewThreadHandler(router);
   const scratch = createScratchProjectActions({
-    t: appI18n.getFixedT(null, "common"),
     environments: () =>
       [...appAtomRegistry.get(environmentPresentations.presentationsAtom)].map(
         ([environmentId, presentation]) => ({ ...presentation, environmentId }),
@@ -56,6 +56,13 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
   const readRouteThreadRef = () => {
     const target = readRouteTarget();
     return target?.kind === "server" ? target.threadRef : null;
+  };
+  const readRouteEnvironmentId = () => {
+    const target = readRouteTarget();
+    if (!target) return null;
+    return target.kind === "server"
+      ? target.threadRef.environmentId
+      : (useComposerDraftStore.getState().getDraftSession(target.draftId)?.environmentId ?? null);
   };
   const readPreviewOpen = () => {
     const threadRef = readRouteThreadRef();
@@ -89,16 +96,13 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
   };
   // Grouped like the sidebar, so the shortcut and the New thread button agree.
   const readProjectGroups = () =>
-    buildSidebarProjectSnapshots(
-      {
-        projects: readProjects(),
-        groupScratchProjects: true,
-        settings: selectProjectGroupingSettings(getClientSettings()),
-        primaryEnvironmentId: appAtomRegistry.get(primaryEnvironmentIdAtom),
-        resolveEnvironmentLabel: () => null,
-      },
-      appI18n.getFixedT(null, "common"),
-    );
+    buildSidebarProjectSnapshots({
+      projects: readProjects(),
+      groupScratchProjects: true,
+      settings: selectProjectGroupingSettings(getClientSettings()),
+      primaryEnvironmentId: appAtomRegistry.get(primaryEnvironmentIdAtom),
+      resolveEnvironmentLabel: () => null,
+    });
   const canOperatePreview = (environmentId: EnvironmentId) =>
     readEnvironmentScope(environmentId, AuthPreviewOperateScope);
 
@@ -119,8 +123,8 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
     (action: PreviewAction): CommandHandler =>
     (event) => {
       claim(event);
-      const threadRef = readRouteThreadRef();
-      if (threadRef && canOperatePreview(threadRef.environmentId)) dispatchPreviewAction(action);
+      const environmentId = readRouteEnvironmentId();
+      if (environmentId && canOperatePreview(environmentId)) dispatchPreviewAction(action);
     };
 
   return registerCommands(
@@ -160,8 +164,8 @@ export function installChatRouteCommands(router: AnyRouter): () => void {
           toastManager.add(
             stackedThreadToast({
               type: "info",
-              title: appI18n.t(($) => $.misc.desktopPreview),
-              description: appI18n.t(($) => $.misc.desktopPreviewDescription),
+              title: m(msg("Preview is desktop-only")),
+              description: m(msg("Open T3 Code in the desktop app to use the in-app preview.")),
             }),
           );
           return;

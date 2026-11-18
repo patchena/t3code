@@ -4,13 +4,6 @@ vi.mock("./appInit", () => ({ startAppServices: () => ({ load: async () => {} })
 vi.mock("./AppRoot", () => ({ AppRoot: () => null }));
 vi.mock("./i18n/runtime", () => ({ whenLocaleReady: async () => {} }));
 vi.mock("react-dom/client", () => ({ default: { createRoot: () => ({ render: () => {} }) } }));
-vi.mock("~/hooks/useSettings", () => ({
-  ensureClientSettingsHydrated: async () => {},
-  getClientSettings: () => ({ interfaceLanguage: "en" }),
-}));
-vi.mock("~/i18n", () => ({ appI18n: { changeLanguage: async () => {} } }));
-vi.mock("~/components/InterfaceErrorBoundary", () => ({ InterfaceErrorBoundary: () => null }));
-vi.mock("~/providerAuthDelivery", () => ({ startProviderAuthDelivery: () => {} }));
 
 // Boots main in a fresh page that shares the tab's sessionStorage, as a reload does.
 async function bootThenFailLazyChunk(sessionStorage: Map<string, string>) {
@@ -25,7 +18,7 @@ async function bootThenFailLazyChunk(sessionStorage: Map<string, string>) {
     location: { reload },
   });
   vi.stubGlobal("window", page);
-  vi.stubGlobal("document", { getElementById: () => ({}), documentElement: {} });
+  vi.stubGlobal("document", { getElementById: () => ({}) });
   try {
     const { startup } = await import("./main");
     await startup;

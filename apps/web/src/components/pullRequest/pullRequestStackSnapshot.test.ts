@@ -1,13 +1,7 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import type { ThreadPullRequestLink } from "@t3tools/contracts";
 import { ProjectId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
-import {
-  savedPullRequestStack,
-  pullRequestStackView,
-} from "~/components/pullRequest/pullRequestStackSnapshot";
-
-const t = createI18n("en").getFixedT(null, "workspace");
+import { savedPullRequestStack, pullRequestStackView } from "./pullRequestStackSnapshot";
 
 const reference = {
   projectId: ProjectId.make("project"),
@@ -76,34 +70,29 @@ describe("saved stack navigation", () => {
   it("shows saved data during loading and marks a failed refresh stale", () => {
     const saved = savedPullRequestStack([link], reference);
     const query = { data: null, isSuccess: false, isPending: true, error: null };
-    expect(pullRequestStackView(query, saved, t)).toMatchObject({
+    expect(pullRequestStackView(query, saved)).toMatchObject({
       data: saved,
       isFresh: false,
       notice: expect.stringContaining("Refreshing"),
     });
     expect(
-      pullRequestStackView({ ...query, isPending: false, error: "Rate limited" }, saved, t),
+      pullRequestStackView({ ...query, isPending: false, error: "Rate limited" }, saved),
     ).toMatchObject({ data: saved, isFresh: false, notice: expect.stringContaining("stale") });
   });
   it("prefers refreshed data and honors a successful absence", () => {
     const saved = savedPullRequestStack([link], reference);
     const query = { data: saved, isSuccess: true, isPending: false, error: null };
-    expect(pullRequestStackView(query, null, t)).toEqual({
-      data: saved,
-      isFresh: true,
-      notice: null,
-    });
-    expect(pullRequestStackView({ ...query, data: null }, saved, t)).toEqual({
+    expect(pullRequestStackView(query, null)).toEqual({ data: saved, isFresh: true, notice: null });
+    expect(pullRequestStackView({ ...query, data: null }, saved)).toEqual({
       data: null,
       isFresh: true,
       notice: null,
     });
-    expect(pullRequestStackView({ ...query, isPending: true }, saved, t).isFresh).toBe(true);
-    expect(pullRequestStackView({ ...query, data: null, isPending: true }, saved, t)).toMatchObject(
-      {
-        data: null,
-        isFresh: true,
-      },
-    );
+    // A shown answer being read again may be one restored from the device, so it cannot clear a merge.
+    expect(pullRequestStackView({ ...query, isPending: true }, saved).isFresh).toBe(false);
+    expect(pullRequestStackView({ ...query, data: null, isPending: true }, saved)).toMatchObject({
+      data: null,
+      isFresh: false,
+    });
   });
 });

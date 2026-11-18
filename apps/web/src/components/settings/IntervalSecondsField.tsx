@@ -15,7 +15,7 @@ export function IntervalSecondsField({
   step,
   onCommit,
 }: {
-  labels: { readonly decrease: string; readonly seconds: string; readonly increase: string };
+  labels: { readonly decrease: string; readonly input: string; readonly increase: string };
   value: number;
   min: number;
   step: number;
@@ -67,7 +67,7 @@ export function IntervalSecondsField({
     >
       <NumberFieldGroup>
         <NumberFieldDecrement aria-label={labels.decrease} />
-        <NumberFieldInput aria-label={labels.seconds} />
+        <NumberFieldInput aria-label={labels.input} />
         <NumberFieldIncrement aria-label={labels.increase} />
       </NumberFieldGroup>
     </NumberField>

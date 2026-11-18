@@ -1,15 +1,12 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it } from "vite-plus/test";
 
-import { describePullRequestDiffError } from "~/components/pullRequest/pullRequestDiffError";
-
-const t = createI18n("en").getFixedT(null, "workspace");
+import { describePullRequestDiffError } from "./pullRequestDiffError";
 
 describe("describePullRequestDiffError", () => {
   it("explains the rate limit inside an HTTP transport error without exposing the endpoint", () => {
     const error =
       "Failed to fetch remote environment endpoint http://127.0.0.1:49477/api/pull-requests/diff (PullRequestOperationError: Pull request operation diff failed: github requests to github.com are paused until the rate limit resets.).";
-    const result = describePullRequestDiffError(error, "GitHub", "pull request", t);
+    const result = describePullRequestDiffError(error, "GitHub", "pr");
 
     expect(result.title).toBe("GitHub rate limit reached");
     expect(result.description).toContain("after the limit resets");
@@ -20,8 +17,7 @@ describe("describePullRequestDiffError", () => {
   // regression: #19945 diff load failures from a provider quota showed a generic error
   it("recognizes a provider's API quota error", () => {
     expect(
-      describePullRequestDiffError("GitHub API rate limit exceeded.", "GitHub", "pull request", t)
-        .title,
+      describePullRequestDiffError("GitHub API rate limit exceeded.", "GitHub", "pr").title,
     ).toBe("GitHub rate limit reached");
   });
 
@@ -29,8 +25,7 @@ describe("describePullRequestDiffError", () => {
     const result = describePullRequestDiffError(
       "Failed to fetch remote environment endpoint http://localhost:49477/api/pull-requests/diff (TypeError: Failed to fetch).",
       "GitHub",
-      "pull request",
-      t,
+      "pr",
     );
 
     expect(result.title).toBe("Couldn't load the changes");

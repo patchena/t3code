@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+import { useMessages } from "gt-react";
 import { AuthEnvironmentMaintainScope } from "@t3tools/contracts";
 
 import { usePrimaryCloudLinkState } from "~/cloud/cloudLinkState";
@@ -10,15 +10,14 @@ import { useEnvironments, usePrimaryEnvironmentId } from "~/state/environments";
 import { usePeerLinkHosts } from "~/state/peerLinks";
 import { useEnvironmentQuery } from "~/state/query";
 import { useEnvironmentScope } from "~/state/session";
-import { isWslSettingsRowVisible } from "~/components/settings/ConnectionsSettings.logic";
-import { isProviderSettingsEnvironmentAvailable } from "~/components/settings/ProviderSettingsPanel.logic";
+import { isWslSettingsRowVisible } from "./ConnectionsSettings.logic";
+import { isProviderSettingsEnvironmentAvailable } from "./ProviderSettingsPanel.logic";
 import {
   filterAvailableSettingsSearchItems,
   getThreadAutoSettlementSearchAvailability,
-} from "~/components/settings/settingsSearch";
+} from "./settingsSearch";
 
 export function useAvailableSettingsSearchItems() {
-  const { t } = useTranslation("settings");
   const { environments } = useEnvironments();
   // Explicit booleans keep flags out of the filter cache so environment updates do not rebuild the list.
   const hasEnvironment =
@@ -57,26 +56,24 @@ export function useAvailableSettingsSearchItems() {
   const canManageLocalBackend = !localEnvironmentDisabled && canMaintain;
   const desktopWsl = useEnvironmentQuery(
     isElectron && canManageLocalBackend ? desktopWslStateAtom : null,
+    useMessages(),
   );
   const cloudPublicConfig = hasCloudPublicConfig() === true;
   const wslSettingsRowVisible =
     isWslSettingsRowVisible({ state: desktopWsl.data, error: desktopWsl.error }) === true;
 
-  return filterAvailableSettingsSearchItems(
-    {
-      localEnvironmentDisabled,
-      hasCloudPublicConfig: cloudPublicConfig,
-      hasEnvironment,
-      hasProviderSettingsEnvironment,
-      canManageLocalBackend,
-      isWslSettingsRowVisible: wslSettingsRowVisible,
-      hasThreadAutoSettlement,
-      managedTunnelActive,
-      hasPeerLinkHost,
-      hasFastWorktreeCheckoutEnvironment,
-      hasTextGeneratorsEnvironment,
-      hasPrimaryEnvironment: primaryEnvironmentId !== null,
-    },
-    t,
-  );
+  return filterAvailableSettingsSearchItems({
+    localEnvironmentDisabled,
+    hasCloudPublicConfig: cloudPublicConfig,
+    hasEnvironment,
+    hasProviderSettingsEnvironment,
+    canManageLocalBackend,
+    isWslSettingsRowVisible: wslSettingsRowVisible,
+    hasThreadAutoSettlement,
+    managedTunnelActive,
+    hasPeerLinkHost,
+    hasFastWorktreeCheckoutEnvironment,
+    hasTextGeneratorsEnvironment,
+    hasPrimaryEnvironment: primaryEnvironmentId !== null,
+  });
 }

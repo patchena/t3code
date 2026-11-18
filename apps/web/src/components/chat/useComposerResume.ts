@@ -1,4 +1,6 @@
-import { useTranslation } from "react-i18next";
+import { msg } from "gt-react";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { m } from "~/i18n/messages";
 import {
   type EnvironmentId,
   type ProviderInteractionMode,
@@ -50,11 +52,10 @@ interface ComposerResumeInput {
 }
 
 /**
- * Resumes an interrupted run ("Continue where you left off.") and/or releases the turns held
+ * Resumes an interrupted run and/or releases the turns held
  * in its queue. Shares the per-route send lock with the composer's send paths.
  */
 export function useComposerResume(input: ComposerResumeInput) {
-  const { t } = useTranslation("chat");
   const {
     environmentId,
     routeThreadKey,
@@ -132,7 +133,7 @@ export function useComposerResume(input: ComposerResumeInput) {
           message: {
             messageId: newMessageId(),
             role: "user",
-            text: "Continue where you left off.",
+            text: "",
             attachments: [],
           },
           runtimeMode,
@@ -150,7 +151,7 @@ export function useComposerResume(input: ComposerResumeInput) {
         const error = squashAtomCommandFailure(result);
         setThreadError(
           threadId,
-          error instanceof Error ? error.message : t(($) => $.composer.resumeFailed),
+          thrownErrorMessage(error, m) ?? m(msg("Could not resume thread.")),
         );
       }
     } else {

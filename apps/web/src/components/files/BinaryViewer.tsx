@@ -1,12 +1,3 @@
-import { decodeFileWorkerError } from "~/components/files/fileWorkerError";
-import {
-  FilePreviewFailure,
-  fileFailure,
-  fileFailureText,
-  type FileFailure,
-} from "~/components/files/fileFailure";
-import { useTranslation } from "react-i18next";
-import { systemLocale } from "~/timestampFormat";
 /* oxlint-disable react/no-array-index-key -- Read-only cells retain their database row and column positions. */
 import {
   decodeFilePreviewText,
@@ -15,7 +6,9 @@ import {
 } from "@t3tools/shared/filePreview";
 import { formatAttachmentSize } from "@t3tools/client-runtime/state/attachments";
 import { ChevronLeftIcon, ChevronRightIcon, FileIcon, FolderIcon } from "lucide-react";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { m } from "~/i18n/messages";
 
 import {
   Select,
@@ -38,20 +31,31 @@ import {
 } from "./binaryPreviewProtocol";
 import { PreviewImage } from "./PreviewImage";
 import { readBinaryPreview } from "./readBinaryPreview";
+import { previewErrorText, previewFailureText } from "./previewFailureMessages";
 
-const numberFormat = new Intl.NumberFormat(systemLocale);
-
-const SourcePreview = lazy(() =>
-  import("~/components/files/ReadOnlySourcePreview").then((module) => ({
-    default: module.ReadOnlySourcePreview,
-  })),
-);
+const SourcePreview = lazy(() => import("./ReadOnlySourcePreview"));
 type Archive = Extract<BinaryWorkerResult, { type: "archive" }>;
 type Database = Extract<BinaryWorkerResult, { type: "sqlite" }>;
 type Rows = Extract<BinaryWorkerResult, { type: "rows" }>;
 
+const rowsLabel = (count: number, gt: ReturnType<typeof useGT>) =>
+  gt("{count, plural, one {{formatted} row} other {{formatted} rows}}", {
+    count,
+    formatted: count.toLocaleString(),
+  });
+const columnsLabel = (count: number, gt: ReturnType<typeof useGT>) =>
+  gt("{count, plural, one {{formatted} column} other {{formatted} columns}}", {
+    count,
+    formatted: count.toLocaleString(),
+  });
+const entriesLabel = (count: number, gt: ReturnType<typeof useGT>) =>
+  gt("{count, plural, one {{formatted} entry} other {{formatted} entries}}", {
+    count,
+    formatted: count.toLocaleString(),
+  });
+
 function ArchiveFile(props: { readonly path: string; readonly bytes: Uint8Array<ArrayBuffer> }) {
-  const { t } = useTranslation("files");
+  const gt = useGT();
   const [url, setUrl] = useState<string | null>(null);
   const kind = filePreviewKind({ name: props.path });
   const text = (() => {
@@ -77,11 +81,18 @@ function ArchiveFile(props: { readonly path: string; readonly bytes: Uint8Array<
   }, [props.bytes, props.path, kind]);
   if (kind === "image")
     return url ? <PreviewImage key={url} src={url} name={props.path} /> : <FileSurfaceLoading />;
-  if (!text) return <FileSurfaceFailure message={t(($) => $.archive.onlyTextImages)} />;
+  if (!text)
+    return (
+      <FileSurfaceFailure
+        message={gt("Only UTF-8 text and images can be opened inside an archive.")}
+      />
+    );
   return (
     <>
       {text.truncated ? (
-        <FileSurfaceNotice>{t(($) => $.archive.firstMegabyte)}</FileSurfaceNotice>
+        <FileSurfaceNotice>
+          <T>Preview limited to the first 1 MB.</T>
+        </FileSurfaceNotice>
       ) : null}
       <Suspense fallback={<FileSurfaceLoading />}>
         <SourcePreview name={props.path} text={text.text} />
@@ -90,13 +101,14 @@ function ArchiveFile(props: { readonly path: string; readonly bytes: Uint8Array<
   );
 }
 
-export function BinaryViewer(props: {
+export default function BinaryViewer(props: {
   readonly src: string;
   readonly name: string;
   readonly kind: "archive" | "sqlite";
   readonly onRetry?: () => void;
 }) {
-  const { t } = useTranslation("files");
+  const gt = useGT();
+  const messages = useMessages();
   const [sizeBytes, setSizeBytes] = useState<number | null>(null);
   const [archive, setArchive] = useState<Archive | null>(null);
   const [database, setDatabase] = useState<Database | null>(null);
@@ -107,7 +119,7 @@ export function BinaryViewer(props: {
   const [selectedTable, setSelectedTable] = useState("");
   const [page, setPage] = useState(0);
   const [busy, setBusy] = useState(true);
-  const [error, setError] = useState<FileFailure | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const send = (request: BinaryWorkerRequest) => {
@@ -115,7 +127,7 @@ export function BinaryViewer(props: {
     setError(null);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      setError(new FilePreviewFailure({ describe: (t) => t(($) => $.archive.timeout) }));
+      setError(m(msg("This file took too long to preview. Close it and try again.")));
       setBusy(false);
       workerRef.current?.terminate();
       workerRef.current = null;
@@ -129,7 +141,7 @@ export function BinaryViewer(props: {
       type: "module",
     });
     workerRef.current = worker;
-    const fail = (message: FileFailure) => {
+    const fail = (message: string) => {
       if (controller.signal.aborted) return;
       setError(message);
       setBusy(false);
@@ -139,21 +151,18 @@ export function BinaryViewer(props: {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
     timerRef.current = setTimeout(
-      () => fail(new FilePreviewFailure({ describe: (t) => t(($) => $.archive.timeout) })),
+      () => fail(m(msg("This file took too long to preview. Close it and try again."))),
       30_000,
     );
     worker.addEventListener("error", () =>
-      fail(new FilePreviewFailure({ describe: (t) => t(($) => $.archive.viewerFailed) })),
+      fail(m(msg("Could not load the file viewer. Close it and try again."))),
     );
     worker.addEventListener("message", (event: MessageEvent<BinaryWorkerResult>) => {
       if (controller.signal.aborted) return;
       if (timerRef.current) clearTimeout(timerRef.current);
       const result = event.data;
       setBusy(false);
-      if (result.type === "error")
-        setError(
-          fileFailure(decodeFileWorkerError(result), (t) => t(($) => $.document.readFailed)),
-        );
+      if (result.type === "error") setError(previewFailureText(result));
       else if (result.type === "archive") setArchive(result);
       else if (result.type === "entry") setEntry(result);
       else if (result.type === "rows") setRows(result);
@@ -173,7 +182,9 @@ export function BinaryViewer(props: {
           worker.postMessage({ type: "open", name: props.name, kind: props.kind, bytes }, [bytes]);
         }
       })
-      .catch((cause: unknown) => fail(fileFailure(cause, (t) => t(($) => $.document.readFailed))));
+      .catch((cause: unknown) =>
+        fail(previewErrorText(cause, m(msg("Could not read this file.")))),
+      );
     return () => {
       controller.abort();
       worker.terminate();
@@ -210,7 +221,7 @@ export function BinaryViewer(props: {
       {archive ? (
         <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border/60 px-3 text-xs">
           <FileSurfaceAction
-            label={selectedPath ? t(($) => $.archive.back) : t(($) => $.archive.parentFolder)}
+            label={selectedPath ? gt("Back to archive") : gt("Parent folder")}
             disabled={!selectedPath && !folder}
             onPress={() => {
               setError(null);
@@ -222,11 +233,11 @@ export function BinaryViewer(props: {
             <ChevronLeftIcon className="size-3.5" />
           </FileSurfaceAction>
           <span className="min-w-0 flex-1 truncate">
-            {selectedPath ?? (folder || t(($) => $.archive.contents))}
+            {selectedPath ?? (folder || gt("Archive contents"))}
           </span>
           <span className="shrink-0 text-muted-foreground">
-            {t(($) => $.document.entries, { count: archive.entries.length, suffix: "" })}
-            {sizeBytes !== null ? ` · ${formatAttachmentSize(sizeBytes)}` : ""}
+            {entriesLabel(archive.entries.length, gt)}
+            {sizeBytes !== null ? ` · ${formatAttachmentSize(sizeBytes, messages)}` : ""}
           </span>
         </div>
       ) : null}
@@ -241,34 +252,26 @@ export function BinaryViewer(props: {
                 }}
               >
                 <SelectTrigger
-                  aria-label={t(($) => $.database.table)}
+                  aria-label={gt("Table", { $context: "noun, database table picker" })}
                   aria-disabled={busy}
                   aria-busy={busy}
                   size="xs"
                 >
                   <SelectValue>
-                    {t(($) => $.document.tableRows, {
-                      name: table.name,
-                      count: table.count,
-                      value: numberFormat.format(table.count),
-                    })}
+                    {table.name} ({rowsLabel(table.count, gt)})
                   </SelectValue>
                 </SelectTrigger>
                 <SelectPopup>
                   {database.tables.map((item) => (
                     <SelectItem key={item.name} value={item.name}>
-                      {t(($) => $.document.tableRows, {
-                        name: item.name,
-                        count: item.count,
-                        value: numberFormat.format(item.count),
-                      })}
+                      {item.name} ({rowsLabel(item.count, gt)})
                     </SelectItem>
                   ))}
                 </SelectPopup>
               </Select>
             </div>
             <FileSurfaceAction
-              label={t(($) => $.database.previousRows)}
+              label={gt("Previous rows")}
               disabled={busy || page === 0}
               onPress={() => selectPage(page - 1)}
             >
@@ -276,15 +279,15 @@ export function BinaryViewer(props: {
             </FileSurfaceAction>
             <span className="shrink-0 tabular-nums" aria-live="polite">
               {table.count === 0
-                ? t(($) => $.document.rows, { count: 0, value: numberFormat.format(0), suffix: "" })
-                : t(($) => $.document.rowRange, {
-                    start: numberFormat.format(page * SQLITE_PAGE_SIZE + 1),
-                    end: numberFormat.format(Math.min(table.count, (page + 1) * SQLITE_PAGE_SIZE)),
-                    total: numberFormat.format(table.count),
+                ? gt("0 rows")
+                : gt("{start}–{end} of {total}", {
+                    start: String(page * SQLITE_PAGE_SIZE + 1),
+                    end: String(Math.min(table.count, (page + 1) * SQLITE_PAGE_SIZE)),
+                    total: table.count.toLocaleString(),
                   })}
             </span>
             <FileSurfaceAction
-              label={t(($) => $.database.nextRows)}
+              label={gt("Next rows")}
               disabled={busy || (page + 1) * SQLITE_PAGE_SIZE >= table.count}
               onPress={() => selectPage(page + 1)}
             >
@@ -295,28 +298,20 @@ export function BinaryViewer(props: {
             className="border-b border-border/60 px-3 py-2 text-xs text-muted-foreground tabular-nums"
             role="status"
           >
-            {t(($) => $.document.dimensions, {
-              rows: t(($) => $.document.rows, {
-                count: table.count,
-                value: numberFormat.format(table.count),
-                suffix: "",
-              }),
-              columns: rows
-                ? t(($) => $.document.columns, {
-                    count: rows.columns.length,
-                    value: numberFormat.format(rows.columns.length),
-                    suffix: "",
-                  })
-                : "…",
-            })}
-            {sizeBytes !== null ? ` · ${formatAttachmentSize(sizeBytes)}` : ""}
+            {rowsLabel(table.count, gt)} ·{" "}
+            {rows ? columnsLabel(rows.columns.length, gt) : gt("… columns")}
+            {sizeBytes !== null ? ` · ${formatAttachmentSize(sizeBytes, messages)}` : ""}
           </div>
-          <FileSurfaceNotice>{t(($) => $.database.notice)}</FileSurfaceNotice>
+          <FileSurfaceNotice>
+            <T>
+              Read-only. Up to 50 columns and 1,024 characters per cell. Blob contents are omitted.
+            </T>
+          </FileSurfaceNotice>
         </>
       ) : null}
       {error ? (
         <FileSurfaceFailure
-          message={fileFailureText(error, t)}
+          message={error}
           {...(props.onRetry ? { onRetry: props.onRetry } : {})}
         />
       ) : busy ? (
@@ -328,19 +323,19 @@ export function BinaryViewer(props: {
       ) : archive ? (
         <div className="scrollbar-gutter-both min-h-0 flex-1 overflow-auto">
           <table
-            aria-label={t(($) => $.archive.entries)}
+            aria-label={gt("Archive entries")}
             className="w-full border-separate border-spacing-0 text-xs"
           >
             <thead className="sticky top-0 bg-background text-muted-foreground">
               <tr>
                 <th scope="col" className="px-3 py-2 text-left font-normal">
-                  {t(($) => $.archive.name)}
+                  <T $context="column header, file name">Name</T>
                 </th>
                 <th scope="col" className="px-3 py-2 text-right font-normal">
-                  {t(($) => $.archive.size)}
+                  <T $context="column header, file size">Size</T>
                 </th>
                 <th scope="col" className="px-3 py-2 text-right font-normal">
-                  {t(($) => $.archive.modified)}
+                  <T $context="column header, last modified date">Modified</T>
                 </th>
               </tr>
             </thead>
@@ -377,19 +372,19 @@ export function BinaryViewer(props: {
                       </button>
                     </td>
                     <td className="w-20 border-b border-border/60 px-3 py-2 text-right whitespace-nowrap text-muted-foreground tabular-nums">
-                      {formatAttachmentSize(item.size)}
+                      {formatAttachmentSize(item.size, messages)}
                     </td>
                     <td className="w-28 border-b border-border/60 px-3 py-2 text-right whitespace-nowrap text-muted-foreground">
-                      {item.modified
-                        ? new Date(item.modified).toLocaleDateString(systemLocale)
-                        : "-"}
+                      {item.modified ? new Date(item.modified).toLocaleDateString() : "-"}
                     </td>
                   </tr>
                 ))}
             </tbody>
           </table>
           {children.size === 0 ? (
-            <p className="p-6 text-xs text-muted-foreground">{t(($) => $.archive.emptyFolder)}</p>
+            <p className="p-6 text-xs text-muted-foreground">
+              <T>This folder is empty.</T>
+            </p>
           ) : null}
         </div>
       ) : rows ? (
@@ -427,11 +422,15 @@ export function BinaryViewer(props: {
             </tbody>
           </table>
           {rows.rows.length === 0 ? (
-            <p className="p-6 text-xs text-muted-foreground">{t(($) => $.database.emptyTable)}</p>
+            <p className="p-6 text-xs text-muted-foreground">
+              <T>This table is empty.</T>
+            </p>
           ) : null}
         </div>
       ) : (
-        <p className="p-6 text-xs text-muted-foreground">{t(($) => $.database.noTables)}</p>
+        <p className="p-6 text-xs text-muted-foreground">
+          <T>This database has no readable tables.</T>
+        </p>
       )}
     </div>
   );

@@ -1,3 +1,4 @@
+import type { EnvironmentConnectionPhase } from "@t3tools/client-runtime/connection";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { parsePullRequestQuery } from "@t3tools/client-runtime/pull-request-query";
 import {
@@ -32,32 +33,35 @@ import {
   type PullRequestDiffStats,
   type PullRequestGroup,
   type PullRequestListOverride,
-} from "~/components/pullRequest/pullRequestList.logic";
-import type { PullRequestExpectedHost } from "~/components/pullRequest/PullRequestListFilters";
-import type {
-  PullRequestListPreferences,
-  PullRequestListSort,
-} from "~/components/pullRequest/pullRequestListPreferences";
+} from "./pullRequestList.logic";
+import type { PullRequestExpectedHost } from "./PullRequestListFilters";
+import type { PullRequestListPreferences, PullRequestListSort } from "./pullRequestListPreferences";
 import {
   pullRequestProjectQueries,
   type PullRequestHostAvailability,
-} from "~/components/pullRequest/pullRequestProjectAssignment.logic";
+} from "./pullRequestProjectAssignment.logic";
 import { pullRequestFilterProjects } from "@t3tools/client-runtime/pull-request-project-filter";
-import { pullRequestListEntryId } from "~/components/pullRequest/pullRequestListGroups.logic";
+import { pullRequestListEntryId } from "./pullRequestListGroups.logic";
 
 export interface PullRequestsSearch extends PullRequestListPreferences {
   readonly selectedUrl?: string;
   readonly environmentId?: EnvironmentId;
   readonly projectId?: ProjectId;
-  readonly host?: string;
+  readonly host?: string | undefined;
   readonly repository?: string;
   readonly number?: number;
-  readonly selectedProjectId?: ProjectId;
-  readonly selectedHost?: string;
-  readonly selectedEnvironmentId?: EnvironmentId;
+  readonly selectedProjectId?: ProjectId | undefined;
+  readonly selectedHost?: string | undefined;
+  readonly selectedEnvironmentId?: EnvironmentId | undefined;
 }
 
 const SEARCH_DEBOUNCE_MS = 250;
+const UNREACHABLE_PHASES: ReadonlySet<EnvironmentConnectionPhase> = new Set([
+  "offline",
+  "reconnecting",
+  "error",
+  "unsupported",
+]);
 
 /** Which servers and projects the page reads, from the URL and what this client knows. */
 export function usePullRequestScope(
@@ -124,6 +128,11 @@ export function usePullRequestScope(
     scopedProjectId,
     projectsKnown,
   );
+  const unreachable = new Set(
+    environments.flatMap((environment) =>
+      UNREACHABLE_PHASES.has(environment.connection.phase) ? [environment.environmentId] : [],
+    ),
+  );
   const queriesFor = (
     availability?: PullRequestHostAvailability,
   ): ReadonlyArray<{
@@ -132,7 +141,7 @@ export function usePullRequestScope(
   }> => {
     const plain = queryEnvironmentIds.map((environmentId) => ({ environmentId }));
     if (!projectsKnown || scopedProjectId !== undefined) return plain;
-    return pullRequestProjectQueries(projects, queryEnvironmentIds, availability);
+    return pullRequestProjectQueries(projects, queryEnvironmentIds, availability, unreachable);
   };
   const environmentQueries = queriesFor(hostAvailability);
   // What the page reads once a refresh forgets host reads; refresh must refetch these too.

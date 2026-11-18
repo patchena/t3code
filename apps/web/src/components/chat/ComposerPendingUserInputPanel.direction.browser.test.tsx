@@ -1,10 +1,9 @@
 import { EnvironmentId, RuntimeRequestId, ThreadId } from "@t3tools/contracts";
 import { expect, it, vi } from "vite-plus/test";
 
-vi.mock(import("../ChatMarkdown"), async () => {
-  const { memo } = await import("react");
-  return { ChatMarkdown: memo(({ text }: { text: string }) => <p>{text}</p>) };
-});
+vi.mock(import("../ChatMarkdown"), () => ({
+  default: (({ text }: { text: string }) => <p>{text}</p>) as never,
+}));
 
 import { render } from "../../../test/render";
 import { ComposerPendingUserInputPanel } from "./ComposerPendingUserInputPanel";

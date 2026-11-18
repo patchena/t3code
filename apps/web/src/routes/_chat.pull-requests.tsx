@@ -1,13 +1,12 @@
 import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
 import { createFileRoute } from "@tanstack/react-router";
 
-import { PullRequestListSort } from "~/components/pullRequest/pullRequestListPreferences";
-import * as Schema from "effect/Schema";
-import { type PullRequestsSearch } from "~/components/pullRequest/usePullRequestListView";
-import { PullRequestsPage } from "~/components/pullRequest/PullRequestsPage";
+import { type PullRequestListSort } from "../components/pullRequest/pullRequestListPreferences";
+import { SORT_OPTIONS } from "../components/pullRequest/pullRequestListOptions";
+import { type PullRequestsSearch } from "../components/pullRequest/usePullRequestListView";
+import { PullRequestsPage } from "../components/pullRequest/PullRequestsPage";
 
 const MAX_SEARCH_LABEL_CANDIDATES = 100;
-const isPullRequestSort = Schema.is(PullRequestListSort);
 
 function pullRequestSearchLabels(raw: unknown): PullRequestsSearch["labels"] {
   const values = (Array.isArray(raw) ? raw : typeof raw === "string" ? [raw] : []).slice(
@@ -35,7 +34,9 @@ export const Route = createFileRoute("/_chat/pull-requests")({
       raw.involvement === "reviewing" || raw.involvement === "authored" ? raw.involvement : "all",
     state:
       raw.state === "closed" || raw.state === "merged" || raw.state === "all" ? raw.state : "open",
-    ...(isPullRequestSort(raw.sort) ? { sort: raw.sort } : {}),
+    ...(SORT_OPTIONS.some((option) => option.value === raw.sort)
+      ? { sort: raw.sort as PullRequestListSort }
+      : {}),
     ...(typeof raw.repository === "string" && raw.repository
       ? { repository: raw.repository.slice(0, 200) }
       : {}),

@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { DEFAULT_CLIENT_SETTINGS, type DesktopSnapShotState } from "@t3tools/contracts";
 import { expect, it } from "vite-plus/test";
 import {
@@ -22,8 +21,6 @@ const gnome: DesktopSnapShotState = {
   message: null,
   gnomeExtension: { status: "enabled", message: "Running" },
 };
-
-const t = createI18n("en").getFixedT(null, "settings");
 
 it("derives Hyprland setup from its own helper and registered action, not old GNOME approval", () => {
   const state: DesktopSnapShotState = {
@@ -99,7 +96,7 @@ it("offers manual capture on an unsupported GNOME version instead of trapping se
   expect(captureSetupBackend(state)).toBe("picker");
   expect(captureSetupAccessReady(state)).toBe(true);
   expect(captureSetupInitialStep(state)).toBe("access");
-  expect(captureSetupCheckMessage(state, t)).toContain("choose a window each time");
+  expect(captureSetupCheckMessage(state)).toContain("choose a window each time");
 });
 
 it.each(["not-installed", "error"] as const)(
@@ -132,17 +129,14 @@ it("resumes KDE setup after the helper passes its real permission check", () => 
 });
 
 it("does not report a successful check when capture support could not be read", () => {
-  expect(captureSetupCheckMessage({ ...gnome, message: "Desktop disconnected" }, t)).toContain(
+  expect(captureSetupCheckMessage({ ...gnome, message: "Desktop disconnected" })).toContain(
     "Still unable to check access",
   );
   expect(
-    captureSetupCheckMessage(
-      {
-        ...gnome,
-        gnomeExtension: { status: "error", message: "Could not read extension state" },
-      },
-      t,
-    ),
+    captureSetupCheckMessage({
+      ...gnome,
+      gnomeExtension: { status: "error", message: "Could not read extension state" },
+    }),
   ).toContain("Still unable to check access");
 });
 
@@ -156,13 +150,10 @@ it("uses a capable portal without requiring the optional GNOME extension", () =>
   expect(captureSetupAccessReady(state)).toBe(true);
   expect(captureSetupInitialStep(state)).toBe("shortcut");
   expect(
-    captureSetupCheckMessage(
-      {
-        ...state,
-        gnomeExtension: { status: "error", message: "Optional extension failed" },
-      },
-      t,
-    ),
+    captureSetupCheckMessage({
+      ...state,
+      gnomeExtension: { status: "error", message: "Optional extension failed" },
+    }),
   ).toBe("Ready. Continue to choose your shortcut.");
 });
 
@@ -247,5 +238,5 @@ it.each(["kde", "hyprland"] as const)("ignores errors from inactive helpers on %
     hyprlandHelper: { status: backend === "hyprland" ? "ready" : "error", message: "Hyprland" },
   };
   expect(captureSetupAccessReady(state)).toBe(true);
-  expect(captureSetupCheckMessage(state, t)).toBe("Ready. Continue to choose your shortcut.");
+  expect(captureSetupCheckMessage(state)).toBe("Ready. Continue to choose your shortcut.");
 });

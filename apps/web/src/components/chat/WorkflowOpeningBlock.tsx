@@ -1,3 +1,4 @@
+import { T, useGT, useMessages } from "gt-react";
 import { useAtomValue } from "@effect/atom-react";
 import {
   isTerminalSubagentStatus,
@@ -14,12 +15,10 @@ import type {
 } from "@t3tools/contracts";
 import { ChevronRightIcon, WorkflowIcon } from "lucide-react";
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
-import { threadRelationshipStatusLabel } from "./ThreadRelationshipIcon";
 
 import { cn } from "../../lib/utils";
 import { providersIgnoringCheckedAtAtom } from "../../state/server";
-import { ChatMarkdown } from "../ChatMarkdown";
+import ChatMarkdown from "../ChatMarkdown";
 import { ThreadHoverCardPopup } from "../ThreadHoverCard";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipTrigger } from "../ui/tooltip";
@@ -42,11 +41,11 @@ export function WorkflowOpeningBlock(props: {
   readonly environmentId: EnvironmentId;
   readonly onOpenThread: (threadId: string) => void;
 }) {
-  const { t } = useTranslation("chat");
-  const { t: tActivity } = useTranslation("activity");
+  const gt = useGT();
   const { opening } = props;
+  const m = useMessages();
   const providers = useAtomValue(providersIgnoringCheckedAtAtom(props.environmentId));
-  const headline = workflowOpeningHeadline(opening, tActivity);
+  const headline = workflowOpeningHeadline(opening, m);
   const phases = opening.group?.phases.filter((phase) => phase.members.length > 0) ?? [];
   const memberRow = (member: RuntimeSubagent) =>
     opening.providerInstanceId === null ? null : (
@@ -62,7 +61,7 @@ export function WorkflowOpeningBlock(props: {
     );
   return (
     <section
-      aria-label={t(($) => $.workflow.startedTitle, { title: headline.title })}
+      aria-label={gt("Workflow started: {title}", { title: headline.title })}
       className="flex min-w-0 flex-col gap-3 px-1 py-0.5"
       data-workflow-opening
     >
@@ -70,7 +69,7 @@ export function WorkflowOpeningBlock(props: {
         <WorkflowIcon aria-hidden className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="text-2xs font-medium text-muted-foreground">
-            {t(($) => $.workflow.started)}
+            <T>Workflow started</T>
           </p>
           <h3 className="truncate text-sm font-medium text-foreground" data-thread-find-text="true">
             {headline.title}
@@ -88,7 +87,7 @@ export function WorkflowOpeningBlock(props: {
         ) : null}
       </header>
       {phases.map((phase) => (
-        <section key={phase.index} aria-label={t(($) => $.workflow.phase, { title: phase.title })}>
+        <section key={phase.index} aria-label={gt("{title} phase", { title: phase.title })}>
           <h4 className="flex items-baseline gap-2 px-2 pb-0.5 text-2xs font-medium text-muted-foreground">
             <span className="min-w-0 truncate" data-thread-find-text="true">
               {phase.title}
@@ -116,8 +115,7 @@ function WorkflowMemberRow(props: {
   readonly driver: ProviderDriverKind | undefined;
   readonly onOpenThread: (threadId: string) => void;
 }) {
-  const { t } = useTranslation("chat");
-  const { t: tActivity } = useTranslation("activity");
+  const gt = useGT();
   const { member } = props;
   const threadId = member.childThreadId;
   const failed = member.status === "failed";
@@ -138,15 +136,12 @@ function WorkflowMemberRow(props: {
           delay={200}
           render={
             threadId === null ? (
-              <div
-                aria-description={threadRelationshipStatusLabel(member.status, tActivity)}
-                className={className}
-              />
+              <div aria-description={member.status} className={className} />
             ) : (
               <button
                 type="button"
-                aria-label={t(($) => $.ui.open, { name: member.title })}
-                aria-description={threadRelationshipStatusLabel(member.status, tActivity)}
+                aria-label={gt("Open {title}", { title: member.title })}
+                aria-description={member.status}
                 onClick={() => props.onOpenThread(threadId)}
                 className={cn(
                   className,
@@ -213,7 +208,7 @@ function WorkflowMemberRow(props: {
 }
 
 function WorkflowScript(props: { readonly script: string }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const [expanded, setExpanded] = useState(false);
   const revealRef = findRevealRef(() => setExpanded(true));
   const { ref: contentRef, tallEnough: canFold } = useTallEnoughToFold();
@@ -245,7 +240,7 @@ function WorkflowScript(props: { readonly script: string }) {
             data-scroll-anchor-ignore
             onClick={() => setExpanded((value) => !value)}
           >
-            {expanded ? t(($) => $.ui.showLess) : t(($) => $.workflow.fullScript)}
+            {expanded ? gt("Show less") : gt("Show full script")}
           </Button>
         </div>
       ) : null}

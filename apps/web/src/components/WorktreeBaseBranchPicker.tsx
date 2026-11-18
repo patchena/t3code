@@ -1,16 +1,16 @@
-import { useTranslation } from "react-i18next";
 import type { EnvironmentId } from "@t3tools/contracts";
+import { useGT, useMessages } from "gt-react";
 import { ChevronDownIcon, GitBranchIcon } from "lucide-react";
 import { useState } from "react";
 
-import { usePaginatedBranches } from "~/state/queries";
-import { useEnvironmentQuery } from "~/state/query";
-import { vcsEnvironment } from "~/state/vcs";
-import { BranchPicker, BranchPickerRefItem } from "~/components/BranchPicker";
-import { resolveBranchTriggerLabel, sanitizeNewRefName } from "~/components/BranchToolbar.logic";
-import { MiddleTruncate } from "~/components/ui/middle-truncate";
-import { Button } from "~/components/ui/button";
-import { ComboboxTrigger } from "~/components/ui/combobox";
+import { usePaginatedBranches } from "../state/queries";
+import { useEnvironmentQuery } from "../state/query";
+import { vcsEnvironment } from "../state/vcs";
+import { BranchPicker, BranchPickerRefItem } from "./BranchPicker";
+import { resolveBranchTriggerLabel, sanitizeNewRefName } from "./BranchToolbar.logic";
+import { MiddleTruncate } from "./ui/middle-truncate";
+import { Button } from "./ui/button";
+import { ComboboxTrigger } from "./ui/combobox";
 
 export function WorktreeBaseBranchPicker({
   environmentId,
@@ -31,14 +31,18 @@ export function WorktreeBaseBranchPicker({
   disabled?: boolean;
   id?: string;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
+  const messages = useMessages();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const branches = usePaginatedBranches({
-    environmentId,
-    cwd,
-    query: sanitizeNewRefName(query.trim()),
-  });
+  const branches = usePaginatedBranches(
+    {
+      environmentId,
+      cwd,
+      query: sanitizeNewRefName(query.trim()),
+    },
+    messages,
+  );
   const selectedRefQuery = useEnvironmentQuery(
     cwd && value
       ? vcsEnvironment.listRefs({
@@ -58,7 +62,7 @@ export function WorktreeBaseBranchPicker({
       resolvedActiveBranchIsRemote: selectedRef ? selectedRef.isRemote === true : null,
       startFromOrigin,
     },
-    t,
+    messages,
   );
   const branchByName = new Map(branches.refs.map((branch) => [branch.name, branch]));
   const items = [...branchByName.keys()];
@@ -66,14 +70,17 @@ export function WorktreeBaseBranchPicker({
   const statusText =
     branches.error ??
     (branches.isPending && branches.data === null
-      ? t(($) => $.git.loadingRefs)
+      ? gt("Loading refs...")
       : branches.isFetchingNextPage
-        ? t(($) => $.git.loadingMoreRefs)
-        : hasNextPage && branches.data !== null
-          ? t(($) => $.git.showingRefs, {
-              count: branches.refs.length,
-              total: branches.data.totalCount,
-            })
+        ? gt("Loading more refs...")
+        : hasNextPage
+          ? gt(
+              "{total, plural, one {Showing {shown} of {total} refs} other {Showing {shown} of {total} refs}}",
+              {
+                shown: branches.refs.length,
+                total: String(branches.data?.totalCount),
+              },
+            )
           : null);
   const handleOpenChange = (next: boolean) => {
     setOpen(next);

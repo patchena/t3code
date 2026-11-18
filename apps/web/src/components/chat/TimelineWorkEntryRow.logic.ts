@@ -1,12 +1,13 @@
+import { msg } from "gt-react";
 import type { PluggableList } from "unified";
 import type { Root, RootContent } from "mdast";
 import {
-  resolveWorkEntryToolDefinition,
+  resolveWorkEntryToolPresentation,
   toolGroupAction,
 } from "@t3tools/client-runtime/work-log/presentation";
 import { isJavaScriptReplTool } from "@t3tools/shared/toolActivity";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { formatWorkspaceRelativePath } from "../../filePathDisplay";
+import { m, type MessageResolver } from "../../i18n/messages";
 import { type TimelineWorkEntry, type TimelineRow } from "./timelineRowContext";
 import { type WorkEntryIconName } from "./TimelineToolActivityIcon";
 
@@ -96,7 +97,7 @@ export function buildToolCallExpandedBody(
   workspaceRoot: string | undefined,
   visibleLabel: string,
   viewedImagePath: string | null,
-  t: TFunction<"activity">,
+  resolve: MessageResolver = m,
 ): string | null {
   const blocks: string[] = [];
   const seen = new Set<string>([visibleLabel.trim()]);
@@ -115,8 +116,9 @@ export function buildToolCallExpandedBody(
             "input" in workEntry.toolData
           ? workEntry.toolData.input
           : undefined;
-    if (input !== undefined)
-      addBlock(t(($) => $.timeline.toolInput, { input: JSON.stringify(input, null, 2) }));
+    if (input !== undefined) {
+      addBlock(resolve(msg("Tool input\n{input}", { input: JSON.stringify(input, null, 2) })));
+    }
   }
   const command = workEntry.command?.trim();
   const raw = workEntryRawCommand(workEntry);
@@ -170,6 +172,12 @@ export function workEntryIconName(workEntry: TimelineWorkEntry): WorkEntryIconNa
         return "zap";
     }
   }
+  if (workEntry.itemType === "system_notice") {
+    return workEntry.structuredPayload?.type === "system_notice" &&
+      workEntry.structuredPayload.level === "info"
+      ? "zap"
+      : "circle-alert";
+  }
   if (workEntry.itemType === "user_input_request" || workEntry.itemType === "approval_request") {
     return "message-circle";
   }
@@ -180,7 +188,7 @@ export function workEntryIconName(workEntry: TimelineWorkEntry): WorkEntryIconNa
     isJavaScriptReplTool(workEntry.structuredPayload.toolName)
   )
     return "code";
-  const toolPresentation = resolveWorkEntryToolDefinition(workEntry);
+  const toolPresentation = resolveWorkEntryToolPresentation(workEntry, undefined, m);
   if (toolPresentation) return toolPresentation.icon;
   const action = toolGroupAction(workEntry);
   if (action !== "other") return toolGroupSummaryIconName(action);
@@ -262,13 +270,6 @@ export function remarkThoughtPreview(fallback: string) {
   };
 }
 
-const thoughtPlugins = new Map<string, PluggableList>();
-
-export function thoughtPreviewPlugins(t: TFunction<"activity">, active = false): PluggableList {
-  const label = active ? t(($) => $.timeline.thinking) : t(($) => $.timeline.thought);
-  const existing = thoughtPlugins.get(label);
-  if (existing) return existing;
-  const plugins: PluggableList = [[remarkThoughtPreview, label]];
-  thoughtPlugins.set(label, plugins);
-  return plugins;
+export function thoughtPreviewPlugins(fallback: string): PluggableList {
+  return [[remarkThoughtPreview, fallback]];
 }

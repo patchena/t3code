@@ -12,7 +12,7 @@ vi.mock(import("~/components/DiffWorkerPoolProvider"), () => ({
   DiffWorkerPoolProvider: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
 
-import { ReadOnlySourcePreview } from "./ReadOnlySourcePreview";
+import ReadOnlySourcePreview from "./ReadOnlySourcePreview";
 
 const LINE_COUNT = 301;
 const text = `${Array.from({ length: LINE_COUNT }, (_, index) => `line ${index + 1}`).join("\n")}\n`;

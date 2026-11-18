@@ -1,61 +1,54 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { msg, useGT, useMessages } from "gt-react";
+import type { VoiceInputErrorCode } from "@t3tools/client-runtime/voice-input";
 import { useNavigate } from "@tanstack/react-router";
 import { CircleAlertIcon, XIcon } from "lucide-react";
-import { useTranslation } from "react-i18next";
 
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { VoiceInputPill } from "./VoiceInputPill";
 
-const LABELED_ERRORS = [
-  "microphonePermission",
-  "microphoneRequired",
-  "draftUnavailable",
-  "anotherRecording",
-  "unavailable",
-  "busy",
-  "unsupportedLanguage",
-  "prepareFailed",
-  "startFailed",
-  "interrupted",
-  "finishFailed",
-  "transcribeFailed",
-  "environmentFailed",
-  "draftChanged",
-  "noSpeech",
-  "processingFailed",
-  "disconnected",
-] as const;
-
-function voiceErrorLabel(error: string | null, t: TFunction<"voice">): string {
-  const key = error
-    ? LABELED_ERRORS.find((candidate) => t(($) => $.errors[candidate]) === error)
-    : undefined;
-  return key ? t(($) => $.errorLabels[key]) : t(($) => $.errors.failed);
-}
+const VOICE_ERROR_LABELS: Readonly<Record<VoiceInputErrorCode, string>> = {
+  "microphone-blocked": msg("Mic blocked"),
+  "draft-unavailable": msg("Draft unavailable"),
+  "already-recording": msg("Already recording"),
+  unavailable: msg("Voice input unavailable"),
+  "still-transcribing": msg("Still transcribing"),
+  "language-unsupported": msg("Language unsupported"),
+  "start-failed": msg("Couldn’t start"),
+  interrupted: msg("Recording interrupted"),
+  "finish-failed": msg("Couldn’t finish"),
+  "transcription-failed": msg("Transcription failed"),
+  "draft-changed": msg("Draft changed"),
+  "no-speech": msg("No speech heard"),
+  "microphone-failed": msg("Mic failed"),
+  "microphone-disconnected": msg("Mic disconnected"),
+};
 
 export function VoiceInputErrorPill(props: {
   error: string | null;
   errorAction: "retry" | "settings" | null;
+  errorCode?: VoiceInputErrorCode | undefined;
   disabled?: boolean;
   cancelShortcutLabel?: string | null;
   size?: "default" | "compact" | undefined;
   onRetry(): void;
   onDismiss(): void;
 }) {
-  const { t } = useTranslation("voice");
+  const gt = useGT();
+  const m = useMessages();
   const navigate = useNavigate();
-  const message = props.error ?? t(($) => $.errors.failed);
+  const message = props.error ?? gt("Voice input failed");
   const openSettings = props.errorAction === "settings";
   const compact = props.size === "compact";
+  const errorLabel = props.errorCode ? VOICE_ERROR_LABELS[props.errorCode] : undefined;
   const action = openSettings
-    ? { label: t(($) => $.input.openSettings), text: t(($) => $.input.settingsAction) }
-    : props.error === t(($) => $.errors.transcribeFailed) ||
-        props.error === t(($) => $.errors.environmentFailed)
-      ? { label: t(($) => $.input.retryTranscription), text: t(($) => $.input.retryAction) }
-      : { label: t(($) => $.input.recordAgain), text: t(($) => $.input.recordAgain) };
-  const dismissLabel = t(($) => $.input.dismissError);
-  const dismissText = t(($) => $.input.dismiss);
+    ? { label: gt("Open voice settings"), text: gt("Settings") }
+    : props.errorCode === "transcription-failed"
+      ? {
+          label: gt("Retry transcription"),
+          text: gt("Retry", { $context: "verb, retries transcription" }),
+        }
+      : { label: gt("Record again"), text: gt("Record again") };
   return (
     <VoiceInputPill tone="error" size={props.size}>
       <Tooltip>
@@ -65,7 +58,7 @@ export function VoiceInputErrorPill(props: {
               type="button"
               size={compact ? "icon-xs" : "icon-sm-pill"}
               variant="ghost"
-              aria-label={dismissLabel}
+              aria-label={gt("Dismiss voice input error")}
               onPointerDown={(event) => event.preventDefault()}
               onClick={props.onDismiss}
               className="shrink-0"
@@ -76,11 +69,8 @@ export function VoiceInputErrorPill(props: {
         />
         <TooltipPopup side="top">
           {props.cancelShortcutLabel
-            ? t(($) => $.input.withShortcut, {
-                label: dismissText,
-                shortcut: props.cancelShortcutLabel,
-              })
-            : dismissText}
+            ? gt("Dismiss ({shortcut})", { shortcut: props.cancelShortcutLabel })
+            : gt("Dismiss")}
         </TooltipPopup>
       </Tooltip>
       <Tooltip>
@@ -95,7 +85,7 @@ export function VoiceInputErrorPill(props: {
           }
         >
           <CircleAlertIcon aria-hidden className="size-3.5 shrink-0" />
-          <span className="truncate">{voiceErrorLabel(props.error, t)}</span>
+          <span className="truncate">{errorLabel ? m(errorLabel) : gt("Voice input failed")}</span>
         </TooltipTrigger>
         <TooltipPopup side="top">{message}</TooltipPopup>
       </Tooltip>

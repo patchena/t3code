@@ -1,7 +1,7 @@
-import { FileWorkerError, encodeFileWorkerError } from "~/components/files/fileWorkerError";
 import { boundedArchive, prepareOffice } from "./officeArchive";
 import { PREVIEW_PAGE_ROWS } from "./largeTextProtocol";
 import type { OfficeWorkerRequest, OfficeWorkerResult } from "./officePreviewProtocol";
+import { PreviewError, previewFailure } from "./previewFailure";
 
 let workbook: string[][][] = [];
 function reply(result: OfficeWorkerResult) {
@@ -10,11 +10,7 @@ function reply(result: OfficeWorkerResult) {
 async function handle(input: OfficeWorkerRequest) {
   if (input.type === "sheet-page") {
     const rows = workbook[input.sheet];
-    if (!rows)
-      throw new FileWorkerError({
-        message: "This sheet is unavailable.",
-        code: "sheetUnavailable",
-      });
+    if (!rows) throw new PreviewError({ code: "sheet-unavailable" });
     reply({
       type: "sheet-page",
       sheet: input.sheet,
@@ -49,9 +45,6 @@ async function handle(input: OfficeWorkerRequest) {
 }
 self.addEventListener("message", (event: MessageEvent<OfficeWorkerRequest>) => {
   void handle(event.data).catch((cause: unknown) =>
-    reply({
-      type: "error",
-      ...encodeFileWorkerError(cause),
-    }),
+    reply({ type: "error", ...previewFailure(cause, "parse-failed") }),
   );
 });

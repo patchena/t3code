@@ -13,7 +13,6 @@ import {
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
-import { createI18n } from "@t3tools/client-runtime/i18n";
 
 import { makeThreadProjectionFixture } from "../../test-fixtures";
 import {
@@ -185,6 +184,53 @@ describe("applyGuestStreamEvent", () => {
     // Once placed, a later snapshot whose window no longer holds the row must not resurrect it.
     const placed = apply([itemEvent(2, guestMessageRow("u1", waiting.id)), snapshot(3)], queued);
     expect(placed.awaitingRowIds.size).toBe(0);
+
+    const windowed = apply(
+      [
+        {
+          type: "thread",
+          item: {
+            kind: "snapshot",
+            snapshotSequence: 3,
+            projection,
+            historyCursor: "cursor-1",
+            hasMoreHistory: true,
+          },
+        },
+      ],
+      queued,
+    );
+    const historyPlaced = applyGuestStreamEvent(windowed, {
+      type: "history-page",
+      cursor: "cursor-1",
+      page: {
+        snapshotSequence: 3,
+        items: [
+          {
+            position: 0,
+            visibility: "local",
+            sourceThreadId: projection.thread.id,
+            sourceItemId: TurnItemId.make("u1"),
+            item: guestMessageRow("u1", waiting.id),
+          },
+        ],
+        nextCursor: null,
+        hasMoreHistory: false,
+      },
+    });
+    expect(historyPlaced.awaitingRowIds.size).toBe(0);
+    // The row is outside the reconnect's window again; the Sent bubble must not come back.
+    const reconnected = apply(
+      [{ type: "view", view: { ...view, messages: [sent] } }, snapshot(4)],
+      historyPlaced,
+    );
+    expect(
+      unplacedGuestMessages(
+        reconnected.view!.messages,
+        reconnected.projection!.visibleTurnItems,
+        reconnected.awaitingRowIds,
+      ),
+    ).toEqual([]);
   });
 });
 
@@ -235,13 +281,9 @@ describe("unplacedGuestMessages", () => {
 describe("formatGuestExpiry", () => {
   const now = Date.parse("2026-10-23T00:00:00.000Z");
   it("shows whole hours, then minutes, then expired", () => {
-    const t = createI18n("en").getFixedT(null, "chat");
-    expect(formatGuestExpiry("2026-10-23T23:59:00.000Z", now, t)).toBe("23h left");
-    expect(formatGuestExpiry("2026-10-23T00:45:30.000Z", now, t)).toBe("45m left");
-    expect(formatGuestExpiry("2026-10-23T00:00:00.000Z", now, t)).toBe("Expired");
-    expect(
-      formatGuestExpiry("2026-10-23T00:45:30.000Z", now, createI18n("de").getFixedT(null, "chat")),
-    ).toBe("Noch 45 Min.");
+    expect(formatGuestExpiry("2026-10-23T23:59:00.000Z", now)).toBe("23h left");
+    expect(formatGuestExpiry("2026-10-23T00:45:30.000Z", now)).toBe("45m left");
+    expect(formatGuestExpiry("2026-10-23T00:00:00.000Z", now)).toBe("Expired");
   });
 });
 
@@ -258,14 +300,9 @@ describe("guestFilesProblem", () => {
   const file = (type: string, size = 1) => ({ type, size });
   it("takes up to four files and 10 MB, with images in the types the owner's composer takes", () => {
     expect(guestFilesProblem([file("image/png"), file("application/pdf"), file("")])).toBeNull();
-    expect(guestFilesProblem([1, 2, 3, 4, 5].map(() => file("image/png")))).toEqual({
-      kind: "files-limit",
-      limit: 4,
-    });
-    expect(guestFilesProblem([file("image/png", 10 * 1024 * 1024 + 1)])).toEqual({
-      kind: "files-size",
-    });
-    expect(guestFilesProblem([file("image/svg+xml")])).toEqual({ kind: "file-unsupported" });
-    expect(guestFilesProblem([file("text/plain", 0)])).toEqual({ kind: "file-unsupported" });
+    expect(guestFilesProblem([1, 2, 3, 4, 5].map(() => file("image/png")))).toMatch(/up to 4/);
+    expect(guestFilesProblem([file("image/png", 10 * 1024 * 1024 + 1)])).toMatch(/10 MB/);
+    expect(guestFilesProblem([file("image/svg+xml")])).toMatch(/PNG, JPEG, GIF, or WebP/);
+    expect(guestFilesProblem([file("text/plain", 0)])).toMatch(/cannot be attached/);
   });
 });

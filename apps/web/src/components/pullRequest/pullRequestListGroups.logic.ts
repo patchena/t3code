@@ -1,4 +1,3 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type {
   PullRequestInvolvement,
   PullRequestListFilters,
@@ -19,47 +18,44 @@ import {
   rankPullRequestMatches,
   type EnvironmentPullRequestEntry,
   type PullRequestPartitionsSnapshot,
-} from "~/components/pullRequest/pullRequestList.logic";
+} from "./pullRequestList.logic";
 
 export const pullRequestListEntryId = (target: Parameters<typeof pullRequestSurfaceId>[0]) =>
   pullRequestSurfaceId({ ...target, repository: target.repository.toLowerCase() });
 
 /** The held rows narrowed to what the reader asked for, in the groups the list shows. */
-export function pullRequestGroups(
-  {
-    known,
-    baseline,
-    providers,
-    viewers,
-    involvement,
-    localFilters,
-    hasLocalFilters,
-    text,
-    answeredLocally,
-    baselineEmpty,
-    held,
-    authored,
-    reviewing,
-    partitionsWanted,
-  }: {
-    known: ReadonlyArray<EnvironmentPullRequestEntry>;
-    /** The text-free rows already loaded, or undefined when the typed filters cannot vet them. */
-    baseline: ReadonlyArray<EnvironmentPullRequestEntry> | undefined;
-    providers: PullRequestListResult["providers"];
-    viewers: PullRequestListResult["viewers"];
-    involvement: PullRequestInvolvement;
-    localFilters: PullRequestListFilters;
-    hasLocalFilters: boolean;
-    text: string;
-    answeredLocally: boolean;
-    baselineEmpty: boolean;
-    held: PullRequestPartitionsSnapshot | undefined;
-    authored: ReadonlyArray<EnvironmentPullRequestEntry> | undefined;
-    reviewing: ReadonlyArray<EnvironmentPullRequestEntry> | undefined;
-    partitionsWanted: boolean;
-  },
-  t: TFunction<"workspace">,
-) {
+export function pullRequestGroups({
+  known,
+  baseline,
+  providers,
+  viewers,
+  involvement,
+  localFilters,
+  hasLocalFilters,
+  text,
+  answeredLocally,
+  baselineEmpty,
+  held,
+  authored,
+  reviewing,
+  partitionsWanted,
+}: {
+  known: ReadonlyArray<EnvironmentPullRequestEntry>;
+  /** The text-free rows already loaded, or undefined when the typed filters cannot vet them. */
+  baseline: ReadonlyArray<EnvironmentPullRequestEntry> | undefined;
+  providers: PullRequestListResult["providers"];
+  viewers: PullRequestListResult["viewers"];
+  involvement: PullRequestInvolvement;
+  localFilters: PullRequestListFilters;
+  hasLocalFilters: boolean;
+  text: string;
+  answeredLocally: boolean;
+  baselineEmpty: boolean;
+  held: PullRequestPartitionsSnapshot | undefined;
+  authored: ReadonlyArray<EnvironmentPullRequestEntry> | undefined;
+  reviewing: ReadonlyArray<EnvironmentPullRequestEntry> | undefined;
+  partitionsWanted: boolean;
+}) {
   const searchingHosts = new Set(
     providers.flatMap((provider) => (provider.searchesOnHost ? [provider.host] : [])),
   );
@@ -106,7 +102,7 @@ export function pullRequestGroups(
   const groups = (() => {
     if (involvement !== "all") return [{ key: "others" as const, label: "", entries }];
     if (baselineEmpty) {
-      return groupPullRequestsByInvolvement(entries, viewers, t);
+      return groupPullRequestsByInvolvement(entries, viewers);
     }
     const narrow = (rows: ReadonlyArray<EnvironmentPullRequestEntry> | undefined) =>
       rows === undefined || !hasLocalFilters
@@ -117,9 +113,9 @@ export function pullRequestGroups(
     const narrowedAuthored = narrow(partitionsWanted ? (authored ?? held?.authored) : undefined);
     const narrowedReviewing = narrow(partitionsWanted ? (reviewing ?? held?.reviewing) : undefined);
     if (narrowedAuthored === undefined || narrowedReviewing === undefined) {
-      return groupPullRequestsByInvolvement(entries, viewers, t);
+      return groupPullRequestsByInvolvement(entries, viewers);
     }
-    return partitionPullRequestsWithPriority(entries, narrowedAuthored, narrowedReviewing, t);
+    return partitionPullRequestsWithPriority(entries, narrowedAuthored, narrowedReviewing);
   })();
 
   const entriesByStatsKey: ReadonlyMap<string, EnvironmentPullRequestEntry> = new Map(

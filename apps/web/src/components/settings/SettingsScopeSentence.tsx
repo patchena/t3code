@@ -1,15 +1,15 @@
-import { Trans, useTranslation } from "react-i18next";
 import { resolveEnvironmentMachineKind } from "@t3tools/contracts";
 import { fileBasename } from "@t3tools/shared/path";
 import { useLocation } from "@tanstack/react-router";
 import { CheckIcon, ChevronDownIcon, FolderIcon, LayersIcon } from "lucide-react";
 import { Fragment, useState, type ReactNode } from "react";
+import { T, useGT, useMessages, Var } from "gt-react";
 
-import type { SidebarProjectSnapshot } from "~/sidebarProjectGrouping";
-import { useEnvironments, type EnvironmentPresentation } from "~/state/environments";
-import { EnvironmentMachineIcon } from "~/components/EnvironmentMachineIcon";
-import { ProjectFavicon } from "~/components/ProjectFavicon";
-import { Button } from "~/components/ui/button";
+import type { SidebarProjectSnapshot } from "../../sidebarProjectGrouping";
+import { useEnvironments, type EnvironmentPresentation } from "../../state/environments";
+import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
+import { ProjectFavicon } from "../ProjectFavicon";
+import { Button } from "../ui/button";
 import {
   Combobox,
   ComboboxEmpty,
@@ -18,7 +18,7 @@ import {
   ComboboxPopup,
   ComboboxSearchInput,
   ComboboxTrigger,
-} from "~/components/ui/combobox";
+} from "../ui/combobox";
 import {
   Menu,
   MenuPopup,
@@ -27,12 +27,9 @@ import {
   MenuRadioItemIndicator,
   MenuSeparator,
   MenuTrigger,
-} from "~/components/ui/menu";
-import { useOptionalSettingsScope } from "~/components/settings/SettingsScopeContext";
-import {
-  resolveSettingsScope,
-  type SettingsScopeSearch,
-} from "~/components/settings/settingsScope";
+} from "../ui/menu";
+import { useOptionalSettingsScope } from "./SettingsScopeContext";
+import { resolveSettingsScope, type SettingsScopeSearch } from "./settingsScope";
 import {
   ALL_CHECKOUTS_VALUE,
   ALL_ENVIRONMENTS_VALUE,
@@ -49,7 +46,7 @@ import {
   settingsScopeEnvironmentLabel,
   settingsScopeEnvironmentLabels,
   settingsScopeProjectMachines,
-} from "~/components/settings/settingsScopeAxis";
+} from "./settingsScopeAxis";
 
 export const SETTINGS_DEVICE_ONLY_PATHS: ReadonlySet<string> = new Set([
   "/settings/general",
@@ -72,7 +69,6 @@ interface SettingsScopeMenuProps {
 }
 
 export function SettingsScopeSentence() {
-  const { t } = useTranslation("settings");
   const scope = useOptionalSettingsScope();
   const pathname = useLocation({ select: (location) => location.pathname });
   const { environments } = useEnvironments();
@@ -84,22 +80,67 @@ export function SettingsScopeSentence() {
     environments,
     onChange: scope.selectScope,
   };
+  const group = scope.groups.find((candidate) => candidate.projectKey === scope.search.project);
+  const hasCheckouts = group ? settingsScopeCheckoutChoices(group, scope.search).length > 0 : false;
+  const project = <ProjectScopeMenu {...props} />;
+  const environment = <EnvironmentScopeMenu {...props} />;
+  const checkout = <CheckoutScopeMenu {...props} />;
+  const onEnvironment = scope.search.machine || scope.scope.kind === "checkout";
   return (
     <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 px-3 text-sm text-muted-foreground sm:px-4">
-      <Trans
-        ns="settings"
-        t={t}
-        i18nKey={($) =>
-          scope.search.machine || scope.scope.kind === "checkout"
-            ? $.scope.applyOn
-            : $.scope.applyAcross
-        }
-        components={{
-          project: <ProjectScopeMenu {...props} />,
-          environment: <EnvironmentScopeMenu {...props} />,
-          checkout: <CheckoutScopeMenu {...props} />,
-        }}
-      />
+      {onEnvironment && hasCheckouts ? (
+        <T context="settings scope sentence; each variable is a menu">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0">Applying settings for</span>
+            <Var>{project}</Var>
+          </span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0">on</span>
+            <Var>{environment}</Var>
+          </span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0">in</span>
+            <Var>{checkout}</Var>
+          </span>
+        </T>
+      ) : onEnvironment ? (
+        <T context="settings scope sentence; each variable is a menu">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0">Applying settings for</span>
+            <Var>{project}</Var>
+          </span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0">on</span>
+            <Var>{environment}</Var>
+          </span>
+        </T>
+      ) : hasCheckouts ? (
+        <T context="settings scope sentence; each variable is a menu">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0">Applying settings for</span>
+            <Var>{project}</Var>
+          </span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0">across</span>
+            <Var>{environment}</Var>
+          </span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0">in</span>
+            <Var>{checkout}</Var>
+          </span>
+        </T>
+      ) : (
+        <T context="settings scope sentence; each variable is a menu">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0">Applying settings for</span>
+            <Var>{project}</Var>
+          </span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="shrink-0">across</span>
+            <Var>{environment}</Var>
+          </span>
+        </T>
+      )}
     </p>
   );
 }
@@ -113,7 +154,6 @@ interface ScopeOption {
 }
 
 function ScopeOptionLabel({ option }: { option: ScopeOption }) {
-  const { t } = useTranslation("settings");
   return (
     <>
       {option.icon}
@@ -124,7 +164,9 @@ function ScopeOptionLabel({ option }: { option: ScopeOption }) {
         ) : null}
       </span>
       {option.offline ? (
-        <span className="shrink-0 text-xs text-muted-foreground">{t(($) => $.scope.offline)}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          <T>Offline</T>
+        </span>
       ) : null}
     </>
   );
@@ -149,7 +191,6 @@ function ScopeMenu({
   searchLabel: string;
   onChange: (next: string) => void;
 }) {
-  const { t } = useTranslation("settings");
   const [query, setQuery] = useState("");
   const Trigger = options.length > 6 ? ComboboxTrigger : MenuTrigger;
   const trigger = (
@@ -197,7 +238,9 @@ function ScopeMenu({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
-          <ComboboxEmpty>{t(($) => $.scope.noMatchesFound)}</ComboboxEmpty>
+          <ComboboxEmpty>
+            <T>No matches found.</T>
+          </ComboboxEmpty>
           <ComboboxList>
             {(option: ScopeOption) => (
               <ComboboxItem key={option.value} value={option}>
@@ -248,8 +291,9 @@ function EnvironmentScopeMenu({
   onChange,
   singleEnvironment,
 }: SettingsScopeMenuProps) {
-  const { t } = useTranslation("settings");
-  const resolved = resolveSettingsScope(value, groups, environments, t);
+  const messages = useMessages();
+  const gt = useGT();
+  const resolved = resolveSettingsScope(value, groups, environments, messages);
   const environmentValue = environmentAxisValue(
     value,
     resolved.kind === "checkout" ? resolved.environmentId : null,
@@ -266,7 +310,7 @@ function EnvironmentScopeMenu({
     : environments;
   return (
     <ScopeMenu
-      ariaLabel={t(($) => $.scope.environmentScope)}
+      ariaLabel={gt("Environment scope")}
       icon={
         selected ? (
           <EnvironmentMachineIcon
@@ -280,20 +324,20 @@ function EnvironmentScopeMenu({
         selected
           ? settingsScopeEnvironmentLabel(selected, environments)
           : environmentValue !== ALL_ENVIRONMENTS_VALUE
-            ? t(($) => $.scope.unavailableEnvironment)
+            ? gt("Unavailable environment")
             : singleEnvironment
-              ? t(($) => $.scope.noEnvironments)
-              : t(($) => $.scope.allEnvironments)
+              ? gt("No environments")
+              : gt("All environments")
       }
       value={environmentValue}
       onChange={(next) => onChange(selectEnvironmentAxis(value, next))}
-      searchLabel={t(($) => $.scope.searchEnvironments)}
+      searchLabel={gt("Search environments")}
       allOption={
         singleEnvironment
           ? null
           : {
               value: ALL_ENVIRONMENTS_VALUE,
-              label: t(($) => $.scope.allEnvironments),
+              label: gt("All environments"),
               icon: <LayersIcon aria-hidden className="size-3.5 shrink-0" />,
             }
       }
@@ -321,47 +365,44 @@ function EnvironmentScopeMenu({
 }
 
 function CheckoutScopeMenu({ value, groups, onChange }: SettingsScopeMenuProps) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   const group = groups.find((candidate) => candidate.projectKey === value.project);
   const checkouts = group ? settingsScopeCheckoutChoices(group, value) : [];
   if (checkouts.length === 0) return null;
   const selected = checkouts.find((member) => member.physicalProjectKey === value.checkout);
   return (
-    <span className="flex min-w-0 items-center gap-1.5">
-      <span className="shrink-0">{t(($) => $.scope.inCheckout)}</span>
-      <ScopeMenu
-        ariaLabel={t(($) => $.scope.checkoutScope)}
-        icon={<FolderIcon aria-hidden className="size-3.5 shrink-0" />}
-        label={
-          selected
-            ? settingsScopeCheckoutLabel(selected, checkouts)
-            : value.checkout
-              ? t(($) => $.scope.unavailableCheckout)
-              : t(($) => $.scope.allCheckouts)
-        }
-        value={value.checkout ?? ALL_CHECKOUTS_VALUE}
-        onChange={(next) =>
-          onChange(
-            selectCheckoutAxis(
-              value,
-              checkouts.find((member) => member.physicalProjectKey === next) ?? null,
-            ),
-          )
-        }
-        searchLabel={t(($) => $.scope.searchCheckouts)}
-        allOption={{ value: ALL_CHECKOUTS_VALUE, label: t(($) => $.scope.allCheckouts) }}
-        options={checkouts.map((member) => ({
-          value: member.physicalProjectKey,
-          label: fileBasename(member.workspaceRoot),
-          secondary: member.workspaceRoot,
-        }))}
-      />
-    </span>
+    <ScopeMenu
+      ariaLabel={gt("Checkout scope")}
+      icon={<FolderIcon aria-hidden className="size-3.5 shrink-0" />}
+      label={
+        selected
+          ? settingsScopeCheckoutLabel(selected, checkouts)
+          : value.checkout
+            ? gt("Unavailable checkout")
+            : gt("All checkouts")
+      }
+      value={value.checkout ?? ALL_CHECKOUTS_VALUE}
+      onChange={(next) =>
+        onChange(
+          selectCheckoutAxis(
+            value,
+            checkouts.find((member) => member.physicalProjectKey === next) ?? null,
+          ),
+        )
+      }
+      searchLabel={gt("Search checkouts")}
+      allOption={{ value: ALL_CHECKOUTS_VALUE, label: gt("All checkouts") }}
+      options={checkouts.map((member) => ({
+        value: member.physicalProjectKey,
+        label: fileBasename(member.workspaceRoot),
+        secondary: member.workspaceRoot,
+      }))}
+    />
   );
 }
 
 function ProjectScopeMenu({ value, groups, environments, onChange }: SettingsScopeMenuProps) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   const selected = groups.find((group) => group.projectKey === value.project);
   const projects = projectScopeMenuGroups(groups, value).map((group) => ({
     group,
@@ -369,16 +410,15 @@ function ProjectScopeMenu({ value, groups, environments, onChange }: SettingsSco
   }));
   return (
     <ScopeMenu
-      ariaLabel={t(($) => $.scope.projectScope)}
+      ariaLabel={gt("Project scope")}
       icon={selected ? <ProjectFavicon project={selected} className="size-3.5 shrink-0" /> : null}
       label={
-        selected?.displayName ??
-        (value.project ? t(($) => $.scope.unavailableProject) : t(($) => $.scope.allProjects))
+        selected?.displayName ?? (value.project ? gt("Unavailable project") : gt("All projects"))
       }
       value={projectAxisValue(value)}
       onChange={(next) => onChange(selectProjectAxis(value, next))}
-      searchLabel={t(($) => $.scope.searchProjects)}
-      allOption={{ value: ALL_PROJECTS_VALUE, label: t(($) => $.scope.allProjects) }}
+      searchLabel={gt("Search projects")}
+      allOption={{ value: ALL_PROJECTS_VALUE, label: gt("All projects") }}
       options={projects.map(({ group, machines }) => {
         const sameName = projects.filter(
           (other) =>
@@ -396,7 +436,9 @@ function ProjectScopeMenu({ value, groups, environments, onChange }: SettingsSco
         return {
           value: group.projectKey,
           label: group.displayName,
-          secondary: group.archived ? ["Archived", location].filter(Boolean).join(" · ") : location,
+          secondary: group.archived
+            ? [gt("Archived", { $context: "project state" }), location].filter(Boolean).join(" · ")
+            : location,
           icon: <ProjectFavicon project={group} className="size-3.5 shrink-0" />,
         };
       })}

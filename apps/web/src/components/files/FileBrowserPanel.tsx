@@ -1,4 +1,5 @@
-import { useTranslation } from "react-i18next";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { m } from "~/i18n/messages";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import type {
   ContextMenuItem as TreeContextMenuItem,
@@ -10,6 +11,7 @@ import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import { serializeComposerFileLink } from "@t3tools/shared/composerTrigger";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Cause from "effect/Cause";
+import { T, useGT, useMessages } from "gt-react";
 import { ChevronsDownUpIcon, ChevronsUpDownIcon } from "lucide-react";
 import { type Ref, useEffect, useEffectEvent, useRef, useState } from "react";
 
@@ -36,7 +38,7 @@ import {
   setAllDirectoriesExpanded,
   writeExpandedDirectories,
 } from "./fileTreeExpansion";
-import { buildFileTreePathUpdates } from "./fileTreePathReconciliation";
+import { buildFileTreePathUpdates, shouldRebuildFileTree } from "./fileTreePathReconciliation";
 import { loadFileAncestors } from "./loadFileAncestors";
 import { useDirectoryEntries } from "./useDirectoryEntries";
 import { useProjectPathSearch } from "~/state/queries";
@@ -63,7 +65,7 @@ function treePath(entry: ProjectEntry): string {
 }
 
 function RefreshFilesButton(props: { isPending: boolean; onRefresh: () => void }) {
-  const { t } = useTranslation("files");
+  const gt = useGT();
   return (
     <Tooltip>
       <TooltipTrigger
@@ -72,16 +74,14 @@ function RefreshFilesButton(props: { isPending: boolean; onRefresh: () => void }
             type="button"
             variant="ghost"
             size="icon-xs"
-            aria-label={t(($) => $.explorer.refreshWorkspace)}
+            aria-label={gt("Refresh workspace files")}
             onClick={props.onRefresh}
           />
         }
       >
         <RefreshIcon refreshing={props.isPending} />
       </TooltipTrigger>
-      <TooltipPopup>
-        {props.isPending ? t(($) => $.explorer.refreshing) : t(($) => $.explorer.refresh)}
-      </TooltipPopup>
+      <TooltipPopup>{props.isPending ? gt("Refreshing…") : gt("Refresh files")}</TooltipPopup>
     </Tooltip>
   );
 }
@@ -97,7 +97,7 @@ function FileSearchField({
   ref: Ref<HTMLInputElement>;
   value: string;
 }) {
-  const { t } = useTranslation("files");
+  const gt = useGT();
   return (
     <InputGroup variant="ghost" className="h-7 min-w-0 flex-1">
       <InputGroupInput
@@ -107,7 +107,7 @@ function FileSearchField({
         size="sm"
         value={props.value}
         aria-label={props.ariaLabel}
-        placeholder={t(($) => $.explorer.searchFiles)}
+        placeholder={gt("Search files")}
         data-workspace-focus-default
         spellCheck={false}
         onChange={(event) => props.onValueChange(event.target.value)}
@@ -151,7 +151,7 @@ function buildTreeEntries(
   return { entries, entryKinds, treePaths, directoryPaths, expandableDirectoryPaths };
 }
 
-export function FileBrowserPanel({
+export default function FileBrowserPanel({
   environmentId,
   cwd,
   projectName,
@@ -163,9 +163,10 @@ export function FileBrowserPanel({
   hostFolder = false,
   answersPanelFind = false,
 }: FileBrowserPanelProps) {
-  const { t } = useTranslation("files");
   const panelPath = (relativePath: string) =>
     hostFolder ? joinHostPath(cwd, relativePath) : relativePath;
+  const gt = useGT();
+  const messages = useMessages();
   const { resolvedTheme } = useTheme();
   const composerRef = useComposerHandleContext();
   const fileContextMenu = useFileContextMenu(environmentId);
@@ -183,10 +184,11 @@ export function FileBrowserPanel({
   const pathSearch = useProjectPathSearch(
     { environmentId, cwd: hostFolder ? null : cwd, query: query.slice(0, 256) },
     200,
+    undefined,
+    messages,
   );
   const { entries, entryKinds, treePaths, directoryPaths, expandableDirectoryPaths } =
     buildTreeEntries(directoryEntries, pathSearch.entries, pathSearch.isPending, query);
-  const fileError = error ?? pathSearch.error;
   const entryKindsRef = useRef(entryKinds);
   const previousTreePathsRef = useRef<readonly string[] | null>(null);
   const syncingSelectionRef = useRef(false);
@@ -219,8 +221,8 @@ export function FileBrowserPanel({
         const clicked = await api.contextMenu.show(
           [
             ...fileMenuItems,
-            { id: "copy-mention", label: t(($) => $.explorer.copyMention) },
-            { id: "add-to-chat", label: t(($) => $.explorer.addToChat) },
+            { id: "copy-mention", label: gt("Copy mention") },
+            { id: "add-to-chat", label: gt("Add to chat") },
           ],
           position,
         );
@@ -235,16 +237,11 @@ export function FileBrowserPanel({
         if (clicked === "copy-mention") {
           try {
             await writeTextToClipboard(mention);
-            toastManager.add({
-              type: "success",
-              title: t(($) => $.explorer.mentionCopied),
-              description: relativePath,
-            });
           } catch (error) {
             toastManager.add({
               type: "error",
-              title: t(($) => $.explorer.mentionFailed),
-              description: error instanceof Error ? error.message : t(($) => $.errorOccurred),
+              title: gt("Failed to copy mention"),
+              description: thrownErrorMessage(error, m) ?? gt("An error occurred."),
             });
           }
           return;
@@ -254,8 +251,8 @@ export function FileBrowserPanel({
           if (!composer) {
             toastManager.add({
               type: "error",
-              title: t(($) => $.explorer.addFailed),
-              description: t(($) => $.explorer.openChat),
+              title: gt("Unable to add to chat"),
+              description: gt("Open a chat for this project and try again."),
             });
             return;
           }
@@ -263,8 +260,8 @@ export function FileBrowserPanel({
           if (!inserted) {
             toastManager.add({
               type: "error",
-              title: t(($) => $.explorer.addFailed),
-              description: t(($) => $.explorer.chatNotReady),
+              title: gt("Unable to add to chat"),
+              description: gt("The chat isn't ready to accept input right now."),
             });
           }
         }
@@ -311,7 +308,7 @@ export function FileBrowserPanel({
       row.kind === "directory" &&
       row.isExpanded &&
       loadingDirectoriesRef.current.has(item.path.replace(/\/$/, ""))
-        ? { icon: "t3-tree-icon-loading", title: t(($) => $.loading) }
+        ? { icon: "t3-tree-icon-loading", title: gt("Loading…") }
         : null,
     search: false,
     onSearchChange: (value) => setQuery(value ?? ""),
@@ -450,6 +447,14 @@ export function FileBrowserPanel({
       return;
     }
     const updates = buildFileTreePathUpdates(previousTreePaths, treePaths);
+    if (shouldRebuildFileTree(previousTreePaths, treePaths, updates)) {
+      // A reset keeps old search matches, so search closes first and recomputes afterwards.
+      const activeSearch = model.isSearchOpen() ? model.getSearchValue() : null;
+      if (activeSearch !== null) model.closeSearch();
+      model.resetPaths(treePaths, { initialExpandedPaths: [...expandedPathsRef.current] });
+      if (activeSearch !== null) model.setSearch(activeSearch);
+      return;
+    }
     if (updates.length > 0) model.batch(updates);
   }, [ready, entryKinds, model, treePaths]);
 
@@ -549,7 +554,7 @@ export function FileBrowserPanel({
         <FileSearchField
           ref={searchInputRef}
           name="project-files-search"
-          ariaLabel={t(($) => $.explorer.searchProject, { project: projectName })}
+          ariaLabel={gt("Search {projectName} files", { projectName })}
           value={search.value}
           onValueChange={handleSearchValueChange}
           onClose={closeSearch}
@@ -564,8 +569,8 @@ export function FileBrowserPanel({
                   variant="ghost"
                   aria-label={
                     expandAll || allDirectoriesExpanded
-                      ? t(($) => $.explorer.collapse)
-                      : t(($) => $.explorer.expand)
+                      ? gt("Collapse all folders")
+                      : gt("Expand all folders")
                   }
                   onClick={toggleAllDirectories}
                 />
@@ -579,24 +584,24 @@ export function FileBrowserPanel({
             </TooltipTrigger>
             <TooltipPopup>
               {expandAll || allDirectoriesExpanded
-                ? t(($) => $.explorer.collapse)
-                : t(($) => $.explorer.expand)}
+                ? gt("Collapse all folders")
+                : gt("Expand all folders")}
             </TooltipPopup>
           </Tooltip>
         ) : null}
       </div>
-      {fileError ? (
+      {error || pathSearch.error ? (
         <button
           type="button"
           onClick={handleRefresh}
           className="p-4 text-left text-xs leading-relaxed text-destructive"
         >
-          {t(($) => $.explorer.retryError, { error: fileError })}
+          {gt("{error} Click to retry.", { error: error ?? pathSearch.error })}
         </button>
       ) : null}
       {query.trim() && pathSearch.truncated && !pathSearch.isPending ? (
         <div className="px-3 py-1 text-xs text-muted-foreground">
-          {t(($) => $.explorer.moreMatches)}
+          <T>More matches available. Refine your search.</T>
         </div>
       ) : null}
       {(!ready || pathSearch.isPending) && (
@@ -608,19 +613,19 @@ export function FileBrowserPanel({
               : "px-3 py-1 text-xs text-muted-foreground"
           }
         >
-          {t(($) => $.explorer.loading)}
+          <T>Loading files…</T>
         </div>
       )}
       {hasNoSearchMatches ? (
         ready && !isPending && !pathSearch.isPending && !error && !pathSearch.error ? (
           <div role="status" className="px-3 py-4 text-xs text-muted-foreground">
-            {t(($) => $.search.noMatchingFiles)}
+            <T>No matching files.</T>
           </div>
         ) : null
       ) : (
         <FileTree
           model={model}
-          aria-label={t(($) => $.explorer.projectFiles, { project: projectName })}
+          aria-label={gt("{projectName} files", { projectName })}
           className="min-h-0 flex-1 overflow-hidden"
           style={pierreTreeStyle(resolvedTheme)}
         />

@@ -1,4 +1,3 @@
-import { useTranslation } from "react-i18next";
 import type {
   DiffLineAnnotation,
   FileDiffContentsLoader,
@@ -8,6 +7,7 @@ import type {
 import { FileDiff } from "@pierre/diffs/react";
 import type { PullRequestReviewGuideExcerpt, PullRequestReviewPosition } from "@t3tools/contracts";
 import { ArrowUpRightIcon } from "lucide-react";
+import { T, useGT, Var } from "gt-react";
 import { useState } from "react";
 
 import { useRenderedAppearance } from "~/hooks/useTheme";
@@ -19,24 +19,25 @@ import {
 import { PREFERRED_HIGHLIGHTER } from "~/lib/syntaxHighlighting";
 import {
   buildDiffReviewComment,
+  diffReviewSelectionId,
   resolveDiffReviewAnchor,
   type ReviewCommentContext,
 } from "~/reviewCommentContext";
 
-import { DiffCommentAnnotation } from "~/components/diffs/DiffCommentAnnotation";
-import { DIFF_VIEW_UNSAFE_CSS } from "~/components/diffs/StyledDiffCodeView";
-import { Button } from "~/components/ui/button";
+import { DiffCommentAnnotation } from "../../diffs/DiffCommentAnnotation";
+import { DIFF_VIEW_UNSAFE_CSS } from "../../diffs/StyledDiffCodeView";
+import { Button } from "../../ui/button";
 import {
   getReviewPositionAnchor,
   PendingReviewCommentCard,
   toViewerSide,
-} from "~/components/pullRequest/PullRequestReviewAnnotation";
-import type { PendingReviewComment } from "~/components/pullRequest/pullRequestReviewStore";
+} from "../PullRequestReviewAnnotation";
+import type { PendingReviewComment } from "../pullRequestReviewStore";
 import { excerptRows, fileDiffRows, rowsToPatch } from "@t3tools/client-runtime/review-guide-tour";
-import type { PullRequestCompletionScope } from "~/components/pullRequest/PullRequestMarkdownTextarea";
-import { excerptLoader } from "~/components/pullRequest/guide/GuideExcerpt.logic";
-import { GuideNoteMarker } from "~/components/pullRequest/guide/GuideNotes";
-import { GuideProse } from "~/components/pullRequest/guide/GuideProse";
+import type { PullRequestCompletionScope } from "../PullRequestMarkdownTextarea";
+import { excerptLoader } from "./GuideExcerpt.logic";
+import { GuideNoteMarker } from "./GuideNotes";
+import { GuideProse } from "./GuideProse";
 
 const EXCERPT_UNSAFE_CSS = `${DIFF_VIEW_UNSAFE_CSS}
 [data-code]::-webkit-scrollbar-thumb {
@@ -115,7 +116,6 @@ export function GuideExcerpt({
   loadDiffFiles: FileDiffContentsLoader;
   onOpenFile: (path: string) => void;
 }) {
-  const { t } = useTranslation("workspace");
   // Keep selections outside ExcerptDiff to survive head reloads.
   const [draft, setDraft] = useState<ExcerptDraft | null>(null);
   const slice = excerptSlice(file, excerpt);
@@ -141,19 +141,22 @@ export function GuideExcerpt({
         />
       ) : loading ? (
         <p className="rounded-lg border border-border/60 px-3 py-2 text-xs text-muted-foreground">
-          {t(($) => $.git.loadingPath, { path: excerpt.path })}
+          <T>
+            Loading <Var>{excerpt.path}</Var>...
+          </T>
         </p>
       ) : (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 px-3 py-2 text-xs text-muted-foreground">
           <span className="min-w-0 truncate">
-            {t(($) => $.git.excerptOutsideDiff, {
-              path: excerpt.path,
-              start: excerpt.start,
-              end: excerpt.end,
-            })}
+            <T>
+              <span className="font-mono text-foreground">
+                <Var>{excerpt.path}</Var>
+              </span>{" "}
+              lines <Var>{excerpt.start}</Var>-<Var>{excerpt.end}</Var> are not in the loaded diff.
+            </T>
           </span>
           <Button size="xs" variant="outline" onClick={() => onOpenFile(excerpt.path)}>
-            {t(($) => $.git.openInCode)}
+            <T>Open in Code</T>
           </Button>
         </div>
       )}
@@ -182,7 +185,6 @@ function ExcerptDiff({
   commenting: ExcerptCommenting | null;
   onOpenFile: (path: string) => void;
 }) {
-  const { t } = useTranslation("workspace");
   const resolvedTheme = useRenderedAppearance();
   const loadExcerptFiles = excerptLoader(excerpt, file, slice.rows, loadDiffFiles);
 
@@ -238,14 +240,16 @@ function ExcerptDiff({
     if (anchor === null) return;
     setDraft({ range, ...anchor });
   };
+  const gt = useGT();
   const interactive = commenting !== null && draft === null;
   const onAskAgent = commenting?.onAskAgent ?? null;
   const askAgent = (request: string) => {
     if (draft === null || onAskAgent === null) return;
     const comment = buildDiffReviewComment({
-      id: `pull-request-guide:${excerpt.path}:${draft.range.start}:${draft.range.end}`,
+      id: `pull-request-guide:${diffReviewSelectionId(excerpt.path, draft.range)}`,
       sectionId: `pull-request-guide:${excerpt.path}`,
-      sectionTitle: t(($) => $.git.reviewGuide),
+      // oxlint-disable-next-line t3code/no-untranslated-copy -- context title sent to the agent
+      sectionTitle: "Review guide",
       filePath: excerpt.path,
       fileDiff: file,
       range: draft.range,
@@ -305,15 +309,15 @@ function ExcerptDiff({
                 text=""
                 completionScope={commenting.canComment ? commenting.completionScope : null}
                 placeholder={
-                  commenting.canComment ? t(($) => $.git.addComment) : t(($) => $.git.askAgentLines)
+                  commenting.canComment
+                    ? gt("Add a comment…")
+                    : gt("Ask the agent about these lines…")
                 }
-                submitLabel={
-                  commenting.canComment ? t(($) => $.git.addToReview) : t(($) => $.git.askAgent)
-                }
+                submitLabel={commenting.canComment ? gt("Add to review") : gt("Ask agent")}
                 {...(commenting.canComment && onAskAgent !== null
                   ? {
                       secondaryAction: {
-                        label: t(($) => $.git.askAgent),
+                        label: gt("Ask agent"),
                         onAction: (text: string) => askAgent(text),
                       },
                     }
@@ -341,19 +345,25 @@ function ExcerptDiff({
           <span className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="tabular-nums">
               {excerpt.side === "old"
-                ? t(($) => $.git.showingRemovedDiffLines, {
-                    shown: slice.shown,
-                    total: slice.total,
-                  })
-                : t(($) => $.git.showingCurrentDiffLines, {
-                    shown: slice.shown,
-                    total: slice.total,
-                  })}
+                ? gt(
+                    "{total, plural, one {removed code, showing {shown} of {total} diff lines} other {removed code, showing {shown} of {total} diff lines}}",
+                    {
+                      shown: slice.shown,
+                      total: slice.total,
+                    },
+                  )
+                : gt(
+                    "{total, plural, one {showing {shown} of {total} diff lines} other {showing {shown} of {total} diff lines}}",
+                    {
+                      shown: slice.shown,
+                      total: slice.total,
+                    },
+                  )}
             </span>
             <Button
               size="icon-xs"
               variant="ghost-muted"
-              aria-label={t(($) => $.git.openFileInCode, { path: excerpt.path })}
+              aria-label={gt("Open {path} in Code", { path: excerpt.path })}
               onClick={() => onOpenFile(excerpt.path)}
             >
               <ArrowUpRightIcon aria-hidden />

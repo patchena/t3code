@@ -28,9 +28,6 @@
       }
     ],
     "allowImportingTsExtensions": true,
-    "paths": {
-      "~/*": ["./src/*"]
-    },
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true

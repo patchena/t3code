@@ -1,5 +1,5 @@
+import { msg, useMessages } from "gt-react";
 import { useAtomValue } from "@effect/atom-react";
-import { useTranslation } from "react-i18next";
 import type {
   AtomCommandFailure,
   AtomCommandResult,
@@ -24,14 +24,15 @@ import {
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/reactivity";
 
-import { appAtomRegistry } from "~/rpc/atomRegistry";
-import { gitEnvironment } from "~/state/git";
-import { useEnvironmentQuery } from "~/state/query";
-import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
-import { sourceControlEnvironment } from "~/state/sourceControl";
-import { useAtomCommand } from "~/state/use-atom-command";
-import { vcsActionManager, vcsEnvironment } from "~/state/vcs";
-import { suggestAppAccessForRemote } from "~/components/sourceControlAppAccessToast";
+import { appAtomRegistry } from "../rpc/atomRegistry";
+import { m } from "../i18n/messages";
+import { gitEnvironment } from "./git";
+import { useEnvironmentQuery } from "./query";
+import { readEnvironmentScope, useEnvironmentScope } from "./session";
+import { sourceControlEnvironment } from "./sourceControl";
+import { useAtomCommand } from "./use-atom-command";
+import { vcsActionManager, vcsEnvironment } from "./vcs";
+import { suggestAppAccessForRemote } from "../components/sourceControlAppAccessToast";
 
 export type SourceControlActionKind =
   | "init"
@@ -82,7 +83,6 @@ function useAction<
   readonly onSuccess?: () => void;
   readonly managedExternally?: boolean;
 }): SourceControlActionState<TArgs, R> {
-  const { t } = useTranslation("workspace");
   const isAllowed = useEnvironmentScope(input.scope.environmentId, AuthSourceControlWriteScope);
   const operation = ACTION_OPERATION[input.kind];
   const state = useAtomValue(vcsActionManager.stateAtom(input.scope));
@@ -101,7 +101,7 @@ function useAction<
         Cause.fail(
           new EnvironmentAuthorizationError({
             requiredScope: AuthSourceControlWriteScope,
-            message: t(($) => $.git.gitPermissionDenied),
+            message: m(msg("This connection cannot change source control.")),
           }),
         ),
       );
@@ -122,7 +122,7 @@ function useAction<
           input.scope,
           {
             operation,
-            label: input.label,
+            label: m(input.label),
           },
           execute,
         );
@@ -160,7 +160,6 @@ export function useSourceControlActionRunning(
 }
 
 export function useVcsInitAction(scope: SourceControlActionScope) {
-  const { t } = useTranslation("workspace");
   const init = useAtomCommand(vcsEnvironment.init, { reportFailure: false });
   const action = async () => {
     const target = resolveScope(scope);
@@ -180,11 +179,10 @@ export function useVcsInitAction(scope: SourceControlActionScope) {
       input: { cwd: target.cwd },
     });
   };
-  return useAction({ kind: "init", label: t(($) => $.git.initializingRepository), scope, action });
+  return useAction({ kind: "init", label: msg("Initializing repository"), scope, action });
 }
 
 export function useVcsPullAction(scope: SourceControlActionScope) {
-  const { t } = useTranslation("workspace");
   const pull = useAtomCommand(vcsEnvironment.pull, { reportFailure: false });
   const status = useEnvironmentQuery(
     scope.environmentId !== null && scope.cwd !== null
@@ -214,7 +212,7 @@ export function useVcsPullAction(scope: SourceControlActionScope) {
   };
   return useAction({
     kind: "pull",
-    label: t(($) => $.git.pulling),
+    label: msg("Pulling latest changes..."),
     scope,
     action,
     onSuccess: status.refresh,
@@ -222,7 +220,6 @@ export function useVcsPullAction(scope: SourceControlActionScope) {
 }
 
 export function useGitStackedAction(scope: SourceControlActionScope) {
-  const { t } = useTranslation("workspace");
   const runStackedAction = useAtomCommand(vcsActionManager.runStackedAction(scope), {
     reportFailure: false,
   });
@@ -252,7 +249,7 @@ export function useGitStackedAction(scope: SourceControlActionScope) {
 
   return useAction({
     kind: "runStackedAction",
-    label: t(($) => $.git.runningSourceControlAction),
+    label: msg("Running source control action"),
     scope,
     action,
     onSuccess: status.refresh,
@@ -261,7 +258,6 @@ export function useGitStackedAction(scope: SourceControlActionScope) {
 }
 
 export function useSourceControlPublishRepositoryAction(scope: SourceControlActionScope) {
-  const { t } = useTranslation("workspace");
   const publishRepository = useAtomCommand(sourceControlEnvironment.publishRepository, {
     reportFailure: false,
   });
@@ -300,13 +296,13 @@ export function useSourceControlPublishRepositoryAction(scope: SourceControlActi
       },
     });
     if (result._tag === "Success") {
-      void suggestAppAccessForRemote(target.environmentId, result.value.remoteUrl, t);
+      void suggestAppAccessForRemote(target.environmentId, result.value.remoteUrl);
     }
     return result;
   };
   return useAction({
     kind: "publishRepository",
-    label: t(($) => $.git.publishingRepository),
+    label: msg("Publishing repository"),
     scope,
     action,
     onSuccess: status.refresh,
@@ -314,7 +310,6 @@ export function useSourceControlPublishRepositoryAction(scope: SourceControlActi
 }
 
 export function usePreparePullRequestThreadAction(scope: SourceControlActionScope) {
-  const { t } = useTranslation("workspace");
   const preparePullRequestThread = useAtomCommand(gitEnvironment.preparePullRequestThread, {
     reportFailure: false,
   });
@@ -344,7 +339,7 @@ export function usePreparePullRequestThreadAction(scope: SourceControlActionScop
         Cause.fail(
           new EnvironmentAuthorizationError({
             requiredScope: AuthOrchestrationOperateScope,
-            message: t(($) => $.git.threadPermissionDenied),
+            message: m(msg("This connection cannot change threads.")),
           }),
         ),
       );
@@ -361,7 +356,7 @@ export function usePreparePullRequestThreadAction(scope: SourceControlActionScop
   };
   return useAction({
     kind: "preparePullRequestThread",
-    label: t(($) => $.git.preparingRequestThread),
+    label: msg("Preparing pull request thread"),
     scope,
     action,
   });
@@ -391,6 +386,7 @@ export function readCachedPullRequestResolution(
 }
 
 export function usePullRequestResolutionState(target: PullRequestResolutionTarget) {
+  const resolve = useMessages();
   const query = useEnvironmentQuery(
     target.environmentId !== null && target.cwd !== null && target.reference !== null
       ? gitEnvironment.pullRequestResolution({
@@ -401,6 +397,7 @@ export function usePullRequestResolutionState(target: PullRequestResolutionTarge
           },
         })
       : null,
+    resolve,
   );
   const cached = readCachedPullRequestResolution(target);
 

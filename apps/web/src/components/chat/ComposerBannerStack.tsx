@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+import { useGT } from "gt-react";
 import { InfoIcon } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
@@ -71,7 +71,7 @@ export function NoticeText({
   readonly className: string;
   readonly detailsLabel: string;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const textRef = useRef<HTMLSpanElement>(null);
   const detailsRef = useRef<HTMLButtonElement>(null);
   const [detailsAtWidth, setDetailsAtWidth] = useState<number | null>(null);
@@ -152,7 +152,7 @@ export function NoticeText({
             <InfoIcon />
           </PopoverTrigger>
           <PopoverPopup
-            aria-label={t(($) => $.composer.noticeDetails)}
+            aria-label={gt("Notice details")}
             tooltipStyle
             side="top"
             className="max-w-[min(30rem,calc(100vw-2rem))] whitespace-normal wrap-anywhere [--inline-button-text-align:start] [--inline-button-white-space:normal] [&_[data-slot=inline-button]]:max-w-full"
@@ -172,7 +172,7 @@ function NoticeCard({
   readonly item: ComposerBannerStackItem;
   readonly detached?: boolean;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   return (
     <ComposerBanner.Root
       role={item.variant === "error" || item.variant === "warning" ? "alert" : undefined}
@@ -185,12 +185,12 @@ function NoticeCard({
         <ComposerBanner.Icon className="h-(--composer-banner-icon-column) self-start">
           {item.icon}
         </ComposerBanner.Icon>
-        <ComposerBanner.Content className="whitespace-nowrap">
+        <ComposerBanner.Content className="items-baseline whitespace-nowrap">
           <NoticeText
             detailsLabel={
               typeof item.title === "string"
-                ? t(($) => $.composer.showFullTitle, { title: item.title })
-                : t(($) => $.composer.showTitleDetails)
+                ? gt("Show full title: {title}", { title: item.title })
+                : gt("Show title details")
             }
             className="min-w-0 truncate font-medium leading-7 sm:leading-6"
           >
@@ -200,8 +200,8 @@ function NoticeCard({
             <NoticeText
               detailsLabel={
                 typeof item.title === "string"
-                  ? t(($) => $.composer.showDetailsTitle, { title: item.title })
-                  : t(($) => $.composer.showNoticeDetails)
+                  ? gt("Show details: {title}", { title: item.title })
+                  : gt("Show notice details")
               }
               className="w-0 min-w-0 grow truncate text-muted-foreground @max-[400px]:sr-only"
             >
@@ -214,7 +214,7 @@ function NoticeCard({
             {item.actions}
             {item.onDismiss ? (
               <ComposerBanner.Dismiss
-                aria-label={item.dismissLabel ?? t(($) => $.composer.dismissWarning)}
+                aria-label={item.dismissLabel ?? gt("Dismiss warning")}
                 onClick={item.onDismiss}
               />
             ) : null}

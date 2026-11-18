@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+import { useGT } from "gt-react";
 import { useEffect, useRef } from "react";
 import type { PhoneViewer } from "@t3tools/client-runtime/device/phone-viewer";
 import type {
@@ -25,7 +25,7 @@ export function DevicePhoneViewport(props: {
   readonly foldAngle: number | null;
   readonly onUnavailable: () => void;
 }) {
-  const { t } = useTranslation("tools");
+  const gt = useGT();
   const viewerRef = useRef<PhoneViewer | null>(null);
   const interactionRef = useRef<ReturnType<typeof createPhoneInteraction> | null>(null);
   const screenRef = useRef(props.screen);
@@ -103,7 +103,9 @@ export function DevicePhoneViewport(props: {
         />
         <canvas
           ref={mountViewer}
-          aria-label={t(($) => $.devicePhoneInstructions)}
+          aria-label={gt(
+            "Interactive 3D device. Drag the screen to interact. Drag outside it or swipe with two fingers to turn.",
+          )}
           className="size-full touch-none"
           onPointerDown={(event) => {
             if (event.button !== 0) return;

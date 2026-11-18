@@ -1,5 +1,4 @@
 import type { DesktopUpdateState } from "@t3tools/contracts";
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { expect, it, vi } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 
@@ -17,14 +16,9 @@ vi.mock("~/env", async (importOriginal) => ({
   isElectron: true,
 }));
 
-it.each([
-  ["en", true],
-  ["de", true],
-  ["en", false],
-  ["de", false],
-] as const)(
-  "respects patch approval when downloading from settings in %s (approved: %s)",
-  async (language, approved) => {
+it.each([true, false])(
+  "respects patch approval when downloading from settings (approved: %s)",
+  async (approved) => {
     const update: DesktopUpdateState = {
       enabled: true,
       status: "available",
@@ -58,12 +52,11 @@ it.each([
     const installUpdate = vi.fn(async () => ({ accepted: true, state: downloaded }));
     using _patcher = stubGlobal("t3codePatcher", { waitReady });
     using _desktop = stubGlobal("desktopBridge", { downloadUpdate, installUpdate });
-    const i18n = createI18n(language);
-    await using screen = await render(<AboutSettingsPanel />, { i18n });
+    await using screen = await render(<AboutSettingsPanel />);
 
     await userEvent.click(
       screen.getByRole("button", {
-        name: i18n.t(($) => $.panels.download, { ns: "settings" }),
+        name: "Download",
         exact: true,
       }),
     );

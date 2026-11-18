@@ -67,6 +67,14 @@ export type T3McpToolSummaryAction =
   | "unwatch-pr"
   | "write-pr-guides"
   | "read-pr-guide"
+  | "list-issues"
+  | "read-issue"
+  | "create-issue"
+  | "comment-issue"
+  | "set-issue-state"
+  | "link-issue"
+  | "unlink-issue"
+  | "list-thread-issues"
   | "browser"
   | "device"
   | "html-preview"
@@ -98,7 +106,7 @@ const T3_MCP_SERVER_ALIASES = new Set([
   "t3_code_direct",
 ]);
 
-const T3_MCP_TOOLS = {
+const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
   link_pull_request: tool(
     ["Link", "Linking", "Linked", "a pull request"],
     "link-pr",
@@ -144,6 +152,17 @@ const T3_MCP_TOOLS = {
     "read-pr-guide",
     "pull-request",
   ),
+  list_issues: tool(["List", "Listing", "Listed", "issues"], "list-issues"),
+  read_issue: tool(["Read", "Reading", "Read", "an issue"], "read-issue"),
+  create_issue: tool(["File", "Filing", "Filed", "an issue"], "create-issue"),
+  comment_on_issue: tool(
+    ["Comment on", "Commenting on", "Commented on", "an issue"],
+    "comment-issue",
+  ),
+  set_issue_state: tool(["Change", "Changing", "Changed", "an issue's state"], "set-issue-state"),
+  link_issue: tool(["Link", "Linking", "Linked", "an issue"], "link-issue"),
+  unlink_issue: tool(["Unlink", "Unlinking", "Unlinked", "an issue"], "unlink-issue"),
+  list_thread_issues: tool(["Check", "Checking", "Checked", "linked issues"], "list-thread-issues"),
   orchestrator_capabilities: tool(
     ["Get", "Getting", "Got", "orchestration capabilities"],
     "capabilities",
@@ -378,11 +397,7 @@ const T3_MCP_TOOLS = {
   html_preview: tool(["Preview", "Previewing", "Previewed", "an HTML page"], "html-preview"),
   html_render: tool(["Render", "Rendering", "Rendered", "an HTML page"], "html-render"),
   send_to_user: tool(["Send", "Sending", "Sent", "a message"], "send-to-user"),
-} satisfies Readonly<Record<string, T3McpToolDefinition>>;
-
-export type T3McpToolId = keyof typeof T3_MCP_TOOLS;
-
-const isT3McpToolId = (value: string): value is T3McpToolId => Object.hasOwn(T3_MCP_TOOLS, value);
+};
 
 export const T3_MCP_TOOL_NAMES: ReadonlySet<string> = new Set(Object.keys(T3_MCP_TOOLS));
 
@@ -439,15 +454,9 @@ function parseT3McpToolName(value: string): string | null {
   return longest;
 }
 
-export function resolveT3McpToolId(
-  toolName: string | null | undefined,
-  input?: unknown,
-): T3McpToolId | null {
+export function resolveT3McpToolId(toolName: string | null | undefined): string | null {
   const name = toolName == null ? null : resolveT3McpToolName(toolName);
-  if (name === null || !isT3McpToolId(name)) return null;
-  const action = asSummaryInput(input)?.action;
-  const actionTool = typeof action === "string" ? ACTION_TOOLS[name]?.(action) : undefined;
-  return actionTool !== undefined && isT3McpToolId(actionTool) ? actionTool : name;
+  return name !== null && Object.hasOwn(T3_MCP_TOOLS, name) ? name : null;
 }
 
 type SummaryInput = Readonly<Record<string, unknown>>;
@@ -471,8 +480,13 @@ export function resolveT3McpToolDefinition(
   toolName: string | null | undefined,
   input?: unknown,
 ): T3McpToolDefinition | null {
-  const id = resolveT3McpToolId(toolName, input);
-  return id === null ? null : T3_MCP_TOOLS[id];
+  const name = toolName == null ? null : resolveT3McpToolName(toolName);
+  if (name === null || !Object.hasOwn(T3_MCP_TOOLS, name)) return null;
+  const action = asSummaryInput(input)?.action;
+  const actionTool = typeof action === "string" ? ACTION_TOOLS[name]?.(action) : undefined;
+  return actionTool !== undefined && Object.hasOwn(T3_MCP_TOOLS, actionTool)
+    ? T3_MCP_TOOLS[actionTool]!
+    : T3_MCP_TOOLS[name]!;
 }
 
 /** Tools whose summary depends on which fields a call sets. */

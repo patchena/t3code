@@ -1,4 +1,5 @@
-import { useTranslation } from "react-i18next";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { m } from "~/i18n/messages";
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import {
   isModifierPairShortcut,
@@ -11,6 +12,7 @@ import { PlayIcon } from "lucide-react";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import * as Cause from "effect/Cause";
 import { useContext, useRef, useState } from "react";
+import { T, useGT, useMessages } from "gt-react";
 
 import { useClientSettings, updateClientSettings } from "../../hooks/useSettings";
 import { getDesktopSnapShotBridge } from "../../lib/desktopSnapShot";
@@ -48,7 +50,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "./settingsLayout";
-import { searchableSetting } from "./settingsSearch";
+import { useSearchableSetting } from "./settingsSearch";
 import { Button } from "../ui/button";
 import { Menu, MenuItem, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "../ui/menu";
 import { SelectButton } from "../ui/select";
@@ -80,7 +82,9 @@ type ShortcutCheck =
     };
 
 export function SnapShotSettings() {
-  const { t } = useTranslation("settings");
+  const messages = useMessages();
+  const setting = useSearchableSetting();
+  const gt = useGT();
   const settings = useClientSettings((current) => ({
     snapShotAnimations: current.snapShotAnimations,
     snapShotEnabled: current.snapShotEnabled,
@@ -118,10 +122,7 @@ export function SnapShotSettings() {
   };
   const refreshState = () =>
     refreshDesktopSnapShotState(registry, (error) =>
-      reportSetupError(
-        t(($) => $.extra.capture.checkFailed),
-        error,
-      ),
+      reportSetupError(gt("Couldn't check capture setup"), error),
     );
   const [candidate, setCandidate] = useState<SnapShotShortcut>(settings.snapShotShortcut);
   const [latestShortcutCheck, setShortcutCheck] = useState<ShortcutCheck>({
@@ -139,9 +140,9 @@ export function SnapShotSettings() {
       ? latestShortcutCheck
       : { status: "idle", availability: null };
   const shortcutCheckIdRef = useRef(0);
-  const unavailableMessage = snapShotUnavailableMessage(Boolean(bridge), t);
+  const unavailableMessage = snapShotUnavailableMessage(Boolean(bridge), messages);
   const captureAvailable = Boolean(bridge) && state !== null && state.mode !== "unavailable";
-  const feedbackUnavailable = snapShotFeedbackUnavailableMessage(state, t);
+  const feedbackUnavailable = snapShotFeedbackUnavailableMessage(state, messages);
   const managedShortcut = state?.linuxBackend === "niri" || state?.linuxBackend === "hyprland";
   const shortcutChanged = !managedShortcut && !sameSnapShotShortcut(candidate, savedShortcut);
   const displayShortcut = shortcutChanged ? candidate : (state?.shortcut ?? savedShortcut);
@@ -153,10 +154,10 @@ export function SnapShotSettings() {
   const soundSelection = settings.snapShotPlaySound ? settings.snapShotSound : "off";
   const soundLabel =
     soundSelection === "off"
-      ? t(($) => $.extra.capture.off)
+      ? gt("Off", { $context: "snapshot sound turned off" })
       : soundSelection === "soft-pop"
-        ? t(($) => $.extra.capture.whooshDefault)
-        : t(($) => $.extra.capture.click);
+        ? gt("Whoosh (Default)")
+        : gt("Click", { $context: "name of a camera-shutter sound" });
 
   const setup = async (action: DesktopSnapShotSetupAction) => {
     if (!bridge || setupBusy) return;
@@ -177,8 +178,8 @@ export function SnapShotSettings() {
     if (result._tag === "Failure") {
       reportSetupError(
         action === "retry-shortcut"
-          ? t(($) => $.extra.capture.permissionFailed)
-          : t(($) => $.extra.capture.completeFailed),
+          ? gt("Couldn't open shortcut permissions")
+          : gt("Couldn't complete capture setup"),
         Cause.squash(result.cause),
       );
     }
@@ -199,10 +200,7 @@ export function SnapShotSettings() {
       await updateClientSettings(patch);
       return await refreshState();
     } catch (error) {
-      reportSetupError(
-        t(($) => $.extra.capture.saveFailed),
-        error,
-      );
+      reportSetupError(gt("Couldn't save capture settings"), error);
     }
   };
 
@@ -212,10 +210,7 @@ export function SnapShotSettings() {
         await bridge?.requestSnapShotPermissions(true);
       await save({ snapShotIncludeAccessibility: includeAccessibility });
     } catch (error) {
-      reportSetupError(
-        t(($) => $.extra.capture.textFailed),
-        error,
-      );
+      reportSetupError(gt("Couldn't allow app text capture"), error);
     }
   };
 
@@ -239,7 +234,9 @@ export function SnapShotSettings() {
         availability: {
           available: false,
           message:
-            error instanceof Error ? error.message : t(($) => $.extra.capture.shortcutCheckFailed),
+            error instanceof Error
+              ? (thrownErrorMessage(error, m) ?? error.message)
+              : gt("Could not check this shortcut."),
         },
       });
     }
@@ -269,20 +266,22 @@ export function SnapShotSettings() {
   });
 
   const shortcutStatus = recording
-    ? t(($) => $.extra.capture.press)
+    ? gt("Press your shortcut. Esc cancels.")
     : candidateConflict
-      ? t(($) => $.extra.capture.conflict, { command: commandLabel(candidateConflict, t) })
+      ? gt('T3 Code already uses this for "{command}".', {
+          command: commandLabel(candidateConflict, messages),
+        })
       : shortcutCheck.status === "checking"
-        ? t(($) => $.extra.capture.checkingShortcut)
+        ? gt("Checking shortcut…")
         : shortcutCheck.availability
           ? shortcutCheck.availability.available
-            ? t(($) => $.extra.capture.readySave)
+            ? gt("Ready to save.")
             : shortcutCheck.availability.message
           : state?.mode === "portal" &&
               !state.shortcutLabel &&
               isModifierPairShortcut(displayShortcut)
-            ? t(($) => $.extra.capture.shortcutExample)
-            : snapShotShortcutStatus(state, t);
+            ? gt("Try a shortcut such as Ctrl+Shift+2.")
+            : snapShotShortcutStatus(state, messages);
 
   const openSetup = async (requested: CaptureSetupStep | "resume" = "resume") => {
     if (!state || setupBusy) return;
@@ -332,10 +331,7 @@ export function SnapShotSettings() {
     });
     setSetupBusy(false);
     if (verified._tag === "Success") return verified.value;
-    reportSetupError(
-      t(($) => $.extra.capture.verifyFailed),
-      Cause.squash(verified.cause),
-    );
+    reportSetupError(gt("Couldn't verify capture access"), Cause.squash(verified.cause));
     return false;
   };
 
@@ -355,10 +351,7 @@ export function SnapShotSettings() {
       setWizard(null);
     });
     if (closed._tag === "Failure") {
-      reportSetupError(
-        t(($) => $.extra.capture.closeFailed),
-        Cause.squash(closed.cause),
-      );
+      reportSetupError(gt("Couldn't close capture setup"), Cause.squash(closed.cause));
     }
     setSetupBusy(false);
   };
@@ -372,18 +365,18 @@ export function SnapShotSettings() {
 
   return (
     <SettingsPageContainer>
-      <SettingsSection id="snap-shot" title={t(($) => $.extra.capture.title)}>
+      <SettingsSection id="snap-shot" title={gt("SnapShots")}>
         <SettingsUnavailableGroup message={unavailableMessage}>
           <SettingsRow
-            {...searchableSetting("snap-shot-enabled", t)}
-            description={snapShotDescription(state, t)}
+            {...setting("snap-shot-enabled")}
+            description={snapShotDescription(state, messages)}
             status={
               bridge
                 ? setupBusy && !wizard
-                  ? t(($) => $.extra.capture.updating)
+                  ? gt("Updating capture settings…")
                   : refreshError
                     ? `${refreshError.title}. ${refreshError.message}`
-                    : snapShotStatus(state, settings.snapShotEnabled, t)
+                    : snapShotStatus(state, settings.snapShotEnabled, messages)
                 : undefined
             }
             control={
@@ -396,13 +389,13 @@ export function SnapShotSettings() {
                     disabled={setupBusy}
                     onClick={() => void openSetup()}
                   >
-                    {snapShotSetupButtonLabel(state, t)}
+                    {snapShotSetupButtonLabel(state, messages)}
                   </Button>
                 ) : null}
                 <Switch
                   checked={settings.snapShotEnabled || Boolean(wizard)}
                   disabled={!captureAvailable || setupBusy}
-                  aria-label={t(($) => $.extra.capture.enable)}
+                  aria-label={gt("Enable snapshots")}
                   onCheckedChange={(checked) => {
                     if (!checked) void save({ snapShotEnabled: false });
                     else if (state?.windows) void save({ snapShotEnabled: true });
@@ -415,30 +408,30 @@ export function SnapShotSettings() {
           {settings.snapShotEnabled && captureAvailable ? (
             <>
               <SettingsRow
-                {...searchableSetting("snap-shot-accessibility", t)}
-                description={t(($) => $.extra.capture.includeTextDescription)}
-                status={snapShotAccessibilityUnavailableMessage(state, t)}
+                {...setting("snap-shot-accessibility")}
+                description={gt("Include text and controls when the app makes them available.")}
+                status={snapShotAccessibilityUnavailableMessage(state, messages)}
                 control={
                   <Switch
                     checked={
-                      !snapShotAccessibilityUnavailableMessage(state, t) &&
+                      !snapShotAccessibilityUnavailableMessage(state, messages) &&
                       settings.snapShotIncludeAccessibility
                     }
                     disabled={
                       !captureAvailable ||
-                      Boolean(snapShotAccessibilityUnavailableMessage(state, t))
+                      Boolean(snapShotAccessibilityUnavailableMessage(state, messages))
                     }
-                    aria-label={t(($) => $.extra.capture.includeText)}
+                    aria-label={gt("Include app text in snapshots")}
                     onCheckedChange={(checked) => void saveIncludeAccessibility(checked)}
                   />
                 }
               />
               <SettingsRow
-                {...searchableSetting("snap-shot-shortcut", t)}
+                {...setting("snap-shot-shortcut")}
                 description={
                   state?.linuxBackend === "picker"
-                    ? t(($) => $.extra.capture.chooseWindow)
-                    : t(($) => $.extra.capture.currentWindow)
+                    ? gt("Choose a window to capture from any app.")
+                    : gt("Capture the window you're using without switching apps.")
                 }
                 status={managedShortcut ? undefined : shortcutStatus}
                 control={
@@ -449,7 +442,7 @@ export function SnapShotSettings() {
                       disabled={setupBusy}
                       onClick={() => void openSetup("shortcut")}
                     >
-                      {t(($) => $.extra.capture.changeShortcut)}
+                      <T>Change shortcut</T>
                     </Button>
                   ) : (
                     <>
@@ -461,9 +454,7 @@ export function SnapShotSettings() {
                             disabled={!canSaveShortcut || setupBusy}
                             onClick={() => void saveShortcut()}
                           >
-                            {setupBusy
-                              ? t(($) => $.extra.capture.saving)
-                              : t(($) => $.extra.capture.save)}
+                            {setupBusy ? gt("Saving…") : gt("Save")}
                           </Button>
                           <Button
                             size="xs"
@@ -476,7 +467,7 @@ export function SnapShotSettings() {
                               setShortcutCheck({ status: "idle", availability: null });
                             }}
                           >
-                            {t(($) => $.extra.capture.cancel)}
+                            <T>Cancel</T>
                           </Button>
                         </>
                       ) : state?.mode === "portal" &&
@@ -488,7 +479,7 @@ export function SnapShotSettings() {
                           disabled={setupBusy || state.shortcutPending}
                           onClick={() => void setup("retry-shortcut")}
                         >
-                          {t(($) => $.extra.capture.permissions)}
+                          <T>Shortcut permissions</T>
                         </Button>
                       ) : null}
                     </>
@@ -496,25 +487,24 @@ export function SnapShotSettings() {
                 }
               />
               <SettingsRow
-                {...searchableSetting("snap-shot-sound", t)}
-                description={t(($) => $.extra.capture.soundDescription)}
+                {...setting("snap-shot-sound")}
+                description={gt("Choose the sound played when capture starts.")}
                 control={
                   <Menu>
                     <MenuTrigger
-                      aria-label={"Snapshot sound: " + soundLabel}
+                      aria-label={gt("Snapshot sound: {sound}", { sound: soundLabel })}
                       render={<SelectButton size="sm" />}
                       className="w-auto min-w-0"
                       disabled={!captureAvailable}
                     >
                       {soundSelection === "off" ? (
-                        t(($) => $.extra.capture.off)
+                        gt("Off", { $context: "snapshot sound turned off" })
                       ) : soundSelection === "soft-pop" ? (
-                        <>
-                          {t(($) => $.extra.capture.whoosh)}
-                          <span className="text-muted-foreground">(Default)</span>
-                        </>
+                        <T>
+                          Whoosh <span className="text-muted-foreground">(Default)</span>
+                        </T>
                       ) : (
-                        t(($) => $.extra.capture.click)
+                        gt("Click", { $context: "name of a camera-shutter sound" })
                       )}
                     </MenuTrigger>
                     <MenuPopup align="end">
@@ -525,15 +515,16 @@ export function SnapShotSettings() {
                         value={soundSelection}
                       >
                         <MenuRadioItem closeOnClick value="off">
-                          {t(($) => $.extra.capture.off)}
+                          {gt("Off", { $context: "snapshot sound turned off" })}
                         </MenuRadioItem>
                         <div className={soundOptionRowClassName}>
                           <MenuRadioItem closeOnClick value="soft-pop">
-                            {t(($) => $.extra.capture.whoosh)}
-                            <span className="text-muted-foreground">(Default)</span>
+                            <T>
+                              Whoosh <span className="text-muted-foreground">(Default)</span>
+                            </T>
                           </MenuRadioItem>
                           <MenuItem
-                            aria-label={t(($) => $.extra.capture.playWhoosh)}
+                            aria-label={gt("Play Whoosh")}
                             closeOnClick={false}
                             onClick={() => playSnapShotSound("soft-pop")}
                           >
@@ -542,10 +533,10 @@ export function SnapShotSettings() {
                         </div>
                         <div className={soundOptionRowClassName}>
                           <MenuRadioItem closeOnClick value="camera-shutter">
-                            {t(($) => $.extra.capture.click)}
+                            {gt("Click", { $context: "name of a camera-shutter sound" })}
                           </MenuRadioItem>
                           <MenuItem
-                            aria-label={t(($) => $.extra.capture.playClick)}
+                            aria-label={gt("Play Click")}
                             closeOnClick={false}
                             onClick={() => playSnapShotSound("camera-shutter")}
                           >
@@ -558,27 +549,27 @@ export function SnapShotSettings() {
                 }
               />
               <SettingsRow
-                {...searchableSetting("snap-shot-flash", t)}
-                description={t(($) => $.extra.capture.flashDescription)}
+                {...setting("snap-shot-flash")}
+                description={gt("Show a gentle cue on the captured window.")}
                 status={feedbackUnavailable}
                 control={
                   <Switch
                     checked={!feedbackUnavailable && settings.snapShotFlash}
                     disabled={!captureAvailable || Boolean(feedbackUnavailable)}
-                    aria-label={t(($) => $.extra.capture.flash)}
+                    aria-label={gt("Flash captured window")}
                     onCheckedChange={(checked) => void save({ snapShotFlash: checked })}
                   />
                 }
               />
               <SettingsRow
-                {...searchableSetting("snap-shot-animations", t)}
-                description={t(($) => $.extra.capture.animationDescription)}
+                {...setting("snap-shot-animations")}
+                description={gt("Animate captured windows into your draft.")}
                 status={feedbackUnavailable}
                 control={
                   <Switch
                     checked={!feedbackUnavailable && settings.snapShotAnimations}
                     disabled={!captureAvailable || Boolean(feedbackUnavailable)}
-                    aria-label={t(($) => $.extra.capture.animate)}
+                    aria-label={gt("Animate snapshots")}
                     onCheckedChange={(checked) => void save({ snapShotAnimations: checked })}
                   />
                 }

@@ -1,4 +1,3 @@
-import { appI18n } from "~/i18n";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
 import { isListedThreadLineage } from "@t3tools/contracts";
@@ -57,12 +56,7 @@ export function startBackgroundThreadAnnouncements(
         snoozed: effectiveSnoozed(thread, { now }),
       });
     }
-    const next = nextBackgroundThreadAnnouncement(
-      memory,
-      snapshots,
-      openThreadKey,
-      appI18n.getFixedT(null, "activity"),
-    );
+    const next = nextBackgroundThreadAnnouncement(memory, snapshots, openThreadKey);
     memory = next.memory;
     if (next.announcement !== null) backgroundThreadLiveRegion.announce(next.announcement);
   };

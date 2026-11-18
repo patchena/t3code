@@ -1,5 +1,6 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import type { DesktopBridge } from "@t3tools/contracts";
+import { msg } from "gt-react";
 
 import {
   getDesktopUpdateActionError,
@@ -7,6 +8,7 @@ import {
 } from "~/components/desktopUpdate.logic";
 import { showDesktopUpdateDownloadedToast } from "~/components/desktopUpdate.toast";
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
+import { m } from "~/i18n/messages";
 import { getPatcherBridge } from "~/state/patcher";
 
 export type ReportLocalUpdateError = (title: string, description: string) => void;
@@ -21,7 +23,6 @@ export async function downloadLocalUpdate(
     notifyDownloaded,
     reportError = toastUpdateError,
   }: { readonly notifyDownloaded: boolean; readonly reportError?: ReportLocalUpdateError },
-  t: TFunction<"workspace">,
 ): Promise<boolean> {
   try {
     const result = await bridge.downloadUpdate();
@@ -31,28 +32,23 @@ export async function downloadLocalUpdate(
         if (await patcher.waitReady()) {
           await installLocalUpdate(
             bridge,
-            t,
             reportError,
             result.state.downloadedVersion ?? undefined,
           );
         }
       } else {
-        showDesktopUpdateDownloadedToast(bridge, result.state, t);
+        showDesktopUpdateDownloadedToast(bridge, result.state);
       }
     }
     const actionError = shouldToastDesktopUpdateActionResult(result)
       ? getDesktopUpdateActionError(result)
       : null;
-    if (actionError)
-      reportError(
-        t(($) => $.updates.couldNotDownloadUpdate),
-        actionError,
-      );
+    if (actionError) reportError(m(msg("Could not download update")), actionError);
     return result.completed;
   } catch (error) {
     reportError(
-      t(($) => $.updates.couldNotStartUpdateDownload),
-      error instanceof Error ? error.message : t(($) => $.updates.anUnexpectedErrorOccurred),
+      m(msg("Could not start update download")),
+      thrownErrorMessage(error, m) ?? m(msg("An unexpected error occurred.")),
     );
     return false;
   }
@@ -60,29 +56,25 @@ export async function downloadLocalUpdate(
 
 export async function installLocalUpdate(
   bridge: DesktopBridge,
-  t: TFunction<"workspace">,
   reportError: ReportLocalUpdateError = toastUpdateError,
   expectedVersion?: string,
 ): Promise<boolean> {
   try {
     const result = await bridge.installUpdate(expectedVersion);
     if (!result.accepted) {
-      showDesktopUpdateDownloadedToast(bridge, result.state, t);
+      showDesktopUpdateDownloadedToast(bridge, result.state);
       return false;
     }
     const actionError = shouldToastDesktopUpdateActionResult(result)
       ? getDesktopUpdateActionError(result)
       : null;
     if (!actionError) return true;
-    reportError(
-      t(($) => $.updates.couldNotInstallUpdate),
-      actionError,
-    );
+    reportError(m(msg("Could not install update")), actionError);
     return false;
   } catch (error) {
     reportError(
-      t(($) => $.updates.couldNotInstallUpdate),
-      error instanceof Error ? error.message : t(($) => $.updates.anUnexpectedErrorOccurred),
+      m(msg("Could not install update")),
+      thrownErrorMessage(error, m) ?? m(msg("An unexpected error occurred.")),
     );
     return false;
   }

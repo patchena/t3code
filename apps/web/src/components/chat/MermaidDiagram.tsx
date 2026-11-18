@@ -1,6 +1,6 @@
 import DOMPurify from "dompurify";
-import { useTranslation } from "react-i18next";
 import type { DiagramType, MathResolver } from "pele/lazy";
+import { T, useGT, Var } from "gt-react";
 import { use, useState } from "react";
 
 import { serializeCodeBlockToMarkdown } from "../../markdown-clipboard";
@@ -227,9 +227,9 @@ export function MermaidDiagram({
   source: string;
   onExpand: (imageUrl: string) => void;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const [, setAttempt] = useState(0);
-  const [renderError, setRenderError] = useState<{ readonly message: string | null } | null>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
   const trimmedSource = source.trim();
   const core = use(loadCore());
   const type = core.status === "loaded" ? detectDiagramType(core.pele, trimmedSource) : null;
@@ -248,7 +248,9 @@ export function MermaidDiagram({
       ...(math ? { math, sanitize: sanitizeMathDiagramSvg } : { sanitize: sanitizeDiagramSvg }),
       onRender: () => setRenderError(null),
       onError: (error) =>
-        setRenderError({ message: error instanceof Error ? error.message : null }),
+        setRenderError(
+          error instanceof Error ? error.message : gt("The diagram could not be rendered."),
+        ),
     });
     return () => mounted.destroy();
   };
@@ -256,7 +258,7 @@ export function MermaidDiagram({
   if (load.status === "failed") {
     return (
       <DiagramError
-        message={t(($) => $.markdown.rendererFailed)}
+        message={gt("The diagram renderer failed to load.")}
         source={source}
         onRetry={() => {
           if (core.status === "failed") coreLoad = null;
@@ -273,15 +275,10 @@ export function MermaidDiagram({
       data-markdown-mermaid=""
       data-markdown-copy={serializeCodeBlockToMarkdown(source, "mermaid")}
     >
-      {renderError ? (
-        <DiagramError
-          message={renderError.message ?? t(($) => $.markdown.couldNotRender)}
-          source={source}
-        />
-      ) : null}
+      {renderError ? <DiagramError message={renderError} source={source} /> : null}
       <button
         type="button"
-        aria-label={t(($) => $.markdown.expandDiagram)}
+        aria-label={gt("Expand diagram")}
         hidden={renderError !== null}
         className="block w-full cursor-zoom-in rounded-md focus-visible:outline-2 focus-visible:outline-ring"
         onClick={(event) => {
@@ -304,16 +301,17 @@ function DiagramError({
   source: string;
   onRetry?: () => void;
 }) {
-  const { t } = useTranslation("chat");
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
         <p className="m-0 text-xs text-destructive">
-          {t(($) => $.markdown.renderFailed, { message })}
+          <T>
+            Unable to render diagram: <Var>{message}</Var>
+          </T>
         </p>
         {onRetry ? (
           <Button type="button" variant="ghost" size="xs" onClick={onRetry}>
-            {t(($) => $.ui.retry)}
+            <T>Retry</T>
           </Button>
         ) : null}
       </div>

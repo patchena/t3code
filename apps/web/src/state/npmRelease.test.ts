@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import * as NodeAssert from "node:assert/strict";
 
 import { EnvironmentId, ServerConfig, ServerNpmReleaseError } from "@t3tools/contracts";
@@ -148,9 +147,9 @@ it.effect("does not call an unsupported RPC or fetch public npm for an older pri
     const unmount = registry.mount(release);
     try {
       const error = yield* AtomRegistry.getResult(registry, release).pipe(Effect.flip);
-      expect(
-        npmReleaseFailureMessage(Cause.fail(error), createI18n("en").getFixedT(null, "settings")),
-      ).toContain("Update it before switching tracks");
+      expect(npmReleaseFailureMessage(Cause.fail(error))).toContain(
+        "Update it before switching tracks",
+      );
       expect(query).not.toHaveBeenCalled();
       expect(fetch).not.toHaveBeenCalled();
     } finally {
@@ -162,13 +161,8 @@ it.effect("does not call an unsupported RPC or fetch public npm for an older pri
 
 it("only displays the safe release error, not arbitrary transport diagnostics", () => {
   const error = new ServerNpmReleaseError({ reason: "Install npm on the server's PATH." });
+  expect(npmReleaseFailureMessage(Cause.fail(error))).toBe(error.message);
   expect(
-    npmReleaseFailureMessage(Cause.fail(error), createI18n("en").getFixedT(null, "settings")),
-  ).toBe(error.message);
-  expect(
-    npmReleaseFailureMessage(
-      Cause.fail(new Error("sensitive transport details")),
-      createI18n("en").getFixedT(null, "settings"),
-    ),
+    npmReleaseFailureMessage(Cause.fail(new Error("sensitive transport details"))),
   ).not.toContain("sensitive");
 });

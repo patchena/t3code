@@ -25,7 +25,7 @@ function setup() {
   const add = vi.spyOn(toastManager, "add").mockReturnValue("error-toast");
   const undo = vi.fn(async () => AsyncResult.success(undefined));
   const claim = ThreadUndo.begin("pin", "env/thread");
-  const options = { action: "Unpinned" as const, undo, claim };
+  const options = { action: "Unpinned" as const, failureTitle: "Restore failed", undo, claim };
   return { add, undo, claim, options };
 }
 

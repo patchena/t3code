@@ -37,6 +37,7 @@ import {
 } from "./composerDraftStore";
 import { startDefaultThemeAdoption } from "./hooks/useDefaultTheme";
 import { startEnvironmentThemeRepaint } from "./hooks/useEnvironmentTheme";
+import { startThemeBackground } from "./themeBackground";
 import { readLocalStorageValue, subscribeLocalStorageKey } from "./hooks/useLocalStorage";
 import { startHostEnvironmentLookup } from "./state/primaryEnvironment";
 import {
@@ -59,11 +60,12 @@ import { primaryServerConfigAtom } from "./state/server";
 import { environmentShell } from "./state/shell";
 import { installChatRouteCommands } from "./shortcuts/chatRouteCommands";
 import { startWorkspaceFocus } from "./lib/workspaceFocus";
+import { m } from "./i18n/messages";
+import { startI18n, subscribeI18n } from "./i18n/runtime";
 import { installCommandPaletteCommands } from "./shortcuts/commandPaletteCommands";
 import { registerOpenFavoriteEditorCommand } from "./components/chat/OpenInPickerShortcut";
 import { environmentThreadShells, threadEnvironment } from "./state/threads";
 import { resolveActiveThreadRouteRef, resolveThreadRouteTarget } from "./threadRoutes";
-import { appI18n } from "~/i18n";
 
 /** Writes appearance settings onto the document, touching only the groups that changed. */
 function startClientAppearance(): void {
@@ -74,12 +76,6 @@ function startClientAppearance(): void {
     const settings = getClientSettings();
     const previous = applied;
     applied = settings;
-    if (previous?.interfaceLanguage !== settings.interfaceLanguage) {
-      document.documentElement.lang = settings.interfaceLanguage;
-      if (appI18n.language !== settings.interfaceLanguage) {
-        void appI18n.changeLanguage(settings.interfaceLanguage);
-      }
-    }
     const separateFonts = readLocalStorageValue(
       TYPOGRAPHY_ADVANCED_STORAGE_KEY,
       false,
@@ -140,6 +136,12 @@ function readOpenThreadRef(router: AppRouter): ScopedThreadRef | null {
   return resolveActiveThreadRouteRef(target, draft);
 }
 
+function windowTitleThreadStatus(
+  thread: Parameters<typeof resolveWindowTitleThreadStatus>[0] | null,
+): string | null {
+  return thread === null ? null : resolveWindowTitleThreadStatus(thread, m);
+}
+
 /**
  * Names the open thread and its project in the window title, or the app when none is open.
  * Screen readers read it on Alt+Tab, so it can lead with the thread and what it's doing.
@@ -175,10 +177,7 @@ function startDocumentTitle(router: AppRouter): void {
       threadTitle: thread?.title ?? null,
       ...(getClientSettings().screenReaderWindowTitle && {
         screenReader: {
-          threadStatus:
-            thread === null
-              ? null
-              : resolveWindowTitleThreadStatus(thread, appI18n.getFixedT(null, "activity")),
+          threadStatus: windowTitleThreadStatus(thread),
         },
       }),
       desktop: isElectron,
@@ -217,6 +216,7 @@ function startDocumentTitle(router: AppRouter): void {
   appAtomRegistry.subscribe(primaryServerConfigAtom, write, { immediate: true });
   appAtomRegistry.subscribe(environmentProjects.projectsAtom, write);
   subscribeClientSettings(write);
+  subscribeI18n(write);
   router.subscribe("onResolved", updateOpenThread);
   useComposerDraftStore.subscribe(updateOpenThread);
 }
@@ -269,9 +269,11 @@ export function startAppServices(): AppRouter {
   installDesktopPasteAsText(window.desktopBridge, window);
 
   startClientAppearance();
+  startI18n();
   startDocumentTitle(router);
   startHostEnvironmentLookup();
   startEnvironmentThemeRepaint();
+  startThemeBackground();
   startBrowserChromeThemeSync(router);
   startDefaultThemeAdoption();
   startModelPreferencesMigration();
@@ -308,7 +310,7 @@ export function startAppServices(): AppRouter {
   startLegacyThreadMigrationToast();
   startPermissionUpdateNotices(router);
   startThreadNotifications(appAtomRegistry, router);
-  startGuideRunNotifications(appAtomRegistry, router, appI18n.getFixedT(null, "workspace"));
+  startGuideRunNotifications(appAtomRegistry, router);
   if (isElectron) startDesktopUpdateLaunchNotice();
 
   return router;

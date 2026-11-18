@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import type { OpenVsxThemeExtension, OpenVsxThemeSort } from "../../openVsxThemes";
@@ -39,12 +38,7 @@ function setup() {
     },
   };
   const session = new AbortController();
-  const themeSearch = createThemeSearch(
-    sink,
-    session.signal,
-    createI18n("en").getFixedT(null, "settings"),
-    search,
-  );
+  const themeSearch = createThemeSearch(sink, session.signal, search);
   return {
     requests,
     view,

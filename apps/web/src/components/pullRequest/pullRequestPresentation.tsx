@@ -1,5 +1,3 @@
-import { useTranslation } from "react-i18next";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { Spinner } from "~/components/ui/spinner";
 import type {
   PullRequestActor,
@@ -23,21 +21,23 @@ import {
   UserRoundIcon,
   UserRoundXIcon,
 } from "lucide-react";
+import { msg, useGT, useMessages } from "gt-react";
 import { Children, type CSSProperties, isValidElement, type ReactNode, useState } from "react";
 
+import { m, type MessageResolver } from "~/i18n/messages";
 import { cn } from "~/lib/utils";
 
-import { Badge } from "~/components/ui/badge";
-import { InlineButton } from "~/components/ui/button";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
-import type { PullRequestReviewOutcome } from "~/components/pullRequest/pullRequestDetail.logic";
-import { pullRequestLabelColor } from "~/components/pullRequest/pullRequestList.logic";
+import { Badge } from "../ui/badge";
+import { InlineButton } from "../ui/button";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import type { PullRequestReviewOutcome } from "./pullRequestDetail.logic";
+import { pullRequestLabelColor } from "./pullRequestList.logic";
 import {
-  pullRequestStatePresentation,
+  PULL_REQUEST_STATE_PRESENTATION,
   PullRequestGlyph,
   type PullRequestStatePresentation,
   type PullRequestGlyphIcon,
-} from "~/components/pullRequest/pullRequestIcons";
+} from "./pullRequestIcons";
 
 export function PullRequestLabelChip({
   label,
@@ -75,27 +75,24 @@ export function PullRequestLabelChip({
   );
 }
 
-function reviewDecisionPresentation(
-  decision: PullRequestReviewDecision,
-  t: TFunction<"workspace">,
-) {
+function reviewDecisionPresentation(decision: PullRequestReviewDecision) {
   switch (decision) {
     case "approved":
       return {
         Icon: UserCheckIcon,
-        label: t(($) => $.git.approved),
+        label: msg("Approved", { $context: "review decision" }),
         toneClassName: CHECK_STATUS_PRESENTATION.success.toneClassName,
       };
     case "changes-requested":
       return {
         Icon: UserRoundXIcon,
-        label: t(($) => $.git.changesRequested),
+        label: msg("Changes requested"),
         toneClassName: "text-amber-600/90 dark:text-amber-400/80",
       };
     case "review-required":
       return {
         Icon: UserRoundIcon,
-        label: t(($) => $.git.awaitingReview),
+        label: msg("Awaiting review"),
         toneClassName: "text-muted-foreground/60",
       };
   }
@@ -106,15 +103,15 @@ export function PullRequestReviewDecisionGlyph({
 }: {
   decision: PullRequestReviewDecision;
 }) {
-  const { t } = useTranslation("workspace");
-  const presentation = reviewDecisionPresentation(decision, t);
+  const m = useMessages();
+  const presentation = reviewDecisionPresentation(decision);
   return (
     <Tooltip>
       <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
         <presentation.Icon aria-hidden className={cn("size-3.5", presentation.toneClassName)} />
-        <span className="sr-only">{presentation.label}</span>
+        <span className="sr-only">{m(presentation.label)}</span>
       </TooltipTrigger>
-      <TooltipPopup>{presentation.label}</TooltipPopup>
+      <TooltipPopup>{m(presentation.label)}</TooltipPopup>
     </Tooltip>
   );
 }
@@ -124,10 +121,11 @@ export function resolvePullRequestState(
     readonly state: PullRequestState;
     readonly isDraft: boolean;
   },
-  t: TFunction<"workspace">,
+  resolve: MessageResolver = m,
 ): PullRequestStatePresentation {
   const key = input.state === "open" && input.isDraft ? "draft" : input.state;
-  return pullRequestStatePresentation(t)[key];
+  const presentation = PULL_REQUEST_STATE_PRESENTATION[key];
+  return { ...presentation, label: resolve(presentation.label) };
 }
 
 export interface PullRequestConflictPresentation {
@@ -143,15 +141,15 @@ function resolvePullRequestConflict(
     readonly mergeability?: PullRequestMergeability;
     readonly baseBranch?: string;
   },
-  t: TFunction<"workspace">,
+  resolve: MessageResolver,
 ): PullRequestConflictPresentation | null {
   if (input.state !== "open" || input.isDraft || input.mergeability !== "conflicting") {
     return null;
   }
   return {
     label: input.baseBranch
-      ? t(($) => $.git.conflictsWith, { branch: input.baseBranch })
-      : t(($) => $.git.hasConflicts),
+      ? resolve(msg("Conflicts with {baseBranch}", { baseBranch: input.baseBranch }))
+      : resolve(msg("Has conflicts")),
     toneClassName: "text-destructive",
     Icon: PullRequestGlyph.conflicting,
   };
@@ -166,8 +164,8 @@ export function PullRequestStateGlyph({
   isDraft: boolean;
   className?: string;
 }) {
-  const { t } = useTranslation("workspace");
-  const presentation = resolvePullRequestState({ state, isDraft }, t);
+  const m = useMessages();
+  const presentation = resolvePullRequestState({ state, isDraft }, m);
   return (
     <Tooltip>
       <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
@@ -195,7 +193,7 @@ export function PullRequestConflictGlyph({
   baseBranch?: string;
   className?: string;
 }) {
-  const { t } = useTranslation("workspace");
+  const m = useMessages();
   const presentation = resolvePullRequestConflict(
     {
       state,
@@ -203,7 +201,7 @@ export function PullRequestConflictGlyph({
       ...(mergeability === undefined ? {} : { mergeability }),
       ...(baseBranch === undefined ? {} : { baseBranch }),
     },
-    t,
+    m,
   );
   if (presentation === null) return null;
   return (
@@ -222,47 +220,43 @@ export function PullRequestConflictGlyph({
 
 const CHECK_STATUS_PRESENTATION = {
   pending: {
-    label: (t: TFunction<"workspace">) => t(($) => $.git.running),
+    label: msg("Running", { $context: "check status" }),
     Icon: Spinner,
     toneClassName: "text-amber-500",
   },
   "action-required": {
-    label: (t: TFunction<"workspace">) => t(($) => $.git.awaitingAction),
+    label: msg("Awaiting action"),
     Icon: CircleDotIcon,
     toneClassName: "text-amber-600 dark:text-amber-400/90",
   },
   success: {
-    label: (t: TFunction<"workspace">) => t(($) => $.git.passed),
+    label: msg("Passed", { $context: "check status" }),
     Icon: CircleCheckIcon,
     toneClassName: "text-emerald-600 dark:text-emerald-300/90",
   },
   failure: {
-    label: (t: TFunction<"workspace">) => t(($) => $.git.failed),
+    label: msg("Failed", { $context: "check status" }),
     Icon: CircleXIcon,
     toneClassName: "text-destructive",
   },
   cancelled: {
-    label: (t: TFunction<"workspace">) => t(($) => $.git.cancelled),
+    label: msg("Cancelled", { $context: "check status" }),
     Icon: OctagonXIcon,
     toneClassName: "text-muted-foreground/70",
   },
   skipped: {
-    label: (t: TFunction<"workspace">) => t(($) => $.git.skipped),
+    label: msg("Skipped", { $context: "check status" }),
     Icon: CircleSlashIcon,
     toneClassName: "text-muted-foreground/70",
   },
   neutral: {
-    label: (t: TFunction<"workspace">) => t(($) => $.git.neutral),
+    label: msg("Neutral", { $context: "check status" }),
     Icon: CircleDashedIcon,
     toneClassName: "text-muted-foreground/70",
   },
 } as const satisfies Record<
   PullRequestCheckStatus,
-  {
-    label: (t: TFunction<"workspace">) => string;
-    Icon: typeof CircleCheckIcon | typeof Spinner;
-    toneClassName: string;
-  }
+  { label: string; Icon: typeof CircleCheckIcon | typeof Spinner; toneClassName: string }
 >;
 
 function isWorkflowApprovalCheck(check: Pick<PullRequestCheck, "status" | "url">): boolean {
@@ -275,11 +269,11 @@ function isWorkflowApprovalCheck(check: Pick<PullRequestCheck, "status" | "url">
 
 export function pullRequestCheckStatusLabel(
   check: Pick<PullRequestCheck, "status" | "url">,
-  t: TFunction<"workspace">,
+  resolve: MessageResolver = m,
 ): string {
   return isWorkflowApprovalCheck(check)
-    ? t(($) => $.git.awaitingApproval)
-    : CHECK_STATUS_PRESENTATION[check.status].label(t);
+    ? resolve(msg("Awaiting approval"))
+    : resolve(CHECK_STATUS_PRESENTATION[check.status].label);
 }
 
 export function PullRequestCheckStatusIcon({ status }: { status: PullRequestCheckStatus }) {
@@ -294,35 +288,31 @@ export function PullRequestCheckStatusIcon({ status }: { status: PullRequestChec
 
 const CHECKS_STATE_PRESENTATION = {
   passing: {
-    label: (t: TFunction<"workspace">) => t(($) => $.git.checksPassed),
+    label: msg("All checks have passed"),
     Icon: CircleCheckIcon,
     toneClassName: CHECK_STATUS_PRESENTATION.success.toneClassName,
   },
   failing: {
-    label: (t: TFunction<"workspace">) => t(($) => $.git.checksUnsuccessful),
+    label: msg("Some checks were not successful"),
     Icon: CircleXIcon,
     toneClassName: "text-destructive",
   },
   pending: {
-    label: (t: TFunction<"workspace">) => t(($) => $.git.checksIncomplete),
+    label: msg("Some checks haven't completed yet"),
     Icon: CircleDotIcon,
     toneClassName: "text-amber-600 dark:text-amber-400/90",
   },
 } as const satisfies Record<
   PullRequestChecksState,
-  {
-    label: (t: TFunction<"workspace">) => string;
-    Icon: typeof CircleCheckIcon;
-    toneClassName: string;
-  }
+  { label: string; Icon: typeof CircleCheckIcon; toneClassName: string }
 >;
 
 export function pullRequestChecksStatePresentation(
   state: PullRequestChecksState,
-  t: TFunction<"workspace">,
+  resolve: MessageResolver = m,
 ) {
   const presentation = CHECKS_STATE_PRESENTATION[state];
-  return { ...presentation, label: presentation.label(t) };
+  return { ...presentation, label: resolve(presentation.label) };
 }
 
 export function pullRequestChecksState(
@@ -337,7 +327,10 @@ export function pullRequestChecksState(
 
 const REVIEW_OUTCOME_PRESENTATION = {
   approved: {
-    label: (t: TFunction<"workspace">) => t(($) => $.git.approved),
+    label: msg("Approved", { $context: "review outcome" }),
+    staleLabel: msg("Approved earlier changes", {
+      $context: "tooltip: this approval was given before the latest commits were pushed",
+    }),
     Icon: CircleCheckIcon,
     toneClassName: "text-emerald-600 dark:text-emerald-300/90",
     ringClassName: "ring-2 ring-emerald-500 dark:ring-emerald-400",
@@ -347,7 +340,11 @@ const REVIEW_OUTCOME_PRESENTATION = {
     badgeVariant: "success",
   },
   "changes-requested": {
-    label: (t: TFunction<"workspace">) => t(($) => $.git.changesRequested),
+    label: msg("Changes requested"),
+    staleLabel: msg("Changes requested earlier changes", {
+      $context:
+        "tooltip: the reviewer requested changes on an older version, before the latest commits",
+    }),
     Icon: CircleXIcon,
     toneClassName: "text-destructive",
     ringClassName: "ring-2 ring-destructive",
@@ -356,7 +353,10 @@ const REVIEW_OUTCOME_PRESENTATION = {
     badgeVariant: "error",
   },
   dismissed: {
-    label: (t: TFunction<"workspace">) => t(($) => $.git.reviewDismissed),
+    label: msg("Review dismissed"),
+    staleLabel: msg("Review dismissed earlier changes", {
+      $context: "tooltip: a review of an older version, before the latest commits, was dismissed",
+    }),
     Icon: CircleDashedIcon,
     toneClassName: "text-muted-foreground/70",
     ringClassName: "ring-2 ring-muted-foreground/60",
@@ -368,7 +368,8 @@ const REVIEW_OUTCOME_PRESENTATION = {
 } as const satisfies Record<
   PullRequestReviewOutcome,
   {
-    label: (t: TFunction<"workspace">) => string;
+    label: string;
+    staleLabel: string;
     Icon: typeof CircleCheckIcon;
     toneClassName: string;
     ringClassName: string;
@@ -393,9 +394,9 @@ export function pullRequestReviewOutcomeRingClassName(
 
 export function pullRequestReviewOutcomeStaleLabel(
   outcome: PullRequestReviewOutcome,
-  t: TFunction<"workspace">,
+  resolve: MessageResolver = m,
 ): string {
-  return t(($) => $.git.earlierOutcome, { outcome: REVIEW_OUTCOME_PRESENTATION[outcome].label(t) });
+  return resolve(REVIEW_OUTCOME_PRESENTATION[outcome].staleLabel);
 }
 
 export function PullRequestReviewOutcomeIcon({
@@ -438,9 +439,9 @@ export function PullRequestReviewOutcomeAvatarBadge({
 
 export function pullRequestReviewOutcomeLabel(
   outcome: PullRequestReviewOutcome,
-  t: TFunction<"workspace">,
+  resolve: MessageResolver = m,
 ): string {
-  return REVIEW_OUTCOME_PRESENTATION[outcome].label(t);
+  return resolve(REVIEW_OUTCOME_PRESENTATION[outcome].label);
 }
 
 export function PullRequestReviewOutcomeBadge({
@@ -450,13 +451,13 @@ export function PullRequestReviewOutcomeBadge({
   outcome: PullRequestReviewOutcome;
   className?: string;
 }) {
-  const { t } = useTranslation("workspace");
+  const m = useMessages();
   const presentation = REVIEW_OUTCOME_PRESENTATION[outcome];
   return (
     <Badge size="sm" variant={presentation.badgeVariant} className={className}>
       <span className="inline-flex items-baseline gap-1">
         <presentation.Icon aria-hidden className="size-3 self-center" />
-        <span>{presentation.label(t)}</span>
+        <span>{m(presentation.label)}</span>
       </span>
     </Badge>
   );
@@ -507,7 +508,7 @@ export function PullRequestActorLabel({
   tooltip?: boolean;
   profileUrl?: string | null;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const login = actor?.login ?? "ghost";
   const label = (
     <span className={cn("flex min-w-0 items-baseline", variant === "label" && "gap-1.5")}>
@@ -531,7 +532,7 @@ export function PullRequestActorLabel({
                   href={profileUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label={t(($) => $.git.openUserProfile, { login: login })}
+                  aria-label={gt("Open {login}'s profile", { login })}
                 />
               }
             />
@@ -544,7 +545,7 @@ export function PullRequestActorLabel({
       </TooltipTrigger>
       <TooltipPopup side="top">
         {actor?.name && actor.name !== login ? `${actor.name} (@${login})` : login}
-        {profileUrl ? t(($) => $.git.openProfileSuffix) : ""}
+        {profileUrl ? ` · ${gt("Open profile")}` : ""}
       </TooltipPopup>
     </Tooltip>
   );
@@ -604,9 +605,9 @@ export function PullRequestMetaLine({
 
 export function summarizePullRequestChecks(
   checks: ReadonlyArray<PullRequestCheck>,
-  t: TFunction<"workspace">,
+  resolve: MessageResolver = m,
 ): string {
-  if (checks.length === 0) return t(($) => $.git.noChecks);
+  if (checks.length === 0) return resolve(msg("No checks reported"));
   const actionRequired = checks.filter((check) => check.status === "action-required");
   const workflowApprovalRequired = actionRequired.filter(isWorkflowApprovalCheck).length;
   const otherActionRequired = actionRequired.length - workflowApprovalRequired;
@@ -615,22 +616,35 @@ export function summarizePullRequestChecks(
   ).length;
   const pending = checks.filter((check) => check.status === "pending").length;
   const passed = checks.filter((check) => check.status === "success").length;
-  if (failed > 0) return t(($) => $.git.checksFailing, { count: failed, total: checks.length });
+  if (failed > 0)
+    return resolve(msg("{failed} of {total} failing", { failed, total: checks.length }));
   if (workflowApprovalRequired > 0 && otherActionRequired > 0) {
-    return t(($) => $.git.mixedAwaiting, {
-      count: workflowApprovalRequired,
-      checks: otherActionRequired,
-      context: otherActionRequired === 1 ? "oneCheck" : "otherChecks",
-    });
+    return resolve(
+      msg(
+        "{workflows, plural, one {{workflows} workflow} other {{workflows} workflows}} and {checks, plural, one {{checks} check} other {{checks} checks}} awaiting action",
+        { workflows: workflowApprovalRequired, checks: otherActionRequired },
+      ),
+    );
   }
   if (workflowApprovalRequired > 0) {
-    return t(($) => $.git.workflowsAwaiting, { count: workflowApprovalRequired });
+    return resolve(
+      msg(
+        "{count, plural, one {{count} workflow awaiting approval} other {{count} workflows awaiting approval}}",
+        { count: workflowApprovalRequired },
+      ),
+    );
   }
   if (otherActionRequired > 0) {
-    return t(($) => $.git.checksAwaiting, { count: otherActionRequired });
+    return resolve(
+      msg(
+        "{count, plural, one {{count} check awaiting action} other {{count} checks awaiting action}}",
+        { count: otherActionRequired },
+      ),
+    );
   }
-  if (pending > 0) return t(($) => $.git.checksRunning, { count: pending, total: checks.length });
+  if (pending > 0)
+    return resolve(msg("{pending} of {total} running", { pending, total: checks.length }));
   return passed === checks.length
-    ? t(($) => $.git.allChecksPassed)
-    : t(($) => $.git.checksPassing, { count: passed, total: checks.length });
+    ? resolve(msg("All checks passed"))
+    : resolve(msg("{passed} of {total} passing", { passed, total: checks.length }));
 }

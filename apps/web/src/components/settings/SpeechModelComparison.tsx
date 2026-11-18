@@ -1,5 +1,5 @@
 import type { EnvironmentSpeechModel, SpeechBenchmarkTier } from "@t3tools/contracts";
-import { useTranslation } from "react-i18next";
+import { T, useLocale, Var } from "gt-react";
 
 import { languageLabel } from "./SpeechLanguageSelect";
 
@@ -34,13 +34,17 @@ const commonLanguages = [
   "yo",
 ];
 
-export function orderSpeechLanguages(languages: readonly string[], preferred: readonly string[]) {
+export function orderSpeechLanguages(
+  languages: readonly string[],
+  preferred: readonly string[],
+  locale = "en",
+) {
   const order = [...new Set([...preferred, ...commonLanguages])];
   const rank = new Map(order.map((code, index) => [code, index]));
   return languages.toSorted(
     (left, right) =>
       (rank.get(left) ?? order.length) - (rank.get(right) ?? order.length) ||
-      languageLabel(left).localeCompare(languageLabel(right)),
+      languageLabel(left, locale).localeCompare(languageLabel(right, locale)),
   );
 }
 
@@ -52,13 +56,13 @@ export function ModelBenchmarks({
 }: {
   model: EnvironmentSpeechModel;
   languages: readonly string[];
-  tier: SpeechBenchmarkTier;
+  tier: SpeechBenchmarkTier | undefined;
   /** Plain facts, such as language count and size, shown after the scores. */
   facts: readonly string[];
 }) {
-  const { t } = useTranslation("voice");
+  const locale = useLocale();
   const data = model.benchmark;
-  const seconds = data?.secondsPer30s[tier];
+  const seconds = tier === undefined ? undefined : data?.secondsPer30s[tier];
   const visible = !data
     ? []
     : languages.length
@@ -72,30 +76,39 @@ export function ModelBenchmarks({
         const score = data?.accuracy[code];
         return (
           <span key={code}>
-            {languageLabel(code)}:{" "}
             {score ? (
-              <>
-                <strong className="font-medium text-foreground">{score.grade}</strong>{" "}
-                {t(($) => $.models.errorRate, { percent: score.errorPercent })}
-              </>
+              <T>
+                <Var>{languageLabel(code, locale)}</Var>:{" "}
+                <strong className="font-medium text-foreground">
+                  <Var>{score.grade}</Var>
+                </strong>{" "}
+                (<Var>{score.errorPercent}</Var>% error)
+              </T>
             ) : (
-              t(($) => $.models.notBenchmarked)
+              <T>
+                <Var>{languageLabel(code, locale)}</Var>: not benchmarked
+              </T>
             )}
           </span>
         );
       })}
-      <span>
-        {t(($) => $.models.speed)}{" "}
-        {tier === "cpu" && data && data.secondsPer30s.cpu === undefined ? (
-          t(($) => $.models.updateServer)
-        ) : seconds == null ? (
-          t(($) => $.models.notBenchmarked)
-        ) : (
-          <>
-            <strong className="font-medium text-foreground">{seconds} s</strong> / 30 s
-          </>
-        )}
-      </span>
+      {data ? (
+        <span>
+          {seconds === undefined ? (
+            <T>Speed: update server for this benchmark</T>
+          ) : seconds === null ? (
+            <T>Speed: not benchmarked</T>
+          ) : (
+            <T>
+              Speed:{" "}
+              <strong className="font-medium text-foreground">
+                <Var>{Number(seconds.toFixed(2))}</Var> s
+              </strong>{" "}
+              / 30 s
+            </T>
+          )}
+        </span>
+      ) : null}
       {facts.map((fact) => (
         <span key={fact}>{fact}</span>
       ))}

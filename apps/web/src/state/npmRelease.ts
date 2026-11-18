@@ -1,10 +1,12 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { type ServerConfig, ServerNpmReleaseError } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { Atom } from "effect/reactivity";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "../i18n/messages";
 
 import { environmentSummaries } from "./presentation";
 import { primaryEnvironmentIdAtom } from "./primaryEnvironment";
@@ -12,36 +14,33 @@ import { serverEnvironment } from "./server";
 
 const isServerNpmReleaseError = Schema.is(ServerNpmReleaseError);
 
-class NpmReleaseUnavailable extends Schema.TaggedError<NpmReleaseUnavailable>()(
-  "NpmReleaseUnavailable",
-  { reason: Schema.Literals(["disconnected", "unsupported", "noServer"]) },
-) {}
-
-const isNpmReleaseUnavailable = Schema.is(NpmReleaseUnavailable);
-
-function unsupportedLookup(config: ServerConfig | null): NpmReleaseUnavailable | null {
+function unsupportedLookup(config: ServerConfig | null): ServerNpmReleaseError | null {
   if (config === null) {
-    return new NpmReleaseUnavailable({ reason: "disconnected" });
+    return new ServerNpmReleaseError({
+      reason: m(msg("Connect to this server to check releases.")),
+    });
   }
   return config.environment.capabilities.npmReleaseLookup === true
     ? null
-    : new NpmReleaseUnavailable({ reason: "unsupported" });
+    : new ServerNpmReleaseError({
+        reason: m(
+          msg("This server does not support registry lookups. Update it before switching tracks."),
+        ),
+      });
 }
 
 export function npmReleaseFailureMessage(
   cause: Cause.Cause<unknown>,
-  t: TFunction<"settings">,
+  resolve: MessageResolver = m,
 ): string {
   const error = Option.getOrUndefined(Cause.findErrorOption(cause));
-  if (isNpmReleaseUnavailable(error)) {
-    const messages = {
-      disconnected: t(($) => $.extra.updates.registryDisconnected),
-      unsupported: t(($) => $.extra.updates.registryUnsupported),
-      noServer: t(($) => $.extra.updates.registryNoServer),
-    };
-    return messages[error.reason];
-  }
-  return isServerNpmReleaseError(error) ? error.message : t(($) => $.extra.updates.registryUnknown);
+  return isServerNpmReleaseError(error)
+    ? error.message
+    : resolve(
+        msg(
+          "Could not check this environment's npm registry. Check the connection and registry settings.",
+        ),
+      );
 }
 
 export const npmReleaseAtom = Atom.family((spec: string) =>
@@ -55,7 +54,9 @@ export const npmReleaseAtom = Atom.family((spec: string) =>
         (id) => unsupportedLookup(get(serverEnvironment.configValueAtom(id))) === null,
       ) ?? candidates[0];
     if (environmentId === undefined) {
-      return Effect.fail(new NpmReleaseUnavailable({ reason: "noServer" }));
+      return Effect.fail(
+        new ServerNpmReleaseError({ reason: m(msg("Connect to a server to check releases.")) }),
+      );
     }
     const unsupported = unsupportedLookup(get(serverEnvironment.configValueAtom(environmentId)));
     if (unsupported !== null) return Effect.fail(unsupported);

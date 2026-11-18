@@ -7,8 +7,8 @@ import type {
   ThreadId,
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
+import { T, Var } from "gt-react";
 import { Atom } from "effect/reactivity";
-import { Trans, useTranslation } from "react-i18next";
 
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { useRightPanelStore } from "~/rightPanelStore";
@@ -147,7 +147,6 @@ export function BranchRestoreConfirmHost(props: {
   readonly canWriteSourceControl: boolean;
   readonly onConfirm: () => void;
 }) {
-  const { t } = useTranslation("chat");
   const open = useThreadOverlay(branchRestoreConfirmAtom, props.threadKey) !== null;
   return (
     <AlertDialog
@@ -159,17 +158,24 @@ export function BranchRestoreConfirmHost(props: {
       <AlertDialogPopup>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            <Trans
-              t={t}
-              i18nKey={($) => $.thread.switchBranchConfirm}
-              components={{ branch: <code className="font-medium">{props.threadBranch}</code> }}
-            />
+            <T>
+              Switch to{" "}
+              <code className="font-medium">
+                <Var>{props.threadBranch}</Var>
+              </code>
+              ?
+            </T>
           </AlertDialogTitle>
-          <AlertDialogDescription>{t(($) => $.thread.uncommittedChanges)}</AlertDialogDescription>
+          <AlertDialogDescription>
+            <T>
+              You have uncommitted changes. They'll carry over to the other branch, or block the
+              switch if they conflict.
+            </T>
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogClose render={<Button variant="outline" />}>
-            {t(($) => $.ui.cancel)}
+            <T>Cancel</T>
           </AlertDialogClose>
           <Button
             variant="default"
@@ -179,7 +185,7 @@ export function BranchRestoreConfirmHost(props: {
               props.onConfirm();
             }}
           >
-            {t(($) => $.thread.switchBranch)}
+            <T>Switch branch</T>
           </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
@@ -204,7 +210,6 @@ export function RevertConfirmHost(props: {
   readonly worktreePath: string | null;
   readonly onConfirm: (turnCount: number, messageId: MessageId, restoreFiles: boolean) => void;
 }) {
-  const { t } = useTranslation("chat");
   const pending = useThreadOverlay(revertConfirmAtom, props.threadKey);
   // The server refuses file restore outside an isolated worktree.
   const canRestoreFiles =
@@ -225,21 +230,30 @@ export function RevertConfirmHost(props: {
     >
       <AlertDialogPopup>
         <AlertDialogHeader>
-          <AlertDialogTitle>{t(($) => $.thread.editConfirm)}</AlertDialogTitle>
-          <AlertDialogDescription>{t(($) => $.thread.rewindDescription)}</AlertDialogDescription>
+          <AlertDialogTitle>
+            <T>Edit from here?</T>
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            <T>
+              Rewind chat to before this message. Your prompt and attachments return to the
+              composer. “Revert files too” also undoes your own edits.
+            </T>
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogClose render={<Button variant="outline" />}>
-            {t(($) => $.ui.cancel)}
+            <T>Cancel</T>
           </AlertDialogClose>
           <Button
             variant="destructive-outline"
             disabled={!canRestoreFiles}
             onClick={() => confirm(true)}
           >
-            {t(($) => $.thread.revertFiles)}
+            <T>Revert files too</T>
           </Button>
-          <Button onClick={() => confirm(false)}>{t(($) => $.thread.keepChanges)}</Button>
+          <Button onClick={() => confirm(false)}>
+            <T>Revert and keep changes</T>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogPopup>
     </AlertDialog>

@@ -1,9 +1,12 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { PREVIEW_ERROR_CODE_MESSAGES } from "~/components/preview/previewConstants";
+import { msg } from "gt-react";
 
-export function describePreviewError(description: string, t: TFunction<"tools">): string {
-  const friendly = PREVIEW_ERROR_CODE_MESSAGES.get(description);
-  if (friendly) return friendly(t);
+import { m, type MessageResolver } from "~/i18n/messages";
+import { PREVIEW_ERROR_CODE_MESSAGES } from "./previewConstants";
+
+/** Components pass `useMessages()` so the message follows a language switch. */
+export function describePreviewError(description: string, resolve: MessageResolver = m): string {
+  const friendly = PREVIEW_ERROR_CODE_MESSAGES[description];
+  if (friendly) return resolve(friendly);
   if (description.length > 0) return description;
-  return t(($) => $.previewNetworkError);
+  return resolve(msg("Network error"));
 }

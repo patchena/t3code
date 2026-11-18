@@ -6,15 +6,13 @@ import {
 import { useEffect, useRef } from "react";
 import { AccessibilityInfo } from "react-native";
 
-import { mobileI18n } from "~/i18n";
+import { m } from "../../i18n/messages";
 import { useAppActive } from "../../lib/appState";
 import {
   nextThreadActivitySnapshot,
   type ThreadActivityInput,
   type ThreadActivityMemory,
 } from "./threadStatusAnnouncement";
-
-const t = mobileI18n.getFixedT("en", "activity");
 
 /** Tells VoiceOver and TalkBack when the open thread starts working, needs the user, or finishes. */
 export function useThreadStatusAnnouncements({
@@ -64,7 +62,7 @@ export function useThreadStatusAnnouncements({
       working,
       run: runId === null || runStatus === null ? null : { runId, status: runStatus },
     });
-    const next = nextThreadAnnouncement(previous?.announcement ?? null, activity.snapshot, t);
+    const next = nextThreadAnnouncement(previous?.announcement ?? null, activity.snapshot, m);
     memoryRef.current = { threadKey: activeKey, activity, announcement: next.memory };
     // Queued, like the web's polite region, so VoiceOver doesn't cut off what it is reading.
     if (next.announcement !== null) {

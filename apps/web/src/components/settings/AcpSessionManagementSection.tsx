@@ -1,5 +1,4 @@
-import { useTranslation } from "react-i18next";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import {
   AuthOrchestrationOperateScope,
   AuthProvidersManageScope,
@@ -20,6 +19,8 @@ import {
   type AtomCommandResult,
 } from "@t3tools/client-runtime/state/runtime";
 import { useLayoutEffect, useRef, useState } from "react";
+import { msg, T, useGT } from "gt-react";
+import { m } from "../../i18n/messages";
 
 import { ensureLocalApi } from "../../localApi";
 import { serverEnvironment } from "../../state/server";
@@ -40,23 +41,21 @@ function needsImport(session: AcpRegistrySession) {
   return session.importedThreadId === null || session.nativeHistoryPending === true;
 }
 
-function reportFailure(
-  t: TFunction<"settings">,
-  title: string,
-  result: AtomCommandResult<unknown, unknown>,
-) {
+function reportFailure(title: string, result: AtomCommandResult<unknown, unknown>) {
   if (result._tag !== "Failure" || isAtomCommandInterrupted(result)) return;
   const error = squashAtomCommandFailure(result);
   toastManager.add({
     type: "error",
     title,
-    description: error instanceof Error ? error.message : t(($) => $.providers.acpOperationError),
+    description:
+      error instanceof Error
+        ? (thrownErrorMessage(error, m) ?? error.message)
+        : m(msg("The ACP operation failed.")),
   });
 }
 
 function parseProviderHeaders(
   text: string,
-  t: TFunction<"settings">,
 ):
   | { readonly ok: true; readonly headers: Record<string, string> | undefined }
   | { readonly ok: false; readonly error: string } {
@@ -67,7 +66,10 @@ function parseProviderHeaders(
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : t(($) => $.providers.headersJson),
+      error:
+        error instanceof Error
+          ? (thrownErrorMessage(error, m) ?? error.message)
+          : m(msg("Headers must be valid JSON.")),
     };
   }
   if (
@@ -76,7 +78,7 @@ function parseProviderHeaders(
     Array.isArray(parsed) ||
     !Object.values(parsed).every((value) => typeof value === "string")
   ) {
-    return { ok: false, error: t(($) => $.providers.headersStrings) };
+    return { ok: false, error: m(msg("Headers must be a JSON object with string values.")) };
   }
   return { ok: true, headers: parsed as Record<string, string> };
 }
@@ -113,7 +115,7 @@ function InstanceSessionManagement(
     readonly onProjectChange: (projectId: ProjectId) => void;
   },
 ) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   const canOperate = useEnvironmentScope(props.environmentId, AuthOrchestrationOperateScope);
   const canRead = useEnvironmentScope(props.environmentId, AuthOrchestrationReadScope);
   const { projectId } = props;
@@ -207,11 +209,7 @@ function InstanceSessionManagement(
       setNextCursor(result.value.nextCursor);
       return;
     }
-    reportFailure(
-      t,
-      t(($) => $.providers.listAcpSessionsError),
-      result,
-    );
+    reportFailure(gt("Could not list ACP sessions"), result);
   };
 
   const importNativeSession = async (session: AcpRegistrySession) => {
@@ -246,16 +244,12 @@ function InstanceSessionManagement(
       toastManager.add({
         type: "success",
         title: result.value.imported
-          ? t(($) => $.providers.acpImported)
-          : t(($) => $.providers.acpAlreadyImported),
+          ? gt("ACP session imported")
+          : gt("ACP session already imported"),
       });
       return;
     }
-    reportFailure(
-      t,
-      t(($) => $.providers.importAcpError),
-      result,
-    );
+    reportFailure(gt("Could not import ACP session"), result);
   };
 
   const deleteNativeSession = async (session: AcpRegistrySession) => {
@@ -263,7 +257,9 @@ function InstanceSessionManagement(
     if (projectId === null || deletingSessionId !== null || session.importedThreadId !== null)
       return;
     const confirmed = await ensureLocalApi().dialogs.confirm(
-      t(($) => $.providers.deleteAcpConfirm, { title: session.title ?? session.sessionId }),
+      gt('Permanently delete native ACP session "{session}"?', {
+        session: session.title ?? session.sessionId,
+      }),
       { variant: "destructive" },
     );
     if (
@@ -283,14 +279,9 @@ function InstanceSessionManagement(
       setSessions((current) =>
         current.filter((candidate) => candidate.sessionId !== session.sessionId),
       );
-      toastManager.add({ type: "success", title: t(($) => $.providers.acpDeleted) });
       return;
     }
-    reportFailure(
-      t,
-      t(($) => $.providers.deleteAcpError),
-      result,
-    );
+    reportFailure(gt("Could not delete ACP session"), result);
   };
 
   const loadProviders = async (resetProviderId?: string) => {
@@ -321,11 +312,7 @@ function InstanceSessionManagement(
       );
       return;
     }
-    reportFailure(
-      t,
-      t(($) => $.providers.listAcpProvidersError),
-      result,
-    );
+    reportFailure(gt("Could not list ACP providers"), result);
   };
 
   const saveProvider = async (provider: AcpRegistryConfigurableProvider) => {
@@ -339,11 +326,11 @@ function InstanceSessionManagement(
       return;
     const draft = providerDrafts[provider.providerId];
     if (draft === undefined || draft.apiType.length === 0 || draft.baseUrl.length === 0) return;
-    const parsedHeaders = parseProviderHeaders(draft.headers, t);
+    const parsedHeaders = parseProviderHeaders(draft.headers);
     if (!parsedHeaders.ok) {
       toastManager.add({
         type: "error",
-        title: t(($) => $.providers.invalidHeaders),
+        title: gt("Invalid provider headers"),
         description: parsedHeaders.error,
       });
       return;
@@ -364,15 +351,10 @@ function InstanceSessionManagement(
     if (generation !== projectGeneration.current) return;
     setSavingProviderId(null);
     if (result._tag === "Success") {
-      toastManager.add({ type: "success", title: t(($) => $.providers.acpConfigured) });
       await loadProviders(provider.providerId);
       return;
     }
-    reportFailure(
-      t,
-      t(($) => $.providers.configureAcpError),
-      result,
-    );
+    reportFailure(gt("Could not configure ACP provider"), result);
   };
 
   const disableConfiguredProvider = async (provider: AcpRegistryConfigurableProvider) => {
@@ -380,7 +362,7 @@ function InstanceSessionManagement(
     if (projectId === null || savingProviderId !== null || loadingProviders || provider.required)
       return;
     const confirmed = await ensureLocalApi().dialogs.confirm(
-      t(($) => $.providers.disableAcpConfirm, { provider: provider.providerId }),
+      gt('Disable ACP provider "{provider}"?', { provider: provider.providerId }),
       { variant: "destructive" },
     );
     if (
@@ -397,15 +379,10 @@ function InstanceSessionManagement(
     if (generation !== projectGeneration.current) return;
     setSavingProviderId(null);
     if (result._tag === "Success") {
-      toastManager.add({ type: "success", title: t(($) => $.providers.acpDisabled) });
       await loadProviders(provider.providerId);
       return;
     }
-    reportFailure(
-      t,
-      t(($) => $.providers.disableAcpError),
-      result,
-    );
+    reportFailure(gt("Could not disable ACP provider"), result);
   };
 
   const logoutProvider = async () => {
@@ -419,24 +396,19 @@ function InstanceSessionManagement(
     if (result._tag === "Success") {
       setSessions([]);
       setNextCursor(null);
-      toastManager.add({ type: "success", title: t(($) => $.providers.acpLoggedOut) });
       return;
     }
-    reportFailure(
-      t,
-      t(($) => $.providers.logoutAcpError),
-      result,
-    );
+    reportFailure(gt("Could not log out of ACP agent"), result);
   };
 
   return (
     <div className="grid gap-3">
       <SettingsRow
-        title={t(($) => $.providers.nativeSessions)}
-        description={t(($) => $.providers.nativeSessionsHint)}
+        title={gt("Native sessions")}
+        description={gt("Resume agent-owned conversations as T3 threads.")}
         status={
           canList && props.projects.length === 0
-            ? t(($) => $.providers.addProjectImport)
+            ? gt("Add a project before importing sessions.")
             : undefined
         }
         control={
@@ -449,7 +421,7 @@ function InstanceSessionManagement(
                 disabled={props.readOnly || loggingOut}
                 onClick={() => void logoutProvider()}
               >
-                {loggingOut ? t(($) => $.providers.loggingOut) : t(($) => $.providers.logOut)}
+                {loggingOut ? gt("Logging out") : gt("Log out")}
               </Button>
             ) : null}
             {canList && props.projects.length > 0 ? (
@@ -463,7 +435,7 @@ function InstanceSessionManagement(
                   }}
                 >
                   <SelectTrigger
-                    aria-label={t(($) => $.providers.projectAcpSessions)}
+                    aria-label={gt("Project for ACP sessions")}
                     className="w-40"
                     size="sm"
                   >
@@ -487,10 +459,10 @@ function InstanceSessionManagement(
                   onClick={() => void loadSessions()}
                 >
                   {loading
-                    ? t(($) => $.providers.loading)
+                    ? gt("Loading")
                     : sessions.length === 0
-                      ? t(($) => $.providers.listSessions)
-                      : t(($) => $.providers.refresh)}
+                      ? gt("List sessions")
+                      : gt("Refresh")}
                 </Button>
               </>
             ) : null}
@@ -528,10 +500,10 @@ function InstanceSessionManagement(
                         onClick={() => void importNativeSession(session)}
                       >
                         {!needsImport(session)
-                          ? t(($) => $.providers.imported)
+                          ? gt("Imported")
                           : importingSessionId === session.sessionId
-                            ? t(($) => $.providers.importing)
-                            : t(($) => $.providers.import)}
+                            ? gt("Importing")
+                            : gt("Import", { $context: "verb" })}
                       </Button>
                       {canDelete ? (
                         <Button
@@ -546,8 +518,8 @@ function InstanceSessionManagement(
                           onClick={() => void deleteNativeSession(session)}
                         >
                           {deletingSessionId === session.sessionId
-                            ? t(($) => $.providers.deleting)
-                            : t(($) => $.providers.delete)}
+                            ? gt("Deleting")
+                            : gt("Delete", { $context: "verb, deletes a session" })}
                         </Button>
                       ) : null}
                     </div>
@@ -565,7 +537,7 @@ function InstanceSessionManagement(
                 disabled={!canRead || loading}
                 onClick={() => void loadSessions(nextCursor)}
               >
-                {loading ? t(($) => $.providers.loading) : t(($) => $.providers.loadMore)}
+                {loading ? gt("Loading") : gt("Load more")}
               </Button>
             ) : null}
           </>
@@ -577,10 +549,10 @@ function InstanceSessionManagement(
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-xs font-medium text-foreground">
-                {t(($) => $.providers.agentProviders)}
+                <T>Agent providers</T>
               </p>
               <p className="text-xs text-muted-foreground">
-                {t(($) => $.providers.routingHeadersHint)}
+                <T>Configure non-secret routing. Headers are write-only.</T>
               </p>
             </div>
             <Button
@@ -593,10 +565,10 @@ function InstanceSessionManagement(
               onClick={() => void loadProviders()}
             >
               {loadingProviders
-                ? t(($) => $.providers.loading)
+                ? gt("Loading")
                 : providers.length === 0
-                  ? t(($) => $.providers.listProviders)
-                  : t(($) => $.providers.refresh)}
+                  ? gt("List providers")
+                  : gt("Refresh")}
             </Button>
           </div>
 
@@ -610,7 +582,7 @@ function InstanceSessionManagement(
               }}
             >
               <SelectTrigger
-                aria-label={t(($) => $.providers.projectAcpProviders)}
+                aria-label={gt("Project for ACP providers")}
                 className="min-w-48"
                 size="xs"
               >
@@ -650,9 +622,9 @@ function InstanceSessionManagement(
                         </p>
                         <p className="text-3xs text-muted-foreground">
                           {provider.current === null
-                            ? t(($) => $.providers.disabled)
-                            : t(($) => $.providers.configured)}
-                          {provider.required ? ` · ${t(($) => $.providers.required)}` : ""}
+                            ? gt("Disabled", { $context: "ACP provider status" })
+                            : gt("Configured")}
+                          {provider.required ? ` · ${gt("Required")}` : ""}
                         </p>
                       </div>
                       <div className="flex items-center gap-1">
@@ -670,8 +642,8 @@ function InstanceSessionManagement(
                           onClick={() => void saveProvider(provider)}
                         >
                           {savingProviderId === provider.providerId
-                            ? t(($) => $.providers.saving)
-                            : t(($) => $.providers.save)}
+                            ? gt("Saving")
+                            : gt("Save", { $context: "verb" })}
                         </Button>
                         {!provider.required && provider.current !== null ? (
                           <Button
@@ -683,7 +655,7 @@ function InstanceSessionManagement(
                             }
                             onClick={() => void disableConfiguredProvider(provider)}
                           >
-                            {t(($) => $.providers.disable)}
+                            <T>Disable</T>
                           </Button>
                         ) : null}
                       </div>
@@ -697,9 +669,7 @@ function InstanceSessionManagement(
                         }}
                       >
                         <SelectTrigger
-                          aria-label={t(($) => $.providers.providerProtocol, {
-                            provider: provider.providerId,
-                          })}
+                          aria-label={gt("{provider} protocol", { provider: provider.providerId })}
                           size="sm"
                         >
                           <SelectValue>{draft.apiType}</SelectValue>
@@ -715,9 +685,7 @@ function InstanceSessionManagement(
                       <Input
                         size="sm"
                         type="url"
-                        aria-label={t(($) => $.providers.providerBaseUrl, {
-                          provider: provider.providerId,
-                        })}
+                        aria-label={gt("{provider} base URL", { provider: provider.providerId })}
                         placeholder="https://api.example.com"
                         value={draft.baseUrl}
                         disabled={props.readOnly || savingProviderId !== null}
@@ -727,10 +695,10 @@ function InstanceSessionManagement(
                     <Input
                       size="sm"
                       type="password"
-                      aria-label={t(($) => $.providers.providerHeaders, {
+                      aria-label={gt("{provider} write-only headers JSON", {
                         provider: provider.providerId,
                       })}
-                      placeholder={t(($) => $.providers.headersPlaceholder, {
+                      placeholder={gt("Write-only headers JSON, e.g. {example}", {
                         example: '{"Authorization":"Bearer …"}',
                       })}
                       value={draft.headers}

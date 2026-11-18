@@ -1,16 +1,16 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-
 import {
   getClientSettings,
   isClientSettingsHydrated,
   updateClientSettings,
-} from "~/hooks/useSettings";
+} from "../hooks/useSettings";
 import {
   type MicrophoneEntry,
   microphoneOrder,
   preferredMicrophoneId,
   rememberMicrophones,
-} from "~/speech/microphoneOrder";
+} from "./microphoneOrder";
+import { msg } from "gt-react";
+import { m } from "../i18n/messages";
 
 export type BrowserMicrophone = Pick<MediaDeviceInfo, "deviceId" | "label">;
 
@@ -22,10 +22,10 @@ export async function listAudioInputs(): Promise<BrowserMicrophone[]> {
     .map(({ deviceId, label }) => ({ deviceId, label }));
 }
 
-export async function listBrowserMicrophones(t: TFunction<"voice">): Promise<BrowserMicrophone[]> {
+export async function listBrowserMicrophones(): Promise<BrowserMicrophone[]> {
   return (await listAudioInputs()).map(({ deviceId, label }, index) => ({
     deviceId,
-    label: label || t(($) => $.microphone.fallbackLabel, { number: index + 1 }),
+    label: label || m(msg("Microphone {number}", { number: index + 1 })),
   }));
 }
 

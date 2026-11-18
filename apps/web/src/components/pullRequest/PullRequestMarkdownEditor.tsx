@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+import { T, useGT } from "gt-react";
 import { useState } from "react";
 import {
   AuthSourceControlWriteScope,
@@ -9,13 +9,13 @@ import {
 import { cn } from "~/lib/utils";
 import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
 
-import { Button } from "~/components/ui/button";
-import { Toggle, ToggleGroup } from "~/components/ui/toggle-group";
-import { PullRequestMarkdown } from "~/components/pullRequest/PullRequestMarkdown";
+import { Button } from "../ui/button";
+import { Toggle, ToggleGroup } from "../ui/toggle-group";
+import { PullRequestMarkdown } from "./PullRequestMarkdown";
 import {
   PullRequestMarkdownTextarea,
   type PullRequestCompletionScope,
-} from "~/components/pullRequest/PullRequestMarkdownTextarea";
+} from "./PullRequestMarkdownTextarea";
 
 export function PullRequestMarkdownEditor({
   value,
@@ -44,7 +44,7 @@ export function PullRequestMarkdownEditor({
   readonly onSave: (next: string) => void;
   readonly onCancel: () => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const canWriteSourceControl = useEnvironmentScope(environmentId, AuthSourceControlWriteScope);
   const [draft, setDraft] = useState(value);
   const [preview, setPreview] = useState(false);
@@ -83,7 +83,7 @@ export function PullRequestMarkdownEditor({
       }}
     >
       <ToggleGroup
-        aria-label={t(($) => $.git.markdownEditorMode)}
+        aria-label={gt("Markdown editor mode")}
         variant="segmented"
         value={[preview ? "preview" : "write"]}
         disabled={saving}
@@ -92,13 +92,19 @@ export function PullRequestMarkdownEditor({
           if (mode === "write" || mode === "preview") setPreview(mode === "preview");
         }}
       >
-        <Toggle value="write">{t(($) => $.git.write)}</Toggle>
-        <Toggle value="preview">{t(($) => $.git.preview)}</Toggle>
+        <Toggle value="write">
+          <T context="verb, markdown editor mode">Write</T>
+        </Toggle>
+        <Toggle value="preview">
+          <T context="markdown editor mode">Preview</T>
+        </Toggle>
       </ToggleGroup>
       {preview ? (
         <div className="rounded-lg border border-border/60 px-3 py-2">
           {empty ? (
-            <p className="text-xs text-muted-foreground">{t(($) => $.git.nothingToPreview)}</p>
+            <p className="text-xs text-muted-foreground">
+              <T>Nothing to preview.</T>
+            </p>
           ) : (
             <PullRequestMarkdown
               text={draft}
@@ -122,7 +128,7 @@ export function PullRequestMarkdownEditor({
       )}
       <div className="flex justify-end gap-2">
         <Button size="xs" variant="ghost" disabled={saving} onClick={onCancel}>
-          {t(($) => $.git.cancel)}
+          <T>Cancel</T>
         </Button>
         <Button
           size="xs"
@@ -138,7 +144,7 @@ export function PullRequestMarkdownEditor({
             onSave(draft);
           }}
         >
-          {saving ? t(($) => $.git.saving) : t(($) => $.git.save)}
+          {saving ? gt("Saving...") : gt("Save")}
         </Button>
       </div>
     </div>

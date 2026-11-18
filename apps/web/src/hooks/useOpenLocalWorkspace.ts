@@ -1,12 +1,13 @@
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import { useTranslation } from "react-i18next";
 import {
   findProjectByPath,
   inferProjectTitleFromPath,
 } from "@t3tools/client-runtime/state/projects";
 import type { DesktopAppActivationRequest } from "@t3tools/contracts";
+import { msg } from "gt-react";
 
 import { handleDesktopAppActivationRequest } from "../desktopAppActivation";
+import { m } from "../i18n/messages";
 import { newProjectId } from "../lib/utils";
 import { readProjects, waitForProject } from "../state/entities";
 import { usePrimaryEnvironment } from "../state/environments";
@@ -24,7 +25,6 @@ import { useNewThreadHandler } from "./useHandleNewThread";
  * primary environment's projects have loaded, so a known folder is not added twice.
  */
 export function useOpenLocalWorkspace() {
-  const { t } = useTranslation("settings");
   const primaryEnvironment = usePrimaryEnvironment();
   const createProject = useAtomCommand(projectEnvironment.create, { reportFailure: false });
   const updateProject = useOrchestrationCommand(projectEnvironment.update, {
@@ -72,7 +72,9 @@ export function useOpenLocalWorkspace() {
         });
         if (result._tag === "Failure") {
           const error = squashAtomCommandFailure(result);
-          throw error instanceof Error ? error : new Error("T3 Code could not add the project.");
+          throw error instanceof Error
+            ? error
+            : new Error(m(msg("T3 Code could not add the project.")));
         }
         return projectId;
       },
@@ -90,12 +92,7 @@ export function useOpenLocalWorkspace() {
           void updateProject({
             environmentId: projectRef.environmentId,
             input: { projectId: projectRef.projectId, archived: false },
-          }).then((result) =>
-            reportProjectFailure(
-              t(($) => $.extra.projects.unarchiveFailed),
-              result,
-            ),
-          );
+          }).then((result) => reportProjectFailure(m(msg("Failed to unarchive project")), result));
         }
         return openThread(projectRef);
       },

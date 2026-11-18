@@ -1,10 +1,12 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { Trans, useTranslation } from "react-i18next";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { settlePromise } from "@t3tools/client-runtime/state/runtime";
 import type { DesktopSshPasswordPromptRequest } from "@t3tools/contracts";
 import * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Cause from "effect/Cause";
+import { msg, T, useGT, Var } from "gt-react";
 import { useId, useRef, useState, useSyncExternalStore } from "react";
+
+import { m } from "../../i18n/messages";
 
 import { useDeadlinePassed } from "../../hooks/useDeadline";
 import { useNowSecond } from "../../hooks/useNowSecond";
@@ -29,8 +31,11 @@ function formatRemainingSeconds(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-function getPromptErrorMessage(error: unknown, t: TFunction<"workspace">): string {
-  return error instanceof Error ? error.message : t(($) => $.ssh.failed);
+function getPromptErrorMessage(error: unknown): string {
+  const message = thrownErrorMessage(error, m) ?? m(msg("SSH verification prompt failed."));
+  return message.includes("expired") || message.includes("no longer pending")
+    ? m(msg("This SSH verification prompt expired. Try connecting again."))
+    : message;
 }
 
 let promptQueue: readonly DesktopSshPasswordPromptRequest[] = [];
@@ -89,10 +94,10 @@ function ActiveSshPasswordPrompt({
 }: {
   readonly request: DesktopSshPasswordPromptRequest;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const [password, setPassword] = useState("");
   const [isResponding, setIsResponding] = useState(false);
-  const [responseError, setResponseError] = useState<unknown>(null);
+  const [responseError, setResponseError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const isRespondingRef = useRef(false);
   const formId = useId();
@@ -109,10 +114,8 @@ function ActiveSshPasswordPrompt({
   const remainingLabel =
     remainingSeconds === null ? null : formatRemainingSeconds(remainingSeconds);
   const visibleResponseError = isExpired
-    ? t(($) => $.ssh.expired)
-    : responseError === null
-      ? null
-      : getPromptErrorMessage(responseError, t);
+    ? gt("This SSH verification prompt expired. Try connecting again.")
+    : responseError;
 
   const respond = async (nextPassword: string | null) => {
     if (isRespondingRef.current) {
@@ -121,7 +124,7 @@ function ActiveSshPasswordPrompt({
 
     const requestId = request.requestId;
     if (nextPassword !== null && isExpired) {
-      setResponseError(null);
+      setResponseError(gt("This SSH verification prompt expired. Try connecting again."));
       return;
     }
 
@@ -134,7 +137,7 @@ function ActiveSshPasswordPrompt({
     if (AsyncResult.isSuccess(result) || nextPassword === null) {
       removeSshPasswordPrompt(requestId);
     } else {
-      setResponseError(Cause.squash(result.cause));
+      setResponseError(getPromptErrorMessage(Cause.squash(result.cause)));
     }
     isRespondingRef.current = false;
     setIsResponding(false);
@@ -165,13 +168,18 @@ function ActiveSshPasswordPrompt({
     >
       <DialogPopup className="max-w-md" initialFocus={inputRef} showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>{t(($) => $.ssh.title)}</DialogTitle>
+          <DialogTitle>
+            <T>SSH verification required</T>
+          </DialogTitle>
           <DialogDescription>
-            <Trans
-              t={t}
-              i18nKey={($) => $.ssh.description}
-              components={{ target: <code>{target}</code> }}
-            />
+            <T>
+              Enter the password or verification code required by{" "}
+              <code>
+                <Var>{target}</Var>
+              </code>
+              . T3 Code passes your response to the local SSH process and keeps it in memory to
+              reuse for this host. T3 Code does not write it to disk.
+            </T>
           </DialogDescription>
         </DialogHeader>
         <DialogPanel scrollFade={false}>
@@ -194,7 +202,7 @@ function ActiveSshPasswordPrompt({
                         : "shrink-0 text-xs text-muted-foreground"
                     }
                   >
-                    {isExpired ? t(($) => $.ssh.expiredLabel) : remainingLabel}
+                    {isExpired ? gt("Expired") : remainingLabel}
                   </span>
                 ) : null}
               </div>
@@ -211,16 +219,21 @@ function ActiveSshPasswordPrompt({
             {visibleResponseError ? (
               <p className="text-sm text-destructive">{visibleResponseError}</p>
             ) : (
-              <p className="text-sm text-muted-foreground">{t(($) => $.ssh.keys)}</p>
+              <p className="text-sm text-muted-foreground">
+                <T>
+                  SSH keys may replace a password, but your server can still require a verification
+                  code.
+                </T>
+              </p>
             )}
           </form>
         </DialogPanel>
         <DialogFooter>
           <Button disabled={isResponding} type="button" variant="outline" onClick={cancelPrompt}>
-            {isExpired ? t(($) => $.dismiss) : t(($) => $.cancel)}
+            {isExpired ? gt("Dismiss") : gt("Cancel")}
           </Button>
           <Button disabled={isResponding || isExpired} form={formId} type="submit">
-            {t(($) => $.palette.continue)}
+            <T>Continue</T>
           </Button>
         </DialogFooter>
       </DialogPopup>

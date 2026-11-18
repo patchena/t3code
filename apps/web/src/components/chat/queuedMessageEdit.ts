@@ -1,6 +1,5 @@
 import { resolveQueuedEditExit } from "@t3tools/client-runtime/queued-run-edit";
 import type { ChatAttachment } from "@t3tools/contracts";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   composerDraftHasUserContent,
   useComposerDraftStore,
@@ -8,6 +7,22 @@ import {
   type ComposerImageAttachment,
   type ComposerThreadTarget,
 } from "../../composerDraftStore";
+import { msg } from "gt-react";
+import { m } from "../../i18n/messages";
+import { releaseDraftAttachments } from "../../lib/attachmentUploadQueue";
+
+/** Staged attachments upload as soon as they are added, so a dropped edit must release them. */
+export function discardQueuedEditDraft(target: ComposerThreadTarget): void {
+  const store = useComposerDraftStore.getState();
+  const draft = store.getComposerDraft(target);
+  if (draft) {
+    releaseDraftAttachments([...draft.images, ...draft.files]);
+    for (const image of draft.images) {
+      if (image.previewUrl.startsWith("blob:")) URL.revokeObjectURL(image.previewUrl);
+    }
+  }
+  store.clearComposerContent(target);
+}
 
 export function recoverQueuedMessageEdit(input: {
   readonly editTarget: ComposerThreadTarget;
@@ -28,27 +43,26 @@ export function recoverQueuedMessageEdit(input: {
       !composerDraftHasUserContent(store.getComposerDraft(input.threadTarget)),
   });
   if (recovery === "kept") {
-    store.moveComposerPromptAndImages(input.editTarget, input.threadTarget);
+    store.moveComposerContent(input.editTarget, input.threadTarget);
+    store.clearComposerContent(input.editTarget);
+  } else {
+    discardQueuedEditDraft(input.editTarget);
   }
-  store.clearComposerContent(input.editTarget);
   return recovery;
 }
 
-export async function prepareQueuedEditAttachments(
-  input: {
-    readonly existingAttachments: ReadonlyArray<ChatAttachment>;
-    readonly images: ReadonlyArray<ComposerImageAttachment>;
-    readonly files: ReadonlyArray<ComposerFileAttachment>;
-    readonly uploadFiles: (
-      files: ReadonlyArray<ComposerFileAttachment>,
-    ) => Promise<ReadonlyArray<ChatAttachment>>;
-    readonly readImage: (file: File) => Promise<string>;
-  },
-  t: TFunction<"chat">,
-) {
+export async function prepareQueuedEditAttachments(input: {
+  readonly existingAttachments: ReadonlyArray<ChatAttachment>;
+  readonly images: ReadonlyArray<ComposerImageAttachment>;
+  readonly files: ReadonlyArray<ComposerFileAttachment>;
+  readonly uploadFiles: (
+    files: ReadonlyArray<ComposerFileAttachment>,
+  ) => Promise<ReadonlyArray<ChatAttachment>>;
+  readonly readImage: (file: File) => Promise<string>;
+}) {
   const files = input.files.length === 0 ? [] : await input.uploadFiles(input.files);
   if (files.length !== input.files.length)
-    throw new Error(t(($) => $.composer.retryUploadsBeforeSave));
+    throw new Error(m(msg("Retry or remove failed uploads before saving.")));
   const images = await Promise.all(
     input.images.map(async (image) => ({
       type: "image" as const,

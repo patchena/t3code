@@ -1,4 +1,6 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "../../i18n/messages";
 import type { BrowserImportFailureReason, BrowserImportSource } from "@t3tools/contracts";
 
 export interface WizardTargetProfile {
@@ -143,30 +145,23 @@ export function isRetryableReason(reason: BrowserImportFailureReason): boolean {
   }
 }
 
-export function browserImportFailureMessage(
-  reason: BrowserImportFailureReason,
-  t: TFunction<"tools">,
-): string {
-  return t(($) => $.browserImport.failures[reason]);
-}
-
 export function formatSkippedDomains(
   domains: ReadonlyArray<string>,
-  t: TFunction<"tools">,
-  formatNumber: (value: number) => string,
+  resolve: MessageResolver = m,
 ): string {
-  const last = domains.at(-1);
-  if (last === undefined) return "";
-  if (domains.length === 1) return last;
+  if (domains.length === 0) return "";
+  if (domains.length === 1) return domains[0]!;
   if (domains.length <= 3)
-    return t(($) => $.browserImport.domainList, {
-      leading: domains.slice(0, -1).join(", "),
-      last,
-    });
-  const count = domains.length - 3;
-  return t(($) => $.browserImport.domainsMore, {
-    domains: domains.slice(0, 3).join(", "),
-    count,
-    amount: formatNumber(count),
-  });
+    return resolve(
+      msg("{domains} and {last}", {
+        domains: domains.slice(0, -1).join(", "),
+        last: domains.at(-1),
+      }),
+    );
+  return resolve(
+    msg("{count, plural, one {{domains} and {count} more} other {{domains} and {count} more}}", {
+      domains: domains.slice(0, 3).join(", "),
+      count: domains.length - 3,
+    }),
+  );
 }

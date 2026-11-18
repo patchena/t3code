@@ -1,13 +1,10 @@
-import { useTranslation } from "react-i18next";
-import { systemLocale } from "~/timestampFormat";
 import { resolvePullRequestDetailChecks } from "@t3tools/client-runtime/pull-request-checks";
-import {
-  capitalizeTerm,
-  sourceControlClients,
-} from "@t3tools/client-runtime/source-control-clients";
-import { PullRequestChangeBreakdownRows } from "~/components/pullRequest/PullRequestChangeBreakdownStat";
-import { ThreadDetailsControl } from "~/components/chat/ThreadDetailsControl";
-import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
+import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
+import { changeRequestTermKind } from "../pullRequest/changeRequestTerm";
+import { T, useGT, useMessages, Var } from "gt-react";
+import { PullRequestChangeBreakdownRows } from "../pullRequest/PullRequestChangeBreakdownStat";
+import { ThreadDetailsControl } from "./ThreadDetailsControl";
+import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { selectEnvironmentQueryData } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { EnvironmentId, ProjectId, PullRequestRef } from "@t3tools/contracts";
@@ -44,26 +41,26 @@ import {
   resolvePullRequestMergeMethod,
   allowedPullRequestMergeMethods,
   resolveThreadPanelPullRequestAction,
-} from "~/components/pullRequest/pullRequestDetail.logic";
-import { PullRequestChecksPopover } from "~/components/pullRequest/PullRequestChecksPopover";
+} from "../pullRequest/pullRequestDetail.logic";
+import { PullRequestChecksPopover } from "../pullRequest/PullRequestChecksPopover";
 import {
   pullRequestChecksState,
   PullRequestCheckStatusIcon,
   PullRequestDiffStat,
   resolvePullRequestState,
-} from "~/components/pullRequest/pullRequestPresentation";
+} from "../pullRequest/pullRequestPresentation";
 import {
   usePullRequestActionRunner,
   usePullRequestDefaultMergeMethodResolver,
   usePullRequestHandoffs,
   writeHandoffToComposer,
   type PullRequestThreadTask,
-} from "~/components/pullRequest/usePullRequestActions";
+} from "../pullRequest/usePullRequestActions";
 import {
   ChangeRequestStatusIcon,
   type PrStatusIndicator,
   type ThreadPr,
-} from "~/components/ThreadStatusIndicators";
+} from "../ThreadStatusIndicators";
 import {
   AlertDialog,
   AlertDialogClose,
@@ -72,17 +69,17 @@ import {
   AlertDialogHeader,
   AlertDialogPopup,
   AlertDialogTitle,
-} from "~/components/ui/alert-dialog";
-import { Button } from "~/components/ui/button";
-import { Spinner } from "~/components/ui/spinner";
-import { toastManager } from "~/components/ui/toast";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+} from "../ui/alert-dialog";
+import { Button } from "../ui/button";
+import { Spinner } from "../ui/spinner";
+import { toastManager } from "../ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   THREAD_DETAILS_PANEL_ICON_CLASS,
   THREAD_DETAILS_PANEL_LABEL_CLASS,
   THREAD_DETAILS_PANEL_SPLIT_GROUP_CLASS,
   THREAD_DETAILS_PANEL_SPLIT_SEPARATOR_CLASS,
-} from "~/components/chat/threadDetailsPanelStyles";
+} from "./threadDetailsPanelStyles";
 
 // A null checks response is settled; polling cannot find checks.
 const isSettledWithoutChecks = (result: AsyncResult.AsyncResult<unknown, unknown>) =>
@@ -96,7 +93,6 @@ export function ThreadDetailsPrRow({
   status,
   project,
   label,
-  openAriaLabel,
   onOpen,
   onActed,
   onStopWatching,
@@ -109,14 +105,14 @@ export function ThreadDetailsPrRow({
   status: PrStatusIndicator | null;
   project: EnvironmentProject | null;
   label: string;
-  openAriaLabel: string;
   onOpen: (event: ReactMouseEvent<HTMLElement>) => void;
   onActed?: () => void;
   onStopWatching?: (() => void) | undefined;
   /** Fix and Resolve write here instead of checking the pull request out in a new thread. */
   composerTarget?: ComposerThreadTarget | undefined;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
+  const m = useMessages();
   const serverConfigs = useServerConfigs();
   const supportsPullRequests = serverConfigs.get(environmentId) !== undefined;
   const repository = sourceControlClients.repositorySelector(project?.repositoryIdentity);
@@ -152,6 +148,7 @@ export function ThreadDetailsPrRow({
   const terminology = sourceControlClients.get(
     detail?.provider ?? project?.repositoryIdentity?.provider,
   ).changeRequest;
+  const term = changeRequestTermKind(terminology);
   const open = reference !== null && (detail?.state ?? pr?.state) === "open";
   const refreshKey = `${environmentId}:${project?.id}:${reference?.host}:${reference?.repository}:${number}`;
   useLiveRefresh(
@@ -199,6 +196,8 @@ export function ThreadDetailsPrRow({
     resolveProjectDefaultMergeMethod(),
     lastSelectedMergeMethod,
   );
+  const mergeMethodKey =
+    selectedMergeMethod === "fast-forward" ? "fastForward" : selectedMergeMethod;
 
   const handOff = (kind: "conflicts" | "findings", task: PullRequestThreadTask) => {
     if (composerTarget === undefined) {
@@ -208,8 +207,8 @@ export function ThreadDetailsPrRow({
     writeHandoffToComposer(composerTarget, task);
     toastManager.add({
       type: "success",
-      title: t(($) => $.git.addedToComposer),
-      description: t(($) => $.git.taskInComposer),
+      title: gt("Added to the composer"),
+      description: gt("The task is in the composer. Read it over, then send."),
     });
   };
 
@@ -255,7 +254,7 @@ export function ThreadDetailsPrRow({
             state: detail.state,
             isDraft: detail.isDraft,
           },
-          t,
+          m,
         );
   const icon = statePresentation ? (
     <statePresentation.Icon
@@ -271,10 +270,43 @@ export function ThreadDetailsPrRow({
     <PullRequestGlyph.pullRequest className={THREAD_DETAILS_PANEL_ICON_CLASS} />
   );
 
+  const stateLabel = (
+    statePresentation ??
+    (pr ? resolvePullRequestState({ state: pr.state, isDraft: pr.isDraft === true }, m) : null)
+  )?.label.toLowerCase();
+  const title = (detail?.title ?? pr?.title)?.trim();
+  const openAriaLabel =
+    stateLabel && title
+      ? gt(
+          "{term, select, mr {Merge request} cr {Change request} other {Pull request}} #{number}, {state}: {title}",
+          { term, number, state: stateLabel, title },
+        )
+      : stateLabel
+        ? gt(
+            "{term, select, mr {Merge request} cr {Change request} other {Pull request}} #{number}, {state}",
+            { term, number, state: stateLabel },
+          )
+        : title
+          ? gt(
+              "{term, select, mr {Merge request} cr {Change request} other {Pull request}} #{number}: {title}",
+              { term, number, title },
+            )
+          : gt(
+              "{term, select, mr {Merge request} cr {Change request} other {Pull request}} #{number}",
+              { term, number },
+            );
+
   const rowTooltip =
     detail === null || statePresentation === null ? (
       <TooltipPopup side="top">
-        {status?.tooltip ?? `${capitalizeTerm(terminology.singular)} #${number}`}
+        {status?.tooltip ??
+          gt(
+            "{term, select, mr {Merge request} cr {Change request} other {Pull request}} #{number}",
+            {
+              term,
+              number,
+            },
+          )}
       </TooltipPopup>
     ) : (
       <TooltipPopup
@@ -315,7 +347,7 @@ export function ThreadDetailsPrRow({
                   }
                 />
                 <div className="min-w-0 truncate text-foreground/75">
-                  {describePullRequestChecks(detail.checks, t)}
+                  {describePullRequestChecks(detail.checks, m)}
                 </div>
               </div>
             ) : null}
@@ -323,16 +355,18 @@ export function ThreadDetailsPrRow({
               <div className="flex min-w-0 items-start gap-2 text-destructive">
                 <TriangleAlertIcon aria-hidden className="mt-0.5 size-3 shrink-0 stroke-current" />
                 <div className="min-w-0 flex-1 wrap-break-word">
-                  {t(($) => $.git.mergeConflicts, { branch: detail.baseBranch })}
+                  <T>
+                    Merge conflicts with <Var>{detail.baseBranch}</Var>
+                  </T>
                 </div>
               </div>
             ) : null}
             <div className="flex min-w-0 items-center gap-2">
               <FileDiffIcon className="size-3 shrink-0 stroke-muted-foreground" />
               <div className="min-w-0 flex items-baseline gap-1 truncate text-foreground/75">
-                {t(($) => $.git.fileCountFormatted, {
+                {gt("{count, plural, one {{formatted} file} other {{formatted} files}}", {
                   count: detail.changedFiles,
-                  value: detail.changedFiles.toLocaleString(systemLocale),
+                  formatted: detail.changedFiles.toLocaleString(),
                 })}
                 <PullRequestDiffStat additions={detail.additions} deletions={detail.deletions} />
               </div>
@@ -356,56 +390,62 @@ export function ThreadDetailsPrRow({
   const trailingAction =
     rowAction === "resolve"
       ? {
-          label: t(($) => $.git.resolveConflictsAction),
-          pendingLabel: t(($) => $.git.preparing),
+          label: gt("Resolve", { $context: "verb, resolves merge conflicts" }),
+          pendingLabel: gt("Preparing..."),
           pending: handoff === "conflicts",
           destructive: true,
           suffix: newThreadSuffix,
           tooltip:
             composerTarget === undefined
-              ? t(($) => $.git.resolveConflictsNewThread)
-              : t(($) => $.git.resolveConflictsThisThread),
+              ? gt("Check the branch out and resolve the conflicts in a new thread")
+              : gt("Resolve the conflicts in this thread"),
           onClick: startResolveConflicts,
         }
       : rowAction === "ready"
         ? {
-            label: t(($) => $.git.readyAction),
-            pendingLabel: t(($) => $.git.marking),
+            label: gt("Ready", { $context: "verb, marks a draft pull request ready for review" }),
+            pendingLabel: gt("Marking..."),
             pending: actionPending,
             destructive: false,
             suffix: null,
-            tooltip: t(($) => $.git.markRequestReady, { term: terminology.singular }),
+            tooltip: gt(
+              "Mark this {term, select, mr {merge request} cr {change request} other {pull request}} as ready for review",
+              { term },
+            ),
             onClick: () => void perform("ready"),
           }
         : rowAction === "fix"
           ? {
-              label: t(($) => $.git.fix),
-              pendingLabel: t(($) => $.git.fix),
+              label: gt("Fix", { $context: "verb, fixes failing checks" }),
+              pendingLabel: gt("Fix", { $context: "verb, fixes failing checks" }),
               pending: handoff === "findings",
               destructive: true,
               suffix:
                 handoff === "findings" ? (
-                  <Spinner size="xs" aria-label={t(($) => $.git.preparingFix)} />
+                  <Spinner size="xs" aria-label={gt("Preparing fix")} />
                 ) : (
                   newThreadSuffix
                 ),
               tooltip:
                 composerTarget === undefined
-                  ? t(($) => $.git.fixChecksNewThread)
-                  : t(($) => $.git.fixChecksThisThread),
+                  ? gt("Fix the failing checks in a new thread")
+                  : gt("Fix the failing checks in this thread"),
               onClick: startFixChecks,
             }
           : rowAction === "merge"
             ? {
-                label: t(($) => $.git.merge),
-                pendingLabel: t(($) => $.git.merging),
+                label: gt("Merge", { $context: "verb, merges a pull request" }),
+                pendingLabel: gt("Merging..."),
                 pending: actionPending,
                 destructive: false,
                 suffix: null,
-                tooltip: t(($) => $.git.mergeRequestMethod, {
-                  term: terminology.singular,
-                  method: selectedMergeMethod,
-                }),
+                tooltip: gt(
+                  "Merge this {term, select, mr {merge request} cr {change request} other {pull request}} ({method, select, merge {merge} squash {squash} rebase {rebase} fastForward {fast-forward} other {merge}})",
+                  {
+                    term,
+                    method: mergeMethodKey,
+                  },
+                ),
                 onClick: () => setConfirmingMerge(true),
               }
             : null;
@@ -423,7 +463,7 @@ export function ThreadDetailsPrRow({
               size="sm"
               part={part}
               className="group/watch"
-              aria-label={t(($) => $.git.stopWatchingNumber, { number: number })}
+              aria-label={gt("Stop watching #{number}", { number })}
               onClick={onStopWatching}
             />
           }
@@ -440,7 +480,12 @@ export function ThreadDetailsPrRow({
             )}
           />
         </TooltipTrigger>
-        <TooltipPopup side="top">{t(($) => $.git.watchingStopHint)}</TooltipPopup>
+        <TooltipPopup side="top">
+          <T>
+            Watching: the agent wakes when checks finish, someone comments, or the branch conflicts.
+            Click to stop.
+          </T>
+        </TooltipPopup>
       </Tooltip>
     ) : null;
 
@@ -453,9 +498,7 @@ export function ThreadDetailsPrRow({
             type="button"
             variant="ghost"
             size="sm"
-            part={part}
-            multiline={wrap}
-            className={wrap ? "items-start [&>svg]:mt-px" : undefined}
+            part={wrap ? "title" : part}
             aria-label={openAriaLabel}
             onClick={onOpen}
             onAuxClick={onOpen}
@@ -485,8 +528,10 @@ export function ThreadDetailsPrRow({
       {detail !== null && (showChecks || trailingAction !== null || watching) ? (
         <div className="pb-1.5">
           {openRow(detail.title, "row", true)}
-          <div className="mt-1.5 flex h-5 min-w-0 items-center gap-0.5 ps-9 pe-2.5 text-xs text-muted-foreground">
-            <span className="me-1 shrink-0 tabular-nums">#{number}</span>
+          <div className="flex h-5 min-w-0 items-center gap-0.5 ps-9 pe-2.5 text-xs text-muted-foreground">
+            <span aria-hidden className="me-1 shrink-0 tabular-nums">
+              #{number}
+            </span>
             {showChecks && checksRollup !== null ? (
               <PullRequestChecksPopover
                 checksState={checksRollup}
@@ -534,15 +579,24 @@ export function ThreadDetailsPrRow({
           <AlertDialogPopup>
             <AlertDialogHeader>
               <AlertDialogTitle>
-                {t(($) => $.git.confirmMergeRequest, { term: terminology.singular })}
+                {gt(
+                  "Merge {term, select, mr {merge request} cr {change request} other {pull request}}?",
+                  { term },
+                )}
               </AlertDialogTitle>
               <AlertDialogDescription>
-                {t(($) => $.git.mergeNumberMethod, { number, method: selectedMergeMethod })}
+                {gt(
+                  "This merges #{number} using {method, select, merge {merge} squash {squash} rebase {rebase} fastForward {fast-forward} other {merge}}.",
+                  {
+                    number,
+                    method: mergeMethodKey,
+                  },
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogClose render={<Button variant="outline" size="sm" />}>
-                {t(($) => $.git.cancel)}
+                <T>Cancel</T>
               </AlertDialogClose>
               <Button
                 size="sm"
@@ -552,7 +606,7 @@ export function ThreadDetailsPrRow({
                   void perform("merge", selectedMergeMethod);
                 }}
               >
-                {t(($) => $.git.merge)}
+                <T context="verb, merges a pull request">Merge</T>
               </Button>
             </AlertDialogFooter>
           </AlertDialogPopup>

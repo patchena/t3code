@@ -1,5 +1,3 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { useTranslation } from "react-i18next";
 import { formatProviderSkillDisplayName } from "@t3tools/shared/inlineSkills";
 import type { ComposerPathSearchTarget } from "@t3tools/client-runtime/state/threads";
 import {
@@ -26,6 +24,7 @@ import {
   UserRoundIcon,
   type LucideIcon,
 } from "lucide-react";
+import { msg, useGT, useMessages } from "gt-react";
 import { memo, useLayoutEffect, useRef, useState } from "react";
 
 import { type ComposerSlashCommand, type ComposerTriggerKind } from "../../composer-logic";
@@ -118,7 +117,8 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
   onHighlightedItemChange: (itemId: string | null) => void;
   onSelect: (item: ComposerCommandItem) => void;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
+  const m = useMessages();
   const listRef = useRef<HTMLDivElement>(null);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- scrolls the highlighted menu item's DOM node into view
@@ -148,7 +148,9 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
         {props.items.length > 0 ? (
           <CommandList
             id={props.listId}
-            aria-label={props.triggerKind ? listboxLabels(t)[props.triggerKind] : undefined}
+            aria-label={
+              props.triggerKind ? m(LISTBOX_LABEL_BY_TRIGGER[props.triggerKind]) : undefined
+            }
             className="max-h-72 min-h-0 scroll-pb-6"
           >
             <CommandGroup>
@@ -171,16 +173,16 @@ export const ComposerCommandMenu = memo(function ComposerCommandMenu(props: {
             <p className="text-secondary-label text-xs">
               {props.isLoading
                 ? props.triggerKind === "skill" || props.triggerKind === "slash-command"
-                  ? t(($) => $.composer.searchingSkills)
+                  ? gt("Searching workspace skills...")
                   : props.triggerKind === "pull-request"
-                    ? t(($) => $.composer.findingPullRequest)
-                    : t(($) => $.composer.searchingFiles)
+                    ? gt("Finding pull request...")
+                    : gt("Searching workspace files...")
                 : (props.emptyStateText ??
                   (props.triggerKind === "skill"
-                    ? t(($) => $.composer.noSkills)
+                    ? gt("No skills found. Try / to browse provider commands.")
                     : props.triggerKind === "path"
-                      ? t(($) => $.composer.noFiles)
-                      : t(($) => $.composer.noCommands)))}
+                      ? gt("No matching files or folders.")
+                      : gt("No matching command.")))}
             </p>
           </div>
         )}
@@ -198,15 +200,13 @@ const ComposerCommandMenuItem = memo(function ComposerCommandMenuItem(props: {
   onHighlight: (itemId: string | null) => void;
   onSelect: (item: ComposerCommandItem) => void;
 }) {
-  const { t: tWorkspace } = useTranslation("workspace");
+  const m = useMessages();
   const skillSourceKind =
     props.item.type === "skill" ? resolveProviderSkillSourceKind(props.item.skill) : null;
   const isSlashSkill =
     props.triggerKind === "slash-command" && props.item.type === "skill" ? props.item.skill : null;
   const pullRequestPresentation =
-    props.item.type === "pull-request"
-      ? resolvePullRequestState(props.item.pullRequest, tWorkspace)
-      : null;
+    props.item.type === "pull-request" ? resolvePullRequestState(props.item.pullRequest, m) : null;
   const descriptionRef = useRef<HTMLSpanElement>(null);
   const [descriptionTruncated, setDescriptionTruncated] = useState(false);
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- measures the rendered description so only cut-off text gets a tooltip
@@ -309,14 +309,12 @@ export function composerSuggestionOptionId(listId: string, itemId: string): stri
   return `${listId}-${encodeURIComponent(JSON.stringify(itemId))}`;
 }
 
-function listboxLabels(t: TFunction<"chat">): Record<ComposerTriggerKind, string> {
-  return {
-    path: t(($) => $.composer.filesFolders),
-    "pull-request": t(($) => $.composer.pullRequests),
-    "slash-command": t(($) => $.composer.commands),
-    skill: t(($) => $.composer.skills),
-  };
-}
+const LISTBOX_LABEL_BY_TRIGGER: Record<ComposerTriggerKind, string> = {
+  path: msg("Files and folders"),
+  "pull-request": msg("Pull requests"),
+  "slash-command": msg("Commands"),
+  skill: msg("Skills"),
+};
 
 const SKILL_SOURCE_ICON_BY_KIND: Record<ProviderSkillSourceKind, LucideIcon> = {
   app: BlocksIcon,
@@ -327,26 +325,44 @@ const SKILL_SOURCE_ICON_BY_KIND: Record<ProviderSkillSourceKind, LucideIcon> = {
   other: PackageIcon,
 };
 
-function skillSourceLabels(t: TFunction<"chat">): Record<ProviderSkillSourceKind, string> {
-  return {
-    app: t(($) => $.composer.app),
-    repo: t(($) => $.composer.repo),
-    project: t(($) => $.composer.project),
-    personal: t(($) => $.composer.personal),
-    system: t(($) => $.composer.system),
-    other: t(($) => $.composer.provider),
-  };
-}
+const SKILL_SOURCE_LABEL_BY_KIND: Record<
+  ProviderSkillSourceKind,
+  { readonly label: string; readonly skillLabel: string }
+> = {
+  app: {
+    label: msg("App", { $context: "skill source badge" }),
+    skillLabel: msg("App Skill"),
+  },
+  repo: {
+    label: msg("Repo", { $context: "skill source badge" }),
+    skillLabel: msg("Repo Skill"),
+  },
+  project: {
+    label: msg("Project", { $context: "skill source badge" }),
+    skillLabel: msg("Project Skill"),
+  },
+  personal: {
+    label: msg("Personal", { $context: "skill source badge" }),
+    skillLabel: msg("Personal Skill"),
+  },
+  system: {
+    label: msg("System", { $context: "skill source badge" }),
+    skillLabel: msg("System Skill"),
+  },
+  other: {
+    label: msg("Provider", { $context: "skill source badge" }),
+    skillLabel: msg("Provider Skill"),
+  },
+};
 
 function SkillSourceBadge(props: { kind: ProviderSkillSourceKind; showSkillSuffix: boolean }) {
-  const { t } = useTranslation("chat");
+  const m = useMessages();
   const Icon = SKILL_SOURCE_ICON_BY_KIND[props.kind];
+  const labels = SKILL_SOURCE_LABEL_BY_KIND[props.kind];
   return (
     <Badge className="ms-auto" variant="secondary">
       <Icon aria-hidden="true" className="text-current" />
-      {props.showSkillSuffix
-        ? t(($) => $.composer.sourceSkill, { source: skillSourceLabels(t)[props.kind] })
-        : skillSourceLabels(t)[props.kind]}
+      {m(props.showSkillSuffix ? labels.skillLabel : labels.label)}
     </Badge>
   );
 }

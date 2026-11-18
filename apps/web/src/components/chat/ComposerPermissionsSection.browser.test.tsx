@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import type { RuntimeMode } from "@t3tools/contracts";
 import { type ReactNode, useRef, useState } from "react";
 import { expect, it, vi } from "vite-plus/test";
@@ -16,10 +15,9 @@ import {
 } from "./composerEventScope";
 import { ComposerFooterModeControls, ComposerPermissionsSection } from "./ComposerFooterControls";
 import { ComposerPickerFooter } from "./ComposerModelEffort";
-import { getRuntimeModeConfig, runtimeModeOptions } from "./runtimeModeConfig";
+import { resolveRuntimeModeOption, runtimeModeOptions } from "./runtimeModeConfig";
 
-const runtimeModeConfig = getRuntimeModeConfig(createI18n("en").getFixedT(null, "chat"));
-const options = runtimeModeOptions.map((mode) => ({ mode, ...runtimeModeConfig[mode] }));
+const options = runtimeModeOptions.map((mode) => resolveRuntimeModeOption(mode));
 
 // Mirrors the overflow menu, which holds the Permissions section.
 function OverflowMenu() {

@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { EnvironmentId, ProjectId, ProviderInstanceId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -47,8 +46,6 @@ function makeProject(overrides: Partial<Project> = {}): Project {
   };
 }
 
-const tCommon = createI18n("en").getFixedT(null, "common");
-
 describe("environment grouping", () => {
   it("opens physical scratch settings from the merged filter, including a remote thread target", () => {
     const local = makeProject({
@@ -69,8 +66,8 @@ describe("environment grouping", () => {
       primaryEnvironmentId,
       resolveEnvironmentLabel: () => null,
     };
-    const filters = buildSidebarProjectSnapshots({ ...input, groupScratchProjects: true }, tCommon);
-    const settingsGroups = buildSidebarProjectSnapshots(input, tCommon);
+    const filters = buildSidebarProjectSnapshots({ ...input, groupScratchProjects: true });
+    const settingsGroups = buildSidebarProjectSnapshots(input);
     expect(filters).toHaveLength(1);
     expect(settingsGroups).toHaveLength(2);
     expect(settingsGroups.map((group) => group.memberProjectRefs)).toEqual([
@@ -97,16 +94,13 @@ describe("environment grouping", () => {
       });
       const settings = { ...defaultGroupingSettings, sidebarProjectGroupingMode: mode };
       const key = deriveLogicalProjectKeyFromSettings(project, settings);
-      const groups = buildSidebarProjectSnapshots(
-        {
-          projects: [{ ...project, isScratch: true }],
-          groupScratchProjects: true,
-          settings,
-          primaryEnvironmentId,
-          resolveEnvironmentLabel: () => null,
-        },
-        tCommon,
-      );
+      const groups = buildSidebarProjectSnapshots({
+        projects: [{ ...project, isScratch: true }],
+        groupScratchProjects: true,
+        settings,
+        primaryEnvironmentId,
+        resolveEnvironmentLabel: () => null,
+      });
       expect(
         resolveSidebarProjectScopeKey({ groups, key, settings, canClearMissingScope: true }),
       ).toBe(groups[0]?.projectKey);
@@ -120,16 +114,13 @@ describe("environment grouping", () => {
       workspaceRoot: "/ordinary",
       repositoryIdentity,
     });
-    const groups = buildSidebarProjectSnapshots(
-      {
-        projects: [scratch, ordinary],
-        groupScratchProjects: true,
-        settings: defaultGroupingSettings,
-        primaryEnvironmentId,
-        resolveEnvironmentLabel: () => null,
-      },
-      tCommon,
-    );
+    const groups = buildSidebarProjectSnapshots({
+      projects: [scratch, ordinary],
+      groupScratchProjects: true,
+      settings: defaultGroupingSettings,
+      primaryEnvironmentId,
+      resolveEnvironmentLabel: () => null,
+    });
     const key = deriveLogicalProjectKeyFromSettings(ordinary, defaultGroupingSettings);
     expect(resolveSidebarProjectScopeKey({ groups, key, canClearMissingScope: true })).toBe(key);
   });
@@ -153,16 +144,13 @@ describe("environment grouping", () => {
       repositoryIdentity,
     });
 
-    const snapshots = buildSidebarProjectSnapshots(
-      {
-        projects: [primary, duplicate, remote],
-        settings: defaultGroupingSettings,
-        primaryEnvironmentId,
-        resolveEnvironmentLabel: (environmentId) =>
-          environmentId === remoteEnvironmentId ? "remote" : "primary",
-      },
-      tCommon,
-    );
+    const snapshots = buildSidebarProjectSnapshots({
+      projects: [primary, duplicate, remote],
+      settings: defaultGroupingSettings,
+      primaryEnvironmentId,
+      resolveEnvironmentLabel: (environmentId) =>
+        environmentId === remoteEnvironmentId ? "remote" : "primary",
+    });
 
     expect(snapshots).toHaveLength(1);
     expect(snapshots[0]?.groupedProjectCount).toBe(2);
@@ -189,16 +177,13 @@ describe("environment grouping", () => {
       repositoryIdentity,
     });
 
-    const snapshots = buildSidebarProjectSnapshots(
-      {
-        projects: [staleWithoutRepositoryIdentity, canonical, remote],
-        settings: defaultGroupingSettings,
-        primaryEnvironmentId,
-        resolveEnvironmentLabel: (environmentId) =>
-          environmentId === remoteEnvironmentId ? "remote" : "primary",
-      },
-      tCommon,
-    );
+    const snapshots = buildSidebarProjectSnapshots({
+      projects: [staleWithoutRepositoryIdentity, canonical, remote],
+      settings: defaultGroupingSettings,
+      primaryEnvironmentId,
+      resolveEnvironmentLabel: (environmentId) =>
+        environmentId === remoteEnvironmentId ? "remote" : "primary",
+    });
 
     expect(snapshots).toHaveLength(1);
     expect(snapshots[0]?.projectKey).toBe(repositoryIdentity.canonicalKey);
@@ -259,21 +244,18 @@ describe("environment grouping", () => {
       title: "fallback",
       workspaceRoot: "/tmp/fallback",
     });
-    const groups = buildSidebarProjectSnapshots(
-      {
-        projects: [
-          currentPrimary,
-          currentRemote,
-          destinationPrimary,
-          destinationRemote,
-          fallbackPrimary,
-        ],
-        settings: defaultGroupingSettings,
-        primaryEnvironmentId,
-        resolveEnvironmentLabel: () => null,
-      },
-      tCommon,
-    );
+    const groups = buildSidebarProjectSnapshots({
+      projects: [
+        currentPrimary,
+        currentRemote,
+        destinationPrimary,
+        destinationRemote,
+        fallbackPrimary,
+      ],
+      settings: defaultGroupingSettings,
+      primaryEnvironmentId,
+      resolveEnvironmentLabel: () => null,
+    });
 
     const entries = buildSidebarProjectPickerEntries({
       groups,
@@ -307,15 +289,12 @@ describe("environment grouping", () => {
         pinnedAt,
       });
     const current = project("current");
-    const groups = buildSidebarProjectSnapshots(
-      {
-        projects: [project("other"), project("pinned", "2026-01-01T00:00:00.000Z"), current],
-        settings: defaultGroupingSettings,
-        primaryEnvironmentId,
-        resolveEnvironmentLabel: () => null,
-      },
-      tCommon,
-    );
+    const groups = buildSidebarProjectSnapshots({
+      projects: [project("other"), project("pinned", "2026-01-01T00:00:00.000Z"), current],
+      settings: defaultGroupingSettings,
+      primaryEnvironmentId,
+      resolveEnvironmentLabel: () => null,
+    });
     const entries = buildSidebarProjectPickerEntries({
       groups: pickableProjectGroups(groups),
       preferredProjectRef: { environmentId: current.environmentId, projectId: current.id },

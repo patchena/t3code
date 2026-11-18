@@ -1,5 +1,3 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { useTranslation } from "react-i18next";
 import {
   createPreviewFramePainter,
   createPreviewStreamClient,
@@ -34,12 +32,15 @@ import {
   useRef,
   useState,
 } from "react";
+import { msg, T, useGT, useMessages } from "gt-react";
 
 import { AgentCursorMark } from "~/components/preview/AgentBrowserCursor";
 import { CommandBlock } from "~/components/CommandBlock";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { toastManager } from "~/components/ui/toast";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { m } from "~/i18n/messages";
 import { cn } from "~/lib/utils";
 import { refreshPreviewStreamAccess, usePreviewStreamAccess } from "~/state/previewStream";
 import { observeResize } from "~/lib/observeResize";
@@ -107,15 +108,15 @@ const historyDeltaOf = (button: number): -1 | 1 | null =>
   button === 3 ? -1 : button === 4 ? 1 : null;
 
 /** Browsers may refuse a write that arrives after the key press; a toast button is a fresh gesture. */
-async function copyPageText(text: string, t: TFunction<"tools">) {
+async function copyPageText(text: string) {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
     const id = toastManager.add({
       type: "info",
-      title: t(($) => $.browserPageCopied),
+      title: m(msg("The page copied text")),
       actionProps: {
-        children: t(($) => $.copy),
+        children: m(msg("Copy", { $context: "verb, copies text to the clipboard" })),
         onClick: () => {
           toastManager.close(id);
           void navigator.clipboard.writeText(text).catch(() => undefined);
@@ -125,12 +126,12 @@ async function copyPageText(text: string, t: TFunction<"tools">) {
   }
 }
 
-function offerDownload(download: PreviewStreamDownload, t: TFunction<"tools">) {
+function offerDownload(download: PreviewStreamDownload) {
   const id = toastManager.add({
     type: "info",
-    title: t(($) => $.browserDownloaded, { fileName: download.fileName }),
+    title: m(msg("Downloaded {fileName}", { fileName: download.fileName })),
     actionProps: {
-      children: t(($) => $.save),
+      children: m(msg("Save", { $context: "verb, saves a downloaded file" })),
       onClick: () => {
         toastManager.close(id);
         const anchor = document.createElement("a");
@@ -157,7 +158,6 @@ export function ServerBrowserSurface(props: {
   readonly pdfUrl?: string | null;
   readonly ref?: Ref<ServerBrowserHandle>;
 }) {
-  const { t } = useTranslation("tools");
   const {
     environmentId,
     threadId,
@@ -173,6 +173,8 @@ export function ServerBrowserSurface(props: {
     pdfUrl = null,
     ref,
   } = props;
+  const gt = useGT();
+  const resolve = useMessages();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const keySentRef = useRef(false);
@@ -193,8 +195,8 @@ export function ServerBrowserSurface(props: {
     void uploadPreviewStreamFiles(chooser, files).catch((cause: unknown) =>
       toastManager.add({
         type: "error",
-        title: t(($) => $.browserSendFilesFailed),
-        description: cause instanceof Error ? cause.message : undefined,
+        title: gt("Could not send the files to the page"),
+        description: thrownErrorMessage(cause, m) ?? undefined,
       }),
     );
   };
@@ -217,10 +219,6 @@ export function ServerBrowserSurface(props: {
   const touchRef = useRef<TouchGesture | null>(null);
   const probeRef = useRef<TouchProbe | null>(null);
   const lastProbeRef = useRef<{ x: number; y: number; editable: boolean; at: number } | null>(null);
-  const pageCopiedText = useEffectEvent((text: string) => void copyPageText(text, t));
-  const pageDownloadedFile = useEffectEvent((download: PreviewStreamDownload) =>
-    offerDownload(download, t),
-  );
   const firstFrame = useEffectEvent(() => onFirstFrame?.());
   const viewportChanged = useEffectEvent((viewport: PreviewStreamViewport) =>
     onViewport?.(viewport),
@@ -405,8 +403,8 @@ export function ServerBrowserSurface(props: {
           const placed = placeAgentCursor(pointer, canvasRef.current, viewportRef.current);
           if (placed) setAgentCursor(placed);
         },
-        onClipboard: pageCopiedText,
-        onDownload: pageDownloadedFile,
+        onClipboard: (text) => void copyPageText(text),
+        onDownload: offerDownload,
         onPopup: popupOpened,
         onFileChooser: setFileChooser,
         onViewport: (viewport) => {
@@ -762,7 +760,7 @@ export function ServerBrowserSurface(props: {
         )}
       >
         <span role="status" className="text-xs text-muted-foreground">
-          {previewStreamControlLabel(control, t)}
+          {previewStreamControlLabel(control, resolve)}
         </span>
         {control?.canOperate ? (
           <Button
@@ -773,9 +771,7 @@ export function ServerBrowserSurface(props: {
               send({ type: control.controller === "you" ? "releaseControl" : "takeControl" })
             }
           >
-            {control.controller === "you"
-              ? t(($) => $.browserReleaseControl)
-              : t(($) => $.browserTakeControl)}
+            {control.controller === "you" ? <T>Release control</T> : <T>Take control</T>}
           </Button>
         ) : null}
       </div>
@@ -784,7 +780,7 @@ export function ServerBrowserSurface(props: {
           <embed
             src={pdfUrl}
             type="application/pdf"
-            title={t(($) => $.browserPdfDocument)}
+            title={gt("PDF document")}
             className="absolute inset-0 z-10 size-full border-0"
           />
         ) : null}
@@ -807,8 +803,8 @@ export function ServerBrowserSurface(props: {
         {/* Pin top-left to avoid focus scrolling; 16px prevents iOS focus zoom. */}
         <textarea
           ref={inputRef}
-          aria-label={t(($) => $.browserPage)}
-          aria-description={t(($) => $.browserLeavePage)}
+          aria-label={gt("Browser page")}
+          aria-description={gt("Press Shift+Escape to leave the browser page.")}
           autoCapitalize="off"
           autoComplete="off"
           autoCorrect="off"
@@ -837,12 +833,14 @@ export function ServerBrowserSurface(props: {
           <div
             className="absolute inset-x-2 top-2 z-10 flex flex-col gap-2 rounded-lg border border-border bg-background p-3 shadow-lg"
             role="dialog"
-            aria-label={t(($) => $.browserChooseFiles)}
+            aria-label={gt("Choose files for the page")}
           >
             <p className="text-sm">
-              {fileChooser.multiple
-                ? t(($) => $.browserFilesRequested)
-                : t(($) => $.browserFileRequested)}
+              {fileChooser.multiple ? (
+                <T>The page asks for files.</T>
+              ) : (
+                <T>The page asks for a file.</T>
+              )}
             </p>
             <input
               ref={fileInputRef}
@@ -858,12 +856,10 @@ export function ServerBrowserSurface(props: {
             />
             <div className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => answerFileChooser([])}>
-                {t(($) => $.cancel)}
+                <T>Cancel</T>
               </Button>
               <Button size="sm" onClick={() => fileInputRef.current?.click()}>
-                {fileChooser.multiple
-                  ? t(($) => $.browserChooseFilesAction)
-                  : t(($) => $.browserChooseFile)}
+                {fileChooser.multiple ? <T>Choose files</T> : <T>Choose file</T>}
               </Button>
             </div>
           </div>
@@ -872,14 +868,14 @@ export function ServerBrowserSurface(props: {
           <div
             className="absolute inset-x-2 top-2 z-10 flex flex-col gap-2 rounded-lg border border-border bg-background p-3 shadow-lg"
             role="dialog"
-            aria-label={t(($) => $.browserDialog)}
+            aria-label={gt("Browser dialog")}
           >
             <p className="break-words text-sm">{control.dialog.message}</p>
             {control.controller === "you" ? (
               <>
                 {control.dialog.type === "prompt" ? (
                   <Input
-                    aria-label={t(($) => $.browserDialogResponse)}
+                    aria-label={gt("Dialog response")}
                     value={promptText}
                     onChange={(event) => setPromptText(event.target.value)}
                   />
@@ -890,7 +886,7 @@ export function ServerBrowserSurface(props: {
                     size="sm"
                     onClick={() => send({ type: "dialog", accept: false })}
                   >
-                    {t(($) => $.browserDismiss)}
+                    <T>Dismiss</T>
                   </Button>
                   <Button
                     size="sm"
@@ -902,13 +898,13 @@ export function ServerBrowserSurface(props: {
                       })
                     }
                   >
-                    {t(($) => $.browserAccept)}
+                    <T>Accept</T>
                   </Button>
                 </div>
               </>
             ) : (
               <p className="text-xs text-muted-foreground">
-                {t(($) => $.browserTakeControlRespond)}
+                <T>Take control to respond.</T>
               </p>
             )}
           </div>
@@ -917,11 +913,11 @@ export function ServerBrowserSurface(props: {
       {visible && hostSetup ? (
         <div className="visible absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-background p-4 text-center">
           <p role="alert" className="max-w-sm text-sm text-muted-foreground">
-            {previewStreamHostSetupMessage(hostSetup, t)}
+            {previewStreamHostSetupMessage(hostSetup, resolve)}
           </p>
           <CommandBlock command={hostSetup.command} className="w-full max-w-md text-left" />
           <Button variant="outline" size="sm" onClick={() => setHostSetup(null)}>
-            {t(($) => $.tryAgain)}
+            <T>Try again</T>
           </Button>
         </div>
       ) : null}
@@ -929,7 +925,7 @@ export function ServerBrowserSurface(props: {
         // The page can be invisible beneath an empty or unreachable state; reconnect must remain reachable.
         <div className="visible absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-background p-3 text-center">
           <p role="alert" className="text-xs text-muted-foreground">
-            {t(($) => $.browserConnectionRefused)}
+            <T>Browser connection was refused.</T>
           </p>
           <Button
             variant="outline"
@@ -940,7 +936,7 @@ export function ServerBrowserSurface(props: {
               refreshPreviewStreamAccess(environmentId);
             }}
           >
-            {t(($) => $.reconnect)}
+            <T>Reconnect</T>
           </Button>
         </div>
       ) : null}

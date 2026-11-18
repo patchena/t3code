@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import {
   EnvironmentId,
   getProviderAttachmentLimitError,
@@ -17,8 +16,6 @@ import {
   normalizeComposerImageFileMimeType,
   shouldHandleComposerAttachmentPaste,
 } from "./composerAttachmentFiles";
-
-const chatT = createI18n("en").getFixedT(null, "chat");
 
 describe("composer attachment files", () => {
   it("keeps previewable images providers cannot accept on the file path", () => {
@@ -124,6 +121,12 @@ describe("composer attachment files", () => {
     ).toBe(true);
   });
 
+  it("leaves an image-and-text clipboard to the text path under Paste as Text", () => {
+    const image = new File(["png"], "image.png", { type: "image/png" });
+    const input = { files: [image], plainText: "Hello from Word", bypassAutoAttachment: true };
+    expect(shouldHandleComposerAttachmentPaste(input)).toBe(false);
+  });
+
   it("preserves text when the clipboard also includes generic image files", () => {
     const image = new File(["tiff"], "photo.tiff", { type: "image/tiff" });
     expect(
@@ -140,15 +143,12 @@ describe("composer attachment files", () => {
       }),
     ).toBe(PROVIDER_SEND_TURN_MAX_FILE_BYTES);
     expect(
-      fileAttachmentCapabilityBlockReason(
-        {
-          files: [{ name: "pending.zip", sizeBytes: PROVIDER_SEND_TURN_MAX_FILE_BYTES }],
-          attachmentUploadsCapabilityKnown: false,
-          supportsAttachmentUploads: false,
-          maxFileAttachmentBytes: null,
-        },
-        chatT,
-      ),
+      fileAttachmentCapabilityBlockReason({
+        files: [{ name: "pending.zip", sizeBytes: PROVIDER_SEND_TURN_MAX_FILE_BYTES }],
+        attachmentUploadsCapabilityKnown: false,
+        supportsAttachmentUploads: false,
+        maxFileAttachmentBytes: null,
+      }),
     ).toBe("Waiting for the server before file attachments can send");
   });
 

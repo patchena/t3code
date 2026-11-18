@@ -1,5 +1,4 @@
 import type { SnapShotSource } from "@t3tools/contracts";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 
 import type { ComposerFileAttachment } from "../../composerDraftStore";
 import { type ChatFileAttachment, type ChatImageAttachment, isVideoAttachment } from "../../types";
@@ -10,6 +9,8 @@ import type {
   ScopedThreadRef,
 } from "@t3tools/contracts";
 import { videoMimeType } from "@t3tools/shared/video";
+import { msg } from "gt-react";
+import { m } from "~/i18n/messages";
 import { resolveMediaSource } from "@t3tools/client-runtime/media-source";
 import { resolveAssetUrl } from "@t3tools/client-runtime/state/assets";
 import {
@@ -28,6 +29,7 @@ export interface ExpandedImageItem {
   /** Revoke this owned object URL; other blob URLs belong to the timeline. */
   ownsSrc?: boolean;
   source?: SnapShotSource;
+  onCopySnapshot?: (() => Promise<void>) | undefined;
   autoPlay?: boolean;
   originalUrl?: string;
   srcFragment?: string;
@@ -39,21 +41,18 @@ export interface ExpandedImagePreview {
   index: number;
 }
 
-export async function resolveMarkdownMediaPreview(
-  input: {
-    source: string;
-    resolvedFilePath?: string | undefined;
-    cwd?: string | undefined;
-    threadRef?: ScopedThreadRef | undefined;
-    httpBaseUrl?: string | undefined;
-    onOpenFile?: ((relativePath: string) => void) | undefined;
-    createAssetUrl: (input: {
-      environmentId: EnvironmentId;
-      input: { resource: AssetResource };
-    }) => Promise<AtomCommandResult<AssetCreateUrlResult, unknown>>;
-  },
-  t: TFunction<"chat">,
-): Promise<ExpandedImagePreview | null> {
+export async function resolveMarkdownMediaPreview(input: {
+  source: string;
+  resolvedFilePath?: string | undefined;
+  cwd?: string | undefined;
+  threadRef?: ScopedThreadRef | undefined;
+  httpBaseUrl?: string | undefined;
+  onOpenFile?: ((relativePath: string) => void) | undefined;
+  createAssetUrl: (input: {
+    environmentId: EnvironmentId;
+    input: { resource: AssetResource };
+  }) => Promise<AtomCommandResult<AssetCreateUrlResult, unknown>>;
+}): Promise<ExpandedImagePreview | null> {
   const media = resolveMediaSource(input.source, {
     threadId: input.threadRef?.threadId,
     workspaceRoot: input.cwd,
@@ -69,7 +68,7 @@ export async function resolveMarkdownMediaPreview(
     src = resolveProtocolRelativeMediaUrl(media.uri);
   } else {
     if (media.access === "unavailable" || !input.threadRef || !input.httpBaseUrl) {
-      throw new Error(t(($) => $.media.reconnectPreview));
+      throw new Error(m(msg("Reconnect to this environment and open the media again.")));
     }
     asset = { environmentId: input.threadRef.environmentId, resource: media.resource };
     const result = await input.createAssetUrl({
@@ -78,7 +77,9 @@ export async function resolveMarkdownMediaPreview(
     });
     if (result._tag === "Failure") throw squashAtomCommandFailure(result);
     const assetUrl = resolveAssetUrl(input.httpBaseUrl, result.value.relativeUrl);
-    if (assetUrl === null) throw new Error(t(($) => $.media.invalidUrl));
+    if (assetUrl === null) {
+      throw new Error(m(msg("The environment returned an invalid media URL.")));
+    }
     src = assetUrl + media.srcFragment;
   }
   return {
@@ -166,6 +167,7 @@ export function attachVideoThumbnail(video: HTMLVideoElement, file: File): () =>
 export function buildExpandedImagePreview(
   images: ReadonlyArray<ChatImageAttachment | ComposerFileAttachment>,
   selectedImageId: string,
+  onCopySnapshot?: (id: string) => Promise<void>,
 ): ExpandedImagePreview | null {
   const selected = images.find((image) => image.id === selectedImageId);
   if (selected?.type === "file" && selected.file && isVideoAttachment(selected)) {
@@ -206,7 +208,12 @@ export function buildExpandedImagePreview(
       src: image.src,
       name: image.name,
       mimeType: image.mimeType,
-      ...(image.source?.kind === "snap-shot" ? { source: image.source } : {}),
+      ...(image.source?.kind === "snap-shot"
+        ? {
+            source: image.source,
+            onCopySnapshot: onCopySnapshot ? () => onCopySnapshot(image.id) : undefined,
+          }
+        : {}),
     })),
     index: selectedIndex,
   };

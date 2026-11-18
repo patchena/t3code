@@ -1,5 +1,7 @@
 import type { EnvironmentThreadStatus } from "@t3tools/client-runtime/state/threads";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "./i18n/messages";
 
 export type ThreadSyncPhase = "loading" | "syncing";
 
@@ -23,8 +25,8 @@ export function resolveThreadSyncPhase(input: {
   }
 }
 
-export function threadSyncLabel(phase: ThreadSyncPhase, t: TFunction<"chat">): string {
+export function threadSyncLabel(phase: ThreadSyncPhase, resolve: MessageResolver = m): string {
   return phase === "loading"
-    ? t(($) => $.thread.loadingMessages)
-    : t(($) => $.thread.syncingMessages);
+    ? resolve(msg("Loading messages..."))
+    : resolve(msg("Syncing messages..."));
 }

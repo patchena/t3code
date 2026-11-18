@@ -1,25 +1,21 @@
-import { useTranslation } from "react-i18next";
 import { type EnvironmentId, T3_PROJECT_FILE_NAME, type T3ProjectFile } from "@t3tools/contracts";
 import { parseT3ProjectFile } from "@t3tools/shared/t3ProjectFile";
 import { useAtomValue } from "@effect/atom-react";
 import { AsyncResult, Atom } from "effect/reactivity";
+import { useMessages } from "gt-react";
 import { createContext, type ReactNode, useContext } from "react";
 
-import { useEnvironments, usePrimaryEnvironmentId } from "~/state/environments";
+import { useEnvironments, usePrimaryEnvironmentId } from "../../state/environments";
+import { getProjectFileQueryAtom, optimisticFileAtom } from "../files/projectFilesQueryState";
+import { useSettingsProjectGroups } from "./useSettingsProjectGroups";
 import {
-  getProjectFileQueryAtom,
-  optimisticFileAtom,
-} from "~/components/files/projectFilesQueryState";
-import { useSettingsProjectGroups } from "~/components/settings/useSettingsProjectGroups";
-import {
+  applyPendingScopedWrites,
+  pendingScopedWritesAtom,
   resolveScopedSettingsTargets,
   selectScopedSettingsEnvironments,
-} from "~/components/settings/scopedSettings";
-import {
-  resolveSettingsScope,
-  type SettingsScopeSearch,
-} from "~/components/settings/settingsScope";
-import { selectSingleEnvironmentScope } from "~/components/settings/settingsScopeAxis";
+} from "./scopedSettings";
+import { resolveSettingsScope, type SettingsScopeSearch } from "./settingsScope";
+import { selectSingleEnvironmentScope } from "./settingsScopeAxis";
 
 type ProjectFileMember = readonly [
   environmentId: EnvironmentId,
@@ -66,26 +62,31 @@ function useMemberProjectFiles(scope: ReturnType<typeof resolveSettingsScope>) {
 }
 
 function useResolvedSettingsScope(rawSearch: SettingsScopeSearch, singleEnvironment: boolean) {
-  const { t } = useTranslation("settings");
   const groups = useSettingsProjectGroups();
   const { environments: availableEnvironments } = useEnvironments();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const m = useMessages();
   const search = singleEnvironment
     ? selectSingleEnvironmentScope(
         rawSearch,
-        resolveSettingsScope(rawSearch, groups, availableEnvironments, t),
+        resolveSettingsScope(rawSearch, groups, availableEnvironments, m),
         availableEnvironments,
         primaryEnvironmentId,
       )
     : rawSearch;
-  const scope = resolveSettingsScope(search, groups, availableEnvironments, t);
+  const scope = resolveSettingsScope(search, groups, availableEnvironments, m);
   const projectFiles = useMemberProjectFiles(scope);
+  const pendingWrites = useAtomValue(pendingScopedWritesAtom);
   const selected = selectScopedSettingsEnvironments(
     scope,
     availableEnvironments,
     primaryEnvironmentId,
   );
-  const targets = resolveScopedSettingsTargets(scope, selected.connectedEnvironments, projectFiles);
+  const targets = resolveScopedSettingsTargets(
+    scope,
+    applyPendingScopedWrites(selected.connectedEnvironments, pendingWrites),
+    projectFiles,
+  );
   const target =
     targets.find((candidate) => candidate.environmentId === selected.environment?.environmentId) ??
     targets[0] ??

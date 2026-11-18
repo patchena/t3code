@@ -1,9 +1,11 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type {
   ServerProvider,
   ServerProviderVersionAdvisory,
   ServerProviderCompatibilityAdvisory,
 } from "@t3tools/contracts";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "../../i18n/messages";
 
 export const PROVIDER_STATUS_STYLES = {
   disabled: {
@@ -25,6 +27,15 @@ export const PROVIDER_STATUS_STYLES = {
 
 export type ProviderStatusKey = keyof typeof PROVIDER_STATUS_STYLES;
 
+/** The server names a custom endpoint in English; other auth labels are product or plan names. */
+export function providerAuthLabel(
+  auth: Pick<ServerProvider["auth"], "label" | "type">,
+  resolve: MessageResolver = m,
+): string | undefined {
+  if (auth.type === "customEndpoint") return resolve(msg("Custom API endpoint"));
+  return auth.label ?? auth.type;
+}
+
 // Antigravity's local health check verifies installation, not Google sign-in.
 // API-key and Agent Platform warnings still need attention.
 function isAntigravitySignInUnchecked(provider: ServerProvider): boolean {
@@ -45,63 +56,72 @@ export function getProviderStatusKey(provider: ServerProvider | undefined): Prov
   return provider?.status ?? "warning";
 }
 
-export function getProviderSummary(provider: ServerProvider | undefined, t: TFunction<"settings">) {
+export function getProviderSummary(
+  provider: ServerProvider | undefined,
+  resolve: MessageResolver = m,
+) {
   if (!provider) {
     return {
-      headline: t(($) => $.providers.checkingProvider),
-      detail: t(($) => $.providers.waitingProvider),
+      headline: resolve(msg("Checking provider status")),
+      detail: resolve(
+        msg("Waiting for the server to report installation and authentication details."),
+      ),
     };
   }
   if (!provider.enabled || provider.status === "disabled") {
     return {
-      headline: t(($) => $.providers.disabled),
-      detail: provider.message ?? t(($) => $.providers.disabledProviderHint),
+      headline: resolve(msg("Disabled", { $context: "provider status" })),
+      detail:
+        provider.message ??
+        resolve(msg("This provider is installed but disabled for new sessions in T3 Code.")),
     };
   }
   if (!provider.installed) {
     return {
-      headline: t(($) => $.providers.notFound),
-      detail: provider.message ?? t(($) => $.providers.cliNotFound),
+      headline: resolve(msg("Not found", { $context: "provider status, CLI is missing" })),
+      detail: provider.message ?? resolve(msg("CLI not detected on PATH.")),
     };
   }
   if (provider.auth.status === "unauthenticated") {
-    const authLabel = provider.auth.label ?? provider.auth.type;
+    const authLabel = providerAuthLabel(provider.auth, resolve);
     return {
       headline: authLabel
-        ? t(($) => $.providers.notAuthenticatedWith, { method: authLabel })
-        : t(($) => $.providers.notAuthenticated),
+        ? resolve(msg("Not authenticated · {method}", { method: authLabel }))
+        : resolve(msg("Not authenticated")),
       detail: provider.message ?? null,
     };
   }
   if (isAntigravitySignInUnchecked(provider)) {
     return {
-      headline: t(($) => $.providers.installedSignInUnchecked),
+      headline: resolve(msg("Installed · Sign-in not checked")),
       detail: provider.message ?? null,
     };
   }
   if (provider.status === "warning") {
     return {
-      headline: t(($) => $.providers.needsAttention),
-      detail: provider.message ?? t(($) => $.providers.providerUnverified),
+      headline: resolve(msg("Needs attention")),
+      detail:
+        provider.message ??
+        resolve(msg("The provider is installed, but the server could not fully verify it.")),
     };
   }
   if (provider.status === "error") {
     return {
-      headline: t(($) => $.providers.unavailable),
-      detail: provider.message ?? t(($) => $.providers.providerStartupFailed),
+      headline: resolve(msg("Unavailable", { $context: "provider status" })),
+      detail: provider.message ?? resolve(msg("The provider failed its startup checks.")),
     };
   }
   if (provider.auth.status === "authenticated") {
-    const authLabel = provider.auth.label ?? provider.auth.type;
+    const authLabel = providerAuthLabel(provider.auth, resolve);
     return {
       headline: authLabel
-        ? t(($) => $.providers.authenticatedWith, { method: authLabel })
-        : t(($) => $.providers.authenticated),
+        ? resolve(msg("Authenticated · {method}", { method: authLabel }))
+        : resolve(msg("Authenticated")),
       detail: provider.message ?? null,
     };
   }
   return {
-    headline: t(($) => $.providers.available),
+    headline: resolve(msg("Available", { $context: "provider status" })),
     detail: provider.message ?? null,
   };
 }
@@ -116,11 +136,17 @@ export function getProviderVersionLabel(version: string | null | undefined) {
   return /^\d/.test(version) ? `v${version}` : version;
 }
 
+const COMPATIBILITY_TITLES = {
+  graceful: msg("Limited support"),
+  unsupported: msg("Unsupported version"),
+  broken: msg("Known broken version"),
+} as const;
+
 export function getProviderVersionAdvisoryPresentation(
   advisory: ServerProviderVersionAdvisory | undefined,
-  t: TFunction<"settings">,
   compatibility?: ServerProviderCompatibilityAdvisory | undefined,
   showCompatibility = true,
+  resolve: MessageResolver = m,
 ): {
   readonly title: string;
   readonly detail: string;
@@ -143,17 +169,12 @@ export function getProviderVersionAdvisoryPresentation(
     // Latest package versions cannot be updated into recommendations requiring another package.
     const isAlreadyLatest = advisory?.status === "current";
     return {
-      title:
-        compatibility.status === "graceful"
-          ? t(($) => $.providers.limitedSupport)
-          : compatibility.status === "unsupported"
-            ? t(($) => $.providers.unsupportedVersion)
-            : t(($) => $.providers.brokenVersion),
+      title: resolve(COMPATIBILITY_TITLES[compatibility.status]),
       detail:
         compatibility.message ??
         (recommendation
-          ? t(($) => $.providers.useRecommended, { version: recommendation })
-          : t(($) => $.providers.updateFullSupport)),
+          ? resolve(msg("Use {version} for full support.", { version: recommendation }))
+          : resolve(msg("Update for full support."))),
       updateCommand:
         targetVersion || latestIsIncompatible || isAlreadyLatest
           ? null
@@ -175,12 +196,12 @@ export function getProviderVersionAdvisoryPresentation(
   const versionLabel = getProviderVersionLabel(version);
 
   return {
-    title: t(($) => $.providers.updateAvailable),
+    title: resolve(msg("Update available")),
     detail:
       advisory.message ??
       (versionLabel
-        ? t(($) => $.providers.installVersionUpdate, { version: versionLabel })
-        : t(($) => $.providers.installLatestUpdate)),
+        ? resolve(msg("Update available: install {version}.", { version: versionLabel }))
+        : resolve(msg("Update available: install the latest provider version."))),
     updateCommand: advisory.updateCommand,
     emphasis: "normal" as const,
     targetVersion: null,

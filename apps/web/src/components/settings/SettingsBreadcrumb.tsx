@@ -1,41 +1,40 @@
-import { useTranslation } from "react-i18next";
+import { msg, useGT, useMessages } from "gt-react";
+
 import {
   WorkspaceBreadcrumb,
   WorkspaceBreadcrumbItem,
   WorkspaceBreadcrumbSeparator,
-} from "~/components/WorkspaceBreadcrumb";
-import {
-  settingsSectionLabels,
-  type SettingsTranslation,
-} from "~/components/settings/settingsSearch";
+} from "../WorkspaceBreadcrumb";
+import { SETTINGS_SECTION_LABELS } from "./settingsSearch";
 
-function settingsBreadcrumbLabels(t: SettingsTranslation): Readonly<Record<string, string>> {
-  return {
-    ...settingsSectionLabels(t),
-    "/settings/diagnostics": t(($) => $.navUi.diagnostics),
-    "/settings/open-source-licenses": t(($) => $.navUi.openSourceLicenses),
-  };
-}
+const SETTINGS_LABEL = msg("Settings");
 
-function settingsBreadcrumbLabel(pathname: string, t: SettingsTranslation): string | null {
+const SETTINGS_BREADCRUMB_LABELS: Readonly<Record<string, string>> = {
+  ...SETTINGS_SECTION_LABELS,
+  "/settings/diagnostics": msg("Diagnostics"),
+  "/settings/open-source-licenses": msg("Open source licenses"),
+};
+
+function settingsBreadcrumbLabel(pathname: string): string | null {
   const normalizedPathname = pathname.replace(/\/+$/, "") || "/";
-  return settingsBreadcrumbLabels(t)[normalizedPathname] ?? null;
+  return SETTINGS_BREADCRUMB_LABELS[normalizedPathname] ?? null;
 }
 
 export function SettingsBreadcrumb({ pathname }: { pathname: string }) {
-  const { t } = useTranslation("settings");
-  const sectionLabel = settingsBreadcrumbLabel(pathname, t);
+  const gt = useGT();
+  const m = useMessages();
+  const sectionLabel = settingsBreadcrumbLabel(pathname);
 
   return (
-    <WorkspaceBreadcrumb ariaLabel={t(($) => $.navUi.settingsBreadcrumb)}>
+    <WorkspaceBreadcrumb ariaLabel={gt("Settings breadcrumb")}>
       {sectionLabel ? (
         <>
-          <WorkspaceBreadcrumbItem>{t(($) => $.navUi.settings)}</WorkspaceBreadcrumbItem>
+          <WorkspaceBreadcrumbItem>{m(SETTINGS_LABEL)}</WorkspaceBreadcrumbItem>
           <WorkspaceBreadcrumbSeparator />
         </>
       ) : null}
       <WorkspaceBreadcrumbItem current className="truncate">
-        {sectionLabel ?? t(($) => $.navUi.settings)}
+        {m(sectionLabel ?? SETTINGS_LABEL)}
       </WorkspaceBreadcrumbItem>
     </WorkspaceBreadcrumb>
   );

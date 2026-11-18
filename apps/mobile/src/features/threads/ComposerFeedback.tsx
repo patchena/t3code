@@ -1,9 +1,9 @@
-import { mobileI18n } from "~/i18n";
 import { Button } from "../../components/ui/Button";
 import {
   codexFeedbackNotice,
   type CodexFeedbackSubmission,
 } from "@t3tools/client-runtime/state/threads";
+import { useGT, useMessages } from "gt-react-native";
 import { Pressable, View } from "react-native";
 
 import { AppText as Text } from "../../components/ui/AppText";
@@ -17,7 +17,9 @@ export function ComposerFeedback({
   readonly submission: CodexFeedbackSubmission;
   readonly onDismiss: () => void;
 }) {
-  const notice = codexFeedbackNotice(submission, mobileI18n.getFixedT(null, "chat"));
+  const gt = useGT();
+  const m = useMessages();
+  const notice = codexFeedbackNotice(submission, m);
   if (!notice) return null;
   return (
     <View className="px-4 pb-3">
@@ -28,7 +30,7 @@ export function ComposerFeedback({
           </Text>
           {submission.status !== "uploading" ? (
             <Pressable
-              accessibilityLabel="Dismiss feedback notice"
+              accessibilityLabel={gt("Dismiss feedback notice")}
               accessibilityRole="button"
               hitSlop={12}
               onPress={onDismiss}
@@ -50,7 +52,7 @@ export function ComposerFeedback({
         ) : null}
         {submission.status === "sent" ? (
           <Button
-            label="Copy ID"
+            label={gt("Copy ID")}
             tone="text"
             onPress={() =>
               copyTextWithHaptic(submission.feedbackId, { target: "Codex feedback thread ID" })

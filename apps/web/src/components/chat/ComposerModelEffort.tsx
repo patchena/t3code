@@ -1,5 +1,3 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { useTranslation } from "react-i18next";
 import {
   buildTraitsTriggerDisplay,
   getDescriptorStringValue,
@@ -9,9 +7,11 @@ import {
 import type { ProviderOptionDescriptor, RuntimeMode } from "@t3tools/contracts";
 import type { EffortDisplay } from "@t3tools/contracts/settings";
 import { getProviderOptionCurrentLabel } from "@t3tools/shared/model";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { CheckIcon, ChevronRightIcon, ChevronUpIcon, WorkflowIcon } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, use, useRef, useState } from "react";
 
+import { m, type MessageResolver } from "~/i18n/messages";
 import { cn } from "~/lib/utils";
 import {
   Menu,
@@ -31,6 +31,7 @@ import { DockedPickerContext } from "./ProviderModelPicker";
 import {
   getTraitsSectionVisibility,
   type TraitsSelectionInput,
+  ULTRATHINK_IN_BODY_NOTE,
   useTraitsSelection,
 } from "./TraitsPicker";
 
@@ -86,23 +87,26 @@ export function describeComposerEffort(
   traits: TraitsSelectionInput | null,
   effortDisplay: EffortDisplay,
   size: ComposerControlSize,
-  t: TFunction<"chat">,
+  resolve: MessageResolver = m,
 ): { suffix: ReactNode; detail: string | null } {
   if (!traits) return { suffix: null, detail: null };
-  const visibility = getTraitsSectionVisibility(traits, t);
+  const visibility = getTraitsSectionVisibility({ ...traits, resolve });
   if (!visibility.hasAnyControls) return { suffix: null, detail: null };
   const modelSelection =
     traits.instanceId && traits.model
       ? { instanceId: traits.instanceId, model: traits.model, options: traits.modelOptions ?? [] }
       : null;
   const primary = visibility.primarySelectDescriptor;
-  const display = buildTraitsTriggerDisplay({
-    descriptors: visibility.descriptors,
-    primarySelectDescriptorId: primary?.id ?? null,
-    ultrathinkPromptControlled: visibility.ultrathinkPromptControlled,
-    modelSelection,
-    reportedModelSelection: traits.reportedModelSelection,
-  });
+  const display = buildTraitsTriggerDisplay(
+    {
+      descriptors: visibility.descriptors,
+      primarySelectDescriptorId: primary?.id ?? null,
+      ultrathinkPromptControlled: visibility.ultrathinkPromptControlled,
+      modelSelection,
+      reportedModelSelection: traits.reportedModelSelection,
+    },
+    resolve,
+  );
   // The same reasoning control the column lists, wherever the agent put it among its options.
   const reasoning =
     columnControls(visibility.selectDescriptors, visibility.booleanDescriptors).effort
@@ -123,7 +127,9 @@ export function describeComposerEffort(
     : !reasoning
       ? null
       : reasoning.type === "boolean"
-        ? `${reasoning.label} ${reasoning.currentValue === true ? t(($) => $.composer.on) : t(($) => $.composer.off)}`
+        ? reasoning.currentValue === true
+          ? resolve(msg("{option} On", { option: reasoning.label }))
+          : resolve(msg("{option} Off", { option: reasoning.label }))
         : ultrathink
           ? "Ultrathink"
           : (getProviderOptionCurrentLabel(
@@ -193,7 +199,7 @@ function ColumnRow(props: {
   disabled?: boolean;
   onPick: () => void;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const rowProps = {
     type: "button",
     role: "radio",
@@ -212,11 +218,17 @@ function ColumnRow(props: {
       <span className="min-w-0 flex-1 truncate">{props.label}</span>
       {props.selected ? (
         <>
-          {props.isDefault ? <span className="sr-only">{t(($) => $.composer.default)}</span> : null}
+          {props.isDefault ? (
+            <span className="sr-only">
+              {gt("Default", { $context: "marks the default option" })}
+            </span>
+          ) : null}
           <CheckIcon aria-hidden="true" className="size-3.5" />
         </>
       ) : props.isDefault ? (
-        <span className="text-muted-foreground/70 text-xs">{t(($) => $.composer.default)}</span>
+        <span className="text-muted-foreground/70 text-xs">
+          {gt("Default", { $context: "marks the default option" })}
+        </span>
       ) : null}
     </>
   );
@@ -303,7 +315,8 @@ function EffortLevels(props: { traits: TraitsSelectionInput }) {
 type TraitsSelection = ReturnType<typeof useTraitsSelection>;
 
 function EffortRows(props: { control: ColumnControl; traits: TraitsSelection; locked: boolean }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
+  const messages = useMessages();
   const { control, traits } = props;
   const { descriptor } = control;
   if (control.kind === "boolean") {
@@ -312,7 +325,11 @@ function EffortRows(props: { control: ColumnControl; traits: TraitsSelection; lo
         {([true, false] as const).map((value) => (
           <ColumnRow
             key={String(value)}
-            label={value ? t(($) => $.composer.on) : t(($) => $.composer.off)}
+            label={
+              value
+                ? gt("On", { $context: "option state" })
+                : gt("Off", { $context: "option state" })
+            }
             selected={(control.descriptor.currentValue === true) === value}
             tabStop={(control.descriptor.currentValue === true) === value}
             onPick={() => traits.changeBoolean(descriptor.id, value)}
@@ -330,7 +347,7 @@ function EffortRows(props: { control: ColumnControl; traits: TraitsSelection; lo
     <div role="radiogroup" aria-label={descriptor.label} className="flex flex-col gap-0.5">
       {locked ? (
         <div className="px-2 pb-1.5 text-muted-foreground/80 text-xs">
-          {t(($) => $.composer.ultrathinkBody)}
+          {messages(ULTRATHINK_IN_BODY_NOTE)}
         </div>
       ) : null}
       {choices.map((option, index) => (
@@ -371,7 +388,7 @@ function OptionMenuRow(props: {
   /** Holds the column's tab stop when the model has no levels. */
   tabStop: boolean;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const { descriptor, traits } = props;
   const [open, setOpen] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -454,7 +471,7 @@ function OptionMenuRow(props: {
                 </span>
                 {choice.isDefault ? (
                   <span className="text-muted-foreground/70 text-xs">
-                    {t(($) => $.composer.default)}
+                    {gt("Default", { $context: "marks the default option" })}
                   </span>
                 ) : null}
                 <MenuRadioItemIndicator />
@@ -473,14 +490,16 @@ function OptionSwitchRow(props: {
   traits: TraitsSelection;
   tabStop: boolean;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const { descriptor, traits } = props;
   const checked = descriptor.currentValue === true;
   return (
     <label className={cn(OPTION_ROW, "has-focus-visible:bg-foreground/[0.09]")}>
       <OptionRowText
         label={descriptor.label}
-        value={checked ? t(($) => $.composer.on) : t(($) => $.composer.off)}
+        value={
+          checked ? gt("On", { $context: "option state" }) : gt("Off", { $context: "option state" })
+        }
       />
       <Switch
         size="sm"
@@ -495,19 +514,21 @@ function OptionSwitchRow(props: {
 }
 
 function NoEffortRow() {
-  const { t } = useTranslation("chat");
   return (
     <div className="flex h-8 items-center px-2 text-muted-foreground text-sm">
-      {t(($) => $.composer.noEffortLevels)}
+      <T>No effort levels</T>
     </div>
   );
 }
 
 /** The model picker's effort column: the selected model's levels and its other options. */
 export function ComposerEffortColumn(props: { traits: TraitsSelectionInput | null }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
+  const messages = useMessages();
   const picker = use(DockedPickerContext);
-  const visibility = props.traits ? getTraitsSectionVisibility(props.traits, t) : null;
+  const visibility = props.traits
+    ? getTraitsSectionVisibility({ ...props.traits, resolve: messages })
+    : null;
   const controls =
     props.traits && visibility
       ? columnControls(visibility.selectDescriptors, visibility.booleanDescriptors)
@@ -520,8 +541,8 @@ export function ComposerEffortColumn(props: { traits: TraitsSelectionInput | nul
           <span className="text-muted-foreground">
             {controls?.effort?.descriptor.label ??
               (controls?.others.length
-                ? t(($) => $.composer.options)
-                : t(($) => $.composer.effort))}
+                ? gt("Options", { $context: "heading for model options" })
+                : gt("Effort", { $context: "heading for reasoning effort levels" }))}
           </span>
           <span className="ms-auto min-w-0 truncate text-muted-foreground text-xs">
             {picker.modelLabel}
@@ -544,12 +565,14 @@ const FOOTER_SEGMENT =
   "flex h-6 cursor-pointer items-center justify-center gap-1 px-2 text-muted-foreground text-xs outline-none first:rounded-l-md last:rounded-r-md hover:text-foreground data-checked:bg-input/72 data-checked:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset";
 
 function SpeedSegment(props: {
-  speed: "fast" | "ultrafast" | null;
   checked: boolean;
   label: string;
+  /** The untranslated speed name that picks the bolt, when `label` is translated. */
+  speed?: string;
   description?: string | undefined;
   onPick: () => void;
 }) {
+  const speed = props.speed ?? props.label;
   const buttonProps = {
     type: "button",
     role: "radio",
@@ -560,7 +583,9 @@ function SpeedSegment(props: {
   } as const;
   const content = (
     <>
-      {props.speed !== null ? <FastBolt ultra={props.speed === "ultrafast"} /> : null}
+      {speed === "Fast" || speed === "Ultrafast" ? (
+        <FastBolt ultra={speed === "Ultrafast"} />
+      ) : null}
       {props.label}
     </>
   );
@@ -574,7 +599,7 @@ function SpeedSegment(props: {
 }
 
 function SpeedControl(props: { traits: TraitsSelectionInput }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const traits = useTraitsSelection(props.traits);
   const { speedSelect, fastToggle } = splitSpeed(
     traits.selectDescriptors,
@@ -594,9 +619,6 @@ function SpeedControl(props: { traits: TraitsSelectionInput }) {
               checked={option.id === traits.selectValue(speedSelect)}
               label={option.label}
               description={option.description}
-              speed={
-                option.label === "Ultrafast" ? "ultrafast" : option.label === "Fast" ? "fast" : null
-              }
               onPick={() => traits.changeSelect(speedSelect, option.id)}
             />
           ))
@@ -605,8 +627,12 @@ function SpeedControl(props: { traits: TraitsSelectionInput }) {
               <SpeedSegment
                 key={String(value)}
                 checked={(fastToggle.currentValue === true) === value}
-                label={value ? t(($) => $.composer.fast) : t(($) => $.composer.standard)}
-                speed={value ? "fast" : null}
+                speed={value ? "Fast" : "Standard"}
+                label={
+                  value
+                    ? gt("Fast", { $context: "response speed" })
+                    : gt("Standard", { $context: "response speed" })
+                }
                 onPick={() => traits.changeBoolean(fastToggle.id, value)}
               />
             ))
@@ -642,7 +668,7 @@ function PermissionsMenu(props: {
   options: ReadonlyArray<RuntimeModeOption>;
   onChange: (mode: RuntimeMode) => void;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const current = props.options.find((option) => option.mode === props.runtimeMode);
   if (!current) return null;
@@ -659,7 +685,7 @@ function PermissionsMenu(props: {
             ref={triggerRef}
             type="button"
             data-composer-permissions-trigger
-            aria-label={t(($) => $.composer.permissionsLabel, { label: current.label })}
+            aria-label={gt("Permissions: {mode}", { mode: current.label })}
             className="ms-auto flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2 text-muted-foreground text-xs outline-none hover:bg-foreground/[0.09] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset data-popup-open:bg-foreground/[0.09] data-popup-open:text-foreground"
           />
         }

@@ -1,16 +1,16 @@
 // @effect-diagnostics globalDate:off -- Tests exercise local calendar snooze boundaries.
 import * as DateTime from "effect/DateTime";
-import { RuntimeRequestId } from "@t3tools/contracts";
+import { RunId, RuntimeRequestId } from "@t3tools/contracts";
 import { ThreadId } from "@t3tools/contracts";
 import { TurnId } from "@t3tools/contracts";
 import type { SnoozePresetSetting } from "@t3tools/contracts/settings";
 import { describe, expect, it } from "vite-plus/test";
-import { createI18n } from "@t3tools/client-runtime/i18n";
 
 import {
   canSnooze,
   effectiveSnoozed,
   hasQueuedTurnStart,
+  hasUnseenRunFailure,
   pickSnoozePreset,
   resolveSnoozePresets,
   snoozeWakeLabel,
@@ -216,6 +216,31 @@ describe("effectiveSnoozed", () => {
   });
 });
 
+describe("hasUnseenRunFailure", () => {
+  it("dates a failure by its run, falling back to the run's start when it never completed", () => {
+    const run = {
+      runId: RunId.make("run-failed"),
+      status: "failed" as const,
+      requestedAt: "2026-04-10T09:00:00.000Z",
+      startedAt: "2026-04-10T09:01:00.000Z",
+      completedAt: "2026-04-10T09:05:00.000Z",
+      assistantMessageId: null,
+    };
+    const visitedAt = "2026-04-10T09:06:00.000Z";
+
+    expect(hasUnseenRunFailure({ latestRun: run, lastVisitedAt: null })).toBe(true);
+    expect(hasUnseenRunFailure({ latestRun: run, lastVisitedAt: visitedAt })).toBe(false);
+    const failedAgain = { ...run, completedAt: "2026-04-10T09:10:00.000Z" };
+    expect(hasUnseenRunFailure({ latestRun: failedAgain, lastVisitedAt: visitedAt })).toBe(true);
+
+    const undated = { ...run, completedAt: null };
+    expect(hasUnseenRunFailure({ latestRun: undated, lastVisitedAt: visitedAt })).toBe(false);
+    expect(
+      hasUnseenRunFailure({ latestRun: undated, lastVisitedAt: "2026-04-10T09:00:30.000Z" }),
+    ).toBe(true);
+  });
+});
+
 describe("threadRaisedHandWhileSnoozed", () => {
   it("is true for approvals, input, and failures", () => {
     expect(
@@ -380,11 +405,9 @@ describe("resolveSnoozePresets", () => {
   const formatTime = (date: Date) =>
     `${date.getHours()}:${String(date.getMinutes()).padStart(2, "0")}`;
   const menu = (now: Date, presets?: ReadonlyArray<SnoozePresetSetting>) =>
-    resolveSnoozePresets(now, {
-      t: createI18n("en").getFixedT(null, "common"),
-      formatTime,
-      ...(presets ? { presets } : {}),
-    }).map((preset) => `${preset.label} ${preset.whenLabel}`);
+    resolveSnoozePresets(now, { formatTime, ...(presets ? { presets } : {}) }).map(
+      (preset) => `${preset.label} ${preset.whenLabel}`,
+    );
 
   it("lists custom presets soonest first and names the day when the label does not", () => {
     // Wednesday 20:00.
@@ -396,36 +419,12 @@ describe("resolveSnoozePresets", () => {
         { kind: "after", minutes: 180 },
       ]),
     ).toEqual(["In 3 hours 23:00", "In 6 hours Thu 2:00", "Tomorrow 21:00", "Next week Mon 18:00"]);
-    const now = localDate(2026, 4, 8, 20);
-    const german = resolveSnoozePresets(now, {
-      t: createI18n("de").getFixedT(null, "common"),
-      formatTime,
-      presets: [
-        { kind: "at", day: "monday", time: "18:00" },
-        { kind: "at", day: "tomorrow", time: "21:00" },
-        { kind: "after", minutes: 360 },
-        { kind: "after", minutes: 180 },
-      ],
-    });
-    expect(german.map((preset) => `${preset.label} ${preset.whenLabel}`)).toEqual([
-      "In 3 Stunden 23:00",
-      "In 6 Stunden Do. 2:00",
-      "Morgen 21:00",
-      "Nächste Woche Mo. 18:00",
-    ]);
-    expect(
-      snoozeWakeLabel(new Date(now.getTime() + 3_600_000).toISOString(), {
-        now: now.toISOString(),
-        t: createI18n("de").getFixedT(null, "common"),
-      }),
-    ).toBe("1 Std.");
   });
 
   it("drops a today preset once its time passes and moves a weekday on that day to next week", () => {
     // Monday 18:30.
     const now = localDate(2026, 4, 13, 18, 30);
     const presets = resolveSnoozePresets(now, {
-      t: createI18n("en").getFixedT(null, "common"),
       presets: [
         { kind: "at", day: "today", time: "18:00" },
         { kind: "at", day: "monday", time: "09:00" },
@@ -484,10 +483,8 @@ describe("pickSnoozePreset", () => {
       { kind: "after", minutes: 180 },
     ];
     // At 15:00 the two differ; at 15:30 "In 3 hours" lands on 18:30 and the menu shows one row.
-    const t = createI18n("en").getFixedT(null, "common");
-    const shown = resolveSnoozePresets(localDate(2026, 4, 8, 15), { presets, t });
+    const shown = resolveSnoozePresets(localDate(2026, 4, 8, 15), { presets });
     const picked = pickSnoozePreset({
-      t,
       shown,
       id: "after:180",
       now: localDate(2026, 4, 8, 15, 30),
@@ -498,15 +495,25 @@ describe("pickSnoozePreset", () => {
 
   it("keeps a set time's shown wake when the day changes while the menu is open", () => {
     // Sunday 23:59: "Tomorrow" means Monday 9:00, even if the pick lands after midnight.
-    const t = createI18n("en").getFixedT(null, "common");
-    const shown = resolveSnoozePresets(localDate(2026, 8, 30, 23, 59), { t });
+    const shown = resolveSnoozePresets(localDate(2026, 8, 30, 23, 59));
     const picked = pickSnoozePreset({
-      t,
       shown,
       id: "at:tomorrow:09:00",
       now: localDate(2026, 8, 31, 0, 1),
     });
     expect(picked?.snoozedUntil).toBe(localDate(2026, 8, 31, 9).toISOString());
+  });
+});
+
+describe("snoozeWakeLabel", () => {
+  it("reads a one-hour snooze as 1h on minute and live clocks", () => {
+    const wake = "2026-04-10T13:00:30.000Z";
+    expect(snoozeWakeLabel(wake, { now: NOW })).toBe("1h");
+    expect(snoozeWakeLabel(wake, { now: "2026-04-10T12:00:40.000Z" })).toBe("1h");
+    expect(snoozeWakeLabel("2026-04-10T15:00:30.000Z", { now: NOW })).toBe("3h");
+    expect(snoozeWakeLabel(wake, { now: "2026-04-10T12:01:00.000Z" })).toBe("59m");
+    expect(snoozeWakeLabel(wake, { now: "2026-04-10T13:00:10.000Z" })).toBe("1m");
+    expect(snoozeWakeLabel(wake, { now: "2026-04-10T13:00:30.000Z" })).toBe("now");
   });
 });
 

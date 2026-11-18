@@ -1,23 +1,18 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type {
   EnvironmentId,
   ServerSettingsPatch,
   UsageModelPriceOverride,
 } from "@t3tools/contracts";
+import { msg } from "gt-react";
+
+import { m } from "~/i18n/messages";
 
 export interface UsagePriceTarget {
   readonly environmentId: EnvironmentId;
   readonly label: string;
   readonly prices: Readonly<Record<string, UsageModelPriceOverride>> | null;
   readonly aliases: Readonly<Record<string, string>> | null;
-  readonly unavailable:
-    | "offline"
-    | "not-loaded"
-    | "checking"
-    | "read-only"
-    | "removed"
-    | { readonly message: string }
-    | null;
+  readonly unavailable: string | null;
 }
 
 /** `null` removes the model's custom price or mapping. */
@@ -31,7 +26,6 @@ export type UsagePriceWriteResult =
 
 /** Destinations settle independently; retries pass only failures. */
 export async function writeUsagePrices(input: {
-  readonly t: TFunction<"files">;
   readonly targets: readonly UsagePriceTarget[];
   readonly changes: ReadonlyMap<EnvironmentId, readonly UsagePriceChange[]>;
   readonly write: (input: {
@@ -51,12 +45,9 @@ export async function writeUsagePrices(input: {
         "alias" in change ? [[change.model, change.alias] as const] : [],
       );
       if (target.unavailable !== null) {
-        result = {
-          status: "failed",
-          error: usagePriceUnavailableLabel(target.unavailable, input.t),
-        };
+        result = { status: "failed", error: target.unavailable };
       } else if (aliases.length > 0 && target.aliases === null) {
-        result = { status: "failed", error: input.t(($) => $.usage.prices.updateServer) };
+        result = { status: "failed", error: m(msg("Update server to map models")) };
       } else {
         try {
           const saved =
@@ -78,31 +69,12 @@ export async function writeUsagePrices(input: {
           result =
             saved._tag === "Success"
               ? { status: "saved" }
-              : { status: "failed", error: input.t(($) => $.usage.prices.saveFailed) };
+              : { status: "failed", error: m(msg("Could not save. Try again.")) };
         } catch {
-          result = { status: "failed", error: input.t(($) => $.usage.prices.saveFailed) };
+          result = { status: "failed", error: m(msg("Could not save. Try again.")) };
         }
       }
       input.onResult(target.environmentId, result);
     }),
   );
-}
-
-export function usagePriceUnavailableLabel(
-  reason: NonNullable<UsagePriceTarget["unavailable"]>,
-  t: TFunction<"files">,
-) {
-  if (typeof reason !== "string") return reason.message;
-  switch (reason) {
-    case "offline":
-      return t(($) => $.usage.prices.offline);
-    case "not-loaded":
-      return t(($) => $.usage.prices.pricesNotLoaded);
-    case "checking":
-      return t(($) => $.usage.prices.checkingPermissions);
-    case "read-only":
-      return t(($) => $.usage.prices.readOnly);
-    case "removed":
-      return t(($) => $.usage.prices.environmentRemoved);
-  }
 }

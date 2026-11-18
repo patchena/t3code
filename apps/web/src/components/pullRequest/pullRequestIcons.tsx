@@ -1,4 +1,3 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   GitMergeIcon,
   GitPullRequestArrowIcon,
@@ -10,6 +9,7 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 import type { PullRequestState } from "@t3tools/contracts";
+import { msg } from "gt-react";
 
 export const PullRequestGlyph = {
   pullRequest: GitPullRequestArrowIcon,
@@ -31,26 +31,25 @@ export interface PullRequestStatePresentation {
   readonly Icon: PullRequestGlyphIcon;
 }
 
-export const pullRequestStatePresentation = (t: TFunction<"workspace">) =>
-  ({
-    open: {
-      label: t(($) => $.git.open),
-      toneClassName: "text-emerald-600 dark:text-emerald-300/90",
-      Icon: PullRequestGlyph.pullRequest,
-    },
-    draft: {
-      label: t(($) => $.git.draft),
-      toneClassName: "text-zinc-500 dark:text-zinc-400/80",
-      Icon: PullRequestGlyph.draft,
-    },
-    closed: {
-      label: t(($) => $.git.closed),
-      toneClassName: "text-red-600 dark:text-red-300/90",
-      Icon: PullRequestGlyph.closed,
-    },
-    merged: {
-      label: t(($) => $.git.merged),
-      toneClassName: "text-violet-600 dark:text-violet-300/90",
-      Icon: PullRequestGlyph.merged,
-    },
-  }) as const satisfies Record<PullRequestState | "draft", PullRequestStatePresentation>;
+export const PULL_REQUEST_STATE_PRESENTATION = {
+  open: {
+    label: msg("Open", { $context: "pull request state" }),
+    toneClassName: "text-emerald-600 dark:text-emerald-300/90",
+    Icon: PullRequestGlyph.pullRequest,
+  },
+  draft: {
+    label: msg("Draft", { $context: "pull request state" }),
+    toneClassName: "text-zinc-500 dark:text-zinc-400/80",
+    Icon: PullRequestGlyph.draft,
+  },
+  closed: {
+    label: msg("Closed", { $context: "pull request state" }),
+    toneClassName: "text-red-600 dark:text-red-300/90",
+    Icon: PullRequestGlyph.closed,
+  },
+  merged: {
+    label: msg("Merged", { $context: "pull request state" }),
+    toneClassName: "text-violet-600 dark:text-violet-300/90",
+    Icon: PullRequestGlyph.merged,
+  },
+} as const satisfies Record<PullRequestState | "draft", PullRequestStatePresentation>;

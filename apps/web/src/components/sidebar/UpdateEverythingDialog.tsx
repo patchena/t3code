@@ -1,9 +1,8 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { useTranslation } from "react-i18next";
 import { useAtomValue } from "@effect/atom-react";
 import { EnvironmentId } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
 import { ChevronRightIcon } from "lucide-react";
+import { msg, T, useGT, useMessages } from "gt-react";
 import { Fragment, type RefObject, useRef } from "react";
 
 import { environmentThreadShells } from "~/state/threads";
@@ -15,15 +14,12 @@ import {
   AlertDialogHeader,
   AlertDialogPopup,
   AlertDialogTitle,
-} from "~/components/ui/alert-dialog";
-import { Button } from "~/components/ui/button";
-import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "~/components/ui/collapsible";
-import { MiddleTruncate } from "~/components/ui/middle-truncate";
-import { ScrollArea } from "~/components/ui/scroll-area";
-import type {
-  RestartingMachine,
-  UpdateEverythingRow,
-} from "~/components/sidebar/updateEverything.logic";
+} from "../ui/alert-dialog";
+import { Button } from "../ui/button";
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
+import { MiddleTruncate } from "../ui/middle-truncate";
+import { ScrollArea } from "../ui/scroll-area";
+import type { RestartingMachine, UpdateEverythingRow } from "./updateEverything.logic";
 
 const isRunning = (status: string) =>
   status === "preparing" || status === "starting" || status === "running";
@@ -91,13 +87,11 @@ export function UpdateEverythingDialog({
   );
 }
 
-function appLabels(t: TFunction<"workspace">) {
-  return {
-    "this-app": t(($) => $.updates.thisApp),
-    server: t(($) => $.updates.server),
-    "desktop-app": t(($) => $.updates.desktopApp),
-  } as const;
-}
+const APP_LABELS = {
+  "this-app": msg("This app"),
+  server: msg("Server"),
+  "desktop-app": msg("Desktop app"),
+} as const;
 
 function UpdateEverythingDialogContent({
   version,
@@ -107,14 +101,14 @@ function UpdateEverythingDialogContent({
   onConfirm,
   cancelRef,
   title,
-  confirmLabel: suppliedConfirmLabel,
+  confirmLabel,
   notes = [],
   disabledReason = null,
   busy = false,
   checking = false,
 }: UpdateEverythingDialogContentProps) {
-  const { t } = useTranslation("workspace");
-  const confirmLabel = suppliedConfirmLabel ?? t(($) => $.updates.update);
+  const gt = useGT();
+  const m = useMessages();
   const stopped = useAtomValue(
     runningThreadCountAtom(
       restarts
@@ -140,7 +134,10 @@ function UpdateEverythingDialogContent({
     <>
       <AlertDialogHeader className="shrink-0">
         <AlertDialogTitle>
-          {title ?? t(($) => $.updates.updateMachines, { count: updating.length })}
+          {title ??
+            gt("{count, plural, one {Update {count} machine?} other {Update {count} machines?}}", {
+              count: updating.length,
+            })}
         </AlertDialogTitle>
         <AlertDialogDescription>
           {version !== null ? (
@@ -150,10 +147,13 @@ function UpdateEverythingDialogContent({
           ) : null}
           {version !== null && providerCount > 0 ? " · " : null}
           {providerCount > 0
-            ? t(($) => $.updates.providerUpdateCount, { count: providerCount })
+            ? gt(
+                "{count, plural, one {{count} provider update} other {{count} provider updates}}",
+                { count: providerCount },
+              )
             : null}
           {checking
-            ? `${version !== null || providerCount > 0 ? " · " : ""}Checking for more…`
+            ? `${version !== null || providerCount > 0 ? " · " : ""}${gt("Checking for more…")}`
             : null}
         </AlertDialogDescription>
       </AlertDialogHeader>
@@ -173,9 +173,13 @@ function UpdateEverythingDialogContent({
               role="row"
               className="col-span-full grid grid-cols-subgrid border-b pb-1.5 text-muted-foreground text-xs"
             >
-              <span role="columnheader">{t(($) => $.updates.machine)}</span>
+              <span role="columnheader">
+                <T>Machine</T>
+              </span>
               <span role="columnheader">T3 Code</span>
-              <span role="columnheader">{t(($) => $.updates.providerHeading)}</span>
+              <span role="columnheader">
+                <T>Providers</T>
+              </span>
               <span role="columnheader" />
             </div>
             {updating.map((row) => (
@@ -189,13 +193,15 @@ function UpdateEverythingDialogContent({
                   <MiddleTruncate value={row.label} aria-hidden />
                 </span>
                 <span role="cell">
-                  {row.app !== null ? appLabels(t)[row.app] : null}
+                  {row.app !== null ? m(APP_LABELS[row.app]) : null}
                   {row.app === null && row.skipped !== null ? (
-                    <span className="text-muted-foreground">{t(($) => $.updates.skipped)}</span>
+                    <span className="text-muted-foreground">
+                      <T>Skipped</T>
+                    </span>
                   ) : null}
                   {row.app === "this-app" ? (
                     <span className="block text-muted-foreground text-xs">
-                      {t(($) => $.updates.restartsLast)}
+                      <T>restarts last</T>
                     </span>
                   ) : null}
                 </span>
@@ -219,7 +225,9 @@ function UpdateEverythingDialogContent({
             <Collapsible>
               <CollapsibleTrigger className="flex items-center gap-1 text-muted-foreground text-xs hover:text-foreground data-panel-open:[&_svg]:rotate-90">
                 <ChevronRightIcon className="size-3.5 transition-transform" aria-hidden />
-                {t(($) => $.updates.skippedCount, { count: skipped.length })}
+                {gt("{count, plural, one {{count} skipped} other {{count} skipped}}", {
+                  count: skipped.length,
+                })}
               </CollapsibleTrigger>
               <CollapsiblePanel>
                 <div className="grid grid-cols-[minmax(0,max-content)_1fr] gap-x-3 gap-y-0.5 pt-1.5 ps-4.5 text-muted-foreground text-xs">
@@ -245,17 +253,29 @@ function UpdateEverythingDialogContent({
         ) : running > 0 ? (
           <p className="self-center text-muted-foreground text-sm max-sm:order-1 max-sm:text-center sm:mr-auto">
             {stopped === 0
-              ? t(($) => $.updates.interruptResume, { count: running })
+              ? gt(
+                  "{count, plural, one {{count} running thread will be interrupted and can resume after the restart.} other {{count} running threads will be interrupted and can resume after the restart.}}",
+                  { count: running },
+                )
               : continuing === 0
-                ? t(($) => $.updates.interrupt, { count: running })
-                : t(($) => $.updates.interruptSome, { count: running, continuing })}
+                ? gt(
+                    "{count, plural, one {{count} running thread will be interrupted.} other {{count} running threads will be interrupted.}}",
+                    { count: running },
+                  )
+                : `${gt(
+                    "{count, plural, one {{count} running thread will be interrupted.} other {{count} running threads will be interrupted.}}",
+                    { count: running },
+                  )} ${gt(
+                    "{count, plural, one {{count} can resume after the restart.} other {{count} can resume after the restart.}}",
+                    { count: continuing },
+                  )}`}
           </p>
         ) : null}
         <AlertDialogClose ref={cancelRef} render={<Button variant="outline" disabled={busy} />}>
-          {t(($) => $.updates.cancel)}
+          <T>Cancel</T>
         </AlertDialogClose>
         <Button disabled={disabledReason !== null || busy} onClick={onConfirm}>
-          {confirmLabel}
+          {confirmLabel ?? gt("Update", { $context: "verb, confirms the update" })}
         </Button>
       </AlertDialogFooter>
     </>
@@ -263,11 +283,11 @@ function UpdateEverythingDialogContent({
 }
 
 function RunningThreads({ environmentId }: { readonly environmentId: EnvironmentId }) {
-  const { t } = useTranslation("workspace");
   const count = useAtomValue(runningThreadCountAtom(environmentId));
+  const gt = useGT();
   return count > 0 ? (
     <span className="whitespace-nowrap text-warning">
-      {t(($) => $.updates.runningCount, { count })}
+      {gt("{count, plural, one {{count} running} other {{count} running}}", { count })}
     </span>
   ) : null;
 }

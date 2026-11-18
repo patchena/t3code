@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+import { useGT } from "gt-react";
 
 /** Bubble classes for a guest's message. A pending one has a dashed edge and no fill. */
 export function guestBubbleClassName(pending: boolean): string {
@@ -7,11 +7,14 @@ export function guestBubbleClassName(pending: boolean): string {
 
 /** The guest's name above their message, where "Sent by T3 Code" sits for server messages. */
 export function GuestMessageName({ name }: { readonly name: string }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   return (
     <p className="me-1 text-2xs text-guest-foreground">
-      <span aria-hidden>{name}</span>
-      <span className="sr-only">{t(($) => $.sharing.guestAnnouncement, { name })}</span>
+      {name}
+      <span className="sr-only">
+        {" "}
+        {gt("(guest)", { $context: "marks the sender of a message as a guest" })}
+      </span>
     </p>
   );
 }

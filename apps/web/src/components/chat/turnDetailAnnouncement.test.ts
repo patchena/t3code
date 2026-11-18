@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { MessageId, RunAttemptId, RunId, type ScreenReaderAnnouncements } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import { describe, expect, it } from "vite-plus/test";
@@ -12,7 +11,6 @@ import {
   type TurnMessage,
 } from "./turnDetailAnnouncement";
 
-const t = createI18n("en").getFixedT("en", "activity");
 const run = RunId.make("run-1");
 const at = "2026-01-01T00:00:00.000Z";
 
@@ -151,12 +149,12 @@ describe("turnDetail", () => {
       activity: null,
     },
   ])("names $name", ({ entries, activity }) => {
-    expect(turnDetail(entries, undefined, null, t).activity).toBe(activity);
+    expect(turnDetail(entries, undefined, null).activity).toBe(activity);
   });
 
   it("cuts a long step without splitting an emoji", () => {
     const edit = work("edit", { itemType: "file_change", changedFiles: [`${"a".repeat(111)}😀z`] });
-    expect(turnDetail([prompt, edit], undefined, null, t).activity).not.toMatch(/[\uD800-\uDFFF]/u);
+    expect(turnDetail([prompt, edit], undefined, null).activity).not.toMatch(/[\uD800-\uDFFF]/u);
   });
 
   it.each<{
@@ -221,7 +219,7 @@ describe("turnDetail", () => {
       finished: [],
     },
   ])("counts $name as finished", ({ entries, finished }) => {
-    const { messages } = turnDetail(entries, undefined, null, t);
+    const { messages } = turnDetail(entries, undefined, null);
     expect(messages.filter((spoken) => spoken.finished).map((spoken) => spoken.text)).toEqual(
       finished,
     );
@@ -240,7 +238,7 @@ describe("turnDetail", () => {
       command("git"),
     ];
     expect(
-      turnDetail(entries, undefined, knownTailId, t).messages.map((spoken) => spoken.fresh),
+      turnDetail(entries, undefined, knownTailId).messages.map((spoken) => spoken.fresh),
     ).toEqual(fresh);
   });
 });
@@ -262,7 +260,7 @@ function speak(level: ScreenReaderAnnouncements, frames: ReadonlyArray<Frame>) {
   let memory: TurnDetailMemory | null = null;
   const spoken: string[] = [];
   for (const next of frames) {
-    const result = nextTurnDetailAnnouncement(memory, { ...next, level, tailId: null }, t);
+    const result = nextTurnDetailAnnouncement(memory, { ...next, level, tailId: null });
     memory = result.memory;
     spoken.push(...result.messages);
     if (result.activity !== null) spoken.push(result.activity);

@@ -1,5 +1,6 @@
-import { useTranslation } from "react-i18next";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { useComposerMenuState } from "../chat/useComposerMenuState";
+import { m as resolveMessage } from "../../i18n/messages";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
 import { useEnvironmentsWithScope } from "../../state/session";
@@ -16,6 +17,7 @@ import {
 import { Navigate, useLocation, useNavigate } from "@tanstack/react-router";
 import { InfoIcon, Trash2Icon } from "lucide-react";
 import { lazy, Suspense, useRef, useState, type ReactNode } from "react";
+import { T, useGT, useMessages } from "gt-react";
 
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { releaseProjectDraftUploads } from "../../lib/composerDraftUploads";
@@ -23,6 +25,7 @@ import { persistClientSettingsUpdate, useClientSettings } from "../../hooks/useS
 import { readLocalApi } from "../../localApi";
 import { derivePhysicalProjectKey } from "@t3tools/client-runtime/state/project-grouping";
 import {
+  PROJECT_GROUPING_MODE_LABELS,
   withProjectGroupingOverride,
   type SidebarProjectGroupMember,
   type SidebarProjectSnapshot,
@@ -79,12 +82,8 @@ function isGroupingSelection(value: unknown): value is SidebarProjectGroupingMod
 
 // Grouping overrides are client settings, so they stay editable without project write access.
 function CheckoutGroupingSelect({ member }: { member: SidebarProjectGroupMember }) {
-  const { t } = useTranslation("settings");
-  const modeLabels: Record<SidebarProjectGroupingMode, string> = {
-    repository: t(($) => $.extra.projects.groupingRepository),
-    repository_path: t(($) => $.extra.projects.groupingRepositoryPath),
-    separate: t(($) => $.extra.projects.groupingSeparate),
-  };
+  const gt = useGT();
+  const m = useMessages();
   const overrideKey = derivePhysicalProjectKey(member);
   const globalMode = useClientSettings((settings) => settings.sidebarProjectGroupingMode);
   const selection = useClientSettings(
@@ -107,9 +106,11 @@ function CheckoutGroupingSelect({ member }: { member: SidebarProjectGroupMember 
           toastManager.add(
             stackedThreadToast({
               type: "error",
-              title: t(($) => $.extra.projects.groupingSaveFailed),
+              title: gt("Could not save grouping rule"),
               description:
-                error instanceof Error ? error.message : t(($) => $.extra.projects.error),
+                error instanceof Error
+                  ? (thrownErrorMessage(error, resolveMessage) ?? error.message)
+                  : gt("An error occurred."),
             }),
           );
         });
@@ -117,7 +118,7 @@ function CheckoutGroupingSelect({ member }: { member: SidebarProjectGroupMember 
     >
       <SelectTrigger
         size="sm"
-        aria-label={t(($) => $.extra.projects.groupingRuleLabel, {
+        aria-label={gt("Grouping rule for {path} on {environment}", {
           path: member.workspaceRoot,
           environment: member.environmentLabel
             ? `${member.environmentLabel} (${member.environmentId})`
@@ -126,22 +127,22 @@ function CheckoutGroupingSelect({ member }: { member: SidebarProjectGroupMember 
       >
         <SelectValue>
           {selection === "inherit"
-            ? t(($) => $.extra.projects.groupingDefault, { mode: modeLabels[globalMode] })
-            : modeLabels[selection]}
+            ? gt("Default ({mode})", { mode: m(PROJECT_GROUPING_MODE_LABELS[globalMode]) })
+            : m(PROJECT_GROUPING_MODE_LABELS[selection])}
         </SelectValue>
       </SelectTrigger>
       <SelectPopup align="end" alignItemWithTrigger={false}>
         <SelectItem hideIndicator value="inherit">
-          {t(($) => $.extra.projects.groupingInherit)}
+          <T>Use global default</T>
         </SelectItem>
         <SelectItem hideIndicator value="repository">
-          {modeLabels.repository}
+          {m(PROJECT_GROUPING_MODE_LABELS.repository)}
         </SelectItem>
         <SelectItem hideIndicator value="repository_path">
-          {modeLabels.repository_path}
+          {m(PROJECT_GROUPING_MODE_LABELS.repository_path)}
         </SelectItem>
         <SelectItem hideIndicator value="separate">
-          {modeLabels.separate}
+          {m(PROJECT_GROUPING_MODE_LABELS.separate)}
         </SelectItem>
       </SelectPopup>
     </Select>
@@ -179,7 +180,7 @@ export function ProjectSettingsPanel({
   checkoutKey?: string | null;
   unavailable?: ReactNode;
 }) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   const groups = useSettingsProjectGroups();
   const pathname = useLocation({ select: (location) => location.pathname });
 
@@ -235,15 +236,15 @@ export function ProjectSettingsPanel({
     return (
       <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
         {groups.length === 0
-          ? t(($) => $.extra.projects.addProject)
-          : t(($) => $.extra.projects.missing)}
+          ? gt("Add a project from the sidebar to configure it here.")
+          : gt("This project is no longer available.")}
       </div>
     );
   }
   if (members.length === 0)
     return (
       <p className="p-8 text-sm text-muted-foreground">
-        {t(($) => $.extra.projects.checkoutMissing)}
+        <T>This checkout is no longer available in the selected project and environment.</T>
       </p>
     );
   const scopedGroup = scopeProjectSettingsGroup(selected, members);
@@ -267,7 +268,7 @@ function ProjectDetail({
   allMembers: ReadonlyArray<SidebarProjectGroupMember>;
   hasOtherMembers: boolean;
 }) {
-  const { t } = useTranslation("settings");
+  const gt = useGT();
   const navigate = useNavigate({ from: "/settings" });
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { environments } = useEnvironments();
@@ -318,14 +319,11 @@ function ProjectDetail({
   const renameGroup = async (nextTitle: string, wasEdited: boolean) => {
     const title = nextTitle.trim();
     if (!title) {
-      toastManager.add({ type: "warning", title: t(($) => $.extra.projects.emptyName) });
+      toastManager.add({ type: "warning", title: gt("Project title cannot be empty") });
       return;
     }
     if (!projectGroupTitleNeedsUpdate(group.memberProjects, title, wasEdited)) return;
-    await updateAllMembers(
-      { title },
-      t(($) => $.extra.projects.renameFailed),
-    );
+    await updateAllMembers({ title }, gt("Failed to rename project"));
   };
 
   const [faviconPickerOpen, setFaviconPickerOpen] = useComposerMenuState(!canEditGroup);
@@ -336,10 +334,7 @@ function ProjectDetail({
     if (savingFaviconRef.current) return;
     savingFaviconRef.current = true;
     setIsSavingFavicon(true);
-    await updateAllMembers(
-      input,
-      t(($) => $.extra.projects.iconFailed),
-    );
+    await updateAllMembers(input, gt("Failed to update project icon"));
     for (const member of group.memberProjects) {
       const update = typeof input === "function" ? input(member) : input;
       if (update.faviconPath === undefined || update.projectIcon) continue;
@@ -359,35 +354,26 @@ function ProjectDetail({
     group.memberProjects.some((member) => member.title !== SCRATCH_PROJECT_TITLE);
 
   const removeMembers = async (members: ReadonlyArray<SidebarProjectGroupMember>) => {
-    if (
-      checkProjectAccess(
-        members,
-        t(($) => $.extra.projects.removeFailed),
-      )
-    )
-      return;
+    if (checkProjectAccess(members, gt("Failed to remove project"))) return;
     const api = readLocalApi();
     if (!api) return;
 
-    const { projectThreads, isWholeGroup, confirmationMessage } = planProjectRemoval({
-      members,
-      groupMemberCount: group.memberProjects.length,
-      hasOtherMembers,
-      displayName: group.displayName,
-      threads,
-      unloadedThreadCount: readUnloadedThreadCount(members, threads),
-    });
+    const { projectThreads, isWholeGroup, confirmationMessage } = planProjectRemoval(
+      {
+        members,
+        groupMemberCount: group.memberProjects.length,
+        hasOtherMembers,
+        displayName: group.displayName,
+        threads,
+        unloadedThreadCount: readUnloadedThreadCount(members, threads),
+      },
+      resolveMessage,
+    );
     const confirmed = await settlePromise(() =>
       api.dialogs.confirm(confirmationMessage, { variant: "destructive" }),
     );
     if (confirmed._tag === "Failure" || !confirmed.value) return;
-    if (
-      checkProjectAccess(
-        members,
-        t(($) => $.extra.projects.removeFailed),
-      )
-    )
-      return;
+    if (checkProjectAccess(members, gt("Failed to remove project"))) return;
 
     const draftStore = useComposerDraftStore.getState();
     const remainingMember = allMembers.find(
@@ -398,13 +384,7 @@ function ProjectDetail({
         ),
     );
     for (const member of members) {
-      if (
-        checkProjectAccess(
-          [member],
-          t(($) => $.extra.projects.removeFailed),
-        )
-      )
-        return;
+      if (checkProjectAccess([member], gt("Failed to remove project"))) return;
       const memberThreads = projectThreads.filter(
         (thread) => thread.environmentId === member.environmentId && thread.projectId === member.id,
       );
@@ -419,10 +399,7 @@ function ProjectDetail({
         () => undefined,
       );
       if (result._tag === "Failure") {
-        reportProjectFailure(
-          t(($) => $.extra.projects.removeNamedFailed, { name: member.title }),
-          result,
-        );
+        reportProjectFailure(gt('Failed to remove "{title}"', { title: member.title }), result);
         return;
       }
       const projectRef = scopeProjectRef(member.environmentId, member.id);
@@ -472,26 +449,27 @@ function ProjectDetail({
           variant="outline"
           disabled={!editableIds.has(member.environmentId)}
           onClick={() => void removeMembers([member])}
-          aria-label={t(($) => $.extra.projects.removeCheckoutLabel, {
-            path: member.workspaceRoot,
-          })}
+          aria-label={gt("Remove checkout {path}", { path: member.workspaceRoot })}
         >
-          {t(($) => $.extra.projects.remove)}
+          {gt("Remove", { $context: "verb, removes a checkout" })}
         </Button>
       ) : null}
     </div>
   );
   const checkoutChoices = (
-    <SettingsSection title={t(($) => $.extra.projects.checkouts)}>
+    <SettingsSection title={gt("Checkouts")}>
       <p className="px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
-        {t(($) => $.extra.projects.groupingDescription)}
+        <T>
+          Grouping rule decides how each checkout joins project groups in the sidebar. Changing it
+          can move a checkout to a different project.
+        </T>
       </p>
       {Array.from(checkoutsByEnvironment, ([environmentId, members]) => {
         if (checkoutsByEnvironment.size === 1) {
           return members.map((member) => (
             <SettingsRow
               key={member.physicalProjectKey}
-              title={member.environmentLabel ?? t(($) => $.extra.projects.environment)}
+              title={member.environmentLabel ?? gt("Environment")}
               description={member.workspaceRoot}
               control={checkoutControls(member)}
             />
@@ -503,7 +481,7 @@ function ProjectDetail({
         const labels = environment
           ? settingsScopeEnvironmentLabels(environment, environments)
           : {
-              primary: firstMember.environmentLabel ?? t(($) => $.extra.projects.environment),
+              primary: firstMember.environmentLabel ?? gt("Environment"),
               secondary: environmentId,
             };
         return (
@@ -560,28 +538,35 @@ function ProjectDetail({
       <SettingsPageContainer className="gap-6">
         <Alert variant="info">
           <InfoIcon aria-hidden />
-          <AlertDescription>{t(($) => $.extra.projects.findSetting)}</AlertDescription>
+          <AlertDescription>
+            <T>
+              Can't find a setting? Keep this project picked above and hop to any other settings
+              page.
+            </T>
+          </AlertDescription>
         </Alert>
-        <SettingsSection id="project-overview" title={t(($) => $.extra.projects.project)} hideTitle>
+        <SettingsSection id="project-overview" title={gt("Project")} hideTitle>
           {!canEditGroup ? (
             <p className="px-3 py-2 text-sm text-muted-foreground sm:px-4">
               {group.memberProjects.length > 1
-                ? t(($) => $.extra.projects.permissionAll)
-                : t(($) => $.extra.projects.permission)}
+                ? gt("Shared settings require permission to change every checkout in this group.")
+                : gt("This connection cannot change this project.")}
             </p>
           ) : null}
           <SettingsRow
-            title={t(($) => $.extra.projects.name)}
-            description={t(($) => $.extra.projects.nameDescription)}
+            title={gt("Name")}
+            description={gt(
+              "The shared name for this project group in the sidebar and thread lists.",
+            )}
             resetAction={
               canResetScratchTitle ? (
                 <SettingResetButton
-                  label={t(($) => $.extra.projects.nameReset)}
+                  ariaLabel={gt("Reset project name to default")}
                   disabled={!canEditGroup}
                   onClick={() =>
                     void updateAllMembers(
                       { title: SCRATCH_PROJECT_TITLE },
-                      t(($) => $.extra.projects.renameFailed),
+                      gt("Failed to rename project"),
                     )
                   }
                 />
@@ -592,7 +577,7 @@ function ProjectDetail({
                 key={`${group.projectKey}:${group.displayName}`}
                 size="sm"
                 className="w-full sm:w-64"
-                aria-label={t(($) => $.extra.projects.nameLabel)}
+                aria-label={gt("Project name")}
                 disabled={!canEditGroup}
                 defaultValue={group.displayName}
                 onChange={() => {
@@ -611,7 +596,7 @@ function ProjectDetail({
             }
           />
           <SettingsRow
-            title={t(($) => $.extra.projects.icon)}
+            title={gt("Project icon")}
             description={
               projectIcon?.kind === "lucide"
                 ? `${projectIcon.name} · ${projectIcon.color}`
@@ -619,12 +604,12 @@ function ProjectDetail({
                   ? `${projectIcon.text} · ${projectIcon.color}`
                   : projectIcon?.kind === "emoji"
                     ? projectIcon.emoji
-                    : (faviconPath ?? t(($) => $.extra.projects.automatic))
+                    : (faviconPath ?? gt("Automatic"))
             }
             resetAction={
               group.memberProjects.some((member) => !hasDefaultProjectIcon(member)) ? (
                 <SettingResetButton
-                  label={t(($) => $.extra.projects.iconReset)}
+                  ariaLabel={gt("Reset project icon to default")}
                   disabled={isSavingFavicon || !canEditGroup}
                   onClick={() => void setProjectIcon(defaultProjectIcon)}
                 />
@@ -637,21 +622,21 @@ function ProjectDetail({
                   size="sm"
                   variant="outline"
                   type="button"
-                  aria-label={t(($) => $.extra.projects.chooseIcon)}
+                  aria-label={gt("Choose a project icon")}
                   disabled={isSavingFavicon || !canEditGroup}
                   onClick={() => setIconPickerOpen(true)}
                 >
-                  {t(($) => $.extra.projects.chooseIconShort)}
+                  <T>Choose icon</T>
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   type="button"
-                  aria-label={t(($) => $.extra.projects.chooseIconFile)}
+                  aria-label={gt("Choose a project icon file")}
                   disabled={isSavingFavicon || !canEditGroup}
                   onClick={() => setFaviconPickerOpen(true)}
                 >
-                  {t(($) => $.extra.projects.chooseFile)}
+                  <T>Choose file</T>
                 </Button>
               </div>
             }
@@ -659,8 +644,8 @@ function ProjectDetail({
           {canOrganize ? (
             <>
               <SettingsRow
-                title={t(($) => $.extra.projects.pin)}
-                description={t(($) => $.extra.projects.pinDescription)}
+                title={gt("Pin")}
+                description={gt("Pinned projects come first in project pickers.")}
                 control={
                   <Switch
                     checked={group.pinned}
@@ -668,21 +653,19 @@ function ProjectDetail({
                     onCheckedChange={(checked) =>
                       void organize(
                         { pinned: Boolean(checked) },
-                        checked
-                          ? t(($) => $.extra.projects.pinFailed)
-                          : t(($) => $.extra.projects.unpinFailed),
+                        checked ? gt("Failed to pin project") : gt("Failed to unpin project"),
                       )
                     }
-                    aria-label={t(($) => $.extra.projects.pinLabel)}
+                    aria-label={gt("Pin project")}
                   />
                 }
               />
               <SettingsRow
-                title={t(($) => $.extra.projects.archive)}
+                title={gt("Archive")}
                 description={
                   group.archived
-                    ? t(($) => $.extra.projects.archivedDescription)
-                    : t(($) => $.extra.projects.archiveDescription)
+                    ? gt("Hidden from project pickers. Threads and files are kept.")
+                    : gt("Hides the project from project pickers. Threads and files are kept.")
                 }
                 control={
                   <Button
@@ -693,14 +676,14 @@ function ProjectDetail({
                       void organize(
                         { archived: !group.archived },
                         group.archived
-                          ? t(($) => $.extra.projects.unarchiveFailed)
-                          : t(($) => $.extra.projects.archiveFailed),
+                          ? gt("Failed to unarchive project")
+                          : gt("Failed to archive project"),
                       )
                     }
                   >
                     {group.archived
-                      ? t(($) => $.extra.projects.unarchive)
-                      : t(($) => $.extra.projects.archive)}
+                      ? gt("Unarchive")
+                      : gt("Archive", { $context: "verb, archives a project" })}
                   </Button>
                 }
               />
@@ -710,23 +693,26 @@ function ProjectDetail({
         <ProjectDefaultsSettings category="project" />
         <ProjectActionsSettings />
         {checkoutChoices}
-        <SettingsSection title={t(($) => $.extra.projects.danger)}>
+        <SettingsSection title={gt("Danger")}>
           <SettingsRow
             title={
               hasOtherMembers
-                ? t(($) => $.extra.projects.removeCheckout)
+                ? gt("Remove checkout")
                 : group.memberProjects.length > 1
-                  ? t(($) => $.extra.projects.removeEverywhere)
-                  : t(($) => $.extra.projects.removeProject)
+                  ? gt("Remove this project everywhere")
+                  : gt("Remove project")
             }
             description={
               hasOtherMembers
-                ? t(($) => $.extra.projects.removeCheckoutDescription)
+                ? gt(
+                    "Deletes the selected machine's checkout entries and their threads. Other machines and files on disk are not touched.",
+                  )
                 : group.memberProjects.length > 1
-                  ? t(($) => $.extra.projects.removeGroupDescription, {
-                      count: group.memberProjects.length,
-                    })
-                  : t(($) => $.extra.projects.removeProjectDescription)
+                  ? gt(
+                      "{count, plural, other {Deletes all {count} checkout entries and their threads on every machine. Files on disk are not touched.}}",
+                      { count: group.memberProjects.length },
+                    )
+                  : gt("Deletes the project entry and its threads. Files on disk are not touched.")
             }
             control={
               <Button
@@ -737,10 +723,10 @@ function ProjectDetail({
               >
                 <Trash2Icon />
                 {hasOtherMembers
-                  ? t(($) => $.extra.projects.removeCheckout)
+                  ? gt("Remove checkout")
                   : group.memberProjects.length > 1
-                    ? t(($) => $.extra.projects.removeAll)
-                    : t(($) => $.extra.projects.removeProject)}
+                    ? gt("Remove all entries")
+                    : gt("Remove project")}
               </Button>
             }
           />

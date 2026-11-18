@@ -1,7 +1,7 @@
-import { useTranslation } from "react-i18next";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
+import { T, useGT } from "gt-react";
 import { PanelLeftCloseIcon, PanelLeftIcon } from "lucide-react";
 import * as React from "react";
 import { cn } from "~/lib/utils";
@@ -298,8 +298,8 @@ function Sidebar({
   resizable?: boolean | SidebarResizableOptions;
   holdPeek?: () => boolean;
 }) {
-  const { t } = useTranslation("files");
   const { isMobile, state, openMobile, setOpenMobile, setMobileSheetMounted } = useSidebar();
+  const gt = useGT();
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [peek, setPeek] = React.useState(false);
   // Not usePanelAnimationSettings: its navigation suppression would snap the sheet shut mid-exit when an item navigates.
@@ -456,8 +456,10 @@ function Sidebar({
             }
           >
             <SheetHeader className="sr-only">
-              <SheetTitle>{props["aria-label"] ?? t(($) => $.ui.sidebar)}</SheetTitle>
-              <SheetDescription>{t(($) => $.ui.mobileSidebar)}</SheetDescription>
+              <SheetTitle>{props["aria-label"] ?? gt("Sidebar")}</SheetTitle>
+              <SheetDescription>
+                <T>Displays the mobile sidebar.</T>
+              </SheetDescription>
             </SheetHeader>
             <div
               className={cn(
@@ -546,7 +548,6 @@ function Sidebar({
 }
 
 function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<typeof Button>) {
-  const { t } = useTranslation("files");
   const { toggleSidebar } = useSidebar();
   const isOpen = useSidebarVisibility();
 
@@ -568,7 +569,9 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
       {...props}
     >
       {isOpen ? <PanelLeftCloseIcon className="size-4" /> : <PanelLeftIcon className="size-4" />}
-      <span className="sr-only">{t(($) => $.ui.toggleSidebar)}</span>
+      <span className="sr-only">
+        <T>Toggle Sidebar</T>
+      </span>
     </Button>
   );
 }
@@ -587,15 +590,15 @@ function SidebarRail({
   onPointerUp,
   ...props
 }: React.ComponentProps<"button">) {
-  const { t } = useTranslation("files");
   const { open, toggleSidebar, onCollapse } = useSidebar();
+  const gt = useGT();
   const sidebarInstance = React.use(SidebarInstanceContext);
   const suppressClickRef = React.useRef(false);
   const resolvedResizable = sidebarInstance?.resizable ?? null;
   const peek = sidebarInstance?.peek ?? false;
   const canResize = resolvedResizable !== null && (open || peek);
-  const railLabel = canResize ? t(($) => $.ui.resizeSidebar) : t(($) => $.ui.toggleSidebar);
-  const railTitle = canResize ? t(($) => $.ui.dragSidebar) : t(($) => $.ui.toggleSidebar);
+  const railLabel = canResize ? gt("Resize Sidebar") : gt("Toggle Sidebar");
+  const railTitle = canResize ? gt("Drag to resize sidebar") : gt("Toggle Sidebar");
   const resize = useResizeDrag<HTMLButtonElement>((event) => {
     const options = resolvedResizable;
     if (!options || !canResize) return null;
@@ -688,7 +691,7 @@ function SidebarRail({
       event.preventDefault();
       return;
     }
-    if (resolvedResizable && open) {
+    if (canResize) {
       event.preventDefault();
       return;
     }
@@ -705,8 +708,10 @@ function SidebarRail({
               /* A collapsed offcanvas rail overlaps the native scrollbar on Windows and Linux. */
               "-translate-x-1/2 group-data-[side=left]:-right-4 absolute inset-y-0 z-20 hidden w-4 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=right]:left-0 sm:flex [[data-collapsible=offcanvas][data-state=collapsed]_&]:pointer-events-none",
               "[[data-panel-animations=true]_&]:transition-all [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
-              "touch-none in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
-              "[[data-side=left][data-state=collapsed][data-peek=false]_&]:cursor-e-resize [[data-side=right][data-state=collapsed][data-peek=false]_&]:cursor-w-resize",
+              "touch-none",
+              canResize
+                ? "cursor-col-resize"
+                : "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize [[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
               "group-data-[collapsible=offcanvas]:translate-x-0 hover:group-data-[collapsible=offcanvas]:bg-sidebar group-data-[collapsible=offcanvas]:after:left-full",
               "[[data-side=left][data-collapsible=offcanvas]_&]:-right-2",
               "[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",

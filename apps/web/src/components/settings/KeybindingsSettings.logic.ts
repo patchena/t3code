@@ -1,4 +1,3 @@
-import type { SettingsTranslation } from "~/components/settings/settingsSearch";
 import {
   STATIC_KEYBINDING_COMMANDS,
   type KeybindingCommand,
@@ -13,7 +12,9 @@ import {
   parseKeybindingWhenExpression,
   US_SHIFTED_TO_UNSHIFTED_KEYS,
 } from "@t3tools/shared/keybindings";
+import { msg } from "gt-react";
 
+import { m, type MessageResolver } from "../../i18n/messages";
 import { shortcutConflictKey, shortcutKeyFromEvent } from "../../keybindings";
 import { isMacPlatform } from "../../lib/utils";
 import { METRIC_OPTIONS, WINDOW_OPTIONS } from "../usage/usageShortcuts";
@@ -49,6 +50,7 @@ export interface KeybindingRow {
   readonly key: string;
   readonly when: string;
   readonly source: KeybindingSource;
+  readonly isUnassigned: boolean;
   readonly defaultKey: string | null;
   readonly defaultWhen: string;
   readonly binding: ResolvedKeybindingRule;
@@ -107,13 +109,13 @@ export function whenAstToExpression(node: KeybindingWhenNode | undefined): strin
 export function whenNodeRemoveLabel(
   node: KeybindingWhenNode,
   depth: number,
-  t: SettingsTranslation,
+  resolve: MessageResolver = m,
 ): string {
-  if (depth === 0) return t(($) => $.extra.keybindings.clearConditions);
+  if (depth === 0) return resolve(msg("Clear all conditions"));
   if (node.type === "identifier" || (node.type === "not" && node.node.type === "identifier")) {
-    return t(($) => $.extra.keybindings.removeCondition);
+    return resolve(msg("Remove condition"));
   }
-  return t(($) => $.extra.keybindings.removeGroup);
+  return resolve(msg("Remove group and its conditions"));
 }
 
 function wrapWhenExpression(node: KeybindingWhenNode): string {
@@ -123,7 +125,7 @@ function wrapWhenExpression(node: KeybindingWhenNode): string {
 
 export function parseWhenExpressionDraft(
   expression: string,
-  t: SettingsTranslation,
+  resolve: MessageResolver = m,
 ): { ok: true; value: KeybindingWhenNode | undefined } | { ok: false; message: string } {
   const trimmed = expression.trim();
   if (trimmed.length === 0) return { ok: true, value: undefined };
@@ -132,7 +134,7 @@ export function parseWhenExpressionDraft(
   if (!ast) {
     return {
       ok: false,
-      message: t(($) => $.extra.keybindings.syntax),
+      message: resolve(msg("Use variables with !, &&, ||, and parentheses.")),
     };
   }
 
@@ -141,7 +143,8 @@ export function parseWhenExpressionDraft(
 
 function sourceForBinding(binding: ResolvedKeybindingRule): KeybindingSource {
   if (String(binding.command).startsWith("script.")) {
-    return "Project";
+    const source: KeybindingSource = "Project";
+    return source;
   }
 
   const bindingKey = shortcutToKeybindingInput(binding.shortcut);
@@ -153,7 +156,8 @@ function sourceForBinding(binding: ResolvedKeybindingRule): KeybindingSource {
       whenAstToExpression(entry.whenAst) === bindingWhen,
   );
 
-  return isDefault ? "Default" : "Custom";
+  const source: KeybindingSource = isDefault ? "Default" : "Custom";
+  return source;
 }
 
 function defaultBindingForBinding(
@@ -169,6 +173,13 @@ function defaultBindingForBinding(
         shortcutToKeybindingInput(entry.shortcut) === bindingKey &&
         whenAstToExpression(entry.whenAst) === bindingWhen,
     ) ??
+    (bindingWhen === "false"
+      ? DEFAULT_RESOLVED_KEYBINDINGS.find(
+          (entry) =>
+            entry.command === binding.command &&
+            shortcutToKeybindingInput(entry.shortcut) === bindingKey,
+        )
+      : undefined) ??
     DEFAULT_RESOLVED_KEYBINDINGS.find(
       (entry) =>
         entry.command === binding.command && whenAstToExpression(entry.whenAst) === bindingWhen,
@@ -182,14 +193,15 @@ function keybindingRowId(command: KeybindingCommand, key: string, when: string):
 }
 
 function conflictsWithWhen(leftWhen: string, rightWhen: string): boolean {
+  if (leftWhen === "false" || rightWhen === "false") return false;
   return leftWhen.length === 0 || rightWhen.length === 0 || leftWhen === rightWhen;
 }
 
 export function keybindingConflictLabels(
   rows: ReadonlyArray<KeybindingRow>,
   input: { readonly rowId: string; readonly key: string; readonly when: string },
-  t: SettingsTranslation,
   platform = navigator.platform,
+  resolve: MessageResolver = m,
 ): ReadonlyArray<string> {
   if (input.key.trim().length === 0) return [];
   const shortcut = parseKeybindingShortcut(input.key);
@@ -203,7 +215,7 @@ export function keybindingConflictLabels(
       shortcutConflictKey(candidate.binding.shortcut, platform) === conflictKey &&
       conflictsWithWhen(candidate.when, input.when)
     ) {
-      conflicts.push(commandLabel(candidate.command, t));
+      conflicts.push(commandLabel(candidate.command, resolve));
     }
   }
   return [...new Set(conflicts)].toSorted();
@@ -218,17 +230,24 @@ export interface KeybindingGroup {
 const KEYBINDING_GROUPS = [
   {
     id: "navigation",
-    title: "Navigation",
+    title: msg("Navigation"),
     prefixes: ["sidebar", "rightPanel", "commandPalette", "filePicker", "projectSearch", "editor"],
   },
-  { id: "threads", title: "Threads", prefixes: ["thread", "chat", "pullRequest"] },
-  { id: "composer", title: "Composer", prefixes: ["composer", "modelPicker"] },
-  { id: "terminal", title: "Terminal", prefixes: ["terminal"] },
-  { id: "preview", title: "Preview & diff", prefixes: ["preview", "diff"] },
-  { id: "appearance", title: "Appearance", prefixes: ["theme", "appearance", "themeEditor"] },
-  { id: "scripts", title: "Project scripts", prefixes: ["script"] },
+  { id: "threads", title: msg("Threads"), prefixes: ["thread", "chat", "pullRequest"] },
+  { id: "composer", title: msg("Composer"), prefixes: ["composer", "modelPicker"] },
+  { id: "terminal", title: msg("Terminal"), prefixes: ["terminal"] },
+  { id: "preview", title: msg("Preview & diff"), prefixes: ["preview", "diff"] },
+  {
+    id: "appearance",
+    title: msg("Appearance"),
+    prefixes: ["theme", "appearance", "themeEditor"],
+  },
+  { id: "scripts", title: msg("Project scripts"), prefixes: ["script"] },
 ] as const;
-const OTHER_KEYBINDING_GROUP = { id: "other", title: "Other" } as const;
+const OTHER_KEYBINDING_GROUP = {
+  id: "other",
+  title: msg("Other", { $context: "keybinding group" }),
+} as const;
 
 function keybindingGroupFor(command: KeybindingCommand): { id: string; title: string } {
   const prefix = String(command).split(".")[0] ?? "";
@@ -240,7 +259,6 @@ function keybindingGroupFor(command: KeybindingCommand): { id: string; title: st
 
 export function groupKeybindingRows(
   rows: ReadonlyArray<KeybindingRow>,
-  t: SettingsTranslation,
 ): ReadonlyArray<KeybindingGroup> {
   const rowsByGroup = new Map<string, Array<KeybindingRow>>();
   for (const row of rows) {
@@ -251,16 +269,14 @@ export function groupKeybindingRows(
   }
   return [...KEYBINDING_GROUPS, OTHER_KEYBINDING_GROUP].flatMap((group) => {
     const groupRows = rowsByGroup.get(group.id);
-    return groupRows
-      ? [{ id: group.id, title: t(($) => $.extra.keybindingGroups[group.id]), rows: groupRows }]
-      : [];
+    return groupRows ? [{ id: group.id, title: group.title, rows: groupRows }] : [];
   });
 }
 
 export function buildKeybindingRows(
   keybindings: ResolvedKeybindingsConfig,
-  t: SettingsTranslation,
   platform = navigator.platform,
+  resolve: MessageResolver = m,
 ): ReadonlyArray<KeybindingRow> {
   const rowsById = new Map<string, KeybindingRow>();
   for (const binding of keybindings) {
@@ -274,6 +290,10 @@ export function buildKeybindingRows(
       key,
       when,
       source: sourceForBinding(binding),
+      isUnassigned:
+        when === "false" &&
+        defaultBinding !== undefined &&
+        key === shortcutToKeybindingInput(defaultBinding.shortcut),
       defaultKey: defaultBinding ? shortcutToKeybindingInput(defaultBinding.shortcut) : null,
       defaultWhen: whenAstToExpression(defaultBinding?.whenAst),
       binding,
@@ -290,8 +310,8 @@ export function buildKeybindingRows(
         key: row.key,
         when: row.when,
       },
-      t,
       platform,
+      resolve,
     );
     return conflicts.length > 0
       ? Object.assign({}, row, { conflicts: [...new Set(conflicts)].toSorted() })
@@ -310,14 +330,14 @@ export function buildKeybindingRows(
 export function filterKeybindingRows(
   rows: ReadonlyArray<KeybindingRow>,
   query: string,
-  t: SettingsTranslation,
+  resolve: MessageResolver = m,
 ): ReadonlyArray<KeybindingRow> {
   const normalizedQuery = query.trim().toLowerCase();
   if (normalizedQuery.length === 0) return rows;
   return rows.filter((row) => {
     return (
       row.command.toLowerCase().includes(normalizedQuery) ||
-      commandLabel(row.command, t).toLowerCase().includes(normalizedQuery) ||
+      commandLabel(row.command, resolve).toLowerCase().includes(normalizedQuery) ||
       row.key.toLowerCase().includes(normalizedQuery) ||
       row.when.toLowerCase().includes(normalizedQuery) ||
       row.source.toLowerCase().includes(normalizedQuery)
@@ -373,118 +393,123 @@ export function buildWhenVariableOptions(): ReadonlyArray<WhenVariableOption> {
 
 export function buildKeybindingCommandOptions(
   keybindings: ResolvedKeybindingsConfig,
-  t: SettingsTranslation,
+  resolve: MessageResolver = m,
 ): ReadonlyArray<KeybindingCommandOption> {
   const commands = new Set<KeybindingCommand>(STATIC_KEYBINDING_COMMANDS);
   for (const binding of keybindings) {
     commands.add(binding.command);
   }
   return [...commands].toSorted((left, right) =>
-    compareCommands(left, right, (command) => commandLabel(command, t)),
+    compareCommands(left, right, (command) => commandLabel(command, resolve)),
   );
 }
 
-const commandLabels = {
-  "thread.jump.1": (t) => t(($) => $.commands.threadJump1),
-  "thread.jump.2": (t) => t(($) => $.commands.threadJump2),
-  "thread.jump.3": (t) => t(($) => $.commands.threadJump3),
-  "thread.jump.4": (t) => t(($) => $.commands.threadJump4),
-  "thread.jump.5": (t) => t(($) => $.commands.threadJump5),
-  "thread.jump.6": (t) => t(($) => $.commands.threadJump6),
-  "thread.jump.7": (t) => t(($) => $.commands.threadJump7),
-  "thread.jump.8": (t) => t(($) => $.commands.threadJump8),
-  "thread.jump.9": (t) => t(($) => $.commands.threadJump9),
-  "modelPicker.jump.1": (t) => t(($) => $.commands.modelPickerJump1),
-  "modelPicker.jump.2": (t) => t(($) => $.commands.modelPickerJump2),
-  "modelPicker.jump.3": (t) => t(($) => $.commands.modelPickerJump3),
-  "modelPicker.jump.4": (t) => t(($) => $.commands.modelPickerJump4),
-  "modelPicker.jump.5": (t) => t(($) => $.commands.modelPickerJump5),
-  "modelPicker.jump.6": (t) => t(($) => $.commands.modelPickerJump6),
-  "modelPicker.jump.7": (t) => t(($) => $.commands.modelPickerJump7),
-  "modelPicker.jump.8": (t) => t(($) => $.commands.modelPickerJump8),
-  "modelPicker.jump.9": (t) => t(($) => $.commands.modelPickerJump9),
-  "thread.stop": (t) => t(($) => $.commands.threadStop),
-  "thread.steerQueuedMessage": (t) => t(($) => $.commands.threadSteerQueuedMessage),
-  "thread.editQueuedMessage": (t) => t(($) => $.commands.threadEditQueuedMessage),
-  "thread.previous": (t) => t(($) => $.commands.threadPrevious),
-  "thread.next": (t) => t(($) => $.commands.threadNext),
-  "thread.copyReference": (t) => t(($) => $.commands.threadCopyReference),
-  "thread.settle": (t) => t(($) => $.commands.threadSettle),
-  "thread.pin": (t) => t(($) => $.commands.threadPin),
-  "thread.undo": (t) => t(($) => $.commands.threadUndo),
-  "thread.regenerateTitle": (t) => t(($) => $.commands.threadRegenerateTitle),
-  "modelPicker.toggle": (t) => t(($) => $.commands.modelPickerToggle),
-  "modelPicker.previousProvider": (t) => t(($) => $.commands.modelPickerPreviousProvider),
-  "modelPicker.nextProvider": (t) => t(($) => $.commands.modelPickerNextProvider),
-  "workspace.focusNext": (t) => t(($) => $.commands.workspaceFocusNext),
-  "workspace.focusPrevious": (t) => t(($) => $.commands.workspaceFocusPrevious),
-  "sidebar.toggle": (t) => t(($) => $.commands.sidebarToggle),
-  "navigation.back": (t) => t(($) => $.commands.navigationBack),
-  "navigation.forward": (t) => t(($) => $.commands.navigationForward),
-  "terminal.toggle": (t) => t(($) => $.commands.terminalToggle),
-  "terminal.split": (t) => t(($) => $.commands.terminalSplit),
-  "terminal.splitVertical": (t) => t(($) => $.commands.terminalSplitVertical),
-  "terminal.new": (t) => t(($) => $.commands.terminalNew),
-  "terminal.close": (t) => t(($) => $.commands.terminalClose),
-  "rightPanel.toggle": (t) => t(($) => $.commands.rightPanelToggle),
-  "rightPanel.new": (t) => t(($) => $.commands.rightPanelNew),
-  "threadPanel.toggle": (t) => t(($) => $.commands.threadPanelToggle),
-  "rightPanel.toggleMaximized": (t) => t(($) => $.commands.rightPanelToggleMaximized),
-  "rightPanel.close": (t) => t(($) => $.commands.rightPanelClose),
-  "view.reopenClosed": (t) => t(($) => $.commands.viewReopenClosed),
-  "pullRequest.copyNumber": (t) => t(($) => $.commands.pullRequestCopyNumber),
-  "diff.toggle": (t) => t(($) => $.commands.diffToggle),
-  "preview.toggle": (t) => t(($) => $.commands.previewToggle),
-  "preview.refresh": (t) => t(($) => $.commands.previewRefresh),
-  "preview.focusUrl": (t) => t(($) => $.commands.previewFocusUrl),
-  "preview.find": (t) => t(($) => $.commands.previewFind),
-  "preview.zoomIn": (t) => t(($) => $.commands.previewZoomIn),
-  "preview.zoomOut": (t) => t(($) => $.commands.previewZoomOut),
-  "preview.resetZoom": (t) => t(($) => $.commands.previewResetZoom),
-  "commandPalette.toggle": (t) => t(($) => $.commands.commandPaletteToggle),
-  "filePicker.toggle": (t) => t(($) => $.commands.filePickerToggle),
-  "projectSearch.toggle": (t) => t(($) => $.commands.projectSearchToggle),
-  "usage.open": (t) => t(($) => $.commands.usageOpen),
-  "theme.select": (t) => t(($) => $.commands.themeSelect),
-  "appearance.cycle": (t) => t(($) => $.commands.appearanceCycle),
-  "themeEditor.toggle": (t) => t(($) => $.commands.themeEditorToggle),
-  "composer.stash": (t) => t(($) => $.commands.composerStash),
-  "composer.sendAlternate": (t) => t(($) => $.commands.composerSendAlternate),
-  "composer.sendBackground": (t) => t(($) => $.commands.composerSendBackground),
-  "composer.sendAndNewThread": (t) => t(($) => $.commands.composerSendAndNewThread),
-  "composer.dictation": (t) => t(($) => $.commands.composerDictation),
-  "composer.host": (t) => t(($) => $.commands.composerHost),
-  "composer.cycleHost": (t) => t(($) => $.commands.composerCycleHost),
-  "composer.effort": (t) => t(($) => $.commands.composerEffort),
-  "composer.increaseEffort": (t) => t(($) => $.commands.composerIncreaseEffort),
-  "composer.decreaseEffort": (t) => t(($) => $.commands.composerDecreaseEffort),
-  "composer.mode": (t) => t(($) => $.commands.composerMode),
-  "composer.workspace": (t) => t(($) => $.commands.composerWorkspace),
-  "composer.previousWorktree": (t) => t(($) => $.commands.composerPreviousWorktree),
-  "composer.branch": (t) => t(($) => $.commands.composerBranch),
-  "chat.new": (t) => t(($) => $.commands.chatNew),
-  "chat.newLocal": (t) => t(($) => $.commands.chatNewLocal),
-  "chat.newWithoutProject": (t) => t(($) => $.commands.chatNewWithoutProject),
-  "chat.find": (t) => t(($) => $.commands.chatFind),
-  "editor.openFavorite": (t) => t(($) => $.commands.editorOpenFavorite),
-  "usage.cost": (t) => t(($) => $.commands.usageCost),
-  "usage.tokens": (t) => t(($) => $.commands.usageTokens),
-  "usage.limits": (t) => t(($) => $.commands.usageLimits),
-  "usage.period.day": (t) => t(($) => $.commands.usagePeriodDay),
-  "usage.period.week": (t) => t(($) => $.commands.usagePeriodWeek),
-  "usage.period.month": (t) => t(($) => $.commands.usagePeriodMonth),
-  "usage.period.quarter": (t) => t(($) => $.commands.usagePeriodQuarter),
-} satisfies Record<(typeof STATIC_KEYBINDING_COMMANDS)[number], (t: SettingsTranslation) => string>;
+const COMMAND_LABELS: Partial<Record<KeybindingCommand, string>> = {
+  "workspace.focusNext": msg("Focus Next Workspace Area"),
+  "workspace.focusPrevious": msg("Focus Previous Workspace Area"),
+  "composer.sendAlternate": msg("Composer: Opposite Queue or Steer Action"),
+  "composer.sendBackground": msg("Composer: Start in Background"),
+  "composer.sendAndNewThread": msg("Composer: Send and Start New Thread"),
+  "composer.dictation": msg("Composer: Start or Finish Dictation"),
+  "thread.steerQueuedMessage": msg("Queue: Send First Queued Message"),
+  "thread.editQueuedMessage": msg("Queue: Edit Last Queued Message"),
+  "thread.copyReference": msg("Pull Request: Copy Link or Thread"),
+  "sidebar.toggle": msg("Sidebar: Toggle"),
+  "navigation.back": msg("Navigation: Back"),
+  "navigation.forward": msg("Navigation: Forward"),
+  "terminal.toggle": msg("Terminal: Toggle"),
+  "terminal.split": msg("Terminal: Split"),
+  "terminal.splitVertical": msg("Terminal: Split Vertical"),
+  "terminal.new": msg("Terminal: New"),
+  "terminal.close": msg("Terminal: Close"),
+  "rightPanel.toggle": msg("Right Panel: Toggle"),
+  "rightPanel.new": msg("Right Panel: New"),
+  "threadPanel.toggle": msg("Thread Panel: Toggle"),
+  "rightPanel.toggleMaximized": msg("Right Panel: Toggle Maximized"),
+  "rightPanel.close": msg("Right Panel: Close"),
+  "pullRequest.copyNumber": msg("Pull Request: Copy Number"),
+  "diff.toggle": msg("Diff: Toggle"),
+  "preview.toggle": msg("Preview: Toggle"),
+  "preview.refresh": msg("Preview: Refresh"),
+  "preview.zoomIn": msg("Preview: Zoom In"),
+  "preview.zoomOut": msg("Preview: Zoom Out"),
+  "preview.resetZoom": msg("Preview: Reset Zoom"),
+  "commandPalette.toggle": msg("Command Palette: Toggle"),
+  "filePicker.toggle": msg("File Picker: Toggle"),
+  "projectSearch.toggle": msg("Project Search: Toggle"),
+  "usage.open": msg("Usage: Open"),
+  "theme.select": msg("Theme: Select"),
+  "appearance.cycle": msg("Appearance: Cycle"),
+  "themeEditor.toggle": msg("Theme Editor: Toggle"),
+  "composer.stash": msg("Composer: Stash"),
+  "composer.host": msg("Composer: Host"),
+  "composer.cycleHost": msg("Composer: Cycle Host"),
+  "composer.effort": msg("Composer: Effort"),
+  "composer.increaseEffort": msg("Composer: Increase Effort"),
+  "composer.decreaseEffort": msg("Composer: Decrease Effort"),
+  "composer.mode": msg("Composer: Mode"),
+  "composer.workspace": msg("Composer: Workspace"),
+  "composer.previousWorktree": msg("Composer: Previous Worktree"),
+  "composer.branch": msg("Composer: Branch"),
+  "chat.new": msg("Chat: New"),
+  "chat.newLocal": msg("Chat: New Local"),
+  "chat.newWithoutProject": msg("Chat: New Without Project"),
+  "chat.find": msg("Chat: Find"),
+  "editor.openFavorite": msg("Editor: Open Favorite"),
+  "modelPicker.toggle": msg("Model Picker: Toggle"),
+  "modelPicker.previousProvider": msg("Model Picker: Previous Provider"),
+  "modelPicker.nextProvider": msg("Model Picker: Next Provider"),
+  "thread.stop": msg("Thread: Stop"),
+  "thread.previous": msg("Thread: Previous"),
+  "thread.next": msg("Thread: Next"),
+  "thread.settle": msg("Thread: Settle"),
+  "thread.pin": msg("Thread: Pin"),
+  "thread.regenerateTitle": msg("Thread: Regenerate Title"),
+  "thread.undo": msg("Thread: Undo"),
+};
 
-export function commandLabel(command: KeybindingCommand, t: SettingsTranslation): string {
-  const known = STATIC_KEYBINDING_COMMANDS.find((candidate) => candidate === command);
-  if (known) return commandLabels[known](t);
+// Whole labels: search titles keep the encoded message, which cannot nest another one.
+const USAGE_COMMAND_LABELS: Record<
+  (typeof METRIC_OPTIONS)[number]["command"] | (typeof WINDOW_OPTIONS)[number]["command"],
+  string
+> = {
+  "usage.cost": msg("Usage: Cost"),
+  "usage.tokens": msg("Usage: Tokens"),
+  "usage.limits": msg("Usage: Limits"),
+  "usage.period.day": msg("Usage: Period: Past 24h"),
+  "usage.period.week": msg("Usage: Period: 7 days"),
+  "usage.period.month": msg("Usage: Period: 30 days"),
+  "usage.period.quarter": msg("Usage: Period: 90 days"),
+};
+
+const LATE_COMMAND_LABELS: Partial<Record<KeybindingCommand, string>> = {
+  "view.reopenClosed": msg("Reopen Closed Tab"),
+  "preview.focusUrl": msg("Preview: Focus URL"),
+  "preview.find": msg("Preview: Find on Page"),
+};
+
+export function commandLabel(command: KeybindingCommand, resolve: MessageResolver = m): string {
+  const label = COMMAND_LABELS[command];
+  if (label) return resolve(label);
+  const usageLabel = USAGE_COMMAND_LABELS[command as keyof typeof USAGE_COMMAND_LABELS];
+  if (usageLabel) return resolve(usageLabel);
+  const lateLabel = LATE_COMMAND_LABELS[command];
+  if (lateLabel) return resolve(lateLabel);
   const raw = String(command);
-  if (!raw.startsWith("script.") || !raw.endsWith(".run"))
-    throw new Error(`Unknown keybinding command: ${raw}`);
-  return t(($) => $.commands.runScript, {
-    script: titleCaseCommandSegment(raw.slice("script.".length, -".run".length)),
-  });
+  if (raw.startsWith("thread.jump.")) {
+    return resolve(msg("Thread: Jump: {n}", { n: raw.slice("thread.jump.".length) }));
+  }
+  if (raw.startsWith("modelPicker.jump.")) {
+    return resolve(msg("Model Picker: Jump: {n}", { n: raw.slice("modelPicker.jump.".length) }));
+  }
+  if (raw.startsWith("script.") && raw.endsWith(".run")) {
+    return resolve(
+      msg("Run Script: {name}", {
+        name: titleCaseCommandSegment(raw.slice("script.".length, -".run".length)),
+      }),
+    );
+  }
+  return raw.split(".").map(titleCaseCommandSegment).join(": ");
 }
 
 function titleCaseCommandSegment(segment: string): string {

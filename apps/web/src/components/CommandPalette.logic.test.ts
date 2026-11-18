@@ -1,4 +1,4 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
+import { threadKey } from "@t3tools/client-runtime/state/entities";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { EnvironmentId, ProjectId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
 import type { Thread } from "../types";
@@ -17,10 +17,6 @@ import {
   reduceCommandPaletteSearchState,
   type CommandPaletteUiState,
 } from "./CommandPalette.logic";
-
-const translations = createI18n("en");
-const t = translations.getFixedT(null, "workspace");
-const tCommon = translations.getFixedT(null, "common");
 
 describe("linked pull request thread navigation", () => {
   it("keeps archived relations searchable and routes them through the PR environment", async () => {
@@ -48,15 +44,8 @@ describe("linked pull request thread navigation", () => {
       },
     );
     expect(state.openIntent).toEqual({ kind: "search", query, linkedThreads });
-    const items = buildLinkedThreadActionItems({
-      t,
-      ...linkedThreads,
-      query,
-      icon: null,
-      runThread,
-    });
+    const items = buildLinkedThreadActionItems({ ...linkedThreads, query, icon: null, runThread });
     const groups = filterCommandPaletteGroups({
-      t,
       activeGroups: [],
       query,
       isInSubmenu: false,
@@ -180,8 +169,6 @@ describe("buildThreadActionItems", () => {
     const remote = makeThread({ environmentId: EnvironmentId.make("remote-copy") });
     const runThread = vi.fn(async () => {});
     const items = buildThreadActionItems({
-      t,
-      tCommon,
       threads: [local, remote],
       activeThread: remote,
       projectByKey: new Map([
@@ -199,8 +186,6 @@ describe("buildThreadActionItems", () => {
 
   it("ranks thread title matches ahead of contextual project-name matches", () => {
     const threadItems = buildThreadActionItems({
-      t,
-      tCommon,
       threads: [
         makeThread({
           id: ThreadId.make("thread-context-match"),
@@ -220,7 +205,6 @@ describe("buildThreadActionItems", () => {
     });
 
     const groups = filterCommandPaletteGroups({
-      t,
       activeGroups: [],
       query: "project",
       isInSubmenu: false,
@@ -259,19 +243,16 @@ describe("buildThreadActionItems", () => {
     const rootGroups = [{ value: "actions", label: "Actions", items: [newThreadIn, addProject] }];
     const search = (query: string, isInSubmenu: boolean) =>
       filterCommandPaletteGroups({
-        t,
         activeGroups: isInSubmenu ? newThreadIn.groups : rootGroups,
         query,
         isInSubmenu,
         allOptions: {
           rootGroups,
-          nestedItems: buildNestedSearchItems([newThreadIn, addProject], query, t),
+          nestedItems: buildNestedSearchItems([newThreadIn, addProject], query),
         },
         projectSearchItems: [],
         threadSearchItems: [
           ...buildThreadActionItems({
-            t,
-            tCommon,
             threads: [makeThread({ title: "Thread about t3code" })],
             projectByKey: new Map(),
             icon: null,
@@ -295,8 +276,6 @@ describe("buildThreadActionItems", () => {
       makeThread({ id: ThreadId.make("message"), title: "Fix schema validation" }),
     ];
     const items = buildThreadActionItems({
-      t,
-      tCommon,
       threads,
       projectByKey: new Map(),
       icon: null,
@@ -304,7 +283,6 @@ describe("buildThreadActionItems", () => {
     });
     const filter = (threadMessageItems: typeof items) =>
       filterCommandPaletteGroups({
-        t,
         activeGroups: [],
         query: "convex",
         isInSubmenu: false,
@@ -334,8 +312,6 @@ describe("buildThreadActionItems", () => {
       run: async () => undefined,
     });
     const threadSearchItems = buildThreadActionItems({
-      t,
-      tCommon,
       threads: [
         makeThread({
           title: "Compaction prompt timing and cache age",
@@ -348,7 +324,6 @@ describe("buildThreadActionItems", () => {
     });
     const firstGroup = (query: string) =>
       filterCommandPaletteGroups({
-        t,
         activeGroups: [
           { value: "actions", label: "Actions", items: [action("action:copy", "Copy thread ID")] },
         ],
@@ -378,8 +353,6 @@ describe("buildThreadActionItems", () => {
       run: async () => undefined,
     });
     const threadSearchItems = buildThreadActionItems({
-      t,
-      tCommon,
       threads: [makeThread({ title: "Upgrade to pnpm 12" })],
       projectByKey: new Map(),
       icon: null,
@@ -387,7 +360,6 @@ describe("buildThreadActionItems", () => {
     });
     const labels = (query: string) =>
       filterCommandPaletteGroups({
-        t,
         activeGroups: [
           { value: "actions", label: "Actions", items: [action("action:upload", "Upload file")] },
         ],
@@ -401,7 +373,6 @@ describe("buildThreadActionItems", () => {
     expect(labels("upl")).toEqual(["Actions"]);
     // A short query still finds a command by a keyword it equals.
     const prGroups = filterCommandPaletteGroups({
-      t,
       activeGroups: [
         {
           value: "actions",
@@ -439,8 +410,6 @@ describe("buildThreadActionItems", () => {
       makeThread({ id: ThreadId.make("thread-other"), title: "New thread button" }),
     ];
     const threadSearchItems = buildThreadActionItems({
-      t,
-      tCommon,
       threads,
       activeThread: threads[1]!,
       projectByKey: new Map(),
@@ -448,7 +417,6 @@ describe("buildThreadActionItems", () => {
       runThread: async () => undefined,
     });
     const groups = filterCommandPaletteGroups({
-      t,
       activeGroups: [
         {
           value: "actions",
@@ -476,8 +444,6 @@ describe("buildThreadActionItems", () => {
 
   it("lists a project above threads that only hold its name when the name is typed", () => {
     const threadSearchItems = buildThreadActionItems({
-      t,
-      tCommon,
       threads: [makeThread({ title: "Lakebed performance gains" })],
       projectByKey: new Map(),
       icon: null,
@@ -495,7 +461,6 @@ describe("buildThreadActionItems", () => {
     ];
     const labels = (query: string) =>
       filterCommandPaletteGroups({
-        t,
         activeGroups: [],
         query,
         isInSubmenu: false,
@@ -509,8 +474,6 @@ describe("buildThreadActionItems", () => {
   it("keeps a command first over a thread in daily use that matches as well", () => {
     const now = Date.parse("2026-10-23T00:00:00.000Z");
     const threadSearchItems = buildThreadActionItems({
-      t,
-      tCommon,
       threads: [
         makeThread({
           title: "New onboarding flow",
@@ -523,7 +486,6 @@ describe("buildThreadActionItems", () => {
       runThread: async () => undefined,
     });
     const groups = filterCommandPaletteGroups({
-      t,
       activeGroups: [
         {
           value: "actions",
@@ -570,7 +532,6 @@ describe("buildThreadActionItems", () => {
     ];
 
     const groups = filterCommandPaletteGroups({
-      t,
       activeGroups: [],
       query: "pairing remote",
       isInSubmenu: false,
@@ -589,7 +550,6 @@ describe("buildThreadActionItems", () => {
 
   it("searches a styled command title by its plain text", () => {
     const groups = filterCommandPaletteGroups({
-      t,
       activeGroups: [
         {
           value: "actions",
@@ -620,7 +580,6 @@ describe("buildThreadActionItems", () => {
 
   it("forgives a typo in a setting name when nothing matches exactly", () => {
     const groups = filterCommandPaletteGroups({
-      t,
       activeGroups: [],
       query: "keybindngs",
       isInSubmenu: false,
@@ -651,7 +610,6 @@ describe("buildThreadActionItems", () => {
       });
     try {
       const groups = filterCommandPaletteGroups({
-        t,
         activeGroups: [],
         query: "GIT",
         isInSubmenu: false,
@@ -688,8 +646,6 @@ describe("buildThreadActionItems", () => {
       updatedAt: "2026-03-04T00:00:00.000Z",
     });
     const items = buildThreadActionItems({
-      t,
-      tCommon,
       threads: [idThread, titleThread],
       projectByKey: new Map([[`${LOCAL_ENVIRONMENT_ID}:${PROJECT_ID}`, { title: "T3 Code" }]]),
       icon: null,
@@ -697,7 +653,6 @@ describe("buildThreadActionItems", () => {
     });
 
     const groups = filterCommandPaletteGroups({
-      t,
       activeGroups: [],
       query: "  THREAD-ALPHA-1234  ",
       isInSubmenu: false,
@@ -712,13 +667,13 @@ describe("buildThreadActionItems", () => {
     ]);
   });
 
-  it("hides subagent threads but keeps forks", () => {
+  it("hides subagent threads and tasks shown under their parent but keeps forks", () => {
     const parentId = ThreadId.make("parent");
+    const delegatedId = ThreadId.make("delegated");
     const items = buildThreadActionItems({
-      t,
-      tCommon,
       threads: [
         makeThread({ id: parentId, title: "Parent" }),
+        makeThread({ id: delegatedId, title: "Delegated task" }),
         makeThread({
           id: ThreadId.make("subagent"),
           title: "Subagent",
@@ -738,6 +693,9 @@ describe("buildThreadActionItems", () => {
           },
         }),
       ],
+      delegatedUnderParent: new Set([
+        threadKey({ environmentId: LOCAL_ENVIRONMENT_ID, threadId: delegatedId }),
+      ]),
       projectByKey: new Map(),
       icon: null,
       runThread: async () => undefined,
@@ -751,8 +709,6 @@ describe("buildThreadActionItems", () => {
 
   it("ranks word-start title matches above newer mid-word matches", () => {
     const items = buildThreadActionItems({
-      t,
-      tCommon,
       threads: [
         makeThread({
           id: ThreadId.make("mid-word"),
@@ -777,7 +733,6 @@ describe("buildThreadActionItems", () => {
     });
 
     const groups = filterCommandPaletteGroups({
-      t,
       activeGroups: [],
       query: "auth",
       isInSubmenu: false,
@@ -794,8 +749,6 @@ describe("buildThreadActionItems", () => {
 
   it("breaks ties between equal matches by latest user message", () => {
     const items = buildThreadActionItems({
-      t,
-      tCommon,
       threads: [
         makeThread({
           id: ThreadId.make("prefix-stale"),
@@ -816,7 +769,6 @@ describe("buildThreadActionItems", () => {
     });
 
     const groups = filterCommandPaletteGroups({
-      t,
       activeGroups: [],
       query: "auth",
       isInSubmenu: false,
@@ -849,6 +801,26 @@ describe("filterPinnedBrowseEntries", () => {
       visibleEntries: windowsEntries,
       exactEntry: windowsEntries[0],
     });
+    const decomposed = { name: "De\u0301veloppement", fullPath: "/Users/me/De\u0301veloppement" };
+    expect(
+      filterPinnedBrowseEntries({
+        browseEntries: [decomposed],
+        filterQuery: "D\u00e9veloppement",
+        pinnedDirectoryName: "repo",
+        caseSensitive: true,
+      }).exactEntry,
+    ).toBe(decomposed);
+    expect(
+      filterPinnedBrowseEntries({
+        browseEntries: [
+          { name: "\u212B", fullPath: "/home/me/\u212B" },
+          { name: "A\u030A", fullPath: "/home/me/A\u030A" },
+        ],
+        filterQuery: "\u00C5",
+        pinnedDirectoryName: "repo",
+        caseSensitive: true,
+      }).exactEntry,
+    ).toBeNull();
   });
 });
 
@@ -859,8 +831,6 @@ it.each([
   "https://github.com/pingdotgg/t3code/pull/10839",
 ])("finds linked threads from PR query %s", (query) => {
   const items = buildThreadActionItems({
-    t,
-    tCommon,
     threads: [
       makeThread({
         title: "Implementation",
@@ -884,7 +854,6 @@ it.each([
     runThread: async () => undefined,
   });
   const groups = filterCommandPaletteGroups({
-    t,
     activeGroups: [],
     query,
     isInSubmenu: false,

@@ -1,8 +1,3 @@
-import { resources } from "@t3tools/client-runtime/i18n";
-import type { UseTranslationResponse } from "react-i18next";
-
-export type SettingsTranslation = UseTranslationResponse<"settings", undefined>["t"];
-
 import { HOSTED_APP_CHANNEL } from "~/branding";
 import { isElectron, isSecretsFeatureEnabled } from "~/env";
 import { isMacPlatform, isWindowsPlatform, normalizeSearchText } from "~/lib/utils";
@@ -15,10 +10,12 @@ import {
 } from "@t3tools/client-runtime/source-control-clients";
 import { DEFAULT_KEYBINDINGS } from "@t3tools/shared/keybindings";
 import * as Schema from "effect/Schema";
-import { TYPOGRAPHY_ADVANCED_STORAGE_KEY } from "~/appearanceFonts";
-import { writeLocalStorageValue } from "~/hooks/useLocalStorage";
-import { commandLabel } from "~/components/settings/KeybindingsSettings.logic";
-import type { ResolvedSettingsScope } from "~/components/settings/settingsScope";
+import { decodeMsg, msg, useMessages } from "gt-react";
+import { TYPOGRAPHY_ADVANCED_STORAGE_KEY } from "../../appearanceFonts";
+import { writeLocalStorageValue } from "../../hooks/useLocalStorage";
+import type { MessageResolver } from "../../i18n/messages";
+import { commandLabel } from "./KeybindingsSettings.logic";
+import type { ResolvedSettingsScope } from "./settingsScope";
 
 export type SettingsPath =
   | "/settings/projects"
@@ -96,222 +93,106 @@ export interface SettingsSearchAvailability {
   readonly hasPrimaryEnvironment?: boolean;
 }
 
-const englishSectionLabels: Readonly<Record<SettingsPath, string>> = {
-  "/settings/diagnostics": resources.en.settings.navigation.diagnostics,
-  "/settings/projects": resources.en.settings.navigation.projects,
-  "/settings/general": resources.en.settings.navigation.general,
-  "/settings/appearance": resources.en.settings.navigation.appearance,
-  "/settings/chat": resources.en.settings.navigation.chat,
-  "/settings/diffs": resources.en.settings.navigation.diffs,
-  "/settings/keybindings": resources.en.settings.navigation.keybindings,
-  "/settings/snap-shot": resources.en.settings.navigation.snapShot,
-  "/settings/providers": resources.en.settings.navigation.providers,
-  "/settings/threads": resources.en.settings.navigation.threads,
-  "/settings/browser": resources.en.settings.navigation.browser,
-  "/settings/devices": resources.en.settings.navigation.devices,
-  "/settings/scheduled-tasks": resources.en.settings.navigation.scheduledTasks,
-  "/settings/source-control": resources.en.settings.navigation.sourceControl,
-  "/settings/worktrees": resources.en.settings.navigation.worktrees,
-  "/settings/connections": resources.en.settings.navigation.connections,
-  "/settings/access": resources.en.settings.navigation.access,
-  "/settings/secrets": resources.en.settings.navigation.secrets,
-  "/settings/maintenance": resources.en.settings.navigation.maintenance,
-  "/settings/labs": resources.en.settings.navigation.labs,
-  "/settings/about": resources.en.settings.navigation.about,
-  "/settings/voice": resources.en.settings.navigation.voice,
-  "/settings/archived": resources.en.settings.navigation.archived,
+export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
+  "/settings/diagnostics": msg("Diagnostics"),
+  "/settings/projects": msg("Projects"),
+  "/settings/general": msg("General"),
+  "/settings/appearance": msg("Appearance"),
+  "/settings/chat": msg("Chat"),
+  "/settings/diffs": msg("Diffs & pull requests"),
+  "/settings/keybindings": msg("Keybindings"),
+  "/settings/snap-shot": msg("SnapShots"),
+  "/settings/providers": msg("Providers"),
+  "/settings/threads": msg("Threads"),
+  "/settings/browser": msg("Browser"),
+  "/settings/devices": msg("Devices"),
+  "/settings/scheduled-tasks": msg("Scheduled tasks"),
+  "/settings/source-control": msg("Source control & issues"),
+  "/settings/worktrees": msg("Worktrees"),
+  "/settings/connections": msg("Environments"),
+  "/settings/access": msg("Sharing & access"),
+  "/settings/secrets": msg("Secrets"),
+  "/settings/maintenance": msg("Maintenance"),
+  "/settings/labs": msg("Labs"),
+  "/settings/about": msg("About"),
+  "/settings/voice": msg("Voice"),
+  "/settings/archived": msg("Archive"),
 };
 
-export function settingsSectionLabels(
-  t: SettingsTranslation,
-): Readonly<Record<SettingsPath, string>> {
-  return {
-    "/settings/diagnostics": t(($) => $.navigation.diagnostics),
-    "/settings/projects": t(($) => $.navigation.projects),
-    "/settings/general": t(($) => $.navigation.general),
-    "/settings/appearance": t(($) => $.navigation.appearance),
-    "/settings/chat": t(($) => $.navigation.chat),
-    "/settings/diffs": t(($) => $.navigation.diffs),
-    "/settings/keybindings": t(($) => $.navigation.keybindings),
-    "/settings/snap-shot": t(($) => $.navigation.snapShot),
-    "/settings/providers": t(($) => $.navigation.providers),
-    "/settings/threads": t(($) => $.navigation.threads),
-    "/settings/browser": t(($) => $.navigation.browser),
-    "/settings/devices": t(($) => $.navigation.devices),
-    "/settings/scheduled-tasks": t(($) => $.navigation.scheduledTasks),
-    "/settings/source-control": t(($) => $.navigation.sourceControl),
-    "/settings/worktrees": t(($) => $.navigation.worktrees),
-    "/settings/connections": t(($) => $.navigation.connections),
-    "/settings/access": t(($) => $.navigation.access),
-    "/settings/secrets": t(($) => $.navigation.secrets),
-    "/settings/maintenance": t(($) => $.navigation.maintenance),
-    "/settings/labs": t(($) => $.navigation.labs),
-    "/settings/about": t(($) => $.navigation.about),
-    "/settings/voice": t(($) => $.navigation.voice),
-    "/settings/archived": t(($) => $.navigation.archived),
-  };
-}
+/** Sidebar labels; an entry of its own lets a translator shorten one below its page title. */
+export const SETTINGS_NAV_LABELS: Readonly<Record<SettingsPath, string>> = {
+  ...SETTINGS_SECTION_LABELS,
+  "/settings/source-control": msg("Source control & issues", {
+    $context: "settings navigation item",
+  }),
+  "/settings/access": msg("Sharing & access", { $context: "settings navigation item" }),
+};
 
 /** Sidebar order. A group with a hidden heading is set apart on screen by space alone. */
-export function settingsNavGroups(t: SettingsTranslation): ReadonlyArray<{
+export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
   readonly heading: string;
   readonly headingHidden?: true;
   readonly paths: ReadonlyArray<SettingsPath>;
-}> {
-  return [
-    {
-      heading: t(($) => $.navigation.preferences),
-      headingHidden: true,
-      paths: [
-        "/settings/general",
-        "/settings/appearance",
-        "/settings/chat",
-        "/settings/diffs",
-        "/settings/keybindings",
-        "/settings/voice",
-        "/settings/snap-shot",
-      ],
-    },
-    {
-      heading: t(($) => $.navigation.agents),
-      paths: [
-        "/settings/providers",
-        "/settings/threads",
-        "/settings/browser",
-        "/settings/devices",
-        "/settings/scheduled-tasks",
-      ],
-    },
-    {
-      heading: t(($) => $.navigation.code),
-      paths: ["/settings/projects", "/settings/source-control", "/settings/worktrees"],
-    },
-    {
-      heading: t(($) => $.navigation.groupConnections),
-      paths: [
-        "/settings/connections",
-        "/settings/access",
-        ...(isSecretsFeatureEnabled ? (["/settings/secrets"] as const) : []),
-      ],
-    },
-    {
-      heading: t(($) => $.navigation.more),
-      headingHidden: true,
-      paths: ["/settings/maintenance", "/settings/labs", "/settings/about", "/settings/archived"],
-    },
-  ];
-}
+}> = [
+  {
+    heading: msg("Preferences"),
+    headingHidden: true,
+    paths: [
+      "/settings/general",
+      "/settings/appearance",
+      "/settings/chat",
+      "/settings/diffs",
+      "/settings/keybindings",
+      "/settings/voice",
+      "/settings/snap-shot",
+    ],
+  },
+  {
+    heading: msg("Agents"),
+    paths: [
+      "/settings/providers",
+      "/settings/threads",
+      "/settings/browser",
+      "/settings/devices",
+      "/settings/scheduled-tasks",
+    ],
+  },
+  {
+    heading: msg("Code"),
+    paths: ["/settings/projects", "/settings/source-control", "/settings/worktrees"],
+  },
+  {
+    heading: msg("Connections"),
+    paths: [
+      "/settings/connections",
+      "/settings/access",
+      ...(isSecretsFeatureEnabled ? (["/settings/secrets"] as const) : []),
+    ],
+  },
+  {
+    heading: msg("More"),
+    headingHidden: true,
+    paths: ["/settings/maintenance", "/settings/labs", "/settings/about", "/settings/archived"],
+  },
+];
 
 export function keybindingSearchAnchorId<Command extends KeybindingCommand>(command: Command) {
   return `keybinding-${command}` as const;
 }
 
-const englishCommandLabels = {
-  "thread.jump.1": resources.en.settings.commands.threadJump1,
-  "thread.jump.2": resources.en.settings.commands.threadJump2,
-  "thread.jump.3": resources.en.settings.commands.threadJump3,
-  "thread.jump.4": resources.en.settings.commands.threadJump4,
-  "thread.jump.5": resources.en.settings.commands.threadJump5,
-  "thread.jump.6": resources.en.settings.commands.threadJump6,
-  "thread.jump.7": resources.en.settings.commands.threadJump7,
-  "thread.jump.8": resources.en.settings.commands.threadJump8,
-  "thread.jump.9": resources.en.settings.commands.threadJump9,
-  "modelPicker.jump.1": resources.en.settings.commands.modelPickerJump1,
-  "modelPicker.jump.2": resources.en.settings.commands.modelPickerJump2,
-  "modelPicker.jump.3": resources.en.settings.commands.modelPickerJump3,
-  "modelPicker.jump.4": resources.en.settings.commands.modelPickerJump4,
-  "modelPicker.jump.5": resources.en.settings.commands.modelPickerJump5,
-  "modelPicker.jump.6": resources.en.settings.commands.modelPickerJump6,
-  "modelPicker.jump.7": resources.en.settings.commands.modelPickerJump7,
-  "modelPicker.jump.8": resources.en.settings.commands.modelPickerJump8,
-  "modelPicker.jump.9": resources.en.settings.commands.modelPickerJump9,
-  "thread.stop": resources.en.settings.commands.threadStop,
-  "thread.steerQueuedMessage": resources.en.settings.commands.threadSteerQueuedMessage,
-  "thread.editQueuedMessage": resources.en.settings.commands.threadEditQueuedMessage,
-  "thread.previous": resources.en.settings.commands.threadPrevious,
-  "thread.next": resources.en.settings.commands.threadNext,
-  "thread.copyReference": resources.en.settings.commands.threadCopyReference,
-  "thread.settle": resources.en.settings.commands.threadSettle,
-  "thread.pin": resources.en.settings.commands.threadPin,
-  "thread.undo": resources.en.settings.commands.threadUndo,
-  "thread.regenerateTitle": resources.en.settings.commands.threadRegenerateTitle,
-  "modelPicker.toggle": resources.en.settings.commands.modelPickerToggle,
-  "modelPicker.previousProvider": resources.en.settings.commands.modelPickerPreviousProvider,
-  "modelPicker.nextProvider": resources.en.settings.commands.modelPickerNextProvider,
-  "workspace.focusNext": resources.en.settings.commands.workspaceFocusNext,
-  "workspace.focusPrevious": resources.en.settings.commands.workspaceFocusPrevious,
-  "sidebar.toggle": resources.en.settings.commands.sidebarToggle,
-  "navigation.back": resources.en.settings.commands.navigationBack,
-  "navigation.forward": resources.en.settings.commands.navigationForward,
-  "terminal.toggle": resources.en.settings.commands.terminalToggle,
-  "terminal.split": resources.en.settings.commands.terminalSplit,
-  "terminal.splitVertical": resources.en.settings.commands.terminalSplitVertical,
-  "terminal.new": resources.en.settings.commands.terminalNew,
-  "terminal.close": resources.en.settings.commands.terminalClose,
-  "rightPanel.toggle": resources.en.settings.commands.rightPanelToggle,
-  "rightPanel.new": resources.en.settings.commands.rightPanelNew,
-  "threadPanel.toggle": resources.en.settings.commands.threadPanelToggle,
-  "rightPanel.toggleMaximized": resources.en.settings.commands.rightPanelToggleMaximized,
-  "rightPanel.close": resources.en.settings.commands.rightPanelClose,
-  "view.reopenClosed": resources.en.settings.commands.viewReopenClosed,
-  "pullRequest.copyNumber": resources.en.settings.commands.pullRequestCopyNumber,
-  "diff.toggle": resources.en.settings.commands.diffToggle,
-  "preview.toggle": resources.en.settings.commands.previewToggle,
-  "preview.refresh": resources.en.settings.commands.previewRefresh,
-  "preview.focusUrl": resources.en.settings.commands.previewFocusUrl,
-  "preview.find": resources.en.settings.commands.previewFind,
-  "preview.zoomIn": resources.en.settings.commands.previewZoomIn,
-  "preview.zoomOut": resources.en.settings.commands.previewZoomOut,
-  "preview.resetZoom": resources.en.settings.commands.previewResetZoom,
-  "commandPalette.toggle": resources.en.settings.commands.commandPaletteToggle,
-  "filePicker.toggle": resources.en.settings.commands.filePickerToggle,
-  "projectSearch.toggle": resources.en.settings.commands.projectSearchToggle,
-  "usage.open": resources.en.settings.commands.usageOpen,
-  "theme.select": resources.en.settings.commands.themeSelect,
-  "appearance.cycle": resources.en.settings.commands.appearanceCycle,
-  "themeEditor.toggle": resources.en.settings.commands.themeEditorToggle,
-  "composer.stash": resources.en.settings.commands.composerStash,
-  "composer.sendAlternate": resources.en.settings.commands.composerSendAlternate,
-  "composer.sendBackground": resources.en.settings.commands.composerSendBackground,
-  "composer.sendAndNewThread": resources.en.settings.commands.composerSendAndNewThread,
-  "composer.dictation": resources.en.settings.commands.composerDictation,
-  "composer.host": resources.en.settings.commands.composerHost,
-  "composer.cycleHost": resources.en.settings.commands.composerCycleHost,
-  "composer.effort": resources.en.settings.commands.composerEffort,
-  "composer.increaseEffort": resources.en.settings.commands.composerIncreaseEffort,
-  "composer.decreaseEffort": resources.en.settings.commands.composerDecreaseEffort,
-  "composer.mode": resources.en.settings.commands.composerMode,
-  "composer.workspace": resources.en.settings.commands.composerWorkspace,
-  "composer.previousWorktree": resources.en.settings.commands.composerPreviousWorktree,
-  "composer.branch": resources.en.settings.commands.composerBranch,
-  "chat.new": resources.en.settings.commands.chatNew,
-  "chat.newLocal": resources.en.settings.commands.chatNewLocal,
-  "chat.newWithoutProject": resources.en.settings.commands.chatNewWithoutProject,
-  "chat.find": resources.en.settings.commands.chatFind,
-  "editor.openFavorite": resources.en.settings.commands.editorOpenFavorite,
-  "usage.cost": resources.en.settings.commands.usageCost,
-  "usage.tokens": resources.en.settings.commands.usageTokens,
-  "usage.limits": resources.en.settings.commands.usageLimits,
-  "usage.period.day": resources.en.settings.commands.usagePeriodDay,
-  "usage.period.week": resources.en.settings.commands.usagePeriodWeek,
-  "usage.period.month": resources.en.settings.commands.usagePeriodMonth,
-  "usage.period.quarter": resources.en.settings.commands.usagePeriodQuarter,
-} satisfies Record<(typeof STATIC_KEYBINDING_COMMANDS)[number], string>;
+const untranslated = ((message) => message) as MessageResolver;
 
-const KEYBINDING_SEARCH_SOURCES = STATIC_KEYBINDING_COMMANDS.map((command) => {
+const KEYBINDING_SEARCH_ITEMS = STATIC_KEYBINDING_COMMANDS.toSorted((left, right) =>
+  commandLabel(left).localeCompare(commandLabel(right)),
+).map((command) => {
   const defaultKeys = DEFAULT_KEYBINDINGS.filter((binding) => binding.command === command).map(
     (binding) => binding.key,
   );
   return {
     id: keybindingSearchAnchorId(command),
-    title: (t: SettingsTranslation) => commandLabel(command, t),
+    title: commandLabel(command, untranslated),
     to: "/settings/keybindings" as const,
-    searchTerms: [
-      command,
-      ...defaultKeys,
-      englishCommandLabels[command],
-      command.replace(/([a-z])([A-Z])/g, "$1 $2").replaceAll(".", " "),
-    ],
+    searchTerms: [command, ...defaultKeys],
     secondary: true,
     ...(defaultKeys.length === 0 ? { targetId: "keybindings" } : {}),
   };
@@ -322,10 +203,10 @@ export function sourceControlHostSettingsSearchId(kind: string) {
 }
 
 /** Each host's own settings: its accounts and token, or the fields of its settings form. */
-function sourceControlHostSearchSources(
+export function sourceControlHostSearchItems(
   definitions: ReadonlyArray<SourceControlDefinition>,
 ): ReadonlyArray<
-  SettingsSearchSource & { readonly id: ReturnType<typeof sourceControlHostSettingsSearchId> }
+  SettingsSearchItem & { readonly id: ReturnType<typeof sourceControlHostSettingsSearchId> }
 > {
   return definitions.flatMap((definition) => {
     if (!definition.settings) return [];
@@ -334,10 +215,9 @@ function sourceControlHostSearchSources(
     return [
       {
         id: sourceControlHostSettingsSearchId(definition.kind),
-        title: (t: SettingsTranslation) =>
-          credentials
-            ? t(($) => $.search.hostAccounts, { host: definition.label })
-            : t(($) => $.search.hostCredentials, { host: definition.label }),
+        title: credentials
+          ? msg("{label} accounts and token", { label: definition.label })
+          : msg("{label} credentials", { label: definition.label }),
         to: "/settings/source-control" as const,
         searchTerms: [
           credentials
@@ -359,1030 +239,949 @@ const SOURCE_CONTROL_HOST_TERMS = sourceControlClients.definitions
   .flatMap((definition) => [definition.label, ...(definition.searchKeywords ?? [])])
   .join(" ");
 
-type SettingsSearchSource = Omit<SettingsSearchItem, "title"> & {
-  readonly title: (t: SettingsTranslation) => string;
-  readonly englishTitle?: string;
-};
-
-const SETTINGS_SEARCH_ITEMS = [
-  {
-    id: "interface-language",
-    title: (t) => t(($) => $.search.interfaceLanguage),
-    englishTitle: resources.en.settings.search.interfaceLanguage,
-    to: "/settings/general",
-    searchTerms: [
-      "Language / Sprache",
-      "language sprache deutsch german english englisch locale übersetzung translation",
-    ],
-  },
+export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "storage-worktree-keep-when",
     targetId: "storage-worktrees",
-    title: (t) => t(($) => $.search.storageWorktreeKeepWhen),
-    englishTitle: resources.en.settings.search.storageWorktreeKeepWhen,
+    title: msg("Keep worktrees with local changes"),
     to: "/settings/worktrees",
     scope: "project-defaults",
     searchTerms: [
-      "any local files uncommitted changes edited tracked files ignored env build output cleanup",
+      msg(
+        "any local files uncommitted changes edited tracked files ignored env build output cleanup",
+      ),
     ],
   },
   {
     id: "storage-delete-now",
-    title: (t) => t(($) => $.search.storageDeleteNow),
-    englishTitle: resources.en.settings.search.storageDeleteNow,
+    title: msg("Delete now"),
     to: "/settings/maintenance",
     scope: "environment-defaults",
-    searchTerms: ["storage cleanup run now results report removed kept failed"],
+    searchTerms: [msg("storage cleanup run now results report removed kept failed")],
   },
   {
     id: "storage-worktrees",
-    title: (t) => t(($) => $.search.storageWorktrees),
-    englishTitle: resources.en.settings.search.storageWorktrees,
+    title: msg("Worktree cleanup"),
     to: "/settings/worktrees",
     scope: "project-defaults",
     searchTerms: [
-      "disk storage automatic delete deleted archived threads old inactive merged settled unchanged worktrees retention days project inherit off custom",
+      msg(
+        "disk storage automatic delete deleted archived threads old inactive merged settled unchanged worktrees retention days project inherit off custom",
+      ),
     ],
   },
   {
     id: "storage-worktrees-location",
-    title: (t) => t(($) => $.search.storageWorktreesLocation),
-    englishTitle: resources.en.settings.search.storageWorktreesLocation,
+    title: msg("Worktree location"),
     to: "/settings/worktrees",
     scope: "environment-defaults",
-    searchTerms: ["worktree location folder directory path drive external disk"],
+    searchTerms: [msg("worktree location folder directory path drive external disk")],
   },
   {
     id: "storage-artifacts",
-    title: (t) => t(($) => $.search.storageArtifacts),
-    englishTitle: resources.en.settings.search.storageArtifacts,
+    title: msg("Artifacts and logs"),
     to: "/settings/maintenance",
     scope: "environment-defaults",
     searchTerms: [
-      "disk storage delete old browser artifacts screenshots captures rotated logs cleanup retention",
+      msg(
+        "disk storage delete old browser artifacts screenshots captures rotated logs cleanup retention",
+      ),
     ],
   },
   {
     id: "project-defaults",
-    title: (t) => t(($) => $.search.projectDefaults),
-    englishTitle: resources.en.settings.search.projectDefaults,
+    title: msg("Project defaults and overrides"),
     to: "/settings/threads",
     scope: "project-defaults",
-    searchTerms: ["model workspace environments projects inheritance checkout"],
+    searchTerms: [msg("model workspace environments projects inheritance checkout")],
   },
   {
     id: "project-overview",
-    title: (t) => t(($) => $.search.projectOverview),
-    englishTitle: resources.en.settings.search.projectOverview,
+    title: msg("Project overview"),
     to: "/settings/projects",
-    searchTerms: ["name icon emoji image checkout remove delete"],
+    searchTerms: [msg("name icon emoji image checkout remove delete")],
   },
   {
     id: "default-model",
-    title: (t) => t(($) => $.search.defaultModel),
-    englishTitle: resources.en.settings.search.defaultModel,
+    title: msg("Default model"),
     to: "/settings/threads",
     scope: "project-defaults",
-    searchTerms: ["new thread project provider reasoning effort"],
+    searchTerms: [msg("new thread project provider reasoning effort")],
   },
   {
     id: "fallback-model",
-    title: (t) => t(($) => $.search.fallbackModel),
-    englishTitle: resources.en.settings.search.fallbackModel,
+    title: msg("Fallback model"),
     to: "/settings/threads",
     scope: "environment-defaults",
-    searchTerms: ["fallback agent provider out of usage new threads"],
+    searchTerms: [msg("fallback agent provider out of usage new threads")],
     environmentOnly: true,
   },
   {
     id: "default-permissions",
-    title: (t) => t(($) => $.search.defaultPermissions),
-    englishTitle: resources.en.settings.search.defaultPermissions,
+    title: msg("Permissions"),
     to: "/settings/threads",
     scope: "project-defaults",
     searchTerms: [
-      "new thread default runtime mode supervised approvals auto accept edits full access",
+      msg("new thread default runtime mode supervised approvals auto accept edits full access"),
     ],
   },
   {
     id: "color-scheme",
-    title: (t) => t(($) => $.search.colorScheme),
-    englishTitle: resources.en.settings.search.colorScheme,
+    title: msg("Color scheme"),
     to: "/settings/appearance",
-    searchTerms: ["appearance light dark system mode"],
+    searchTerms: [msg("appearance light dark system mode")],
     targetId: "appearance",
   },
   {
     id: "theme",
-    title: (t) => t(($) => $.search.theme),
-    englishTitle: resources.en.settings.search.theme,
+    title: msg("Themes"),
     to: "/settings/appearance",
-    searchTerms: ["appearance colors palette custom import"],
+    searchTerms: [msg("appearance colors palette custom import")],
     targetId: "appearance",
   },
   {
     // Prefixed because the slider control already owns the `appearance-contrast` id.
     id: "setting-appearance-contrast",
-    title: (t) => t(($) => $.search.settingAppearanceContrast),
-    englishTitle: resources.en.settings.search.settingAppearanceContrast,
+    title: msg("Contrast"),
     to: "/settings/appearance",
-    searchTerms: ["colors borders interface"],
+    searchTerms: [msg("colors borders interface")],
   },
   {
     // Prefixed because the slider control already owns the `glass-opacity` id.
     id: "setting-glass-opacity",
-    title: (t) => t(($) => $.search.settingGlassOpacity),
-    englishTitle: resources.en.settings.search.settingGlassOpacity,
+    title: msg("Glass opacity"),
     to: "/settings/appearance",
-    searchTerms: ["transparent transparency solid menus dialogs composer"],
+    searchTerms: [msg("transparent transparency solid menus dialogs composer")],
   },
   {
     id: "diff-color-scheme",
-    title: (t) => t(($) => $.search.diffColorScheme),
-    englishTitle: resources.en.settings.search.diffColorScheme,
+    title: msg("Diff colors"),
     to: "/settings/diffs",
-    searchTerms: ["red green blue orange additions deletions changes counts palette colorblind"],
+    searchTerms: [
+      msg("red green blue orange additions deletions changes counts palette colorblind"),
+    ],
   },
   {
     id: "chat-width",
-    title: (t) => t(($) => $.search.chatWidth),
-    englishTitle: resources.en.settings.search.chatWidth,
+    title: msg("Chat width"),
     to: "/settings/appearance",
-    searchTerms: ["wide full width column layout messages composer monitor"],
+    searchTerms: [msg("wide full width column layout messages composer monitor")],
   },
   {
     id: "thread-details-items",
-    title: (t) => t(($) => $.search.threadDetailsItems),
-    englishTitle: resources.en.settings.search.threadDetailsItems,
+    title: msg("Thread details"),
     to: "/settings/appearance",
     searchTerms: [
-      "customize show hide panel card environment editor scripts branch pull request git changes servers automations lineage usage limits 5 hour weekly quota tokens context window",
+      msg(
+        "customize show hide panel card environment editor scripts branch pull request git changes servers automations lineage usage limits 5 hour weekly quota tokens context window",
+      ),
     ],
   },
   {
     id: "effort-display",
-    title: (t) => t(($) => $.search.effortDisplay),
-    englishTitle: resources.en.settings.search.effortDisplay,
+    title: msg("Effort display"),
     to: "/settings/appearance",
-    searchTerms: ["reasoning effort thinking bars graph word label level composer"],
+    searchTerms: [msg("reasoning effort thinking bars graph word label level composer")],
   },
   {
     id: "math-rendering",
-    title: (t) => t(($) => $.search.mathRendering),
-    englishTitle: resources.en.settings.search.mathRendering,
+    title: msg("Render math"),
     to: "/settings/appearance",
-    searchTerms: ["latex tex katex equations formulas markdown"],
+    searchTerms: [msg("latex tex katex equations formulas markdown")],
   },
   {
     id: "panel-animations",
-    title: (t) => t(($) => $.search.panelAnimations),
-    englishTitle: resources.en.settings.search.panelAnimations,
+    title: msg("Panel animations"),
     to: "/settings/appearance",
   },
   {
     id: "environment-identification",
-    title: (t) => t(($) => $.search.environmentIdentification),
-    englishTitle: resources.en.settings.search.environmentIdentification,
+    title: msg("Environment identification"),
     to: "/settings/appearance",
-    searchTerms: ["dev nightly latest channel artwork pill label hide none"],
+    searchTerms: [msg("dev nightly latest channel artwork pill label hide none")],
     targetId: "appearance-interface",
   },
   {
     id: "interface-font",
-    title: (t) => t(($) => $.search.interfaceFont),
-    englishTitle: resources.en.settings.search.interfaceFont,
+    title: msg("Interface font"),
     to: "/settings/appearance",
-    searchTerms: ["typography family size system sans"],
+    searchTerms: [msg("typography family size system sans")],
   },
   {
     id: "prompt-font",
-    title: (t) => t(($) => $.search.promptFont),
-    englishTitle: resources.en.settings.search.promptFont,
+    title: msg("Prompt font"),
     to: "/settings/appearance",
-    searchTerms: ["typography family size composer input"],
+    searchTerms: [msg("typography family size composer input")],
   },
   {
     id: "code-font",
-    title: (t) => t(($) => $.search.codeFont),
-    englishTitle: resources.en.settings.search.codeFont,
+    title: msg("Code font"),
     to: "/settings/appearance",
-    searchTerms: ["typography family size monospace code blocks diffs file previews"],
+    searchTerms: [msg("typography family size monospace code blocks diffs file previews")],
   },
   {
     id: "terminal-font",
-    title: (t) => t(($) => $.search.terminalFont),
-    englishTitle: resources.en.settings.search.terminalFont,
+    title: msg("Terminal font"),
     to: "/settings/appearance",
-    searchTerms: ["typography family size monospace output"],
+    searchTerms: [msg("typography family size monospace output")],
   },
   {
     id: "separate-fonts",
-    title: (t) => t(($) => $.search.separateFonts),
-    englishTitle: resources.en.settings.search.separateFonts,
+    title: msg("Separate fonts"),
     to: "/settings/appearance",
-    searchTerms: ["typography advanced prompt code terminal font family size individually"],
+    searchTerms: [msg("typography advanced prompt code terminal font family size individually")],
   },
   {
     id: "font-smoothing",
-    title: (t) => t(($) => $.search.fontSmoothing),
-    englishTitle: resources.en.settings.search.fontSmoothing,
+    title: msg("Font smoothing"),
     to: "/settings/appearance",
-    searchTerms: ["typography text grayscale anti aliasing macos thin"],
+    searchTerms: [msg("typography text grayscale anti aliasing macos thin")],
     macOnly: true,
   },
   {
     id: "word-wrap",
-    title: (t) => t(($) => $.search.wordWrap),
-    englishTitle: resources.en.settings.search.wordWrap,
+    title: msg("Word wrap"),
     to: "/settings/appearance",
-    searchTerms: ["long lines code blocks diffs file previews"],
+    searchTerms: [msg("long lines code blocks diffs file previews")],
   },
   {
     id: "composer-context",
-    title: (t) => t(($) => $.search.composerContext),
-    englishTitle: resources.en.settings.search.composerContext,
+    title: msg("Composer context"),
     to: "/settings/appearance",
   },
   {
     id: "project-grouping",
-    title: (t) => t(($) => $.search.projectGrouping),
-    englishTitle: resources.en.settings.search.projectGrouping,
+    title: msg("Project grouping"),
     to: "/settings/general",
-    searchTerms: ["combine matching repositories environments sidebar"],
+    searchTerms: [msg("combine matching repositories environments sidebar")],
   },
   {
     id: "project-order",
-    title: (t) => t(($) => $.search.projectOrder),
-    englishTitle: resources.en.settings.search.projectOrder,
+    title: msg("Project order"),
     to: "/settings/general",
-    searchTerms: ["sort projects sidebar manual created recent"],
+    searchTerms: [msg("sort projects sidebar manual created recent")],
   },
   {
     id: "snooze-options",
-    title: (t) => t(($) => $.search.snoozeOptions),
-    englishTitle: resources.en.settings.search.snoozeOptions,
+    title: msg("Snooze options"),
     to: "/settings/threads",
-    searchTerms: ["snooze presets times later tonight tomorrow next week remind"],
+    searchTerms: [msg("snooze presets times later tonight tomorrow next week remind")],
     environmentOnly: true,
     scope: "environment-defaults",
   },
   {
     id: "snooze-limited-threads",
-    title: (t) => t(($) => $.search.snoozeLimitedThreads),
-    englishTitle: resources.en.settings.search.snoozeLimitedThreads,
+    title: msg("Snooze until limits reset"),
     to: "/settings/threads",
-    searchTerms: ["usage quota rate limit reset wake recover continue"],
+    searchTerms: [msg("usage quota rate limit reset wake recover continue")],
   },
   {
     id: "auto-resume-limited-threads",
-    title: (t) => t(($) => $.search.autoResumeLimitedThreads),
-    englishTitle: resources.en.settings.search.autoResumeLimitedThreads,
+    title: msg("Resume after usage limits"),
     to: "/settings/threads",
-    searchTerms: ["usage quota rate limit reset recover continue"],
+    searchTerms: [msg("usage quota rate limit reset recover continue")],
   },
   {
     id: "working-shelf",
-    title: (t) => t(($) => $.search.workingShelf),
-    englishTitle: resources.en.settings.search.workingShelf,
+    title: msg("Working section"),
     to: "/settings/general",
-    searchTerms: ["hide fold running monitoring threads inbox sidebar shelf"],
+    searchTerms: [msg("hide fold running monitoring threads inbox sidebar shelf")],
   },
   {
     id: "boring-sidebar",
-    title: (t) => t(($) => $.search.boringSidebar),
-    englishTitle: resources.en.settings.search.boringSidebar,
+    title: msg("Boring sidebar (group by project)"),
     to: "/settings/labs",
-    searchTerms: ["beta folders project tree classic sidebar"],
+    searchTerms: [msg("beta folders project tree classic sidebar")],
   },
   {
     id: "boring-sidebar-multiline",
-    title: (t) => t(($) => $.search.boringSidebarMultiline),
-    englishTitle: resources.en.settings.search.boringSidebarMultiline,
+    title: msg("Two-line folder rows"),
     to: "/settings/labs",
     // Shown inside the boring sidebar row only while it is on, so search lands on the parent.
     targetId: "boring-sidebar",
-    searchTerms: ["beta boring sidebar folder rows multiline branch pull request details"],
+    searchTerms: [msg("beta boring sidebar folder rows multiline branch pull request details")],
   },
   {
     id: "tool-call-visibility",
-    title: (t) => t(($) => $.search.toolCallVisibility),
-    englishTitle: resources.en.settings.search.toolCallVisibility,
+    title: msg("Tool calls in chat"),
     to: "/settings/chat",
     searchTerms: [
-      "hide tool calls commands edits searches work log activity quiet chat zen final answers only",
+      msg(
+        "hide tool calls commands edits searches work log activity quiet chat zen final answers only",
+      ),
     ],
   },
   {
     id: "screen-reader-announcements",
-    title: (t) => t(($) => $.search.screenReaderAnnouncements),
-    englishTitle: resources.en.settings.search.screenReaderAnnouncements,
+    title: msg("Screen reader announcements"),
     to: "/settings/chat",
     searchTerms: [
-      "accessibility a11y screen reader nvda jaws voiceover orca narrator speech announce read aloud messages activity steps",
+      msg(
+        "accessibility a11y screen reader nvda jaws voiceover orca narrator speech announce read aloud messages activity steps",
+      ),
     ],
   },
   {
     id: "screen-reader-window-title",
-    title: (t) => t(($) => $.search.screenReaderWindowTitle),
-    englishTitle: resources.en.settings.search.screenReaderWindowTitle,
+    title: msg("Screen reader window title"),
     to: "/settings/chat",
     searchTerms: [
-      "accessibility a11y screen reader nvda jaws voiceover orca narrator window title tab title alt tab taskbar thread status order working approval",
+      msg(
+        "accessibility a11y screen reader nvda jaws voiceover orca narrator window title tab title alt tab taskbar thread status order working approval",
+      ),
     ],
   },
   {
     id: "guest-links",
-    title: (t) => t(($) => $.search.guestLinks),
-    englishTitle: resources.en.settings.search.guestLinks,
+    title: msg("Guest links"),
     to: "/settings/labs",
     scope: "environment",
-    searchTerms: ["beta share guest invite link teammate watch t3 connect tunnel"],
+    searchTerms: [msg("beta share guest invite link teammate watch t3 connect tunnel")],
   },
   {
     id: "linked-environments-beta",
-    title: (t) => t(($) => $.search.linkedEnvironmentsBeta),
-    englishTitle: resources.en.settings.search.linkedEnvironmentsBeta,
+    title: msg("Linked environments"),
     to: "/settings/labs",
     scope: "environment",
-    searchTerms: ["beta link another machine vps peer agents work there delegate"],
+    searchTerms: [msg("beta link another machine vps peer agents work there delegate")],
   },
   {
     id: "prompt-suggestions-beta",
-    title: (t) => t(($) => $.search.promptSuggestionsBeta),
-    englishTitle: resources.en.settings.search.promptSuggestionsBeta,
+    title: msg("Suggest next prompt"),
     to: "/settings/labs",
     scope: "environment",
-    searchTerms: ["beta tab autocomplete predict next message claude codex ghost text"],
+    searchTerms: [msg("beta tab autocomplete predict next message claude codex ghost text")],
   },
   {
     id: "simlock-hosts",
-    title: (t) => t(($) => $.search.simlockHosts),
-    englishTitle: resources.en.settings.search.simlockHosts,
+    title: msg("Simlock device hosts (alpha)"),
     to: "/settings/labs",
     scope: "environment",
-    searchTerms: ["beta alpha simlock callstack simulator emulator ios android pool lease gateway"],
+    searchTerms: [
+      msg("beta alpha simlock callstack simulator emulator ios android pool lease gateway"),
+    ],
   },
   {
     id: "worktree-fast-checkout",
-    title: (t) => t(($) => $.search.worktreeFastCheckout),
-    englishTitle: resources.en.settings.search.worktreeFastCheckout,
+    title: msg("Fast worktree checkout"),
     to: "/settings/labs",
     scope: "environment",
     fastWorktreeCheckoutOnly: true,
-    searchTerms: ["beta fast worktree checkout clone apfs copy-on-write cache macos speed"],
+    searchTerms: [msg("beta fast worktree checkout clone apfs copy-on-write cache macos speed")],
   },
   {
     id: "voice-transcription-destination",
-    title: (t) => t(($) => $.search.voiceTranscriptionDestination),
-    englishTitle: resources.en.settings.search.voiceTranscriptionDestination,
+    title: msg("Transcribe with"),
     to: "/settings/voice",
     searchTerms: [
-      "send microphone audio dictation destination speech voice stt transcription environment machine consent privacy cloud OpenAI Grok OpenRouter",
+      msg(
+        "send microphone audio dictation destination speech voice stt transcription environment machine consent privacy cloud OpenAI Grok OpenRouter",
+      ),
     ],
   },
   {
     id: "voice-microphone",
-    title: (t) => t(($) => $.search.voiceMicrophone),
-    englishTitle: resources.en.settings.search.voiceMicrophone,
+    title: msg("Microphone"),
     to: "/settings/voice",
-    searchTerms: ["mic input audio device order priority preferred"],
+    searchTerms: [msg("mic input audio device order priority preferred")],
   },
   {
     id: "dictation-shortcut-mode",
-    title: (t) => t(($) => $.search.dictationShortcutMode),
-    englishTitle: resources.en.settings.search.dictationShortcutMode,
+    title: msg("Dictation shortcut"),
     to: "/settings/voice",
-    searchTerms: ["speech voice keyboard hotkey hold toggle auto"],
+    searchTerms: [msg("speech voice keyboard hotkey hold toggle auto")],
   },
   {
     id: "speech-language",
-    title: (t) => t(($) => $.search.speechLanguage),
-    englishTitle: resources.en.settings.search.speechLanguage,
+    title: msg("Transcription language"),
     to: "/settings/voice",
-    searchTerms: ["speech voice translate english auto detect"],
+    searchTerms: [msg("speech voice translate english auto detect")],
   },
   {
     id: "speech-dictionary",
-    title: (t) => t(($) => $.search.speechDictionary),
-    englishTitle: resources.en.settings.search.speechDictionary,
+    title: msg("Dictionary"),
     to: "/settings/voice",
-    searchTerms: ["speech voice transcription vocabulary names glossary alias"],
+    searchTerms: [msg("speech voice transcription vocabulary names glossary alias")],
   },
   {
     id: "speech-project-dictionary",
-    title: (t) => t(($) => $.search.speechProjectDictionary),
-    englishTitle: resources.en.settings.search.speechProjectDictionary,
+    title: msg("Project dictionary"),
     to: "/settings/voice",
     scope: "project-defaults",
     searchTerms: [
-      "speech voice transcription vocabulary shared dictionary team environment glossary",
+      msg("speech voice transcription vocabulary shared dictionary team environment glossary"),
     ],
   },
   {
     id: "speech-post-processing-model",
-    title: (t) => t(($) => $.search.speechPostProcessingModel),
-    englishTitle: resources.en.settings.search.speechPostProcessingModel,
+    title: msg("Cleanup model"),
     to: "/settings/voice",
     scope: "environment",
-    searchTerms: ["speech voice transcript cleanup provider model post-processing"],
+    searchTerms: [msg("speech voice transcript cleanup provider model post-processing")],
   },
   {
     id: "speech-correction-word",
-    title: (t) => t(($) => $.search.speechCorrectionWord),
-    englishTitle: resources.en.settings.search.speechCorrectionWord,
+    title: msg("Correction cue"),
     to: "/settings/voice",
-    searchTerms: ["speech voice cleanup sorry scratch that fix mistake"],
+    searchTerms: [msg("speech voice cleanup sorry scratch that fix mistake")],
   },
   {
     id: "speech-silence-filtering",
-    title: (t) => t(($) => $.search.speechSilenceFiltering),
-    englishTitle: resources.en.settings.search.speechSilenceFiltering,
+    title: msg("Silence filtering"),
     to: "/settings/voice",
-    searchTerms: ["voice speech vad silero pauses noise"],
+    searchTerms: [msg("voice speech vad silero pauses noise")],
   },
   {
     id: "remove-filler-words",
-    title: (t) => t(($) => $.search.removeFillerWords),
-    englishTitle: resources.en.settings.search.removeFillerWords,
+    title: msg("Remove filler words"),
     to: "/settings/voice",
-    searchTerms: ["voice speech transcription hesitation um uh cleanup"],
+    searchTerms: [msg("voice speech transcription hesitation um uh cleanup")],
   },
   {
     id: "speech-post-processing",
-    title: (t) => t(($) => $.search.cleanUpTranscripts),
-    englishTitle: resources.en.settings.search.cleanUpTranscripts,
+    title: msg("Clean up transcripts"),
     to: "/settings/voice",
-    searchTerms: ["speech transcription polish clean provider prompt post-processing"],
+    searchTerms: [msg("speech transcription polish clean provider prompt post-processing")],
   },
   {
     id: "speech-models",
-    title: (t) => t(($) => $.search.speechModels),
-    englishTitle: resources.en.settings.search.speechModels,
+    title: msg("Transcription models"),
     to: "/settings/voice",
     searchTerms: [
-      "speech voice stt download whisper parakeet canary moonshine accuracy speed benchmark languages",
+      msg(
+        "speech voice stt download whisper parakeet canary moonshine accuracy speed benchmark languages",
+      ),
     ],
   },
   {
     id: "speech-hardware",
-    title: (t) => t(($) => $.search.speechHardware),
-    englishTitle: resources.en.settings.search.speechHardware,
+    title: msg("Transcription hardware and model unloading"),
     to: "/settings/voice",
-    searchTerms: ["speech voice stt advanced gpu cpu acceleration memory unload idle"],
+    searchTerms: [msg("speech voice stt advanced gpu cpu acceleration memory unload idle")],
+  },
+  {
+    id: "speech-streaming",
+    title: msg("Streaming transcription"),
+    to: "/settings/voice",
+    searchTerms: [
+      msg("speech voice stt advanced native live preview batch after stopping slow lag"),
+    ],
   },
   {
     id: "microphone-test",
-    title: (t) => t(($) => $.search.microphoneTest),
-    englishTitle: resources.en.settings.search.microphoneTest,
+    title: msg("Test microphone"),
     to: "/settings/voice",
-    searchTerms: ["test mic audio playback loopback record input level"],
+    searchTerms: [msg("test mic audio playback loopback record input level")],
   },
   {
     id: "transcription-test",
-    title: (t) => t(($) => $.search.transcriptionTest),
-    englishTitle: resources.en.settings.search.transcriptionTest,
+    title: msg("Test model"),
     to: "/settings/voice",
-    searchTerms: ["test voice speech model transcription recognition"],
+    searchTerms: [msg("test voice speech model transcription recognition")],
   },
   {
     id: "auto-settle-inactive-threads",
-    title: (t) => t(($) => $.search.autoSettleInactiveThreads),
-    englishTitle: resources.en.settings.search.autoSettleInactiveThreads,
+    title: msg("Auto-settle inactive threads"),
     to: "/settings/threads",
-    searchTerms: ["sidebar inactivity days no activity automatically"],
+    searchTerms: [msg("sidebar inactivity days no activity automatically")],
     requiresThreadAutoSettlement: true,
     scope: "project-defaults",
   },
   {
     id: "compact-idle-threads",
-    title: (t) => t(($) => $.search.compactIdleThreads),
-    englishTitle: resources.en.settings.search.compactIdleThreads,
+    title: msg("Compact idle threads"),
     to: "/settings/providers",
     scope: "environment-defaults",
-    searchTerms: ["claude context compaction idle cache tokens usage summary resume"],
+    searchTerms: [msg("claude context compaction idle cache tokens usage summary resume")],
   },
   {
     id: "auto-settle-merged-threads",
-    title: (t) => t(($) => $.search.autoSettleMergedThreads),
-    englishTitle: resources.en.settings.search.autoSettleMergedThreads,
+    title: msg("Auto-settle merged threads"),
     to: "/settings/threads",
-    searchTerms: ["pull request merge closed automatically sidebar"],
+    searchTerms: [msg("pull request merge closed automatically sidebar")],
     requiresThreadAutoSettlement: true,
     scope: "project-defaults",
   },
   {
     id: "keep-threads-with-pull-requests",
-    title: (t) => t(($) => $.search.keepThreadsWithPullRequests),
-    englishTitle: resources.en.settings.search.keepThreadsWithPullRequests,
+    title: msg("Keep threads with a PR"),
     to: "/settings/threads",
     targetId: "auto-settle-inactive-threads",
-    searchTerms: ["pull request inactivity auto-settle merge close sidebar"],
+    searchTerms: [msg("pull request inactivity auto-settle merge close sidebar")],
     requiresThreadAutoSettlement: true,
     scope: "project-defaults",
   },
   {
     id: "days-before-auto-settle",
-    title: (t) => t(($) => $.search.daysBeforeAutoSettle),
-    englishTitle: resources.en.settings.search.daysBeforeAutoSettle,
+    title: msg("Days of inactivity before auto-settle"),
     to: "/settings/threads",
     targetId: "auto-settle-inactive-threads",
-    searchTerms: ["thread timeout activity sidebar"],
+    searchTerms: [msg("thread timeout activity sidebar")],
     requiresThreadAutoSettlement: true,
     scope: "project-defaults",
   },
   {
     id: "thread-notifications",
-    title: (t) => t(($) => $.search.threadNotifications),
-    englishTitle: resources.en.settings.search.threadNotifications,
+    title: msg("Thread notifications"),
     to: "/settings/general",
-    searchTerms: ["notification sound alert completion input approval desktop"],
+    searchTerms: [msg("notification sound alert completion input approval desktop")],
   },
   {
     id: "in-app-notifications",
-    title: (t) => t(($) => $.search.inAppNotifications),
-    englishTitle: resources.en.settings.search.inAppNotifications,
+    title: msg("In-app notifications"),
     to: "/settings/general",
-    searchTerms: ["notification toast popup completion input approval failure"],
+    searchTerms: [msg("notification toast popup completion input approval failure")],
+  },
+  {
+    id: "language",
+    title: msg("Language"),
+    to: "/settings/general",
+    searchTerms: [
+      msg(
+        "locale translation english deutsch german español spanish français french português portuguese brasil brazilian chinese 中文 japanese 日本語 korean 한국어 russian русский swedish svenska sprache idioma langue 语言 言語 언어 язык",
+      ),
+    ],
   },
   {
     id: "time-format",
-    title: (t) => t(($) => $.search.timeFormat),
-    englishTitle: resources.en.settings.search.timeFormat,
+    title: msg("Time format"),
     to: "/settings/general",
-    searchTerms: ["timestamp clock locale system browser os 12 hour 24 hour"],
+    searchTerms: [msg("timestamp clock locale system browser os 12 hour 24 hour")],
   },
   {
     id: "response-streaming",
-    title: (t) => t(($) => $.search.responseStreaming),
-    englishTitle: resources.en.settings.search.responseStreaming,
+    title: msg("Response streaming"),
     to: "/settings/threads",
     scope: "project-defaults",
-    searchTerms: ["output token paragraph buffered wait turn legacy"],
+    searchTerms: [msg("output token paragraph buffered wait turn legacy")],
   },
   {
     id: "hide-whitespace-changes",
-    title: (t) => t(($) => $.search.hideWhitespaceChanges),
-    englishTitle: resources.en.settings.search.hideWhitespaceChanges,
+    title: msg("Hide whitespace changes"),
     to: "/settings/diffs",
-    searchTerms: ["diff ignore spaces edits default"],
+    searchTerms: [msg("diff ignore spaces edits default")],
   },
   {
     id: "default-diff-file-state",
-    title: (t) => t(($) => $.search.defaultDiffFileState),
-    englishTitle: resources.en.settings.search.defaultDiffFileState,
+    title: msg("Default diff file state"),
     to: "/settings/diffs",
-    searchTerms: ["collapsed expanded collapse expand files pull request pr code tab"],
+    searchTerms: [msg("collapsed expanded collapse expand files pull request pr code tab")],
   },
   {
     id: "diff-layout",
-    title: (t) => t(($) => $.search.diffLayout),
-    englishTitle: resources.en.settings.search.diffLayout,
+    title: msg("Diff layout"),
     to: "/settings/diffs",
-    searchTerms: ["stacked split side by side unified inline view"],
+    searchTerms: [msg("stacked split side by side unified inline view")],
   },
   {
     id: "proactive-panels",
-    title: (t) => t(($) => $.search.proactivePanels),
-    englishTitle: resources.en.settings.search.proactivePanels,
+    title: msg("Open pull requests and changes panels proactively"),
     to: "/settings/diffs",
-    searchTerms: ["proactive automatically open diff pull request pr right panel agent completion"],
+    searchTerms: [
+      msg("proactive automatically open diff pull request pr right panel agent completion"),
+    ],
   },
   {
     id: "skills-in-slash-menu",
-    title: (t) => t(($) => $.search.skillsInSlashMenu),
-    englishTitle: resources.en.settings.search.skillsInSlashMenu,
+    title: msg("Show skills in slash menu"),
     to: "/settings/chat",
-    searchTerms: ["command menu dollar $ slash /"],
+    searchTerms: [msg("command menu dollar $ slash /")],
   },
   {
     id: "composer-rich-text",
-    title: (t) => t(($) => $.search.composerRichText),
-    englishTitle: resources.en.settings.search.composerRichText,
+    title: msg("Rich text composer"),
     to: "/settings/chat",
-    searchTerms: ["composer rich text tiptap bold italic markdown styled wysiwyg"],
+    searchTerms: [msg("composer rich text tiptap bold italic markdown styled wysiwyg")],
   },
   {
     id: "composer-spell-check",
-    title: (t) => t(($) => $.search.composerSpellCheck),
-    englishTitle: resources.en.settings.search.composerSpellCheck,
+    title: msg("Composer spell check"),
     to: "/settings/chat",
-    searchTerms: ["spellcheck spelling typo misspelled underline red squiggle rechtschreibung"],
+    searchTerms: [
+      msg("spellcheck spelling typo misspelled underline red squiggle rechtschreibung"),
+    ],
   },
   {
     id: "send-shortcut",
-    title: (t) => t(($) => $.search.sendShortcut),
-    englishTitle: resources.en.settings.search.sendShortcut,
+    title: msg("Send shortcut"),
     to: "/settings/chat",
-    searchTerms: ["enter return command ctrl multiline prompt new line composer"],
+    searchTerms: [msg("enter return command ctrl multiline prompt new line composer")],
   },
   {
     id: "follow-up-behavior",
-    title: (t) => t(($) => $.search.followUpBehavior),
-    englishTitle: resources.en.settings.search.followUpBehavior,
+    title: msg("Follow-up behavior"),
     to: "/settings/chat",
-    searchTerms: ["queue steer running turn send default behavior composer"],
+    searchTerms: [msg("queue steer running turn send default behavior composer")],
   },
   {
     id: "provider-update-checks",
-    title: (t) => t(($) => $.search.providerUpdateChecks),
-    englishTitle: resources.en.settings.search.providerUpdateChecks,
+    title: msg("Provider update checks"),
     to: "/settings/maintenance",
     searchTerms: [
-      "installed cli versions newer available codex claude cursor grok fx kiro opencode",
+      msg("installed cli versions newer available codex claude cursor grok fx kiro opencode"),
     ],
     scope: "environment-defaults",
   },
   {
     id: "continue-threads-after-server-update",
-    title: (t) => t(($) => $.search.continueThreadsAfterServerUpdate),
-    englishTitle: resources.en.settings.search.continueThreadsAfterServerUpdate,
+    title: msg("Continue threads after restarts"),
     to: "/settings/maintenance",
     scope: "project-defaults",
     searchTerms: [
-      "resume running active interrupted work restart reboot machine crash desktop update automatically",
+      msg(
+        "resume running active interrupted work restart reboot machine crash desktop update automatically",
+      ),
     ],
   },
   {
     id: "keep-awake-while-agents-work",
-    title: (t) => t(($) => $.search.keepAwakeWhileAgentsWork),
-    englishTitle: resources.en.settings.search.keepAwakeWhileAgentsWork,
+    title: msg("Keep awake while agents work"),
     to: "/settings/maintenance",
     scope: "environment-defaults",
-    searchTerms: ["caffeinate sleep prevent stay awake power laptop lid inhibit"],
+    searchTerms: [msg("caffeinate sleep prevent stay awake power laptop lid inhibit")],
   },
   {
     id: "background-activity",
-    title: (t) => t(($) => $.search.backgroundActivity),
-    englishTitle: resources.en.settings.search.backgroundActivity,
+    title: msg("Background activity"),
     to: "/settings/maintenance",
     scope: "environment-defaults",
     searchTerms: [
-      "balanced performance battery saver advanced git fetch provider health refresh host power monitor idle policy",
+      msg(
+        "balanced performance battery saver advanced git fetch provider health refresh host power monitor idle policy",
+      ),
     ],
   },
   {
     id: "new-threads",
-    title: (t) => t(($) => $.search.newThreads),
-    englishTitle: resources.en.settings.search.newThreads,
+    title: msg("New threads"),
     to: "/settings/threads",
     scope: "project-defaults",
-    searchTerms: ["default workspace mode draft local worktree"],
+    searchTerms: [msg("default workspace mode draft local worktree")],
   },
   {
     id: "worktree-submodules",
-    title: (t) => t(($) => $.search.worktreeSubmodules),
-    englishTitle: resources.en.settings.search.worktreeSubmodules,
+    title: msg("Submodules"),
     to: "/settings/worktrees",
     scope: "project-defaults",
-    searchTerms: ["git submodule init recursive top-level none worktree t3.json"],
+    searchTerms: [msg("git submodule init recursive top-level none worktree t3.json")],
   },
   {
     id: "start-from-origin",
-    title: (t) => t(($) => $.search.startFromOrigin),
-    englishTitle: resources.en.settings.search.startFromOrigin,
+    title: msg("Start from remote"),
     to: "/settings/worktrees",
     scope: "project-defaults",
-    searchTerms: ["new worktrees start remote origin latest fetched branch local"],
+    searchTerms: [msg("new worktrees start remote origin latest fetched branch local")],
   },
   {
     id: "add-project-starts-in",
-    title: (t) => t(($) => $.search.addProjectStartsIn),
-    englishTitle: resources.en.settings.search.addProjectStartsIn,
+    title: msg("Add project starts in"),
     to: "/settings/threads",
     scope: "environment-defaults",
-    searchTerms: ["base directory folder browser path home"],
+    searchTerms: [msg("base directory folder browser path home")],
   },
   {
     id: "ghq-clone-layout",
-    title: (t) => t(($) => $.search.ghqCloneLayout),
-    englishTitle: resources.en.settings.search.ghqCloneLayout,
+    title: msg("Clone into host folders"),
     to: "/settings/threads",
     scope: "environment-defaults",
-    searchTerms: ["ghq clone destination host owner repository root layout"],
+    searchTerms: [msg("ghq clone destination host owner repository root layout")],
   },
   {
     id: "unpin-confirmation",
-    title: (t) => t(($) => $.search.unpinConfirmation),
-    englishTitle: resources.en.settings.search.unpinConfirmation,
+    title: msg("Unpin confirmation"),
     to: "/settings/general",
-    searchTerms: ["ask before thread pinned section"],
+    searchTerms: [msg("ask before thread pinned section")],
   },
   {
     id: "archive-confirmation",
-    title: (t) => t(($) => $.search.archiveConfirmation),
-    englishTitle: resources.en.settings.search.archiveConfirmation,
+    title: msg("Archive confirmation"),
     to: "/settings/general",
-    searchTerms: ["ask before thread second click inline action"],
+    searchTerms: [msg("ask before thread second click inline action")],
   },
   {
     id: "delete-confirmation",
-    title: (t) => t(($) => $.search.deleteConfirmation),
-    englishTitle: resources.en.settings.search.deleteConfirmation,
+    title: msg("Delete confirmation"),
     to: "/settings/general",
-    searchTerms: ["ask before thread chat history"],
+    searchTerms: [msg("ask before thread chat history")],
+  },
+  {
+    id: "terminal-close-confirmation",
+    title: msg("Terminal close confirmation"),
+    to: "/settings/general",
+    searchTerms: ["ask before delete stop process shell console history"],
   },
   {
     id: "quit-confirmation",
-    title: (t) => t(($) => $.search.quitConfirmation),
-    englishTitle: resources.en.settings.search.quitConfirmation,
+    title: msg("Quit shortcut"),
     to: "/settings/general",
-    searchTerms: ["confirmation desktop app exit direct hold double click press twice"],
+    searchTerms: [msg("confirmation desktop app exit direct hold double click press twice")],
     desktopOnly: true,
   },
   {
     id: "text-generation-model",
-    title: (t) => t(($) => $.search.textGenerationModel),
-    englishTitle: resources.en.settings.search.textGenerationModel,
+    title: msg("Text generation model"),
     to: "/settings/threads",
     scope: "project-defaults",
-    searchTerms: ["generated thread titles source control content default provider"],
+    searchTerms: [msg("generated thread titles source control content default provider")],
   },
   {
     id: "thread-title-instructions",
-    title: (t) => t(($) => $.search.threadTitleInstructions),
-    englishTitle: resources.en.settings.search.threadTitleInstructions,
+    title: msg("Thread title instructions"),
     to: "/settings/threads",
     scope: "project-defaults",
-    searchTerms: ["generated thread titles prompt custom style naming rename regenerate"],
+    searchTerms: [msg("generated thread titles prompt custom style naming rename regenerate")],
   },
   {
     id: "app-version",
-    title: (t) => t(($) => $.search.appVersion),
-    englishTitle: resources.en.settings.search.appVersion,
+    title: msg("Version"),
     to: "/settings/about",
-    searchTerms: ["about check for updates download install upgrade release"],
+    searchTerms: [msg("about check for updates download install upgrade release")],
   },
   {
     id: "update-track",
-    title: (t) => t(($) => $.search.updateTrack),
-    englishTitle: resources.en.settings.search.updateTrack,
+    title: msg("Update track"),
     to: "/settings/about",
-    searchTerms: ["release channel stable latest nightly prerelease"],
+    searchTerms: [msg("release channel stable latest nightly prerelease")],
     releaseChannelOnly: true,
   },
   {
     id: "cli-command",
-    title: (t) => t(($) => $.search.cliCommand),
-    englishTitle: resources.en.settings.search.cliCommand,
+    title: msg("t3 command"),
     to: "/settings/about",
-    searchTerms: ["cli terminal shell path install command line"],
+    searchTerms: [msg("cli terminal shell path install command line")],
     desktopOnly: true,
   },
   {
     id: "mobile-app",
-    title: (t) => t(($) => $.search.mobileApp),
-    englishTitle: resources.en.settings.search.mobileApp,
+    title: msg("Mobile app"),
     to: "/settings/about",
-    searchTerms: ["phone tablet iPhone iPad iOS Android App Store Google Play QR"],
+    searchTerms: [msg("phone tablet iPhone iPad iOS Android App Store Google Play QR")],
   },
   {
     id: "welcome-page",
-    title: (t) => t(($) => $.search.welcomePage),
-    englishTitle: resources.en.settings.search.welcomePage,
+    title: msg("Welcome page"),
     to: "/settings/about",
     primaryEnvironmentOnly: true,
-    searchTerms: ["onboarding setup first run getting started agents import projects"],
+    searchTerms: [msg("onboarding setup first run getting started agents import projects")],
   },
   {
     id: "privacy-policy",
-    title: (t) => t(($) => $.search.privacyPolicy),
-    englishTitle: resources.en.settings.search.privacyPolicy,
+    title: msg("Privacy policy"),
     to: "/settings/about",
-    searchTerms: ["telemetry analytics usage data tracking legal opt out"],
+    searchTerms: [msg("telemetry analytics usage data tracking legal opt out")],
   },
   {
     id: "telemetry-export",
-    title: (t) => t(($) => $.search.telemetryExport),
-    englishTitle: resources.en.settings.search.telemetryExport,
+    title: msg("OpenTelemetry export"),
     to: "/settings/diagnostics",
     targetId: "telemetry-export",
     scope: "environment",
-    searchTerms: ["OTel OTLP telemetry export endpoints logs traces metrics Grafana"],
+    searchTerms: [msg("OTel OTLP telemetry export endpoints logs traces metrics Grafana")],
   },
   {
     id: "diagnostics",
-    title: (t) => t(($) => $.search.diagnostics),
-    englishTitle: resources.en.settings.search.diagnostics,
+    title: msg("Diagnostics"),
     to: "/settings/maintenance",
-    searchTerms: ["logs traces processes resource history failures spans cpu memory"],
+    searchTerms: [msg("logs traces processes resource history failures spans cpu memory")],
   },
   {
     id: "open-source-licenses",
-    title: (t) => t(($) => $.search.openSourceLicenses),
-    englishTitle: resources.en.settings.search.openSourceLicenses,
+    title: msg("Open source licenses"),
     to: "/settings/about",
   },
   {
     id: "keybindings",
-    title: (t) => t(($) => $.search.keybindings),
-    englishTitle: resources.en.settings.search.keybindings,
+    title: msg("Keybindings"),
     to: "/settings/keybindings",
-    searchTerms: ["keyboard shortcuts hotkeys commands bindings json"],
+    searchTerms: [msg("keyboard shortcuts hotkeys commands bindings json")],
   },
-  ...KEYBINDING_SEARCH_SOURCES,
+  ...KEYBINDING_SEARCH_ITEMS,
   {
     id: "snap-shot-enabled",
-    title: (t) => t(($) => $.search.snapShotEnabled),
-    englishTitle: resources.en.settings.search.snapShotEnabled,
-    searchTerms: ["window capture screenshot"],
+    title: msg("SnapShots"),
+    searchTerms: [msg("window capture screenshot")],
     to: "/settings/snap-shot",
   },
   {
     id: "snap-shot-accessibility",
-    title: (t) => t(($) => $.search.snapShotAccessibility),
-    englishTitle: resources.en.settings.search.snapShotAccessibility,
+    title: msg("Include app text"),
     to: "/settings/snap-shot",
     targetId: "snap-shot-enabled",
     searchTerms: [
-      "capture accessibility data text UI structure elements privacy omit agent context",
+      msg("capture accessibility data text UI structure elements privacy omit agent context"),
     ],
   },
   {
     id: "snap-shot-shortcut",
-    title: (t) => t(($) => $.search.snapShotShortcut),
-    englishTitle: resources.en.settings.search.snapShotShortcut,
+    title: msg("Capture shortcut"),
     to: "/settings/snap-shot",
     targetId: "snap-shot-enabled",
   },
   {
     id: "snap-shot-sound",
-    title: (t) => t(($) => $.search.snapShotSound),
-    englishTitle: resources.en.settings.search.snapShotSound,
+    title: msg("Capture sound"),
     to: "/settings/snap-shot",
     targetId: "snap-shot-enabled",
   },
   {
     id: "snap-shot-flash",
-    title: (t) => t(($) => $.search.snapShotFlash),
-    englishTitle: resources.en.settings.search.snapShotFlash,
+    title: msg("Capture flash"),
     to: "/settings/snap-shot",
     targetId: "snap-shot-enabled",
   },
   {
     id: "snap-shot-animations",
-    title: (t) => t(($) => $.search.snapShotAnimations),
-    englishTitle: resources.en.settings.search.snapShotAnimations,
+    title: msg("Capture animations"),
     to: "/settings/snap-shot",
     targetId: "snap-shot-enabled",
   },
   {
     id: "providers",
-    title: (t) => t(($) => $.search.providers),
-    englishTitle: resources.en.settings.search.providers,
+    title: msg("Providers"),
     to: "/settings/providers",
     searchTerms: [
-      "agents cli codex claude cursor grok fx kiro opencode antigravity google sign in sign out install subscription instances authentication api key models configuration binary path config directory codex_home shadow home endpoint arguments environment variables display name accent color custom favorite hidden auto compact native sessions import resume",
+      msg(
+        "agents cli codex claude cursor grok fx kiro opencode antigravity google sign in sign out install subscription instances authentication api key models configuration binary path config directory codex_home shadow home endpoint arguments environment variables display name accent color custom favorite hidden auto compact native sessions import resume",
+      ),
     ],
   },
   {
     id: "usage-providers",
-    title: (t) => t(($) => $.search.usageProviders),
-    englishTitle: resources.en.settings.search.usageProviders,
+    title: msg("Usage providers"),
     to: "/settings/providers",
     searchTerms: [
-      "usage sources CLIProxyAPI CLI proxy hub quota subscription limits management key add remove",
+      msg(
+        "usage sources CLIProxyAPI CLI proxy hub quota subscription limits management key add remove",
+      ),
     ],
     providerSettingsOnly: true,
   },
   {
     id: "text-generators",
-    title: (t) => t(($) => $.search.textGenerators),
-    englishTitle: resources.en.settings.search.textGenerators,
+    title: msg("Text generators"),
     to: "/settings/providers",
     searchTerms: [
-      "model api api key openai openrouter anthropic ollama lm studio custom endpoint base url thread titles commit messages",
+      msg(
+        "model api api key openai openrouter anthropic ollama lm studio custom endpoint base url thread titles commit messages",
+      ),
     ],
     providerSettingsOnly: true,
     textGeneratorsOnly: true,
   },
   {
     id: "provider-health-check-interval",
-    title: (t) => t(($) => $.search.providerHealthCheckInterval),
-    englishTitle: resources.en.settings.search.providerHealthCheckInterval,
+    title: msg("Health check interval"),
     to: "/settings/providers",
-    searchTerms: ["refresh availability versions auth state models background probes seconds off"],
+    searchTerms: [
+      msg("refresh availability versions auth state models background probes seconds off"),
+    ],
     providerSettingsOnly: true,
   },
   {
     id: "scheduled-tasks",
-    title: (t) => t(($) => $.navigation.scheduledTasks),
-    englishTitle: resources.en.settings.navigation.scheduledTasks,
+    title: msg("Scheduled tasks"),
     to: "/settings/scheduled-tasks",
   },
   {
     id: "agent-browser-access",
-    title: (t) => t(($) => $.search.agentBrowserAccess),
-    englishTitle: resources.en.settings.search.agentBrowserAccess,
+    title: msg("Agent browser access"),
     to: "/settings/browser",
     scope: "project-defaults",
-    searchTerms: ["allow disable enable open drive preview tools sessions project override"],
+    searchTerms: [msg("allow disable enable open drive preview tools sessions project override")],
   },
   {
     id: "device-sources",
-    title: (t) => t(($) => $.search.deviceSources),
-    englishTitle: resources.en.settings.search.deviceSources,
+    title: msg("Device sources"),
     to: "/settings/devices",
     searchTerms: [
-      "device hosts ssh remote mac mini identity key connection eas expo cloud simlock pool gateway local simulators",
+      msg(
+        "device hosts ssh remote mac mini identity key connection eas expo cloud simlock pool gateway local simulators",
+      ),
     ],
   },
   {
     id: "agent-device-access",
-    title: (t) => t(($) => $.search.agentDeviceAccess),
-    englishTitle: resources.en.settings.search.agentDeviceAccess,
+    title: msg("Agents can use devices"),
     to: "/settings/devices",
     targetId: "devices",
-    searchTerms: ["allow simulator emulator ios android drive tools sessions"],
+    searchTerms: [msg("allow simulator emulator ios android drive tools sessions")],
   },
   {
     id: "device-hub",
-    title: (t) => t(($) => $.search.deviceHub),
-    englishTitle: resources.en.settings.search.deviceHub,
+    title: msg("Use devices"),
     to: "/settings/devices",
     targetId: "devices",
-    searchTerms: ["device hub simulator emulator ios android install start version"],
+    searchTerms: [msg("device hub simulator emulator ios android install start version")],
   },
   {
     id: "device-platform-support",
-    title: (t) => t(($) => $.search.devicePlatformSupport),
-    englishTitle: resources.en.settings.search.devicePlatformSupport,
+    title: msg("Local simulators"),
     to: "/settings/devices",
     targetId: "device-sources",
-    searchTerms: ["simulator support xcode android studio sdk avd runtime"],
+    searchTerms: [msg("simulator support xcode android studio sdk avd runtime")],
   },
   {
     id: "browser-profiles",
-    title: (t) => t(($) => $.search.browserProfiles),
-    englishTitle: resources.en.settings.search.browserProfiles,
+    title: msg("Browser profiles"),
     to: "/settings/browser",
     targetId: "browser",
   },
   {
     id: "browser-default-profile",
-    title: (t) => t(($) => $.search.browserDefaultProfile),
-    englishTitle: resources.en.settings.search.browserDefaultProfile,
+    title: msg("Default browser profile"),
     to: "/settings/browser",
     targetId: "browser-profiles",
   },
   {
     id: "browser-default-viewport",
-    title: (t) => t(($) => $.search.browserDefaultViewport),
-    englishTitle: resources.en.settings.search.browserDefaultViewport,
+    title: msg("Default browser viewport"),
     to: "/settings/browser",
-    searchTerms: ["preview size width height device desktop mobile rotate"],
+    searchTerms: [msg("preview size width height device desktop mobile rotate")],
   },
   {
     id: "browser-default-zoom",
-    title: (t) => t(($) => $.search.browserDefaultZoom),
-    englishTitle: resources.en.settings.search.browserDefaultZoom,
+    title: msg("Default browser zoom"),
     to: "/settings/browser",
-    searchTerms: ["preview page scale tabs percent"],
+    searchTerms: [msg("preview page scale tabs percent")],
   },
   {
     id: "browser-default-appearance",
-    title: (t) => t(($) => $.search.browserDefaultAppearance),
-    englishTitle: resources.en.settings.search.browserDefaultAppearance,
+    title: msg("Default browser appearance"),
     to: "/settings/browser",
-    searchTerms: ["preview color scheme light dark system os"],
+    searchTerms: [msg("preview color scheme light dark system os")],
   },
   {
     id: "browser-recording-frame-rate",
-    title: (t) => t(($) => $.search.browserRecordingFrameRate),
-    englishTitle: resources.en.settings.search.browserRecordingFrameRate,
+    title: msg("Browser recording frame rate"),
     to: "/settings/browser",
   },
   {
     id: "browser-recording-key-presses",
-    title: (t) => t(($) => $.search.browserRecordingKeyPresses),
-    englishTitle: resources.en.settings.search.browserRecordingKeyPresses,
+    title: msg("Show key presses in recordings"),
     to: "/settings/browser",
-    searchTerms: ["browser preview keyboard shortcuts keystrokes overlay capture"],
+    searchTerms: [msg("browser preview keyboard shortcuts keystrokes overlay capture")],
   },
   {
     id: "browser-recording-mouse-presses",
-    title: (t) => t(($) => $.search.browserRecordingMousePresses),
-    englishTitle: resources.en.settings.search.browserRecordingMousePresses,
+    title: msg("Show mouse presses in recordings"),
     to: "/settings/browser",
-    searchTerms: ["browser preview clicks buttons drag overlay capture"],
+    searchTerms: [msg("browser preview clicks buttons drag overlay capture")],
   },
   {
     id: "browser-link-target",
-    title: (t) => t(($) => $.search.browserLinkTarget),
-    englishTitle: resources.en.settings.search.browserLinkTarget,
+    title: msg("Open links in"),
     to: "/settings/browser",
-    searchTerms: ["links default browser in-app browser external open"],
+    searchTerms: [msg("links default browser in-app browser external open")],
   },
   {
     id: "browser-search-engine",
-    title: (t) => t(($) => $.search.browserSearchEngine),
-    englishTitle: resources.en.settings.search.browserSearchEngine,
+    title: msg("Search engine"),
     to: "/settings/browser",
-    searchTerms: ["address bar duckduckgo google bing brave kagi ecosia custom url"],
+    searchTerms: [msg("address bar duckduckgo google bing brave kagi ecosia custom url")],
   },
   {
     id: "pull-request-links-open-in-app",
-    title: (t) => t(($) => $.search.pullRequestLinksOpenInApp),
-    englishTitle: resources.en.settings.search.pullRequestLinksOpenInApp,
+    title: msg("Open pull requests in T3 Code"),
     to: "/settings/diffs",
     searchTerms: [
       `pr commit links ${SOURCE_CONTROL_HOST_LABELS} browser external click default pull request view panel`,
@@ -1390,23 +1189,20 @@ const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "browser-auto-show-floating-preview",
-    title: (t) => t(($) => $.search.browserAutoShowFloatingPreview),
-    englishTitle: resources.en.settings.search.browserAutoShowFloatingPreview,
+    title: msg("Auto-show floating preview"),
     to: "/settings/browser",
-    searchTerms: ["agent opens browser device simulator pop into view hide"],
+    searchTerms: [msg("agent opens browser device simulator pop into view hide")],
   },
   {
     id: "automatic-pull",
-    title: (t) => t(($) => $.search.automaticPull),
-    englishTitle: resources.en.settings.search.automaticPull,
+    title: msg("Automatically pull"),
     to: "/settings/source-control",
     scope: "project-defaults",
-    searchTerms: ["auto pull default branch current checkout fast forward upstream"],
+    searchTerms: [msg("auto pull default branch current checkout fast forward upstream")],
   },
   {
     id: "remove-agent-credits-on-merge",
-    title: (t) => t(($) => $.search.removeAgentCreditsOnMerge),
-    englishTitle: resources.en.settings.search.removeAgentCreditsOnMerge,
+    title: msg("Remove agent credits when merging"),
     to: "/settings/source-control",
     scope: "project-defaults",
     searchTerms: [
@@ -1415,16 +1211,21 @@ const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "pull-request-merge-method",
-    title: (t) => t(($) => $.search.pullRequestMergeMethod),
-    englishTitle: resources.en.settings.search.pullRequestMergeMethod,
+    title: msg("Default merge method"),
     to: "/settings/source-control",
     scope: "project-defaults",
-    searchTerms: ["pull request merge squash rebase last selected"],
+    searchTerms: [msg("pull request merge squash rebase last selected")],
+  },
+  {
+    id: "issue-trackers",
+    title: msg("Issue trackers"),
+    to: "/settings/source-control",
+    scope: "environment-defaults",
+    searchTerms: [msg("linear jira issues tracker team api key connect bind project")],
   },
   {
     id: "source-control",
-    title: (t) => t(($) => $.search.sourceControl),
-    englishTitle: resources.en.settings.search.sourceControl,
+    title: msg("Source control"),
     to: "/settings/source-control",
     scope: "environment-defaults",
     searchTerms: [
@@ -1433,133 +1234,125 @@ const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "git-fetch-interval",
-    title: (t) => t(($) => $.search.gitFetchInterval),
-    englishTitle: resources.en.settings.search.gitFetchInterval,
+    title: msg("Git fetch interval"),
     to: "/settings/maintenance",
     targetId: "background-activity",
     searchTerms: [
-      "automatic remote branch refresh background credentials security keys seconds off",
+      msg("automatic remote branch refresh background credentials security keys seconds off"),
     ],
     environmentOnly: true,
     scope: "environment-defaults",
   },
   {
     id: "worktree-branch-naming",
-    title: (t) => t(($) => $.search.worktreeBranchNaming),
-    englishTitle: resources.en.settings.search.worktreeBranchNaming,
+    title: msg("Worktree branch naming"),
     to: "/settings/worktrees",
-    searchTerms: ["static semantic prefix custom prompt instructions feat fix refactor chore"],
+    searchTerms: [msg("static semantic prefix custom prompt instructions feat fix refactor chore")],
     environmentOnly: true,
     scope: "project-defaults",
   },
-  ...sourceControlHostSearchSources(sourceControlClients.definitions),
+  ...sourceControlHostSearchItems(sourceControlClients.definitions),
   {
     id: "source-control-writing-style",
-    title: (t) => t(($) => $.search.commitAndPullRequestWriting),
-    englishTitle: resources.en.settings.search.commitAndPullRequestWriting,
+    title: msg("Commit and pull request writing"),
     to: "/settings/source-control",
     searchTerms: [
-      "repository conventions conventional commits custom instructions commit messages change pr pull request merge request titles descriptions body style prompt write my own",
+      msg(
+        "repository conventions conventional commits custom instructions commit messages change pr pull request merge request titles descriptions body style prompt write my own",
+      ),
     ],
     environmentOnly: true,
   },
   {
     id: "follow-change-request-templates",
-    title: (t) => t(($) => $.search.followPullRequestTemplates),
-    englishTitle: resources.en.settings.search.followPullRequestTemplates,
+    title: msg("Follow pull request templates"),
     to: "/settings/source-control",
-    searchTerms: ["repository pr pull request merge request change request description structure"],
+    searchTerms: [
+      msg("repository pr pull request merge request change request description structure"),
+    ],
     environmentOnly: true,
   },
   {
     id: "source-control-writer-model",
-    title: (t) => t(($) => $.search.sourceControlWriterModel),
-    englishTitle: resources.en.settings.search.sourceControlWriterModel,
+    title: msg("Source control writer model"),
     to: "/settings/source-control",
     searchTerms: [
-      "override generated commit change request pr titles descriptions branch bookmark",
+      msg("override generated commit change request pr titles descriptions branch bookmark"),
     ],
     environmentOnly: true,
     scope: "project-defaults",
   },
   {
     id: "review-guides",
-    title: (t) => t(($) => $.search.reviewGuides),
-    englishTitle: resources.en.settings.search.reviewGuides,
+    title: msg("Review guides (beta)"),
     to: "/settings/source-control",
-    searchTerms: ["pull request pr guided review guide tour beta experimental"],
+    searchTerms: [msg("pull request pr guided review guide tour beta experimental")],
     environmentOnly: true,
   },
   {
     id: "review-guide-model",
-    title: (t) => t(($) => $.search.reviewGuideModel),
-    englishTitle: resources.en.settings.search.reviewGuideModel,
+    title: msg("Review guide model"),
     to: "/settings/source-control",
     // Hidden until review guides are on, so a search lands on the switch that shows it.
     targetId: "review-guides",
-    searchTerms: ["pull request pr guided review guide brief maintainer"],
+    searchTerms: [msg("pull request pr guided review guide brief maintainer")],
     environmentOnly: true,
     scope: "project-defaults",
   },
   {
     id: "review-guide-instructions",
-    title: (t) => t(($) => $.search.reviewGuideInstructions),
-    englishTitle: resources.en.settings.search.reviewGuideInstructions,
+    title: msg("Review guide instructions"),
     to: "/settings/source-control",
     targetId: "review-guides",
-    searchTerms: ["pull request pr guided review guide preferences taste prompt custom"],
+    searchTerms: [msg("pull request pr guided review guide preferences taste prompt custom")],
     environmentOnly: true,
     scope: "project-defaults",
   },
   {
     id: "project-actions",
-    title: (t) => t(($) => $.search.projectActions),
-    englishTitle: resources.en.settings.search.projectActions,
+    title: msg("Actions"),
     to: "/settings/projects",
-    searchTerms: ["commands scripts setup run dev server checkout worktree t3.json import"],
+    searchTerms: [msg("commands scripts setup run dev server checkout worktree t3.json import")],
   },
   {
     id: "environment-icon",
-    title: (t) => t(($) => $.search.environmentIcon),
-    englishTitle: resources.en.settings.search.environmentIcon,
+    title: msg("Environment icon"),
     to: "/settings/access",
     targetId: "connections-environment",
-    searchTerms: ["machine glyph sidebar mac mini studio laptop desktop server cloud vm"],
+    searchTerms: [msg("machine glyph sidebar mac mini studio laptop desktop server cloud vm")],
   },
   {
     id: "local-environment",
-    title: (t) => t(($) => $.search.localEnvironment),
-    englishTitle: resources.en.settings.search.localEnvironment,
+    title: msg("Local environment"),
     to: "/settings/connections",
-    searchTerms: ["turn off on disable enable local server agents remote only restart"],
+    searchTerms: [msg("turn off on disable enable local server agents remote only restart")],
     desktopOnly: true,
   },
   {
     id: "network-access",
-    title: (t) => t(($) => $.search.networkAccess),
-    englishTitle: resources.en.settings.search.networkAccess,
+    title: msg("Network access"),
     to: "/settings/access",
     targetId: "connections-environment",
-    searchTerms: ["expose backend remote pairing local machine interfaces host restart"],
+    searchTerms: [msg("expose backend remote pairing local machine interfaces host restart")],
     localBackendManagementOnly: true,
   },
   {
     id: "tailscale-https",
-    title: (t) => t(($) => $.search.tailscaleHttps),
-    englishTitle: resources.en.settings.search.tailscaleHttps,
+    title: msg("Tailscale HTTPS"),
     to: "/settings/access",
     targetId: "connections-environment",
-    searchTerms: ["serve magicdns endpoint remote secure network"],
+    searchTerms: [msg("serve magicdns endpoint remote secure network")],
     desktopOnly: true,
     localBackendManagementOnly: true,
   },
   {
     id: "wsl-backend",
-    title: (t) => t(($) => $.search.wslBackend),
-    englishTitle: resources.en.settings.search.wslBackend,
+    title: msg("WSL backend"),
     to: "/settings/access",
     searchTerms: [
-      "windows subsystem linux distro second server projects stop windows backend restart wsl only",
+      msg(
+        "windows subsystem linux distro second server projects stop windows backend restart wsl only",
+      ),
     ],
     desktopOnly: true,
     windowsOnly: true,
@@ -1569,83 +1362,80 @@ const SETTINGS_SEARCH_ITEMS = [
   {
     id: "t3-connect",
     localEnvironmentOnly: true,
-    title: (t) => t(($) => $.search.t3Connect),
-    englishTitle: resources.en.settings.search.t3Connect,
+    title: msg("T3 Connect"),
     to: "/settings/access",
     targetId: "connections-environment",
-    searchTerms: ["managed tunnel cloud other devices remote tunnels limit t3 chat"],
+    searchTerms: [msg("managed tunnel cloud other devices remote tunnels limit t3 chat")],
     desktopOnly: true,
     cloudOnly: true,
   },
   {
     id: "connect-device-approval",
-    title: (t) => t(($) => $.search.connectDeviceApproval),
-    englishTitle: resources.en.settings.search.connectDeviceApproval,
+    title: msg("Require approval for new devices"),
     to: "/settings/access",
     targetId: "connections-environment",
-    searchTerms: ["t3 connect devices approve deny trust revoke pairing code security account"],
+    searchTerms: [
+      msg("t3 connect devices approve deny trust revoke pairing code security account"),
+    ],
     cloudOnly: true,
     managedTunnelOnly: true,
   },
   {
     id: "hold-webhooks-while-offline",
     localEnvironmentOnly: true,
-    title: (t) => t(($) => $.search.holdWebhooksWhileOffline),
-    englishTitle: resources.en.settings.search.holdWebhooksWhileOffline,
+    title: msg("Hold webhooks while offline"),
     to: "/settings/access",
     targetId: "connections-environment",
-    searchTerms: ["webhook automations offline queue mailbox t3 connect"],
+    searchTerms: [msg("webhook automations offline queue mailbox t3 connect")],
     cloudOnly: true,
     managedTunnelOnly: true,
   },
   {
     id: "publish-agent-activity",
     localEnvironmentOnly: true,
-    title: (t) => t(($) => $.search.publishAgentActivity),
-    englishTitle: resources.en.settings.search.publishAgentActivity,
+    title: msg("Publish agent activity"),
     to: "/settings/access",
     targetId: "connections-environment",
-    searchTerms: ["mobile push notifications live activities cloud tunnel"],
+    searchTerms: [msg("mobile push notifications live activities cloud tunnel")],
     cloudOnly: true,
   },
   {
     id: "connections-environment",
-    title: (t) => t(($) => $.search.connectionsEnvironment),
-    englishTitle: resources.en.settings.search.connectionsEnvironment,
+    title: msg("This machine"),
     to: "/settings/access",
     searchTerms: [
-      "connections server backend local remote access administrative permissions scope pairing links qr code authorized clients sessions revoke endpoint",
+      msg(
+        "connections server backend local remote access administrative permissions scope pairing links qr code authorized clients sessions revoke endpoint",
+      ),
     ],
   },
   {
     id: "linked-environments",
     peerLinksOnly: true,
-    title: (t) => t(($) => $.search.linkedEnvironments),
-    englishTitle: resources.en.settings.search.linkedEnvironments,
+    title: msg("Linked environments"),
     to: "/settings/connections",
     targetId: "linked-environments",
-    searchTerms: ["link peer another machine vps agents work there handoff pairing code"],
+    searchTerms: [msg("link peer another machine vps agents work there handoff pairing code")],
   },
   {
     id: "remote-environments",
-    title: (t) => t(($) => $.search.remoteEnvironments),
-    englishTitle: resources.en.settings.search.remoteEnvironments,
+    title: msg("Environments"),
     to: "/settings/connections",
-    searchTerms: ["add pair backend host code ssh config agent tunnel saved t3 connect"],
+    searchTerms: [msg("add pair backend host code ssh config agent tunnel saved t3 connect")],
   },
   {
     id: "load-balancing",
-    title: (t) => t(($) => $.search.loadBalancing),
-    englishTitle: resources.en.settings.search.loadBalancing,
+    title: msg("Load balancing"),
     to: "/settings/connections",
     searchTerms: [
-      "automatic machine environment resources cpu memory capacity preference weight shared projects",
+      msg(
+        "automatic machine environment resources cpu memory capacity preference weight shared projects",
+      ),
     ],
   },
   {
     id: "pull-request-routing",
-    title: (t) => t(($) => $.search.pullRequestRouting),
-    englishTitle: resources.en.settings.search.pullRequestRouting,
+    title: msg("Pull request sharing"),
     to: "/settings/connections",
     searchTerms: [
       `pull request routing trusted environments shared credentials permissions read actions source control ${SOURCE_CONTROL_HOST_LABELS}`,
@@ -1653,29 +1443,26 @@ const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "secret-providers",
-    title: (t) => t(($) => $.search.secretProviders),
-    englishTitle: resources.en.settings.search.secretProviders,
+    title: msg("Secret providers"),
     to: "/settings/secrets",
-    searchTerms: ["1password vault credentials api key"],
+    searchTerms: [msg("1password vault credentials api key")],
     secretsFeatureOnly: true,
   },
   {
     id: "secret-providers-add",
-    title: (t) => t(($) => $.search.secretProvidersAdd),
-    englishTitle: resources.en.settings.search.secretProvidersAdd,
+    title: msg("Add secret provider"),
     to: "/settings/secrets",
     targetId: "secret-providers",
-    searchTerms: ["new 1password vault op cli account"],
+    searchTerms: [msg("new 1password vault op cli account")],
     secretsFeatureOnly: true,
   },
   {
     id: "archive",
-    title: (t) => t(($) => $.search.archive),
-    englishTitle: resources.en.settings.search.archive,
+    title: msg("Archived threads"),
     to: "/settings/archived",
-    searchTerms: ["restore reopen deleted history projects"],
+    searchTerms: [msg("restore reopen deleted history projects")],
   },
-] as const satisfies ReadonlyArray<SettingsSearchSource>;
+] as const satisfies ReadonlyArray<SettingsSearchItem>;
 
 export type SettingsSearchItemId = (typeof SETTINGS_SEARCH_ITEMS)[number]["id"];
 
@@ -1729,7 +1516,7 @@ const MOVED_SECTION_ANCHORS: Readonly<Record<string, SettingsPath>> = {
 /** Where an old settings link now lives. Its anchor finds the page its row moved to. */
 export function movedSettingsPath(pathname: string, hash: string): SettingsPath | null {
   if (!SPLIT_SETTINGS_PATHS.has(pathname)) return null;
-  const items: readonly SettingsSearchSource[] = SETTINGS_SEARCH_ITEMS;
+  const items: readonly SettingsSearchItem[] = SETTINGS_SEARCH_ITEMS;
   const anchored = hash
     ? (items.find((item) => item.id === hash) ?? items.find((item) => item.targetId === hash))
     : undefined;
@@ -1738,14 +1525,14 @@ export function movedSettingsPath(pathname: string, hash: string): SettingsPath 
   return to === pathname ? null : to;
 }
 
-export function getSettingsSearchTargetScope(targetId: string, t: SettingsTranslation) {
-  const items: readonly SettingsSearchSource[] = SETTINGS_SEARCH_ITEMS;
+export function getSettingsSearchTargetScope(targetId: string) {
+  const items: readonly SettingsSearchItem[] = SETTINGS_SEARCH_ITEMS;
   const item =
     items.find((candidate) => candidate.id === targetId) ??
     items.find((candidate) => candidate.targetId === targetId);
   return item
     ? {
-        title: item.title(t),
+        title: item.title,
         scope: item.scope ?? SETTINGS_CATEGORY_SCOPES[item.to],
         ...(item.requiresThreadAutoSettlement ? { requiresThreadAutoSettlement: true } : {}),
       }
@@ -1805,23 +1592,27 @@ export function isSettingsSearchScopeAvailable(
   }
 }
 
-export function searchableSetting(
-  id: SettingsSearchItemId,
-  t: SettingsTranslation,
-): {
+function searchableSetting(id: SettingsSearchItemId): {
   readonly id: string;
   readonly title: string;
 } {
-  const item = SEARCH_ITEMS_BY_ID.get(id);
-  if (!item) throw new Error(`Unknown setting: ${id}`);
-  return { id: item.id, title: item.title(t) };
+  const { id: anchorId, title } = SEARCH_ITEMS_BY_ID.get(id)!;
+  return { id: anchorId, title };
+}
+
+/** `searchableSetting` with its title in the active language, for spreading onto a row. */
+export function useSearchableSetting() {
+  const m = useMessages();
+  return (id: SettingsSearchItemId) => {
+    const setting = searchableSetting(id);
+    return { ...setting, title: m(setting.title) };
+  };
 }
 
 export function filterAvailableSettingsSearchItems(
   availability: SettingsSearchAvailability,
-  t: SettingsTranslation,
 ): ReadonlyArray<SettingsSearchItem> {
-  const items = settingsSearchItems(t);
+  const items: ReadonlyArray<SettingsSearchItem> = SETTINGS_SEARCH_ITEMS;
   return items.filter(
     (item) =>
       (!item.cloudOnly || availability.hasCloudPublicConfig) &&
@@ -1855,48 +1646,26 @@ export function settingsForThisPlatform(
   );
 }
 
-export function settingsSearchItems(t: SettingsTranslation): ReadonlyArray<SettingsSearchItem> {
-  return SETTINGS_SEARCH_ITEMS.map((item) => {
-    const source: SettingsSearchSource = item;
-    return {
-      ...source,
-      title: source.title(t),
-      searchTerms: [
-        ...(source.searchTerms ?? []),
-        ...(source.englishTitle ? [source.englishTitle] : []),
-      ],
-    };
-  });
-}
-
-export function sourceControlHostSearchItems(
-  definitions: ReadonlyArray<SourceControlDefinition>,
-  t: SettingsTranslation,
-): ReadonlyArray<SettingsSearchItem> {
-  return sourceControlHostSearchSources(definitions).map((item) => ({
-    ...item,
-    title: item.title(t),
-  }));
-}
-
 export function searchSettings(
   query: string,
-  t: SettingsTranslation,
-  items: ReadonlyArray<SettingsSearchItem> = settingsSearchItems(t),
+  items: ReadonlyArray<SettingsSearchItem> = SETTINGS_SEARCH_ITEMS,
+  translate: (message: string) => string = (message) => message,
 ): ReadonlyArray<SettingsSearchItem> {
   const normalizedQuery = normalizeSearchText(query);
   if (normalizedQuery.length === 0) return [];
   const queryTokens = normalizedQuery.split(" ");
-  const sectionLabels = settingsSectionLabels(t);
 
   return settingsForThisPlatform(items)
     .flatMap((item, index) => {
-      const title = normalizeSearchText(item.title);
+      const title = normalizeSearchText(decodeMsg(item.title));
       const fields = [
         title,
-        normalizeSearchText(sectionLabels[item.to]),
-        normalizeSearchText(englishSectionLabels[item.to]),
+        normalizeSearchText(SETTINGS_SECTION_LABELS[item.to]),
+        // The labels as displayed, so search also works in the active language.
+        normalizeSearchText(translate(item.title)),
+        normalizeSearchText(translate(SETTINGS_SECTION_LABELS[item.to])),
         ...(item.searchTerms ?? []).map(normalizeSearchText),
+        ...(item.searchTerms ?? []).map((term) => normalizeSearchText(translate(term))),
       ];
       if (!queryTokens.every((token) => fields.some((field) => field.includes(token)))) return [];
 

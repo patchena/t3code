@@ -1,5 +1,5 @@
+import { msg, useGT } from "gt-react";
 import { CheckIcon, CopyIcon } from "lucide-react";
-import { useTranslation } from "react-i18next";
 
 import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { cn } from "~/lib/utils";
@@ -15,10 +15,14 @@ export function CommandBlock({
   readonly className?: string;
   readonly prominent?: boolean;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const { copyToClipboard, isCopied } = useCopyToClipboard({
     timeout: 1500,
-    target: "command",
+    target: {
+      target: "command",
+      unavailableMessage: msg("Clipboard API is unavailable while copying command."),
+      failureMessage: msg("Failed to copy command to the clipboard."),
+    },
   });
   return (
     <div
@@ -35,7 +39,7 @@ export function CommandBlock({
       <Button
         size="icon-xs"
         variant="ghost"
-        aria-label={t(($) => $.terminal.copyCommand)}
+        aria-label={gt("Copy command")}
         onClick={() => copyToClipboard(command, undefined)}
       >
         {isCopied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}

@@ -1,9 +1,9 @@
-import { useTranslation } from "react-i18next";
 import {
   type ClientSettings,
   type EnvironmentId,
   resolveEnvironmentMachineKind,
 } from "@t3tools/contracts";
+import { useGT } from "gt-react";
 
 import { isDesktopLocalConnectionTarget } from "../connection/desktopLocal";
 import { useClientSettings } from "../hooks/useSettings";
@@ -18,7 +18,7 @@ import { orderItemsByPreferredIds, sortLogicalProjectsForSidebar } from "./Sideb
 // source. Taking the source as an argument instead leaves the helper hook-free, and the
 // compiler then treats it as a plain function and caches nothing.
 export function useEnvironmentLookups() {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const { environments } = useEnvironments();
   const environmentLabelById = new Map(
     environments.map((environment) => [environment.environmentId, environment.label] as const),
@@ -32,12 +32,11 @@ export function useEnvironmentLookups() {
         {
           kind: isLocal ? "local" : "remote",
           label: isPrimary
-            ? t(($) => $.palette.local)
+            ? gt("Local", { $context: "machine location" })
             : isLocal
-              ? t(($) => $.palette.localEnvironment, { environment: environment.label })
+              ? gt("{label} (Local)", { label: environment.label })
               : environment.label,
           machine: resolveEnvironmentMachineKind(environment.serverConfig),
-          searchTerms: isLocal ? ["Local"] : [],
         },
       ] as const;
     }),
@@ -61,7 +60,6 @@ export const selectCommandPaletteClientSettings = (settings: ClientSettings) => 
 });
 
 export function useSortedProjectGroups(environmentLabelById: ReadonlyMap<EnvironmentId, string>) {
-  const { t: tCommon } = useTranslation("common");
   const projects = useProjects();
   const threads = useVisibleThreadShells();
   const projectOrder = useUiStateStore((store) => store.projectOrder);
@@ -80,15 +78,12 @@ export function useSortedProjectGroups(environmentLabelById: ReadonlyMap<Environ
       legacyProjectCwdPreferenceKey(project.workspaceRoot),
     ],
   });
-  const unsortedProjectGroups = buildSidebarProjectSnapshots(
-    {
-      projects: clientSettings.sidebarProjectSortOrder === "manual" ? orderedProjects : projects,
-      settings: projectGroupingSettings,
-      primaryEnvironmentId,
-      resolveEnvironmentLabel: (environmentId) => environmentLabelById.get(environmentId) ?? null,
-    },
-    tCommon,
-  );
+  const unsortedProjectGroups = buildSidebarProjectSnapshots({
+    projects: clientSettings.sidebarProjectSortOrder === "manual" ? orderedProjects : projects,
+    settings: projectGroupingSettings,
+    primaryEnvironmentId,
+    resolveEnvironmentLabel: (environmentId) => environmentLabelById.get(environmentId) ?? null,
+  });
   return sortLogicalProjectsForSidebar(
     unsortedProjectGroups,
     threads,

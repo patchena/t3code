@@ -1,5 +1,7 @@
+import { msg } from "gt-react";
+import { errorDisplayMessage, thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { m } from "~/i18n/messages";
 import type { ToolCallDiffTarget } from "../../diffPanelStore";
-import { useTranslation } from "react-i18next";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { ThreadPreviewState } from "../../previewStateStore";
 import { formatFilePathForClipboard } from "@t3tools/client-runtime/media-actions";
@@ -67,7 +69,6 @@ interface RightPanelActionsInput {
  * requests, device, and terminal tabs.
  */
 export function useRightPanelActions(input: RightPanelActionsInput) {
-  const { t } = useTranslation("chat");
   const {
     closeRightPanelSurface,
     activeThreadRef,
@@ -121,8 +122,8 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: t(($) => $.details.openBrowserFailed),
-            description: error.message,
+            title: m(msg("Unable to open browser")),
+            description: errorDisplayMessage(error, m) ?? error.message,
           }),
         );
       }
@@ -206,6 +207,12 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
     if (surface.kind === "terminal") {
       focusTerminal(activeThreadRef, surface.activeTerminalId);
     }
+    if (surface.kind === "side-chat") {
+      requestWorkspaceFocus({
+        area: "panel",
+        selector: `[data-side-chat-pane="${CSS.escape(surface.threadId)}"] [data-workspace-area="composer"] [contenteditable="true"]`,
+      });
+    }
     if (surface.kind === "diff" && !diffOpen) {
       onDiffPanelOpen?.();
     }
@@ -253,8 +260,8 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: t(($) => $.markdown.pathCopyFailed),
-          description: t(($) => $.markdown.clipboardUnavailable),
+          title: m(msg("Failed to copy path")),
+          description: m(msg("Clipboard API unavailable.")),
         }),
       );
       return;
@@ -264,24 +271,15 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
       relativePath,
       resolvePathLinkTarget(relativePath, gitCwd ?? activeProjectCwd ?? ""),
     );
-    void navigator.clipboard.writeText(clipboardPath).then(
-      () => {
-        toastManager.add({
-          type: "success",
-          title: t(($) => $.markdown.copiedPath),
-          description: clipboardPath,
-        });
-      },
-      (error) => {
-        toastManager.add(
-          stackedThreadToast({
-            type: "error",
-            title: t(($) => $.markdown.pathCopyFailed),
-            description: error instanceof Error ? error.message : t(($) => $.ui.error),
-          }),
-        );
-      },
-    );
+    void navigator.clipboard.writeText(clipboardPath).then(undefined, (error) => {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: m(msg("Failed to copy path")),
+          description: thrownErrorMessage(error, m) ?? m(msg("An error occurred.")),
+        }),
+      );
+    });
   };
   const copyRightPanelFilePathStable = useStableCallback(copyRightPanelFilePath);
   const addPullRequestSurface = () => {

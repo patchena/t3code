@@ -1,15 +1,16 @@
-import { isTranslationError } from "@t3tools/client-runtime/i18n";
-import { useTranslation } from "react-i18next";
+import { msg } from "gt-react";
 import { useState, useSyncExternalStore } from "react";
 
 import { useStableCallback } from "~/hooks/useStableCallback";
+import { m } from "~/i18n/messages";
 import { getDocumentActivity, subscribeDocumentActivity } from "~/lib/documentActivity";
 
 const POLL_INTERVAL_MS = 1500;
+const CHECK_FAILED_MESSAGE = msg("Could not check permissions. We'll try again automatically.");
 
 interface PermissionSnapshot<Id extends string> {
   readonly status: Record<Id, boolean>;
-  readonly error: "checkFailed" | null;
+  readonly error: string | null;
 }
 
 /**
@@ -37,9 +38,8 @@ export function createPermissionPoller<Id extends string>(
         checking = true;
         try {
           publish({ status: await check(), error: null });
-        } catch (cause) {
-          if (isTranslationError(cause)) throw cause;
-          publish({ status: snapshot.status, error: "checkFailed" });
+        } catch {
+          publish({ status: snapshot.status, error: m(CHECK_FAILED_MESSAGE) });
         }
         checking = false;
       };
@@ -72,7 +72,6 @@ export function usePermissionStatus<Id extends string>(
   initialStatus: Record<Id, boolean>,
   enabled = true,
 ) {
-  const { t } = useTranslation("tools");
   const checkLatest = useStableCallback(check);
   const [poller] = useState(() => createPermissionPoller(checkLatest, initialStatus));
   const { status, error } = useSyncExternalStore(
@@ -81,7 +80,7 @@ export function usePermissionStatus<Id extends string>(
   );
   return {
     status,
-    error: error === null ? null : t(($) => $.permissions.checkFailed),
+    error,
     isReady: (required: readonly Id[]) => error === null && required.every((id) => status[id]),
   };
 }

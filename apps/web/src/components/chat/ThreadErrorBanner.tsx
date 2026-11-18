@@ -1,12 +1,12 @@
 import type { OrchestrationV2ProviderFailureClass } from "@t3tools/contracts";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { useTranslation } from "react-i18next";
 import {
   CHATGPT_USAGE_LIMIT_CODE,
   CHATGPT_WORKSPACE_ADMIN_REQUEST,
   CHATGPT_WORKSPACE_USAGE_LIMIT_CODE,
 } from "@t3tools/shared/usageLimits";
+import { msg, T, useGT } from "gt-react";
 import { memo } from "react";
+import { m } from "../../i18n/messages";
 import { writeTextToClipboard } from "../../hooks/useCopyToClipboard";
 import { Alert, AlertAction, AlertDescription } from "../ui/alert";
 import { Button } from "../ui/button";
@@ -16,18 +16,19 @@ import { OpenAI } from "../Icons";
 import { ChatGptUsageButton } from "../settings/ChatGptUsageButton";
 import { ExpandableText } from "../settings/ExpandableText";
 
-export function copyAdminRequest(t: TFunction<"chat">) {
-  void writeTextToClipboard(
-    CHATGPT_WORKSPACE_ADMIN_REQUEST,
-    t(($) => $.errors.adminRequest),
-  ).then(
+export function copyAdminRequest() {
+  void writeTextToClipboard(CHATGPT_WORKSPACE_ADMIN_REQUEST, {
+    target: "admin request",
+    unavailableMessage: msg("Clipboard API is unavailable while copying admin request."),
+    failureMessage: msg("Failed to copy admin request to the clipboard."),
+  }).then(
     () =>
       toastManager.add({
         type: "success",
-        title: t(($) => $.errors.requestCopied),
-        description: t(($) => $.errors.sendToAdmin),
+        title: m(msg("Request copied")),
+        description: m(msg("Send it to your workspace admin.")),
       }),
-    () => toastManager.add({ type: "error", title: t(($) => $.errors.copyRequestFailed) }),
+    () => toastManager.add({ type: "error", title: m(msg("Could not copy the request")) }),
   );
 }
 
@@ -85,7 +86,7 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
   errorCode?: string | null;
   onDismiss?: () => void;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   if (!error) return null;
   const workspaceLimit = errorCode === CHATGPT_WORKSPACE_USAGE_LIMIT_CODE;
   const chatGptLimit = workspaceLimit || errorCode === CHATGPT_USAGE_LIMIT_CODE;
@@ -101,8 +102,16 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
         <AlertDescription>
           {chatGptLimit ? (
             <div className="space-y-1">
-              <p className="font-medium">{t(($) => $.errors.chatGptLimit)}</p>
-              {workspaceLimit ? <p>{t(($) => $.errors.workspaceLimit)}</p> : null}
+              <p className="font-medium">
+                <T>ChatGPT usage limit reached</T>
+              </p>
+              {workspaceLimit ? (
+                <p>
+                  {gt(
+                    "You've reached your workspace's limit for using your ChatGPT plan in other apps. Copy a request to ask your workspace admin for increased usage limits.",
+                  )}
+                </p>
+              ) : null}
             </div>
           ) : (
             <ExpandableText text={error} collapsedText={getThreadErrorBannerMessage(error)} />
@@ -111,8 +120,8 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
         {(chatGptLimit || onDismiss) && (
           <AlertAction>
             {workspaceLimit ? (
-              <Button variant="default" size="sm" onClick={() => copyAdminRequest(t)}>
-                {t(($) => $.errors.copyAdminRequest)}
+              <Button variant="default" size="sm" onClick={copyAdminRequest}>
+                <T>Copy request for admin</T>
               </Button>
             ) : chatGptLimit ? (
               <ChatGptUsageButton variant="default" size="sm" />
@@ -121,7 +130,7 @@ export const ThreadErrorBanner = memo(function ThreadErrorBanner({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                aria-label={t(($) => $.errors.dismiss)}
+                aria-label={gt("Dismiss error")}
                 onClick={onDismiss}
               >
                 <XIcon />

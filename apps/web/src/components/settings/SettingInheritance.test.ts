@@ -1,11 +1,8 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { DEFAULT_SERVER_SETTINGS, EnvironmentId, ProjectId } from "@t3tools/contracts";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import { describe, expect, it } from "vite-plus/test";
 
 import { settingInheritanceLayers } from "./SettingInheritance";
-
-const t = createI18n("en").getFixedT(null, "settings");
 
 const environmentId = EnvironmentId.make("laptop");
 const projectId = ProjectId.make("project");
@@ -31,7 +28,6 @@ describe("worktree cleanup inheritance", () => {
       },
       settings,
       "worktreeCleanup",
-      t,
     );
     expect(layers.map((layer) => [layer.key, layer.value, layer.effective])).toEqual([
       ["project", "Off", true],
@@ -60,7 +56,6 @@ describe("settingInheritanceLayers", () => {
       },
       settings,
       "backgroundActivity",
-      t,
     );
     expect(layers.map((layer) => [layer.key, layer.value, layer.effective])).toEqual([
       ["environment", "Performance", true],
@@ -79,7 +74,6 @@ describe("settingInheritanceLayers", () => {
       },
       DEFAULT_SERVER_SETTINGS,
       "defaultThreadEnvMode",
-      t,
     );
     expect(fromFile.map((layer) => [layer.label, layer.value, layer.effective])).toEqual([
       ["Project", "Inherits", false],
@@ -97,7 +91,6 @@ describe("settingInheritanceLayers", () => {
       },
       settings,
       "defaultThreadEnvMode",
-      t,
     );
     expect(fromEnvironment.map((layer) => [layer.value, layer.effective])).toEqual([
       ["Inherits", false],

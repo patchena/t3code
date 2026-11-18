@@ -1,36 +1,31 @@
-import { useTranslation } from "react-i18next";
 import type { PullRequestAction } from "@t3tools/contracts";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
+import { T } from "gt-react";
 import { SearchIcon } from "lucide-react";
-import { PullRequestChangeBreakdownStat } from "~/components/pullRequest/PullRequestChangeBreakdownStat";
-import { PullRequestStackPopover } from "~/components/pullRequest/PullRequestStackPopover";
+import { PullRequestChangeBreakdownStat } from "./PullRequestChangeBreakdownStat";
+import { PullRequestStackPopover } from "./PullRequestStackPopover";
 import {
   PullRequestSpeedActions,
   type PullRequestSpeedActionResult,
-} from "~/components/pullRequest/PullRequestSpeedActions";
+} from "./PullRequestSpeedActions";
 import { memo, type RefCallback } from "react";
 
 import { cn } from "~/lib/utils";
 import { getSourceControlPresentationForKind } from "~/sourceControlPresentation";
 
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
-import { PullRequestChecksPopover } from "~/components/pullRequest/PullRequestChecksPopover";
-import type { EnvironmentPullRequestEntry } from "~/components/pullRequest/pullRequestList.logic";
-import {
-  openOnHostLabel,
-  showPullRequestLinkContextMenu,
-} from "~/components/pullRequest/pullRequestLinkContextMenu";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { PullRequestChecksPopover } from "./PullRequestChecksPopover";
+import { pullRequestPanelReference } from "./usePullRequestDetail";
+import type { EnvironmentPullRequestEntry } from "./pullRequestList.logic";
+import { openOnHostLabel, showPullRequestLinkContextMenu } from "./pullRequestLinkContextMenu";
 import {
   PULL_REQUEST_ROW_CLASS,
   PULL_REQUEST_ROW_NUMBER_CLASS,
   PullRequestRowAuthor,
   PullRequestRowGlyph,
   PullRequestRowLines,
-} from "~/components/pullRequest/PullRequestListRow";
-import {
-  PullRequestLabelChip,
-  PullRequestReviewDecisionGlyph,
-} from "~/components/pullRequest/pullRequestPresentation";
+} from "./PullRequestListRow";
+import { PullRequestLabelChip, PullRequestReviewDecisionGlyph } from "./pullRequestPresentation";
 
 const LABEL_SLOTS = [
   { overflow: "@xl/pr-row-meta:hidden" },
@@ -110,7 +105,6 @@ function PullRequestRowImpl({
   sweeping?: boolean;
   onCloseSweepStart?: (entry: EnvironmentPullRequestEntry, event: PointerEvent) => void;
 }) {
-  const { t } = useTranslation("workspace");
   const { Icon, providerName, terminology } = getSourceControlPresentationForKind(entry.provider);
   return (
     <div
@@ -154,14 +148,11 @@ function PullRequestRowImpl({
               onContextMenu={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                void showPullRequestLinkContextMenu(
-                  {
-                    url: entry.url,
-                    openLabel: openOnHostLabel(sourceControlClients.get(entry.provider), t),
-                    position: { x: event.clientX, y: event.clientY },
-                  },
-                  t,
-                );
+                void showPullRequestLinkContextMenu({
+                  url: entry.url,
+                  openLabel: openOnHostLabel(sourceControlClients.get(entry.provider)),
+                  position: { x: event.clientX, y: event.clientY },
+                });
               }}
             >
               #{entry.number}
@@ -175,9 +166,8 @@ function PullRequestRowImpl({
                   checksState={entry.checksState}
                   environmentId={entry.environmentId}
                   reference={{
-                    projectId: entry.projectId,
-                    repository: entry.repository,
-                    number: entry.number,
+                    ...pullRequestPanelReference({ ...entry, host: entry.host.toLowerCase() }),
+                    allowStale: false,
                   }}
                 />
               )}
@@ -227,13 +217,17 @@ function PullRequestRowImpl({
                       <span className="flex min-w-6 items-center gap-1 overflow-hidden rounded-full border border-border/60 px-1 text-3xs" />
                     }
                   >
-                    <span className="sr-only">{t(($) => $.git.matchedDescriptionLower)}</span>
+                    <span className="sr-only">
+                      <T>matched in the description</T>
+                    </span>
                     <SearchIcon aria-hidden className="size-3 shrink-0" />
                     <span aria-hidden className="hidden truncate @xs/pr-row-meta:block">
-                      {t(($) => $.git.matchedDescriptionLower)}
+                      <T>matched in the description</T>
                     </span>
                   </TooltipTrigger>
-                  <TooltipPopup side="top">{t(($) => $.git.matchedDescription)}</TooltipPopup>
+                  <TooltipPopup side="top">
+                    <T>Matched in the description</T>
+                  </TooltipPopup>
                 </Tooltip>
               ) : null}
               {showProvider ? (

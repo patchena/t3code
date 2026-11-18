@@ -1,4 +1,3 @@
-import { FileWorkerError } from "~/components/files/fileWorkerError";
 // Adapted from opencode (MIT). Copyright (c) 2025 opencode. See LICENSE.opencode.
 import { openWordDocument, pageSize } from "./word-document";
 import type { WordMethods } from "./word-protocol";
@@ -14,11 +13,7 @@ const opened: { value: Awaited<ReturnType<typeof openWordDocument>> | undefined 
 
 serveWorker<WordMethods>({
   open: async (input) => {
-    if (opened.value)
-      throw new FileWorkerError({
-        message: "The worker already holds a document",
-        code: "workerHasDocument",
-      });
+    if (opened.value) throw new Error("The worker already holds a document");
 
     // SAFETY: a worker's global scope is a FontFaceSource, whose `fonts` is a FontFaceSet (CSS Font Loading, exposed to
     // workers). The window's types declare it on documents only. Without one, the canvas keeps the system's fonts.
@@ -50,11 +45,7 @@ serveWorker<WordMethods>({
 });
 
 function required() {
-  if (!opened.value)
-    throw new FileWorkerError({
-      message: "The worker holds no document",
-      code: "workerNoDocument",
-    });
+  if (!opened.value) throw new Error("The worker holds no document");
 
   return opened.value;
 }

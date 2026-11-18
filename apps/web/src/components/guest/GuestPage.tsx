@@ -12,6 +12,7 @@ import {
   OrchestrationV2ThreadHistoryPage,
   type OrchestrationV2ThreadProjection,
   type ThreadGuestMessage,
+  type ThreadGuestMessageStatus,
 } from "@t3tools/contracts";
 import type { LegendListRef } from "@legendapp/list/react";
 import * as Option from "effect/Option";
@@ -33,8 +34,9 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from "react";
-import { useTranslation } from "react-i18next";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { msg, T, useGT, useMessages } from "gt-react";
+
+import { m } from "~/i18n/messages";
 
 import { useIncrementalTimelineEntries } from "~/hooks/useIncrementalTimelineEntries";
 import { useNowMinute } from "~/hooks/useNowMinute";
@@ -67,7 +69,6 @@ import {
   initialGuestStreamState,
   inviteShareId,
   type GuestStreamState,
-  type GuestFilesProblem,
   parseGuestStreamEvent,
   unplacedGuestMessages,
 } from "./guestStream.logic";
@@ -138,35 +139,12 @@ const decodeHistoryPage = Schema.decodeUnknownOption(
   Schema.toCodecJson(OrchestrationV2ThreadHistoryPage),
 );
 
-type GuestFailure =
-  | { readonly kind: "history" | "request" | "network" }
-  | { readonly kind: "remote"; readonly message: string }
-  | GuestFilesProblem;
-
-function guestFailureMessage(failure: GuestFailure, t: TFunction<"chat">): string {
-  switch (failure.kind) {
-    case "history":
-      return t(($) => $.links.guest.historyFailed);
-    case "request":
-      return t(($) => $.links.guest.requestFailed);
-    case "network":
-      return t(($) => $.links.guest.networkFailed);
-    case "remote":
-      return failure.message;
-    case "files-limit":
-      return t(($) => $.links.guest.filesLimit, { count: failure.limit });
-    case "files-size":
-      return t(($) => $.links.guest.filesSize);
-    case "file-unsupported":
-      return t(($) => $.links.guest.unsupportedFile);
-  }
-}
-
 /** Resolves to the page, or to a message the guest can read. */
 async function fetchGuestHistoryPage(
   shareId: string,
   cursor: string,
-): Promise<OrchestrationV2ThreadHistoryPage | GuestFailure> {
+): Promise<OrchestrationV2ThreadHistoryPage | string> {
+  const failed = m(msg("Could not load earlier turns. Try again."));
   try {
     const response = await fetch(
       `${GUEST_HISTORY_ROUTE}?${GUEST_SHARE_PARAM}=${encodeURIComponent(shareId)}&cursor=${encodeURIComponent(cursor)}`,
@@ -174,13 +152,13 @@ async function fetchGuestHistoryPage(
     const json: unknown = await response.json().catch(() => null);
     if (!response.ok) {
       return Option.match(decodeErrorBody(json), {
-        onNone: (): GuestFailure => ({ kind: "history" }),
-        onSome: ({ message }): GuestFailure => ({ kind: "remote", message }),
+        onNone: () => failed,
+        onSome: ({ message }) => message,
       });
     }
-    return Option.getOrElse(decodeHistoryPage(json), (): GuestFailure => ({ kind: "history" }));
+    return Option.getOrElse(decodeHistoryPage(json), () => failed);
   } catch {
-    return { kind: "network" };
+    return m(msg("Could not reach the server."));
   }
 }
 
@@ -188,7 +166,7 @@ async function fetchGuestHistoryPage(
 async function postGuest(
   path: "redeem" | `messages?${string}`,
   body: typeof GuestRedeemRequest.Encoded | FormData,
-): Promise<GuestFailure | null> {
+): Promise<string | null> {
   try {
     const response = await fetch(
       `${GUEST_ROUTE_PREFIX}/${path}`,
@@ -203,13 +181,19 @@ async function postGuest(
     if (response.ok) return null;
     const json: unknown = await response.json().catch(() => null);
     return Option.match(decodeErrorBody(json), {
-      onNone: (): GuestFailure => ({ kind: "request" }),
-      onSome: ({ message }): GuestFailure => ({ kind: "remote", message }),
+      onNone: () => m(msg("Something went wrong. Try again.")),
+      onSome: ({ message }) => message,
     });
   } catch {
-    return { kind: "network" };
+    return m(msg("Could not reach the server."));
   }
 }
+
+const STATUS_LABEL: Record<ThreadGuestMessageStatus, string> = {
+  pending: msg("Waiting for approval"),
+  sent: msg("Sent", { $context: "message status" }),
+  dismissed: msg("Not sent"),
+};
 
 /** Same column as the owner's timeline, so both views wrap text at the same width. */
 const LANE = "chat-content-lane px-4";
@@ -217,7 +201,7 @@ const LANE = "chat-content-lane px-4";
 type GuestAccess = "checking" | "session" | "name" | "none";
 
 export function GuestPage() {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const [{ credential, shareId }] = useState(takeGuestEntry);
   // A browser that already joined this share goes straight back in, even from the spent link.
   // Sessions are per share, so one for another link never stands in for this one.
@@ -255,7 +239,7 @@ export function GuestPage() {
   return (
     <div className="flex h-dvh flex-col bg-background text-foreground">
       {access === "checking" ? (
-        <Notice title={t(($) => $.links.guest.connecting)} />
+        <Notice title={gt("Connecting...")} />
       ) : access === "name" && credential !== null ? (
         <NameForm
           credential={credential}
@@ -268,14 +252,17 @@ export function GuestPage() {
       ) : access === "session" && shareId !== null ? (
         <GuestSession shareId={shareId} />
       ) : (
-        <Notice title={t(($) => $.links.guest.invalid)} detail={t(($) => $.links.guest.newLink)} />
+        <Notice
+          title={gt("This link has ended or is not valid")}
+          detail={gt("Ask the owner for a new link. Each link works in one browser.")}
+        />
       )}
     </div>
   );
 }
 
 function GuestSession({ shareId }: { readonly shareId: string }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const [stream, dispatch] = useReducer(applyGuestStreamEvent, null, () => ({
     ...initialGuestStreamState,
     awaitingRowIds: readAwaitingRowIds(),
@@ -288,18 +275,18 @@ function GuestSession({ shareId }: { readonly shareId: string }) {
 
   const [historyLoad, setHistoryLoad] = useState<{
     readonly cursor: string;
-    readonly error: GuestFailure | null;
+    readonly error: string | null;
   } | null>(null);
   const historyCursor = stream.historyCursor;
   // A load for an older cursor is stale: a page or a reconnect snapshot moved the cursor on.
   const currentLoad = historyLoad?.cursor === historyCursor ? historyLoad : null;
   const loadingHistory = currentLoad !== null && currentLoad.error === null;
-  const historyError = currentLoad?.error ? guestFailureMessage(currentLoad.error, t) : null;
+  const historyError = currentLoad?.error ?? null;
   const loadEarlier = async () => {
     if (historyCursor === null || loadingHistory) return;
     setHistoryLoad({ cursor: historyCursor, error: null });
     const result = await fetchGuestHistoryPage(shareId, historyCursor);
-    if ("kind" in result) setHistoryLoad({ cursor: historyCursor, error: result });
+    if (typeof result === "string") setHistoryLoad({ cursor: historyCursor, error: result });
     else dispatch({ type: "history-page", cursor: historyCursor, page: result });
   };
   const historyControls: MessagesTimelineHistoryControls | undefined =
@@ -336,11 +323,14 @@ function GuestSession({ shareId }: { readonly shareId: string }) {
 
   if (stream.ended || (rejected && stream.view !== null)) {
     return (
-      <Notice title={t(($) => $.links.guest.ended)} detail={t(($) => $.links.guest.stopped)} />
+      <Notice
+        title={gt("This link has ended")}
+        detail={gt("The owner stopped sharing this thread.")}
+      />
     );
   }
   if (stream.view !== null) {
-    if (stream.projection === null) return <Notice title={t(($) => $.links.guest.connecting)} />;
+    if (stream.projection === null) return <Notice title={gt("Connecting...")} />;
     return (
       <GuestThread
         view={stream.view}
@@ -350,9 +340,12 @@ function GuestSession({ shareId }: { readonly shareId: string }) {
       />
     );
   }
-  if (!rejected) return <Notice title={t(($) => $.links.guest.connecting)} />;
+  if (!rejected) return <Notice title={gt("Connecting...")} />;
   return (
-    <Notice title={t(($) => $.links.guest.invalid)} detail={t(($) => $.links.guest.newLink)} />
+    <Notice
+      title={gt("This link has ended or is not valid")}
+      detail={gt("Ask the owner for a new link. Each link works in one browser.")}
+    />
   );
 }
 
@@ -372,10 +365,10 @@ function NameForm({
   readonly credential: string;
   readonly onJoined: () => void;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<GuestFailure | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const trimmed = name.trim();
@@ -388,9 +381,11 @@ function NameForm({
   };
   return (
     <form className="m-auto flex w-full max-w-xs flex-col gap-3 p-6" onSubmit={submit}>
-      <h1 className="text-base font-medium">{t(($) => $.links.guest.joinTitle)}</h1>
+      <h1 className="text-base font-medium">
+        <T>Join a shared thread</T>
+      </h1>
       <label className="flex flex-col gap-1.5 text-sm" htmlFor="guest-name">
-        {t(($) => $.links.guest.name)}
+        {gt("Your name")}
         <Input
           id="guest-name"
           autoFocus
@@ -402,13 +397,15 @@ function NameForm({
       </label>
       {error !== null ? (
         <p role="alert" className="text-sm text-destructive">
-          {guestFailureMessage(error, t)}
+          {error}
         </p>
       ) : null}
       <Button type="submit" disabled={submitting || name.trim() === ""}>
-        {t(($) => $.links.guest.join)}
+        <T context="verb, join a shared thread">Join</T>
       </Button>
-      <p className="text-xs text-muted-foreground">{t(($) => $.links.guest.approvalDescription)}</p>
+      <p className="text-xs text-muted-foreground">
+        <T>The owner sees your name and approves each message before the agent gets it.</T>
+      </p>
     </form>
   );
 }
@@ -558,11 +555,11 @@ function GuestThread({
 }
 
 function ExpiryLabel({ expiresAt }: { readonly expiresAt: string }) {
-  const { t } = useTranslation("chat");
   const nowMinute = useNowMinute();
+  const m = useMessages();
   return (
     <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-      {formatGuestExpiry(expiresAt, Date.parse(`${nowMinute}Z`), t)}
+      {formatGuestExpiry(expiresAt, Date.parse(`${nowMinute}Z`), m)}
     </span>
   );
 }
@@ -585,18 +582,14 @@ function UnplacedGuestMessage({
   readonly shareId: GuestShareView["shareId"];
   readonly message: ThreadGuestMessage;
 }) {
-  const { t } = useTranslation("chat");
-  const statusLabel = {
-    pending: t(($) => $.links.guest.pending),
-    sent: t(($) => $.links.guest.sent),
-    dismissed: t(($) => $.links.guest.dismissed),
-  };
   // A dismissed message's files are deleted, so only their names remain.
   const served = message.status !== "dismissed";
+  const gt = useGT();
+  const m = useMessages();
   const url = (attachment: { readonly id: string }) => guestAttachmentUrl(shareId, attachment.id);
   return (
     <div className="flex flex-col items-end gap-1">
-      <GuestMessageName name={t(($) => $.links.guest.you)} />
+      <GuestMessageName name={gt("You", { $context: "the guest's own messages" })} />
       <div
         className={cn(
           BUBBLE,
@@ -612,20 +605,20 @@ function UnplacedGuestMessage({
         />
         {message.text ? <span>{message.text}</span> : null}
       </div>
-      <p className="me-1 text-2xs text-muted-foreground">{statusLabel[message.status]}</p>
+      <p className="me-1 text-2xs text-muted-foreground">{m(STATUS_LABEL[message.status])}</p>
     </div>
   );
 }
 
 /** The thread's model, labeled as the owner's composer labels it, with no way to change it. */
 function GuestModelLabel({ model }: { readonly model: GuestThreadModel }) {
-  const { t } = useTranslation("chat");
   const label = getTriggerDisplayModelName({ slug: model.name, ...model }, model.driver);
   const fullLabel = getDisplayModelName({ slug: model.name, ...model });
+  const gt = useGT();
   return (
     <ComposerControl
       render={<span />}
-      aria-label={t(($) => $.links.guest.model, { model: fullLabel })}
+      aria-label={gt("Model: {model}", { model: fullLabel })}
       className="pointer-events-none min-w-0 shrink"
     >
       {model.driver === null ? null : (
@@ -674,11 +667,12 @@ function GuestComposer({
   /** The guest's own message comes into view even if they had scrolled up, as the owner's does. */
   readonly onSent: () => void;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
+  const m = useMessages();
   const [text, setText] = useState("");
   const [files, setFiles] = useState<ReadonlyArray<StagedFile>>([]);
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<GuestFailure | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nextFileKey = useRef(0);
   const { resolvedTheme } = useTheme();
@@ -688,7 +682,10 @@ function GuestComposer({
       ...files,
       ...added.map((file) => ({ key: `staged-${nextFileKey.current++}`, file })),
     ];
-    const problem = guestFilesProblem(next.map((staged) => staged.file));
+    const problem = guestFilesProblem(
+      next.map((staged) => staged.file),
+      m,
+    );
     setError(problem);
     if (problem === null) setFiles(next);
   };
@@ -748,7 +745,7 @@ function GuestComposer({
       }}
     >
       {files.length > 0 ? (
-        <ul className="flex flex-wrap gap-2" aria-label={t(($) => $.links.guest.attachedFiles)}>
+        <ul className="flex flex-wrap gap-2" aria-label={gt("Attached files")}>
           {files.map((staged) => (
             <li
               key={staged.key}
@@ -763,14 +760,14 @@ function GuestComposer({
                   <PierreEntryIcon pathValue={staged.file.name} kind="file" theme={resolvedTheme} />
                   <span className="max-w-40 truncate">{staged.file.name}</span>
                   <span className="shrink-0 text-xs text-muted-foreground">
-                    {formatAttachmentSize(staged.file.size)}
+                    {formatAttachmentSize(staged.file.size, m)}
                   </span>
                 </span>
               )}
               <Button
                 size="icon-xs"
                 variant="ghost-muted"
-                aria-label={t(($) => $.links.guest.removeFile, { file: staged.file.name })}
+                aria-label={gt("Remove {name}", { name: staged.file.name })}
                 onClick={() => {
                   setError(null);
                   setFiles((current) => current.filter((candidate) => candidate !== staged));
@@ -783,8 +780,8 @@ function GuestComposer({
         </ul>
       ) : null}
       <textarea
-        aria-label={t(($) => $.links.guest.message)}
-        placeholder={t(($) => $.links.guest.message)}
+        aria-label={gt("Message", { $context: "message input" })}
+        placeholder={gt("Message", { $context: "message input" })}
         rows={2}
         maxLength={GUEST_MESSAGE_MAX_LENGTH}
         value={text}
@@ -799,7 +796,7 @@ function GuestComposer({
           type="file"
           multiple
           hidden
-          aria-label={t(($) => $.links.guest.filesToAttach)}
+          aria-label={gt("Files to attach")}
           onChange={(event) => {
             addFiles(Array.from(event.target.files ?? []));
             // The same file can be picked again after it is removed.
@@ -807,7 +804,7 @@ function GuestComposer({
           }}
         />
         <ComposerControl
-          aria-label={t(($) => $.links.guest.attach)}
+          aria-label={gt("Attach files")}
           onClick={() => fileInputRef.current?.click()}
         >
           <ComposerControlIcon icon={PaperclipIcon} />
@@ -815,16 +812,16 @@ function GuestComposer({
         <GuestModelLabel model={model} />
         {error !== null ? (
           <p role="alert" className="min-w-0 flex-1 text-xs text-destructive">
-            {guestFailureMessage(error, t)}
+            {error}
           </p>
         ) : (
           <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-            {t(($) => $.links.guest.approves)}
+            <T>The owner approves each message</T>
           </p>
         )}
         <button
           type="submit"
-          aria-label={t(($) => $.links.guest.send)}
+          aria-label={gt("Send", { $context: "verb, sends the message" })}
           disabled={sending || (text.trim() === "" && files.length === 0)}
           className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-message-action text-message-action-foreground shadow-xs hover:bg-message-action-hover focus-visible:outline-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-64"
         >

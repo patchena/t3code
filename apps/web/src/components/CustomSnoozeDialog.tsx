@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
+import { T, useGT } from "gt-react";
 import { useNavigate } from "@tanstack/react-router";
 import { create } from "zustand";
-import { useTranslation } from "react-i18next";
 import {
   localSnoozeDate,
   localSnoozeTime,
@@ -11,7 +11,7 @@ import {
 import { Button } from "./ui/button";
 import { CalendarIcon, Settings2Icon } from "lucide-react";
 import { Calendar } from "./ui/calendar";
-import { interfaceDateLocale, weekStartsOn } from "~/timestampFormat";
+import { weekStartsOn } from "../timestampFormat";
 import { useNowMinute } from "../hooks/useNowMinute";
 import { Popover, PopoverTrigger, PopoverPopup } from "./ui/popover";
 import { Input } from "./ui/input";
@@ -64,7 +64,7 @@ export function CustomSnoozeDialogHost() {
 }
 
 function CustomSnoozeDialog() {
-  const { t, i18n } = useTranslation("common");
+  const gt = useGT();
   const id = useId();
   const navigate = useNavigate();
   const [initial] = useState(() => new Date(Date.now() + 3_600_000));
@@ -77,7 +77,7 @@ function CustomSnoozeDialog() {
   const [time, setTime] = useState(localSnoozeTime(initial));
   const [amount, setAmount] = useState("2");
   const [unit, setUnit] = useState<"minutes" | "hours" | "days">("hours");
-  const [error, setError] = useState<CustomSnoozeInput["mode"] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const input: CustomSnoozeInput =
     mode === "date" ? { mode, date: localSnoozeDate(date), time } : { mode, amount, unit };
   return (
@@ -94,20 +94,28 @@ function CustomSnoozeDialog() {
             event.preventDefault();
             const snoozedUntil = resolveCustomSnooze(input, new Date());
             if (!snoozedUntil) {
-              setError(mode);
+              setError(
+                mode === "date"
+                  ? gt("Choose a valid date and time in the future.")
+                  : gt("Enter a positive duration."),
+              );
               return;
             }
             finish({ snoozedUntil });
           }}
         >
           <DialogHeader>
-            <DialogTitle>{t(($) => $.misc.customSnooze.title)}</DialogTitle>
-            <DialogDescription>{t(($) => $.misc.customSnooze.description)}</DialogDescription>
+            <DialogTitle>
+              <T>Custom snooze</T>
+            </DialogTitle>
+            <DialogDescription>
+              <T>Choose when snoozed threads return to your inbox.</T>
+            </DialogDescription>
           </DialogHeader>
           <DialogPanel>
             <div className="flex flex-col gap-4">
               <ToggleGroup
-                aria-label={t(($) => $.misc.customSnooze.scheduleType)}
+                aria-label={gt("Schedule type")}
                 className="w-full *:flex-1"
                 value={[mode]}
                 onValueChange={(next) => {
@@ -116,14 +124,20 @@ function CustomSnoozeDialog() {
                   setError(null);
                 }}
               >
-                <Toggle value="date">{t(($) => $.misc.customSnooze.dateTime)}</Toggle>
-                <Toggle value="duration">{t(($) => $.misc.customSnooze.duration)}</Toggle>
+                <Toggle value="date">
+                  <T>Date and time</T>
+                </Toggle>
+                <Toggle value="duration">
+                  <T>Duration</T>
+                </Toggle>
               </ToggleGroup>
               <div className="flex flex-col gap-4">
                 {mode === "date" ? (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex min-w-0 flex-col gap-2">
-                      <Label htmlFor={`${id}-date`}>{t(($) => $.misc.customSnooze.date)}</Label>
+                      <Label htmlFor={`${id}-date`}>
+                        <T context="calendar date">Date</T>
+                      </Label>
                       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                         <PopoverTrigger
                           render={
@@ -134,17 +148,14 @@ function CustomSnoozeDialog() {
                             />
                           }
                         >
-                          {date.toLocaleDateString(interfaceDateLocale(i18n.language), {
+                          {date.toLocaleDateString(undefined, {
                             month: "short",
                             day: "numeric",
                             year: "numeric",
                           })}
                           <CalendarIcon className="size-4 text-muted-foreground" />
                         </PopoverTrigger>
-                        <PopoverPopup
-                          align="start"
-                          aria-label={t(($) => $.misc.customSnooze.chooseDate)}
-                        >
+                        <PopoverPopup align="start" aria-label={gt("Choose snooze date")}>
                           <Calendar
                             mode="single"
                             required
@@ -162,7 +173,7 @@ function CustomSnoozeDialog() {
                       </Popover>
                     </div>
                     <Label className="flex min-w-0 flex-col items-stretch" htmlFor={`${id}-time`}>
-                      {t(($) => $.misc.customSnooze.time)}
+                      <T context="time of day">Time</T>
                       <Input
                         nativeInput
                         id={`${id}-time`}
@@ -190,23 +201,19 @@ function CustomSnoozeDialog() {
                       }}
                     >
                       <Label htmlFor={`${id}-amount`}>
-                        {t(($) => $.misc.customSnooze.snoozeFor)}
+                        <T>Snooze for</T>
                       </Label>
                       <NumberFieldGroup>
-                        <NumberFieldDecrement aria-label={t(($) => $.misc.customSnooze.decrease)} />
+                        <NumberFieldDecrement aria-label={gt("Decrease duration")} />
                         <NumberFieldInput required />
-                        <NumberFieldIncrement aria-label={t(($) => $.misc.customSnooze.increase)} />
+                        <NumberFieldIncrement aria-label={gt("Increase duration")} />
                       </NumberFieldGroup>
                     </NumberField>
                     <Label className="flex min-w-0 flex-col items-stretch" htmlFor={`${id}-unit`}>
-                      {t(($) => $.misc.customSnooze.unit)}
+                      <T context="unit of time">Unit</T>
                       <Select
                         value={unit}
-                        items={{
-                          minutes: t(($) => $.misc.customSnooze.minutes),
-                          hours: t(($) => $.misc.customSnooze.hours),
-                          days: t(($) => $.misc.customSnooze.days),
-                        }}
+                        items={{ minutes: gt("Minutes"), hours: gt("Hours"), days: gt("Days") }}
                         onValueChange={(value) => {
                           if (value === "minutes" || value === "hours" || value === "days")
                             setUnit(value);
@@ -218,12 +225,14 @@ function CustomSnoozeDialog() {
                         </SelectTrigger>
                         <SelectPopup>
                           <SelectItem value="minutes">
-                            {t(($) => $.misc.customSnooze.minutes)}
+                            <T>Minutes</T>
                           </SelectItem>
                           <SelectItem value="hours">
-                            {t(($) => $.misc.customSnooze.hours)}
+                            <T>Hours</T>
                           </SelectItem>
-                          <SelectItem value="days">{t(($) => $.misc.customSnooze.days)}</SelectItem>
+                          <SelectItem value="days">
+                            <T>Days</T>
+                          </SelectItem>
                         </SelectPopup>
                       </Select>
                     </Label>
@@ -233,9 +242,7 @@ function CustomSnoozeDialog() {
             </div>
             {error && (
               <p role="alert" className="text-destructive">
-                {error === "date"
-                  ? t(($) => $.misc.customSnooze.invalidDate)
-                  : t(($) => $.misc.customSnooze.invalidDuration)}
+                {error}
               </p>
             )}
           </DialogPanel>
@@ -253,12 +260,14 @@ function CustomSnoozeDialog() {
               }}
             >
               <Settings2Icon />
-              {t(($) => $.misc.customSnooze.edit)}
+              <T>Edit snooze options</T>
             </Button>
             <Button type="button" variant="outline" onClick={() => finish(null)}>
-              {t(($) => $.misc.cancel)}
+              <T>Cancel</T>
             </Button>
-            <Button type="submit">{t(($) => $.misc.customSnooze.snooze)}</Button>
+            <Button type="submit">
+              <T context="verb">Snooze</T>
+            </Button>
           </DialogFooter>
         </form>
       </DialogPopup>

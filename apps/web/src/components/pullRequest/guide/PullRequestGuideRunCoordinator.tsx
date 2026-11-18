@@ -1,4 +1,4 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { msg } from "gt-react";
 import type { AnyRouter } from "@tanstack/react-router";
 import type { PullRequestReviewGuideResult } from "@t3tools/contracts";
 import { CircleAlertIcon, CircleCheckIcon } from "lucide-react";
@@ -12,9 +12,10 @@ import {
   playNotificationSound,
 } from "~/threadNotifications";
 
-import { toastManager } from "~/components/ui/toast";
-import { readPullRequestListPreferences } from "~/components/pullRequest/pullRequestListPreferences";
-import { useGuideRunStore, type GuideRunWatch } from "~/components/pullRequest/guide/guideRunStore";
+import { toastManager } from "../../ui/toast";
+import { readPullRequestListPreferences } from "../pullRequestListPreferences";
+import { useGuideRunStore, type GuideRunWatch } from "./guideRunStore";
+import { m } from "~/i18n/messages";
 
 const RUN_POLL_MS = 5_000;
 const UNSEEN_RUN_MS = 60_000;
@@ -28,7 +29,6 @@ function isGuideShown(runKey: string): boolean {
 export function startGuideRunNotifications(
   registry: AtomRegistry.AtomRegistry,
   router: AnyRouter,
-  t: TFunction<"workspace">,
 ): () => void {
   const running = new Map<string, () => void>();
   const sync = (watches: Readonly<Record<string, GuideRunWatch>>) => {
@@ -39,7 +39,7 @@ export function startGuideRunNotifications(
     }
     for (const [key, watch] of Object.entries(watches)) {
       if (running.has(key)) continue;
-      const stop = watchGuideRun(registry, router, key, watch, t);
+      const stop = watchGuideRun(registry, router, key, watch);
       // The first read can settle the run before it is recorded as running.
       if (useGuideRunStore.getState().watches[key] === watch) running.set(key, stop);
       else stop();
@@ -61,7 +61,6 @@ function watchGuideRun(
   router: AnyRouter,
   runKey: string,
   watch: GuideRunWatch,
-  t: TFunction<"workspace">,
 ): () => void {
   const atom = pullRequestEnvironment.reviewGuide({
     environmentId: watch.environmentId,
@@ -92,8 +91,7 @@ function watchGuideRun(
     const looking = document.visibilityState === "visible" && document.hasFocus();
     if (looking && isGuideShown(runKey)) return;
 
-    const title =
-      failure === null ? t(($) => $.git.reviewGuideReady) : t(($) => $.git.reviewGuideFailed);
+    const title = failure === null ? m(msg("Review guide ready")) : m(msg("Review guide failed"));
     const body =
       watch.title ??
       observedPullRequestTitle(registry, watch.environmentId, watch.reference) ??
@@ -133,7 +131,7 @@ function watchGuideRun(
             ),
         },
         actionProps: {
-          children: t(($) => $.git.openGuide),
+          children: m(msg("Open guide")),
           onClick: () => {
             toastManager.close(toastId);
             open();

@@ -1,6 +1,7 @@
+import { msg } from "gt-react";
+import { m } from "~/i18n/messages";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import type { UnifiedSettings } from "@t3tools/contracts";
-import { useTranslation } from "react-i18next";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
@@ -35,7 +36,6 @@ interface PullRequestDraftThreadInput {
  * worktree on the project's draft thread, reusing the one already open when there is one.
  */
 export function usePullRequestDraftThread(input: PullRequestDraftThreadInput) {
-  const { t } = useTranslation("chat");
   const {
     routeKind,
     draftId,
@@ -72,7 +72,7 @@ export function usePullRequestDraftThread(input: PullRequestDraftThreadInput) {
     checkoutPullRequest: DraftCheckoutPullRequest;
   }) => {
     if (!activeProject) {
-      throw new Error(t(($) => $.thread.pullRequestProjectMissing));
+      throw new Error(m(msg("No active project is available for this pull request.")));
     }
     const activeProjectRef = scopeProjectRef(activeProject.environmentId, activeProject.id);
     const logicalProjectKey = deriveLogicalProjectKeyFromSettings(

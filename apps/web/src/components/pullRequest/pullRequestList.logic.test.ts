@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { SourceControlProviderKind } from "@t3tools/contracts";
 import type {
   EnvironmentId,
@@ -38,14 +37,12 @@ import {
   pullRequestOverrideAfterAction,
   reusePullRequestEntries,
   settlePullRequestOverrides,
-} from "~/components/pullRequest/pullRequestList.logic";
-import { pullRequestGroups } from "~/components/pullRequest/pullRequestListGroups.logic";
+} from "./pullRequestList.logic";
+import { pullRequestGroups } from "./pullRequestListGroups.logic";
 import {
   readPullRequestListPreferences,
   writePullRequestListPreferences,
-} from "~/components/pullRequest/pullRequestListPreferences";
-
-const t = createI18n("en").getFixedT(null, "workspace");
+} from "./pullRequestListPreferences";
 
 const VIEWERS = { "github.com": "Bilal" } as const;
 
@@ -166,21 +163,23 @@ describe("ranking what a search found", () => {
   const row = (overrides: Partial<PullRequestListEntry> & { number?: number }) =>
     entry({ number: 1, ...overrides });
 
-  it("puts the pull request whose title says it above one that merely mentions it", () => {
-    const titled = row({
-      number: 1,
-      title: "Add the welcome wizard",
-      updatedAt: "2026-07-01T00:00:00Z",
-    });
-    const mentioned = row({
-      number: 2,
-      title: "Unrelated work",
-      updatedAt: "2026-08-01T00:00:00Z",
-    });
-    expect(
-      rankPullRequestMatches([mentioned, titled], "welcome wizard").map((entry) => entry.number),
-    ).toEqual([1, 2]);
-  });
+  it.each([
+    ["welcome wizard", "Add the welcome wizard"],
+    ["24", "Upgrade Node to 24"],
+  ])(
+    "puts the pull request whose title says %j above one that merely mentions it",
+    (query, title) => {
+      const titled = row({ number: 1, title, updatedAt: "2026-07-01T00:00:00Z" });
+      const mentioned = row({
+        number: 2,
+        title: "Unrelated work",
+        updatedAt: "2026-08-01T00:00:00Z",
+      });
+      expect(
+        rankPullRequestMatches([mentioned, titled], query).map((entry) => entry.number),
+      ).toEqual([1, 2]);
+    },
+  );
 
   it("keeps loaded partial-word matches the host's whole-word search missed, after its answer", () => {
     const bilal = { login: "bilal", name: null, avatarUrl: null };
@@ -190,34 +189,31 @@ describe("ranking what a search found", () => {
     const theirs = row({ number: 4, title: "Toasted sidebar" });
     const unrelated = row({ number: 5, title: "Cursor no longer adds attribution", author: bilal });
 
-    const { entries } = pullRequestGroups(
-      {
-        known: [hosted, toast],
-        baseline: [theirs, unrelated, toaster, toast],
-        providers: [
-          {
-            host: "github.com",
-            kind: SourceControlProviderKind.make("github"),
-            searchesOnHost: true,
-            projectCount: 1,
-            configured: true,
-            detail: null,
-          },
-        ],
-        viewers: VIEWERS,
-        involvement: "all",
-        localFilters: { author: "bilal" },
-        hasLocalFilters: true,
-        text: "toa",
-        answeredLocally: true,
-        baselineEmpty: false,
-        held: undefined,
-        authored: undefined,
-        reviewing: undefined,
-        partitionsWanted: false,
-      },
-      t,
-    );
+    const { entries } = pullRequestGroups({
+      known: [hosted, toast],
+      baseline: [theirs, unrelated, toaster, toast],
+      providers: [
+        {
+          host: "github.com",
+          kind: SourceControlProviderKind.make("github"),
+          searchesOnHost: true,
+          projectCount: 1,
+          configured: true,
+          detail: null,
+        },
+      ],
+      viewers: VIEWERS,
+      involvement: "all",
+      localFilters: { author: "bilal" },
+      hasLocalFilters: true,
+      text: "toa",
+      answeredLocally: true,
+      baselineEmpty: false,
+      held: undefined,
+      authored: undefined,
+      reviewing: undefined,
+      partitionsWanted: false,
+    });
 
     expect(entries.map((entry) => entry.number)).toEqual([1, 2, 3]);
   });
@@ -369,7 +365,7 @@ describe("partitioning with the hosts' own priority reads", () => {
     const older = entry({ number: 1, updatedAt: "2026-07-05T00:00:00Z" });
     const newer = entry({ number: 2, updatedAt: "2026-07-06T00:00:00Z" });
     const mine = authoredRow(3, "2026-07-04T00:00:00Z");
-    const groups = partitionPullRequestsWithPriority([newer, older, mine], [mine], [], t);
+    const groups = partitionPullRequestsWithPriority([newer, older, mine], [mine], []);
     expect(groups.map((group) => group.key)).toEqual(["authored", "others"]);
     expect(groups[1]!.entries.map((item) => item.number)).toEqual([2, 1]);
     expect(groups[0]!.entries.map((item) => item.number)).toEqual([3]);
@@ -387,15 +383,22 @@ describe("partitioning with the hosts' own priority reads", () => {
       viewerReviewRequested: true,
       updatedAt: "2026-06-02T00:00:00Z",
     });
-    const groups = partitionPullRequestsWithPriority(
-      [],
-      [both],
-      [both, requestedOlder, requested],
-      t,
-    );
+    const groups = partitionPullRequestsWithPriority([], [both], [both, requestedOlder, requested]);
     expect(groups.map((group) => group.key)).toEqual(["authored", "reviewRequested"]);
     expect(groups[0]!.entries.map((item) => item.number)).toEqual([1]);
     expect(groups[1]!.entries.map((item) => item.number)).toEqual([2, 3]);
+  });
+
+  it("lists a pull request once when another environment's authored read supplies it", () => {
+    const mine = authoredRow(4, "2026-07-01T00:00:00Z");
+    const groups = partitionPullRequestsWithPriority(
+      [{ ...mine, environmentId: ENV_1 }],
+      [{ ...mine, environmentId: ENV_2 }],
+      [],
+    );
+    expect(groups.map((group) => [group.key, group.entries])).toEqual([
+      ["authored", [{ ...mine, environmentId: ENV_1 }]],
+    ]);
   });
 });
 
@@ -500,12 +503,19 @@ describe("merging the environments' own listings", () => {
         ...rows.map((row) => [ENV_1, answer({ entries: [row] })] as const),
         [ENV_2, answer({ entries: [older] })],
       ]);
-      expect(merged?.entries).toEqual([
-        { ...newer, environmentId: ENV_1 },
-        { ...older, environmentId: ENV_2 },
-      ]);
+      expect(merged?.entries).toEqual([{ ...newer, environmentId: ENV_1 }]);
     },
   );
+
+  it("keeps a pull request two environments read on the first environment that answered", () => {
+    const older = entry({ number: 4, updatedAt: "2026-07-01T00:00:00Z" });
+    const newer = entry({ number: 4, updatedAt: "2026-07-02T00:00:00Z" });
+    const merged = mergePullRequestLists([
+      [ENV_1, answer({ entries: [older] })],
+      [ENV_2, answer({ entries: [newer] })],
+    ]);
+    expect(merged?.entries).toEqual([{ ...older, environmentId: ENV_1 }]);
+  });
 
   it("keeps Azure pull requests from distinct projects with the same repository name and number", () => {
     const first = entry({
@@ -603,7 +613,7 @@ describe('who "I" am, per server', () => {
       [ENV_2, answer({ "github.com": "Octocat" }, [entry({ number: 2, author: byBilal })])],
     ])!;
 
-    const groups = groupPullRequestsByInvolvement(merged.entries, merged.viewers, t);
+    const groups = groupPullRequestsByInvolvement(merged.entries, merged.viewers);
     expect(
       groups.find((group) => group.key === "authored")?.entries.map((row) => row.number),
     ).toEqual([1]);
@@ -663,7 +673,7 @@ describe("the priority groups against a paginated feed", () => {
     ];
     const feed = [newest, entry({ number: 6123, updatedAt: "2026-08-11T09:00:00Z" })];
 
-    const groups = partitionPullRequestsWithPriority(feed, [newest, ...older], [], t);
+    const groups = partitionPullRequestsWithPriority(feed, [newest, ...older], []);
 
     expect(
       groups.find((group) => group.key === "authored")?.entries.map((row) => row.number),

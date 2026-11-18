@@ -1,6 +1,30 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { EnvironmentId, ThreadContextRecord } from "@t3tools/contracts";
+import { msg } from "gt-react";
+import { m, type MessageResolver } from "../../i18n/messages";
 import { collectInlineContextIds } from "../../lib/composerContextReferences";
+import type { ComposerThreadDraftState } from "../../composerDraftStore";
+
+/** Compare immutable user content without copying image bytes or upload metadata. */
+export function composerDraftContentChanged(
+  before: ComposerThreadDraftState | null,
+  after: ComposerThreadDraftState | null,
+): boolean {
+  if (before === after) return false;
+  if (!before || !after) return true;
+  const sameIds = (left: ReadonlyArray<{ id: string }>, right: ReadonlyArray<{ id: string }>) =>
+    left.length === right.length && left.every((item, index) => item.id === right[index]?.id);
+  return (
+    before.prompt !== after.prompt ||
+    !sameIds(before.images, after.images) ||
+    !sameIds(before.files, after.files) ||
+    before.terminalContexts !== after.terminalContexts ||
+    before.previewAnnotations !== after.previewAnnotations ||
+    before.reviewComments !== after.reviewComments ||
+    before.threadContexts !== after.threadContexts ||
+    before.environmentContexts !== after.environmentContexts ||
+    before.replyTo !== after.replyTo
+  );
+}
 
 /** Attached threads the prompt still links to; replacing linked text leaves stale records. */
 export function referencedThreadContexts(draft: {
@@ -19,12 +43,14 @@ export function loadBalancingSendWarning(
     readonly threadContexts: ReadonlyArray<ThreadContextRecord>;
     readonly candidateEnvironmentIds: ReadonlyArray<EnvironmentId>;
   },
-  t: TFunction<"chat">,
+  resolve: MessageResolver = m,
 ) {
   if (input.pending) {
     return {
-      title: t(($) => $.composer.checkingResources),
-      description: t(($) => $.composer.resourceChecksRunning),
+      title: resolve(msg("Checking machine resources")),
+      description: resolve(
+        msg("Resource checks are still running. You can choose a machine in the composer."),
+      ),
     };
   }
   const noMachineReadsEveryThread =
@@ -33,10 +59,18 @@ export function loadBalancingSendWarning(
       input.threadContexts.every((record) => record.environmentId === environmentId),
     );
   return {
-    title: t(($) => $.composer.chooseMachineContinue),
+    title: resolve(msg("Choose a machine to continue")),
     description: noMachineReadsEveryThread
-      ? t(($) => $.composer.noMachineReadsThreads)
-      : t(($) => $.composer.noMachineResources),
+      ? resolve(
+          msg(
+            "No machine can read every attached thread. Choose a machine in the composer or remove the threads.",
+          ),
+        )
+      : resolve(
+          msg(
+            "No eligible machine has available resources. Choose a machine in the composer to override.",
+          ),
+        ),
   };
 }
 
@@ -71,18 +105,18 @@ export function approvalRedirectNotice(
     readonly approvalResponding: boolean;
     readonly approvalArrived: boolean;
   },
-  t: TFunction<"chat">,
+  resolve: MessageResolver = m,
 ): string | null {
   if (input.draftChanged) {
     return input.declined
-      ? t(($) => $.composer.approvalDeclinedMessageChanged)
-      : t(($) => $.composer.messageChangedNotSent);
+      ? resolve(msg("Approval declined. Your message changed, so it wasn't sent."))
+      : resolve(msg("Your message changed, so it wasn't sent."));
   }
   if (input.approvalResponding) {
-    return t(($) => $.composer.approvalRespondingNotSent);
+    return resolve(msg("An approval is already being answered, so your message wasn't sent."));
   }
   if (input.declined && input.approvalArrived) {
-    return t(($) => $.composer.anotherApprovalNotSent);
+    return resolve(msg("Another approval arrived, so your message wasn't sent."));
   }
   return null;
 }

@@ -1,3 +1,4 @@
+import { errorDisplayMessage } from "./errors/translatable.ts";
 import {
   SecretReference,
   secretRequestPageUrl,
@@ -10,7 +11,8 @@ import {
 import { builtInSecretProviderDefinitions } from "@t3tools/secret-provider-definitions/registry";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { mFallback, msg } from "gt-i18n";
+import type { MFunctionType } from "gt-i18n/types";
 
 export type SecretRequestItem = Extract<
   OrchestrationV2TurnItem,
@@ -20,9 +22,14 @@ export type SecretRequestItem = Extract<
 /** A `file` request lets the agent's commands read the value, so its card must not promise more. */
 export const secretRequestPrivacyNote = (
   item: Pick<SecretRequestItem, "delivery">,
-  t: TFunction<"chat">,
+  resolve: MFunctionType = mFallback,
 ) =>
-  item.delivery === "file" ? t(($) => $.secret.privateFile) : t(($) => $.secret.privateStorage);
+  item.delivery === "file"
+    ? resolve(
+        msg("Kept out of chat, in a private file this agent's commands can read for 24 hours"),
+      )
+    : resolve(msg("Stored securely, never shown to the agent"));
+export const SECRET_REQUEST_DEFAULT_PLACEHOLDER = msg("Paste the secret");
 
 // Backticks, <angle brackets> and markdown link targets (balanced parentheses allowed) keep their
 // exact text; a bare link drops trailing sentence punctuation.
@@ -95,19 +102,26 @@ const PENDING_DISPLAY: SecretRequestDisplay = { kind: "pending" };
 export function secretRequestDisplay(
   item: Pick<SecretRequestItem, "secretStatus">,
   visibility: "local" | "inherited" | "synthetic",
-  t: TFunction<"chat">,
+  resolve: MFunctionType = mFallback,
 ): SecretRequestDisplay {
   switch (item.secretStatus) {
     case "pending":
       return visibility === "local"
         ? PENDING_DISPLAY
-        : { kind: "pending-elsewhere", label: t(($) => $.secret.waitingOriginal) };
+        : {
+            kind: "pending-elsewhere",
+            label: resolve(msg("Waiting for an answer in the original thread")),
+          };
     case "saved":
-      return { kind: "answered", outcome: "saved", label: t(($) => $.secret.saved) };
+      return {
+        kind: "answered",
+        outcome: "saved",
+        label: resolve(msg("Saved securely and kept private")),
+      };
     case "declined":
-      return { kind: "answered", outcome: "declined", label: t(($) => $.secret.declined) };
+      return { kind: "answered", outcome: "declined", label: resolve(msg("Declined")) };
     case "cancelled":
-      return { kind: "answered", outcome: "ended", label: t(($) => $.secret.ended) };
+      return { kind: "answered", outcome: "ended", label: resolve(msg("Request ended")) };
   }
 }
 
@@ -121,6 +135,23 @@ export interface SecretRequestSource {
 }
 
 const NO_SOURCES: ReadonlyArray<SecretRequestSource> = [];
+
+// Secret provider packages author this text in English; the same English, translatable here.
+const INVALID_REFERENCE_MESSAGES: ReadonlyMap<string, string> = new Map([
+  [
+    "Use a 1Password reference like op://vault/item/field.",
+    msg("Use a 1Password reference like {example}.", { example: "op://vault/item/field" }),
+  ],
+]);
+
+/** A secret provider's `invalidReferenceMessage` in the UI language when it is a known one. */
+export function invalidSecretReferenceText(
+  message: string,
+  resolve: MFunctionType = mFallback,
+): string {
+  const translated = INVALID_REFERENCE_MESSAGES.get(message);
+  return translated === undefined ? message : resolve(translated);
+}
 const decodeConfigByKind = new Map(
   builtInSecretProviderDefinitions.definitions.map((definition) => [
     definition.kind,
@@ -132,13 +163,15 @@ const decodeConfigByKind = new Map(
 export function secretRequestSources(
   config: Pick<ServerConfig, "secretRequestReferences"> | null | undefined,
   providers: ServerSettings["secretProviders"],
+  resolve: MFunctionType = mFallback,
 ): ReadonlyArray<SecretRequestSource> {
   if (config?.secretRequestReferences !== true) return NO_SOURCES;
-  return configuredSecretSources(providers);
+  return configuredSecretSources(providers, resolve);
 }
 
 export function configuredSecretSources(
   providers: ServerSettings["secretProviders"],
+  resolve: MFunctionType = mFallback,
 ): ReadonlyArray<SecretRequestSource> {
   return (Object.keys(providers) as Array<SecretProviderId>).flatMap((id) => {
     const provider = providers[id];
@@ -157,7 +190,10 @@ export function configuredSecretSources(
         label: provider.label,
         isReference: definition.isReference,
         referencePlaceholder: definition.referencePlaceholder,
-        invalidReferenceMessage: definition.invalidReferenceMessage,
+        invalidReferenceMessage: invalidSecretReferenceText(
+          definition.invalidReferenceMessage,
+          resolve,
+        ),
       },
     ];
   });
@@ -201,7 +237,14 @@ export function secretRequestAnswerInput(
 
 const USER_FACING_FAILURE_TAGS = new Set(["SecretRequestError", "EnvironmentAuthorizationError"]);
 
-export function secretRequestFailureDetail(failure: unknown): string | null {
+/**
+ * Only known server errors pass their message through: anything else (transport or encoding
+ * failures) gets the generic copy, so the typed value can never surface in the UI.
+ */
+export function secretRequestFailureMessage(
+  failure: unknown,
+  resolve: MFunctionType = mFallback,
+): string {
   if (
     typeof failure === "object" &&
     failure !== null &&
@@ -212,11 +255,7 @@ export function secretRequestFailureDetail(failure: unknown): string | null {
     typeof failure.message === "string" &&
     failure.message.trim().length > 0
   ) {
-    return failure.message;
+    return errorDisplayMessage(failure, resolve) ?? failure.message;
   }
-  return null;
-}
-
-export function secretRequestFailureMessage(failure: unknown, t: TFunction<"chat">): string {
-  return secretRequestFailureDetail(failure) ?? t(($) => $.secret.answerFailed);
+  return resolve(msg("Could not answer the request. Try again."));
 }

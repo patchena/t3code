@@ -1,22 +1,19 @@
-import {
-  downloadLocalUpdate,
-  installLocalUpdate,
-  toastUpdateError,
-} from "~/components/desktopUpdate.actions";
-import { useTranslation } from "react-i18next";
-import { type DesktopUpdateState, managedUpdatesDenial } from "@t3tools/contracts";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { managedUpdatesDenial } from "@t3tools/client-runtime/contract-labels";
+import { type DesktopUpdateState } from "@t3tools/contracts";
 import { TriangleAlertIcon } from "lucide-react";
+import { T, useGT, useMessages } from "gt-react";
 import { type ComponentProps, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import { isElectron } from "~/env";
-import { useMediaQuery } from "~/hooks/useMediaQuery";
-import { cn } from "~/lib/utils";
-import { ensureLocalApi } from "~/localApi";
-import { useDesktopUpdateState } from "~/state/desktopUpdate";
-import { usePrimaryManagedPolicy } from "~/state/managedPolicy";
-import { usePatchState } from "~/state/patcher";
-import { stackedThreadToast, toastManager } from "~/components/ui/toast";
+import { isElectron } from "../../env";
+import { m } from "../../i18n/messages";
+import { useMediaQuery } from "../../hooks/useMediaQuery";
+import { cn } from "../../lib/utils";
+import { ensureLocalApi } from "../../localApi";
+import { useDesktopUpdateState } from "../../state/desktopUpdate";
+import { usePrimaryManagedPolicy } from "../../state/managedPolicy";
+import { stackedThreadToast, toastManager } from "../ui/toast";
 import {
   canCheckForUpdate,
   getArm64IntelBuildWarningDescription,
@@ -27,37 +24,35 @@ import {
   isDesktopUpdateButtonDisabled,
   resolveDesktopUpdateButtonAction,
   shouldShowArm64IntelBuildWarning,
-} from "~/components/desktopUpdate.logic";
-import { useCheckProviderUpdates } from "~/components/ProviderUpdatesAction";
-import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
-import {
-  Popover,
-  PopoverCreateHandle,
-  PopoverPopup,
-  PopoverTrigger,
-} from "~/components/ui/popover";
-import { SidebarMenuItem } from "~/components/ui/sidebar";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+} from "../desktopUpdate.logic";
+import { useCheckProviderUpdates } from "../ProviderUpdatesAction";
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
+import { Popover, PopoverCreateHandle, PopoverPopup, PopoverTrigger } from "../ui/popover";
+import { SidebarMenuItem } from "../ui/sidebar";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   DesktopUpdateStatusIcon,
   type DesktopUpdateStatusIconState,
   shouldContinueDesktopUpdateCheckAnimation,
   shouldShowDesktopUpdateCheckIcon,
-} from "~/components/sidebar/DesktopUpdateStatusIcon";
-import { SidebarUpdateReleaseNotes } from "~/components/sidebar/SidebarUpdateReleaseNotes";
-import { SidebarUpdateCapsule } from "~/components/sidebar/SidebarUpdateCapsule";
-import { SidebarPatchCapsule } from "~/components/sidebar/SidebarPatchCapsule";
-import { UpdateEverythingDialog } from "~/components/sidebar/UpdateEverythingDialog";
-import type {
-  UpdateEverythingRun,
-  UpdateRunLocalState,
-} from "~/components/sidebar/updateEverything.logic";
+} from "./DesktopUpdateStatusIcon";
+import { SidebarUpdateReleaseNotes } from "./SidebarUpdateReleaseNotes";
+import { SidebarUpdateCapsule } from "./SidebarUpdateCapsule";
+import { UpdateEverythingDialog } from "./UpdateEverythingDialog";
+import type { UpdateEverythingRun, UpdateRunLocalState } from "./updateEverything.logic";
 import {
   clearSavedUpdateEverythingResult,
   saveUpdateEverythingResult,
   useUpdateEverythingRun,
-} from "~/components/sidebar/updateEverythingRun";
-import { useUpdateEverything } from "~/components/sidebar/useUpdateEverything";
+} from "./updateEverythingRun";
+import { useUpdateEverything } from "./useUpdateEverything";
+import {
+  downloadLocalUpdate,
+  installLocalUpdate,
+  toastUpdateError,
+} from "~/components/desktopUpdate.actions";
+import { SidebarPatchCapsule } from "~/components/sidebar/SidebarPatchCapsule";
+import { usePatchState } from "~/state/patcher";
 
 type SidebarUpdatePopoverChangeDetails = Parameters<
   NonNullable<ComponentProps<typeof Popover>["onOpenChange"]>
@@ -130,17 +125,20 @@ export function SidebarUpdateArchitectureWarning() {
 }
 
 function SidebarUpdateArchitectureWarningContent() {
-  const { t } = useTranslation("workspace");
   const state = useDesktopUpdateState();
+  const messages = useMessages();
   const visible = shouldShowArm64IntelBuildWarning(state);
-  const description = state && visible ? getArm64IntelBuildWarningDescription(state, t) : null;
+  const description =
+    state && visible ? getArm64IntelBuildWarningDescription(state, messages) : null;
 
   if (!visible || !description) return null;
 
   return (
     <Alert variant="warning">
       <TriangleAlertIcon />
-      <AlertTitle>{t(($) => $.updates.intelBuildOnAppleSilicon)}</AlertTitle>
+      <AlertTitle>
+        <T>Intel build on Apple Silicon</T>
+      </AlertTitle>
       <AlertDescription>{description}</AlertDescription>
     </Alert>
   );
@@ -151,11 +149,12 @@ export function SidebarUpdatePill() {
 }
 
 function SidebarUpdateControl() {
-  const { t } = useTranslation("workspace");
   const state = useDesktopUpdateState();
-  // The desktop updates this machine, whose policy the primary environment reports.
-  const updatesDenial = managedUpdatesDenial(usePrimaryManagedPolicy());
   const patch = usePatchState();
+  const gt = useGT();
+  const messages = useMessages();
+  // The desktop updates this machine, whose policy the primary environment reports.
+  const updatesDenial = managedUpdatesDenial(usePrimaryManagedPolicy(), messages);
   const [isActionPending, setIsActionPending] = useState(false);
   const [providerCheck, setProviderCheck] = useState<"button" | "dialog" | null>(null);
   const isCheckingProviders = providerCheck === "button";
@@ -207,17 +206,17 @@ function SidebarUpdateControl() {
   });
   const idleTooltip =
     !showUpdateDetails && !showCheckIcon
-      ? getDesktopUpdateIdleTooltip(state, t, updatesDenial)
+      ? getDesktopUpdateIdleTooltip(state, updatesDenial, messages)
       : null;
   const tooltip = runsEverything
     ? everything.summary
     : showUpdateDetails
       ? state
-        ? getDesktopUpdateButtonTooltip(state, t)
-        : t(($) => $.updates.updateAvailable)
+        ? getDesktopUpdateButtonTooltip(state, messages)
+        : gt("Update available")
       : showCheckIcon
-        ? t(($) => $.updates.checkingForUpdates)
-        : (idleTooltip?.title ?? t(($) => $.updates.checkForUpdates));
+        ? gt("Checking for updates…")
+        : (idleTooltip?.title ?? gt("Check for updates"));
   const disabled = showCheckIcon
     ? true
     : runsEverything
@@ -255,7 +254,7 @@ function SidebarUpdateControl() {
     setIsActionPending(true);
 
     if (action === "download") {
-      void downloadLocalUpdate(bridge, { notifyDownloaded: true }, t).finally(() =>
+      void downloadLocalUpdate(bridge, { notifyDownloaded: true }).finally(() =>
         setIsActionPending(false),
       );
       return;
@@ -265,7 +264,7 @@ function SidebarUpdateControl() {
       let confirmed = false;
       try {
         confirmed = await ensureLocalApi().dialogs.confirm(
-          getDesktopUpdateInstallConfirmationMessage(state, t),
+          getDesktopUpdateInstallConfirmationMessage(state),
           { initialFocus: "confirm" },
         );
       } catch (error) {
@@ -273,9 +272,8 @@ function SidebarUpdateControl() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: t(($) => $.updates.couldNotConfirmUpdate),
-            description:
-              error instanceof Error ? error.message : t(($) => $.updates.updateConfirmationFailed),
+            title: gt("Could not confirm update"),
+            description: thrownErrorMessage(error, m) ?? gt("Update confirmation failed."),
           }),
         );
         return;
@@ -284,7 +282,7 @@ function SidebarUpdateControl() {
         setIsActionPending(false);
         return;
       }
-      void installLocalUpdate(bridge, t).finally(() => setIsActionPending(false));
+      void installLocalUpdate(bridge).finally(() => setIsActionPending(false));
       return;
     }
 
@@ -299,11 +297,11 @@ function SidebarUpdateControl() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: t(($) => $.updates.couldNotCheckForUpdates),
+            title: gt("Could not check for updates"),
             description:
               updatesDenial ??
               result.state.message ??
-              t(($) => $.updates.automaticUpdatesAreNotAvailableInThisBuild),
+              gt("Automatic updates are not available in this build."),
           }),
         );
       })
@@ -311,9 +309,8 @@ function SidebarUpdateControl() {
         toastManager.add(
           stackedThreadToast({
             type: "error",
-            title: t(($) => $.updates.couldNotCheckForUpdates),
-            description:
-              error instanceof Error ? error.message : t(($) => $.updates.updateCheckFailed),
+            title: gt("Could not check for updates"),
+            description: thrownErrorMessage(error, m) ?? gt("Update check failed."),
           }),
         );
       });
@@ -331,11 +328,11 @@ function SidebarUpdateControl() {
         ...(bridge && action === "download"
           ? {
               downloadLocal: (reportError) =>
-                downloadLocalUpdate(bridge, { notifyDownloaded: false, reportError }, t),
+                downloadLocalUpdate(bridge, { notifyDownloaded: false, reportError }),
             }
           : {}),
         ...(bridge && action !== "none"
-          ? { installLocal: (reportError) => installLocalUpdate(bridge, t, reportError) }
+          ? { installLocal: (reportError) => installLocalUpdate(bridge, reportError) }
           : {}),
       }),
     );
@@ -344,9 +341,8 @@ function SidebarUpdateControl() {
       toastManager.add(
         stackedThreadToast({
           type: "error",
-          title: t(($) => $.updates.couldNotUpdateEverything),
-          description:
-            error instanceof Error ? error.message : t(($) => $.updates.anUnexpectedErrorOccurred),
+          title: gt("Could not update everything"),
+          description: thrownErrorMessage(error, m) ?? gt("An unexpected error occurred."),
         }),
       );
     }
@@ -393,8 +389,8 @@ function SidebarUpdateControl() {
           state={patch}
           onInstall={async () => {
             const bridge = window.desktopBridge;
-            if (!bridge) throw new Error(t(($) => $.updates.patchUnavailable));
-            await installLocalUpdate(bridge, t, toastUpdateError, patch.version ?? undefined);
+            if (!bridge) throw new Error(gt("The desktop patcher is unavailable."));
+            await installLocalUpdate(bridge, toastUpdateError, patch.version ?? undefined);
           }}
         />
         {confirmDialog}
@@ -425,7 +421,7 @@ function SidebarUpdateControl() {
                     failures: [],
                     restarting: [],
                   });
-                  if (!(await installLocalUpdate(window.desktopBridge!, t))) {
+                  if (!(await installLocalUpdate(window.desktopBridge!))) {
                     clearSavedUpdateEverythingResult();
                   }
                 },
@@ -440,7 +436,11 @@ function SidebarUpdateControl() {
   const updateButton = (
     <button
       type="button"
-      aria-label={idleTooltip?.detail ? `${tooltip}: ${idleTooltip.detail}` : tooltip}
+      aria-label={
+        idleTooltip?.detail
+          ? gt("{tooltip}: {detail}", { tooltip, detail: idleTooltip.detail })
+          : tooltip
+      }
       aria-disabled={isInteractionDisabled || undefined}
       className={cn(
         "inline-flex size-8 items-center justify-center rounded-full outline-hidden ring-ring transition-colors focus-visible:ring-2 focus-visible:ring-inset",
@@ -539,7 +539,7 @@ function SidebarUpdateControl() {
         {showReleaseNotesPopover && state ? (
           <PopoverPopup
             align="center"
-            aria-label={t(($) => $.updates.updateReleaseNotes)}
+            aria-label={gt("Update release notes")}
             initialFocus={false}
             onKeyDownCapture={(event) => {
               if (

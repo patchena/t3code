@@ -1,5 +1,6 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type { ServerEventLoopStall } from "@t3tools/contracts";
+import { mFallback, msg } from "gt-i18n";
+import type { MFunctionType } from "gt-i18n/types";
 
 export interface HostFreezeNotice {
   readonly title: string;
@@ -13,18 +14,25 @@ export interface HostFreezeNotice {
 export function hostFreezeNotice(
   hostLabel: string,
   stall: ServerEventLoopStall | undefined,
-  t: TFunction<"workspace">,
+  resolve: MFunctionType = mFallback,
 ): HostFreezeNotice | null {
   if (stall === undefined) return null;
   const { loadAverage, cpuCount } = stall;
   return {
-    title: t(($) => $.updates.hostFroze, {
-      host: hostLabel,
-      seconds: Math.round(stall.durationMs / 1000),
-    }),
+    title: resolve(
+      msg("{host} froze for {seconds}s", {
+        host: hostLabel,
+        seconds: Math.round(stall.durationMs / 1000),
+      }),
+    ),
     description:
       loadAverage !== undefined && loadAverage > cpuCount
-        ? t(($) => $.updates.hostOverloaded, { load: Math.round(loadAverage), cores: cpuCount })
-        : t(($) => $.updates.hostBusy, { host: hostLabel }),
+        ? resolve(
+            msg("Its CPU is overloaded (load {load} on {cpuCount} cores).", {
+              load: Math.round(loadAverage),
+              cpuCount,
+            }),
+          )
+        : resolve(msg("T3 Code on {host} was too busy to answer.", { host: hostLabel })),
   };
 }

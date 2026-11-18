@@ -1,7 +1,7 @@
+import { T, useGT } from "gt-react";
 import { PlayIcon, WrapTextIcon, CheckIcon, CopyIcon } from "lucide-react";
 import { toHtml } from "hast-util-to-html";
 import React, { use, useEffect, useState, type ReactNode } from "react";
-import { useTranslation } from "react-i18next";
 
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useClientSettings } from "../../hooks/useSettings";
@@ -100,7 +100,7 @@ function MarkdownCodeBlockTitleContent({
   language: string;
   theme: "light" | "dark";
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   if (fenceTitle) {
     return (
       <>
@@ -120,7 +120,7 @@ function MarkdownCodeBlockTitleContent({
         render={
           <span
             className="inline-flex shrink-0 rounded-sm"
-            aria-label={t(($) => $.markdown.language, { language })}
+            aria-label={gt("Language: {language}", { language })}
           />
         }
       >
@@ -154,7 +154,7 @@ export function MarkdownCodeBlock({
   diagram?: boolean;
   children: ReactNode;
 }) {
-  const { t } = useTranslation("chat");
+  const gt = useGT();
   const { copyToClipboard, isCopied: copied } = useCopyToClipboard({
     timeout: 1200,
     onError: (cause) =>
@@ -170,8 +170,8 @@ export function MarkdownCodeBlock({
   const defaultWrapped = useClientSettings((settings) => settings.wordWrap);
   const [wrapOverride, setWrapOverride] = useState<boolean | null>(null);
   const wrapped = wrapOverride ?? defaultWrapped;
-  const wrapLabel = wrapped ? t(($) => $.markdown.disableWrap) : t(($) => $.markdown.wrap);
-  const copyLabel = copied ? t(($) => $.ui.copied) : t(($) => $.markdown.copyCode);
+  const wrapLabel = wrapped ? gt("Disable line wrap") : gt("Wrap lines");
+  const copyLabel = copied ? gt("Copied") : gt("Copy code");
   const command = code.trim();
   const canRun =
     onRunShellCommand !== undefined &&
@@ -184,7 +184,7 @@ export function MarkdownCodeBlock({
     // make the rendered command differ from what the terminal would receive.
     !/[\p{Cc}\p{Cf}]/u.test(code.slice(0, -1));
 
-  const handleCopy = () => copyToClipboard(code);
+  const handleCopy = () => copyToClipboard(code.endsWith("\n") ? code.slice(0, -1) : code);
 
   const copyButton = (
     <Tooltip>
@@ -228,7 +228,7 @@ export function MarkdownCodeBlock({
         <span
           className="flex items-center gap-0.5"
           role="toolbar"
-          aria-label={t(($) => $.markdown.codeActions)}
+          aria-label={gt("Code block actions")}
         >
           {canWrap ? (
             <Tooltip>
@@ -258,13 +258,15 @@ export function MarkdownCodeBlock({
                     variant="ghost-muted"
                     size="icon-xs"
                     onClick={() => onRunShellCommand(command)}
-                    aria-label={t(($) => $.markdown.run)}
+                    aria-label={gt("Run in terminal")}
                   />
                 }
               >
                 <PlayIcon className="size-3" />
               </TooltipTrigger>
-              <TooltipPopup side="top">{t(($) => $.markdown.run)}</TooltipPopup>
+              <TooltipPopup side="top">
+                <T>Run in terminal</T>
+              </TooltipPopup>
             </Tooltip>
           ) : null}
           {viewToggle}

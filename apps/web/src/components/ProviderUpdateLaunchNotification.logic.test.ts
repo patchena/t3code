@@ -1,4 +1,3 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { describe, expect, it } from "vite-plus/test";
 import {
   EnvironmentId,
@@ -18,8 +17,6 @@ import {
   isProviderSettingsUpdateCandidate,
   type ProviderUpdateCandidate,
 } from "./ProviderUpdateLaunchNotification.logic";
-
-const tWorkspace = createI18n("en").getFixedT(null, "workspace");
 
 const checkedAt = "2026-04-23T10:00:00.000Z";
 const sessionStartedAt = "2026-04-23T09:59:00.000Z";
@@ -150,23 +147,20 @@ describe("provider update launch notification logic", () => {
   });
 
   it("shows the active sidebar pill for an update on a non-default instance", () => {
-    const view = getProviderUpdateSidebarPillView(
-      [
-        provider({ driver: driver("claudeAgent") }),
-        provider({
-          driver: driver("claudeAgent"),
-          instanceId: instanceId("claude_work"),
-          updateState: {
-            status: "running",
-            startedAt: checkedAt,
-            finishedAt: null,
-            message: "Updating provider.",
-            output: null,
-          },
-        }),
-      ],
-      tWorkspace,
-    );
+    const view = getProviderUpdateSidebarPillView([
+      provider({ driver: driver("claudeAgent") }),
+      provider({
+        driver: driver("claudeAgent"),
+        instanceId: instanceId("claude_work"),
+        updateState: {
+          status: "running",
+          startedAt: checkedAt,
+          finishedAt: null,
+          message: "Updating provider.",
+          output: null,
+        },
+      }),
+    ]);
 
     expect(view).toMatchObject({
       key: "loading:claudeAgent:running",
@@ -204,7 +198,6 @@ describe("provider update launch notification logic", () => {
           },
         }),
       ],
-      tWorkspace,
       { visibleAfterIso: sessionStartedAt },
     );
 
@@ -230,7 +223,6 @@ describe("provider update launch notification logic", () => {
             },
           }),
         ],
-        tWorkspace,
         { visibleAfterIso: "2026-04-23T10:00:01.000Z" },
       ),
     ).toBeNull();
@@ -263,7 +255,7 @@ describe("provider update launch notification logic", () => {
       }),
     ] satisfies ReadonlyArray<ServerProvider>;
 
-    const successView = getProviderUpdateSidebarPillView(providers, tWorkspace, {
+    const successView = getProviderUpdateSidebarPillView(providers, {
       visibleAfterIso: sessionStartedAt,
     });
     expect(successView).toMatchObject({
@@ -272,7 +264,7 @@ describe("provider update launch notification logic", () => {
       title: "Codex updated: v1.2.0",
     });
 
-    const failureView = getProviderUpdateSidebarPillView(providers, tWorkspace, {
+    const failureView = getProviderUpdateSidebarPillView(providers, {
       visibleAfterIso: sessionStartedAt,
       dismissedKeys: new Set(["succeeded:codex:2026-04-23T10:01:00.000Z:Provider updated."]),
     });
@@ -339,64 +331,57 @@ describe("getProviderUpdateRunToastView", () => {
       installedVersion: "2.2.5",
     };
     expect(
-      getProviderUpdateRunToastView(
-        [
-          run("Linux", "opencode", AsyncResult.success({ providers: [updated] })),
-          run("Laptop", "opencode", AsyncResult.success({ providers: [updated] })),
-        ],
-        tWorkspace,
-      ),
+      getProviderUpdateRunToastView([
+        run("Linux", "opencode", AsyncResult.success({ providers: [updated] })),
+        run("Laptop", "opencode", AsyncResult.success({ providers: [updated] })),
+      ]),
     ).toMatchObject({
       type: "success",
       description: `Linux · OpenCode: ${message}\nLaptop · OpenCode: ${message}`,
     });
     expect(
-      getProviderUpdateSidebarPillView([updated], tWorkspace, {
+      getProviderUpdateSidebarPillView([updated], {
         visibleAfterIso: sessionStartedAt,
       }),
     ).toMatchObject({ title: "OpenCode updated: v2.2.5", description: message });
 
     const restarted = { ...updated, version: "2.2.5" };
     expect(
-      getProviderUpdateRunToastView(
-        [run("Linux", "opencode", AsyncResult.success({ providers: [restarted] }))],
-        tWorkspace,
-      ),
+      getProviderUpdateRunToastView([
+        run("Linux", "opencode", AsyncResult.success({ providers: [restarted] })),
+      ]),
     ).toMatchObject({ description: "New sessions will use the updated provider." });
   });
 
   it("lists every failed update and ignores interrupted ones", () => {
-    const view = getProviderUpdateRunToastView(
-      [
-        run(
-          "Mac Studio",
-          "codex",
-          AsyncResult.success({
-            providers: [
-              provider({
-                driver: driver("codex"),
-                updateState: updateState("succeeded", "Provider updated."),
-              }),
-            ],
-          }),
-        ),
-        run(
-          "Mac Studio",
-          "claudeAgent",
-          AsyncResult.success({
-            providers: [
-              provider({
-                driver: driver("claudeAgent"),
-                updateState: updateState("failed", "npm exited with code 1."),
-              }),
-            ],
-          }),
-        ),
-        run("Laptop", "codex", AsyncResult.failure(Cause.die(new Error("WebSocket closed")))),
-        run("Server", "codex", AsyncResult.failure(Cause.interrupt())),
-      ],
-      tWorkspace,
-    );
+    const view = getProviderUpdateRunToastView([
+      run(
+        "Mac Studio",
+        "codex",
+        AsyncResult.success({
+          providers: [
+            provider({
+              driver: driver("codex"),
+              updateState: updateState("succeeded", "Provider updated."),
+            }),
+          ],
+        }),
+      ),
+      run(
+        "Mac Studio",
+        "claudeAgent",
+        AsyncResult.success({
+          providers: [
+            provider({
+              driver: driver("claudeAgent"),
+              updateState: updateState("failed", "npm exited with code 1."),
+            }),
+          ],
+        }),
+      ),
+      run("Laptop", "codex", AsyncResult.failure(Cause.die(new Error("WebSocket closed")))),
+      run("Server", "codex", AsyncResult.failure(Cause.interrupt())),
+    ]);
 
     expect(view).toEqual({
       type: "error",

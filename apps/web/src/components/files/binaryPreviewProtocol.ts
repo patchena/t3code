@@ -1,4 +1,4 @@
-import type { FileWorkerCode } from "~/components/files/fileWorkerError";
+import type { PreviewFailure } from "./previewFailure";
 import { ARCHIVE_MAX_BYTES } from "@t3tools/client-runtime/zip/bounded-zip";
 
 export {
@@ -22,7 +22,7 @@ export type BinaryWorkerRequest =
   | { type: "rows"; table: string; page: number };
 
 export type BinaryWorkerResult =
-  | { type: "error"; message: string; code?: FileWorkerCode }
+  | ({ type: "error" } & PreviewFailure)
   | { type: "archive"; entries: ArchiveEntry[] }
   | { type: "entry"; path: string; bytes: Uint8Array<ArrayBuffer> }
   | { type: "sqlite"; tables: { name: string; count: number }[] }

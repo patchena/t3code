@@ -5,8 +5,6 @@ import {
   threadErrorSummary,
   usageLimitRunPresentedAsLatest,
 } from "@t3tools/shared/orchestrationV2ThreadError";
-import type { InterfaceLanguage } from "@t3tools/contracts/settings";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   isOrchestrationV2WorkActive,
   isProviderNativeSubagentThread,
@@ -42,7 +40,6 @@ import * as DateTime from "effect/DateTime";
 
 import {
   threadRuntimeIsActive,
-  type ProviderStarting,
   type ThreadRunSummary,
   type ThreadRuntimeSummary,
   type ThreadStructure,
@@ -51,6 +48,9 @@ import {
 } from "./models.ts";
 import { commandDisplayText } from "../work-log/commandLabel.ts";
 import { formatSubagentDisplayTitle } from "./subagentDisplay.ts";
+import { mFallback, msg } from "gt-i18n";
+import { markedTextEnglish } from "../errors/translatable.ts";
+import type { MFunctionType } from "gt-i18n/types";
 
 const ACTIVITY_RUN_STATUSES = new Set(["preparing", "starting", "running", "waiting"]);
 const INTERRUPTIBLE_RUN_STATUSES = new Set(["preparing", "starting", "running"]);
@@ -112,17 +112,16 @@ function latestMatchingRun(
 function providerStarting(
   projection: ThreadStructure,
   run: OrchestrationV2ThreadProjection["runs"][number],
-): ProviderStarting {
+): Pick<ThreadRunSummary, "providerStartingLabel" | "providerStartingLabelMsg"> {
   const driver = projection.providerSessions.findLast(
     (session) => session.providerInstanceId === run.providerInstanceId,
   )?.driver;
-  return { provider: (driver === undefined ? undefined : PROVIDER_DISPLAY_NAMES[driver]) ?? null };
-}
-
-export function providerStartingText(starting: ProviderStarting, t: TFunction<"activity">): string {
-  return starting.provider === null
-    ? t(($) => $.status.starting)
-    : t(($) => $.status.startingProvider, { provider: starting.provider });
+  const name = driver === undefined ? undefined : PROVIDER_DISPLAY_NAMES[driver];
+  const label =
+    name === undefined
+      ? msg("Starting", { $context: "a provider is launching" })
+      : msg("Starting {provider}", { provider: name });
+  return { providerStartingLabel: markedTextEnglish([label]), providerStartingLabelMsg: label };
 }
 
 function summarizeThreadRun(
@@ -146,7 +145,7 @@ function summarizeThreadRun(
     // the provider can still be launching for minutes.
     ...(turnStatus === undefined
       ? PROVIDER_STARTING_RUN_STATUSES.has(run.status)
-        ? { providerStarting: providerStarting(projection, run) }
+        ? providerStarting(projection, run)
         : {}
       : turnStatus === "pending" || turnStatus === "running"
         ? {}
@@ -282,13 +281,25 @@ export function formatSubagentEffort(input: {
   );
 }
 
+const SUBAGENT_STATUS_LABELS: Record<OrchestrationV2ExecutionNode["status"], string> = {
+  idle: msg("Idle"),
+  pending: msg("Working"),
+  running: msg("Working"),
+  waiting: msg("Waiting"),
+  completed: msg("Completed"),
+  interrupted: msg("Interrupted"),
+  failed: msg("Failed"),
+  cancelled: msg("Cancelled"),
+  rolled_back: msg("Cancelled"),
+};
+
 export function formatProviderSubagentStatus(
   status: ProviderSubagentStatus | null,
   nowMs: number,
-  t: TFunction<"activity">,
+  resolve: MFunctionType = mFallback,
 ): string {
-  if (status === null) return t(($) => $.status.starting);
-  const label = t(($) => $.providerStatus[status.status]);
+  if (status === null) return resolve(msg("Starting"));
+  const label = resolve(SUBAGENT_STATUS_LABELS[status.status]);
   const live = isOrchestrationV2WorkActive(status.status);
   if (!live && status.status !== "completed") return label;
   const start = status.startedAt === null ? Number.NaN : Date.parse(status.startedAt);
@@ -300,8 +311,8 @@ export function formatProviderSubagentStatus(
   if (!Number.isFinite(start) || !Number.isFinite(end)) return label;
   const elapsed = formatDuration(Math.max(1_000, Math.floor((end - start) / 1_000) * 1_000));
   return live
-    ? t(($) => $.providerStatus.live, { status: label, elapsed })
-    : t(($) => $.providerStatus.completedIn, { status: label, elapsed });
+    ? resolve(msg("{label} {elapsed}", { label, elapsed }))
+    : resolve(msg("{label} in {elapsed}", { label, elapsed }));
 }
 
 /** The run a manual continuation resumes; the server holds the queue until it does. */
@@ -494,11 +505,30 @@ export function threadRuntimeHasInterruptibleRun(
 
 type BackgroundWorkKind = OrchestrationV2PendingBackgroundTask["kind"];
 
-const BACKGROUND_WORK_ORDER: Record<BackgroundWorkKind, number> = {
-  subagent: 0,
-  command: 1,
-  monitor: 2,
-  background_task: 3,
+const BACKGROUND_WORK_KINDS: Record<
+  BackgroundWorkKind,
+  { readonly order: number; readonly singular: string; readonly count: string }
+> = {
+  subagent: {
+    order: 0,
+    singular: msg("subagent"),
+    count: msg("{count, plural, one {{count} subagent} other {{count} subagents}}"),
+  },
+  command: {
+    order: 1,
+    singular: msg("command"),
+    count: msg("{count, plural, one {{count} command} other {{count} commands}}"),
+  },
+  monitor: {
+    order: 2,
+    singular: msg("monitor"),
+    count: msg("{count, plural, one {{count} monitor} other {{count} monitors}}"),
+  },
+  background_task: {
+    order: 3,
+    singular: msg("background task"),
+    count: msg("{count, plural, one {{count} background task} other {{count} background tasks}}"),
+  },
 };
 
 export interface RunStopPresentation {
@@ -563,10 +593,12 @@ export interface PendingBackgroundWorkPresentation {
   readonly waiting: boolean;
 }
 
-const backgroundListFormatters = {
-  en: new Intl.ListFormat("en-GB", { style: "long", type: "conjunction" }),
-  de: new Intl.ListFormat("de", { style: "long", type: "conjunction" }),
-};
+function joinWithAnd(parts: ReadonlyArray<string>, resolve: MFunctionType): string {
+  if (parts.length <= 1) return parts.join("");
+  return resolve(
+    msg("{items} and {last}", { items: parts.slice(0, -1).join(", "), last: parts.at(-1)! }),
+  );
+}
 
 // The Claude adapter forces a stuck query closed after 10 seconds.
 export const BACKGROUND_WORK_STOP_RETRY_AFTER_MS = 10_000;
@@ -590,37 +622,10 @@ export function isBackgroundWorkStopPending(
 
 export function presentPendingBackgroundWork(
   tasks: ReadonlyArray<OrchestrationV2PendingBackgroundTask>,
-  t: TFunction<"activity">,
-  language: InterfaceLanguage,
+  resolve: MFunctionType = mFallback,
 ): PendingBackgroundWorkPresentation | null {
   if (tasks.length === 0) return null;
   const waiting = backgroundWorkHoldsCompletion(tasks);
-  const kinds = {
-    subagent: {
-      singular: t(($) => $.background.subagent),
-      waiting: t(($) => $.background.waitingSubagent),
-      running: t(($) => $.background.runningSubagent),
-      count: (count: number) => t(($) => $.background.subagentCount, { count }),
-    },
-    command: {
-      singular: t(($) => $.background.command),
-      waiting: t(($) => $.background.waitingCommand),
-      running: t(($) => $.background.runningCommand),
-      count: (count: number) => t(($) => $.background.commandCount, { count }),
-    },
-    monitor: {
-      singular: t(($) => $.background.monitor),
-      waiting: t(($) => $.background.waitingMonitor),
-      running: t(($) => $.background.runningMonitor),
-      count: (count: number) => t(($) => $.background.monitorCount, { count }),
-    },
-    background_task: {
-      singular: t(($) => $.background.background_task),
-      waiting: t(($) => $.background.waitingTask),
-      running: t(($) => $.background.runningTask),
-      count: (count: number) => t(($) => $.background.taskCount, { count }),
-    },
-  };
   const items = tasks
     .map((task): PendingBackgroundWorkItem => {
       const description = task.description?.trim();
@@ -635,42 +640,61 @@ export function presentPendingBackgroundWork(
       return {
         taskId: task.taskId,
         kind: task.kind,
-        label: label === undefined || label.length === 0 ? kinds[task.kind].singular : label,
+        label:
+          label === undefined || label.length === 0
+            ? resolve(BACKGROUND_WORK_KINDS[task.kind].singular)
+            : label,
         childThreadId: task.kind === "subagent" ? task.childThreadId : undefined,
       };
     })
     // `map` returned a new array; Hermes has no `toSorted`.
-    .sort((left, right) => BACKGROUND_WORK_ORDER[left.kind] - BACKGROUND_WORK_ORDER[right.kind]);
+    .sort(
+      (left, right) =>
+        BACKGROUND_WORK_KINDS[left.kind].order - BACKGROUND_WORK_KINDS[right.kind].order,
+    );
   const [only] = items;
   if (items.length === 1 && only !== undefined) {
-    const kind = kinds[only.kind];
-    const noun = kind.singular;
+    const noun = resolve(BACKGROUND_WORK_KINDS[only.kind].singular);
     const named = only.label !== noun;
     const title = named
       ? waiting
-        ? t(($) => $.background.waitingNamed, { label: only.label })
-        : t(($) => $.background.runningNamed, { label: only.label })
-      : waiting
-        ? kind.waiting
-        : kind.running;
+        ? resolve(msg("Waiting · {label}", { label: only.label }))
+        : resolve(msg("Running · {label}", { label: only.label }))
+      : backgroundWorkSingleTitle(only.kind, waiting, resolve);
     return { title, items, waiting };
   }
   const counts = new Map<BackgroundWorkKind, number>();
   for (const item of items) counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
-  const groups = Array.from(counts, ([kind, count]) => {
-    return kinds[kind].count(count);
-  });
+  const groups = joinWithAnd(
+    Array.from(counts, ([kind, count]) => resolve(BACKGROUND_WORK_KINDS[kind].count, { count })),
+    resolve,
+  );
   return {
     title: waiting
-      ? t(($) => $.background.waitingGroups, {
-          groups: backgroundListFormatters[language].format(groups),
-        })
-      : t(($) => $.background.runningGroups, {
-          groups: backgroundListFormatters[language].format(groups),
-        }),
+      ? resolve(msg("Waiting on {groups}", { groups }))
+      : resolve(msg("Running {groups}", { groups })),
     items,
     waiting,
   };
+}
+
+function backgroundWorkSingleTitle(
+  kind: BackgroundWorkKind,
+  waiting: boolean,
+  resolve: MFunctionType,
+): string {
+  switch (kind) {
+    case "subagent":
+      return waiting ? resolve(msg("Waiting on a subagent")) : resolve(msg("Running a subagent"));
+    case "command":
+      return waiting ? resolve(msg("Waiting on a command")) : resolve(msg("Running a command"));
+    case "monitor":
+      return waiting ? resolve(msg("Waiting on a monitor")) : resolve(msg("Running a monitor"));
+    case "background_task":
+      return waiting
+        ? resolve(msg("Waiting on a background task"))
+        : resolve(msg("Running a background task"));
+  }
 }
 
 export interface ProviderGoalPresentation {
@@ -679,6 +703,15 @@ export interface ProviderGoalPresentation {
   readonly usage: string | null;
   readonly canResume: boolean;
 }
+
+const PROVIDER_GOAL_TITLES: Record<OrchestrationV2ProviderGoal["status"], string> = {
+  active: msg("Pursuing goal"),
+  paused: msg("Goal paused"),
+  blocked: msg("Goal blocked"),
+  usage_limited: msg("Goal hit a usage limit"),
+  budget_limited: msg("Goal reached its token budget"),
+  complete: msg("Goal complete"),
+};
 
 function formatGoalTokens(tokens: number): string {
   if (tokens < 1_000) return `${tokens}`;
@@ -690,28 +723,36 @@ function formatGoalTokens(tokens: number): string {
 export function presentProviderGoal(
   goal: OrchestrationV2ProviderGoal,
   working: boolean,
-  t: TFunction<"activity">,
+  resolve: MFunctionType = mFallback,
 ): ProviderGoalPresentation {
   const usage: Array<string> = [];
   if (goal.tokensUsed !== undefined && goal.tokensUsed > 0) {
     usage.push(
       goal.tokenBudget == null
-        ? t(($) => $.goal.tokens, { used: formatGoalTokens(goal.tokensUsed) })
-        : t(($) => $.goal.tokenBudget, {
-            used: formatGoalTokens(goal.tokensUsed),
-            budget: formatGoalTokens(goal.tokenBudget),
-          }),
+        ? resolve(msg("{used} tokens", { used: formatGoalTokens(goal.tokensUsed) }))
+        : resolve(
+            msg("{used} / {budget} tokens", {
+              used: formatGoalTokens(goal.tokensUsed),
+              budget: formatGoalTokens(goal.tokenBudget),
+            }),
+          ),
     );
   }
   if (goal.timeUsedSeconds !== undefined && goal.timeUsedSeconds >= 60) {
     usage.push(formatDuration(goal.timeUsedSeconds * 1_000));
   }
   if (goal.checks !== undefined && goal.checks > 0) {
-    usage.push(t(($) => $.goal.checks, { count: goal.checks }));
+    usage.push(
+      resolve(
+        msg("{count, plural, one {{count} check} other {{count} checks}}", { count: goal.checks }),
+      ),
+    );
   }
   return {
     title:
-      goal.status === "active" && !working ? t(($) => $.goal.set) : t(($) => $.goal[goal.status]),
+      goal.status === "active" && !working
+        ? resolve(msg("Goal set"))
+        : resolve(PROVIDER_GOAL_TITLES[goal.status]),
     objective: goal.objective,
     usage: usage.length === 0 ? null : usage.join(" · "),
     canResume: goal.status !== "active" && goal.status !== "complete",

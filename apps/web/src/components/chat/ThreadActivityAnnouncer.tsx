@@ -1,8 +1,8 @@
 import type { ScreenReaderAnnouncements } from "@t3tools/contracts";
 import { memo, useEffect, useRef } from "react";
-import { useTranslation } from "react-i18next";
 
 import { useLiveRegion } from "../../hooks/useLiveRegion";
+import { m } from "../../i18n/messages";
 import type { TimelineEntry } from "../../session-logic";
 
 import {
@@ -62,7 +62,6 @@ export const ThreadActivityAnnouncer = memo(function ThreadActivityAnnouncer({
   readonly entries: ReadonlyArray<TimelineEntry>;
   readonly workspaceRoot: string | undefined;
 }) {
-  const { t } = useTranslation("activity");
   const { regionRef, announce, clear } = useLiveRegion();
   const {
     regionRef: detailRegionRef,
@@ -114,27 +113,18 @@ export const ThreadActivityAnnouncer = memo(function ThreadActivityAnnouncer({
     const previous = memoryRef.current?.threadKey === threadKey ? memoryRef.current : null;
     const turn = nextThreadAnnouncement(
       previous?.memory ?? null,
-      {
-        status,
-        requestId,
-        runId,
-        runStatus,
-      },
-      t,
+      { status, requestId, runId, runStatus },
+      m,
     );
     // A new level starts from what the turn already holds, so raising it mid-turn replays nothing.
     const previousDetail = previous?.level === level ? previous.detail : null;
-    const detail = nextTurnDetailAnnouncement(
-      previousDetail,
-      {
-        ...(level === "status"
-          ? NO_TURN_DETAIL
-          : turnDetail(entries, workspaceRoot, previousDetail?.tailId ?? null, t)),
-        level,
-        status,
-      },
-      t,
-    );
+    const detail = nextTurnDetailAnnouncement(previousDetail, {
+      ...(level === "status"
+        ? NO_TURN_DETAIL
+        : turnDetail(entries, workspaceRoot, previousDetail?.tailId ?? null)),
+      level,
+      status,
+    });
     memoryRef.current = { threadKey, level, memory: turn.memory, detail: detail.memory };
     if (previous === null) {
       step.quietUntil = 0;
@@ -186,7 +176,6 @@ export const ThreadActivityAnnouncer = memo(function ThreadActivityAnnouncer({
     clear,
     announceDetail,
     clearDetail,
-    t,
   ]);
 
   // No role="status": Orca 50 maps it to a status bar in Chromium and drops its updates.

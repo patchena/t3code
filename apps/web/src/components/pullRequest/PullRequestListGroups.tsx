@@ -1,20 +1,21 @@
 import type { EnvironmentId, PullRequestAction } from "@t3tools/contracts";
 import { EyeIcon, LayersIcon, PenLineIcon, UsersIcon, type LucideIcon } from "lucide-react";
+import { useMessages } from "gt-react";
 import { useDeferredValue, type RefCallback } from "react";
 
 import { cn } from "~/lib/utils";
-import { Separator } from "~/components/ui/separator";
+import { Separator } from "../ui/separator";
 import {
   pullRequestEntryKey,
   scorePullRequestMatch,
   type EnvironmentPullRequestEntry,
   type PullRequestGroup,
-} from "~/components/pullRequest/pullRequestList.logic";
-import { PullRequestRow, type PullRequestRowTarget } from "~/components/pullRequest/PullRequestRow";
+} from "./pullRequestList.logic";
+import { PullRequestRow, type PullRequestRowTarget } from "./PullRequestRow";
 import {
   PullRequestSpeedModeProvider,
   type PullRequestSpeedActionResult,
-} from "~/components/pullRequest/PullRequestSpeedActions";
+} from "./PullRequestSpeedActions";
 
 const GROUP_ICONS: Record<string, LucideIcon> = {
   authored: PenLineIcon,
@@ -43,11 +44,12 @@ function PullRequestGroupHeader({
   group: { key: string; label: string };
   count: number;
 }) {
+  const resolve = useMessages();
   const Icon = GROUP_ICONS[group.key] ?? LayersIcon;
   return (
     <div className="flex items-center gap-2 px-3 pb-1 text-xs font-medium text-muted-foreground/70">
       <Icon aria-hidden className="size-3.5 shrink-0" />
-      <h2 className="shrink-0">{group.label}</h2>
+      <h2 className="shrink-0">{resolve(group.label)}</h2>
       <span className="shrink-0 tabular-nums text-muted-foreground/50">{count}</span>
       <Separator className="min-w-2 flex-1" />
     </div>

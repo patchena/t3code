@@ -10,7 +10,7 @@ import {
 import type { Ref } from "react";
 
 import { DIFF_SURFACE_THEME_UNSAFE_CSS } from "~/lib/diffRendering";
-import { DiffWorkerPoolProvider } from "~/components/DiffWorkerPoolProvider";
+import { DiffWorkerPoolProvider } from "../DiffWorkerPoolProvider";
 
 export const DIFF_VIEW_UNSAFE_CSS = `${DIFF_SURFACE_THEME_UNSAFE_CSS}
 /* A 1fr track's automatic minimum grows with the currently mounted lines. In split

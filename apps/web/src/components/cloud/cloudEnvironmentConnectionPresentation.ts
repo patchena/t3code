@@ -1,6 +1,10 @@
-import { type EnvironmentConnectionPresentation } from "@t3tools/client-runtime/connection";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
-import { connectionStatusText } from "~/connection/presentation";
+import {
+  connectionStatusText,
+  type EnvironmentConnectionPresentation,
+} from "@t3tools/client-runtime/connection";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "~/i18n/messages";
 
 export interface SavedCloudEnvironmentConnectionPresentation {
   readonly buttonLabel: string;
@@ -8,53 +12,54 @@ export interface SavedCloudEnvironmentConnectionPresentation {
   readonly tone: "connected" | "connecting" | "error" | "idle";
 }
 
+/** Components pass `useMessages()` so the label follows a language switch. */
 export function presentSavedCloudEnvironmentConnection(
   connection: EnvironmentConnectionPresentation,
-  t: TFunction<"connect">,
+  resolve: MessageResolver = m,
 ): SavedCloudEnvironmentConnectionPresentation {
   switch (connection.phase) {
     case "connected":
       return {
-        buttonLabel: t(($) => $.connection.connected),
-        statusText: connectionStatusText(connection, t),
+        buttonLabel: resolve(msg("Connected")),
+        statusText: connectionStatusText(connection, resolve),
         tone: "connected",
       };
     case "connecting":
       return {
-        buttonLabel: t(($) => $.connection.connecting),
-        statusText: connectionStatusText(connection, t),
+        buttonLabel: resolve(msg("Connecting…")),
+        statusText: connectionStatusText(connection, resolve),
         tone: "connecting",
       };
     case "reconnecting":
       return {
         buttonLabel: connection.awaitingApproval
-          ? t(($) => $.connection.awaitingApproval)
-          : t(($) => $.connection.reconnecting),
-        statusText: connectionStatusText(connection, t),
+          ? resolve(msg("Waiting for approval…"))
+          : resolve(msg("Reconnecting…")),
+        statusText: connectionStatusText(connection, resolve),
         tone: "connecting",
       };
     case "unsupported":
       return {
-        buttonLabel: t(($) => $.connection.unsupported),
-        statusText: connectionStatusText(connection, t),
+        buttonLabel: resolve(msg("Client not supported")),
+        statusText: connectionStatusText(connection, resolve),
         tone: "idle",
       };
     case "error":
       return {
-        buttonLabel: t(($) => $.connection.failed),
-        statusText: connectionStatusText(connection, t),
+        buttonLabel: resolve(msg("Connection failed")),
+        statusText: connectionStatusText(connection, resolve),
         tone: "error",
       };
     case "offline":
       return {
-        buttonLabel: t(($) => $.connection.offline),
-        statusText: connectionStatusText(connection, t),
+        buttonLabel: resolve(msg("Offline")),
+        statusText: connectionStatusText(connection, resolve),
         tone: "idle",
       };
     case "available":
       return {
-        buttonLabel: t(($) => $.connection.notConnected),
-        statusText: connectionStatusText(connection, t),
+        buttonLabel: resolve(msg("Not connected")),
+        statusText: connectionStatusText(connection, resolve),
         tone: "idle",
       };
   }

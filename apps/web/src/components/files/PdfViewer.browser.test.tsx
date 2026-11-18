@@ -18,7 +18,7 @@ function setup(page: number) {
   findGate.page = page;
   findGate.opened = new Promise((resolve) => (findGate.open = resolve));
 }
-vi.mock(import("~/components/files/pdfDocument"), async (importOriginal) => {
+vi.mock(import("./pdfDocument"), async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
@@ -42,7 +42,7 @@ vi.mock(import("~/components/files/pdfDocument"), async (importOriginal) => {
   };
 });
 
-import { PdfViewer } from "~/components/files/PdfViewer";
+import PdfViewer from "./PdfViewer";
 
 // Page 1 is a short banner whose title is drawn in two runs with a font change, so pdf.js
 // splits it into two text spans. Page 2 is a letter page rotated a quarter turn.

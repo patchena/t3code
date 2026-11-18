@@ -1,4 +1,5 @@
-import { useTranslation } from "react-i18next";
+import { m } from "../i18n/messages";
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { useParams } from "@tanstack/react-router";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
 import {
@@ -20,6 +21,7 @@ import {
 } from "@t3tools/shared/cloneUrl";
 import { ArrowRightIcon } from "lucide-react";
 import { useId, useState } from "react";
+import { T, useGT, Var } from "gt-react";
 import { create } from "zustand";
 
 import { type DraftId, useComposerDraftStore } from "../composerDraftStore";
@@ -33,6 +35,7 @@ import {
   isDefaultCopiedFile,
 } from "../lib/addProjectToMachine";
 import { formatBytes } from "../lib/formatBytes";
+import { seedDraftModelSelection } from "../lib/seedDraftModelSelection";
 import { newProjectId } from "../lib/utils";
 import { readProject, subscribeProject, useProject } from "../state/entities";
 import { useEnvironments } from "../state/environments";
@@ -94,8 +97,7 @@ export function AddProjectToMachineDialogHost() {
 }
 
 function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRequest }) {
-  const { t } = useTranslation("workspace");
-  const { t: tCommon } = useTranslation("common");
+  const gt = useGT();
   const id = useId();
   const project = useProject(request.projectRef);
   const handleNewThread = useNewThreadHandler();
@@ -162,9 +164,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
   );
 
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<
-    { readonly kind: "folder" } | { readonly kind: "clone"; readonly cause: unknown } | null
-  >(null);
+  const [error, setError] = useState<string | null>(null);
 
   // The project or every target can vanish while the dialog is open. Submitting
   // before the file list loads would silently skip the default .env copies.
@@ -206,6 +206,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
         environmentSelection: "manual",
         loadBalancedEnvironmentId: null,
       });
+      seedDraftModelSelection(draftId, targetRef);
       return;
     }
     void handleNewThread(targetRef);
@@ -214,33 +215,29 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
   const submit = async () => {
     if (!project || !target || submitting) return;
     if (destinationPath.trim().length === 0) {
-      setError({ kind: "folder" });
+      setError(gt("Choose a folder on the other machine."));
       return;
     }
     setSubmitting(true);
     setError(null);
     try {
-      const projectId = await addProjectToMachine(
-        {
-          source: { environmentId: project.environmentId, cwd: project.workspaceRoot },
-          subdirectory: projectSubdirectory(
-            project.repositoryIdentity?.rootPath,
-            project.workspaceRoot,
-          ),
-          target: { environmentId: target.environmentId, label: target.label },
-          projectId: newProjectId(),
-          title: project.title,
-          remoteUrl,
-          destinationPath: destinationPath.trim(),
-          files: [...selectedFiles.keys()],
-        },
-        tCommon,
-        t,
-      );
+      const projectId = await addProjectToMachine({
+        source: { environmentId: project.environmentId, cwd: project.workspaceRoot },
+        subdirectory: projectSubdirectory(
+          project.repositoryIdentity?.rootPath,
+          project.workspaceRoot,
+        ),
+        target: { environmentId: target.environmentId, label: target.label },
+        projectId: newProjectId(),
+        title: project.title,
+        remoteUrl,
+        destinationPath: destinationPath.trim(),
+        files: [...selectedFiles.keys()],
+      });
       close();
       openClonedProject(scopeProjectRef(target.environmentId, projectId));
     } catch (cause) {
-      setError({ kind: "clone", cause });
+      setError(thrownErrorMessage(cause, m) ?? gt("Could not start the clone."));
       setSubmitting(false);
     }
   };
@@ -261,13 +258,14 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
           }}
         >
           <DialogHeader>
-            <DialogTitle>{t(($) => $.clone.title)}</DialogTitle>
+            <DialogTitle>
+              <T>Add to another machine</T>
+            </DialogTitle>
             <DialogDescription>
-              {project
-                ? t(($) => $.clone.description, {
-                    project: project.repositoryIdentity?.displayName ?? project.title,
-                  })
-                : t(($) => $.clone.projectUnavailable)}
+              <T>
+                Clone <Var>{project?.repositoryIdentity?.displayName ?? project?.title}</Var> and
+                bring the local files git does not track.
+              </T>
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
@@ -278,13 +276,14 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                     kind={resolveEnvironmentMachineKind(source?.serverConfig ?? null)}
                     className="size-3.5 shrink-0"
                   />
-                  <span className="truncate">{source?.label ?? t(($) => $.clone.thisMachine)}</span>
+                  <span className="truncate">{source?.label ?? gt("This machine")}</span>
                 </span>
                 <span className="flex min-w-0 font-mono text-muted-foreground text-xs">
                   <MiddleTruncate value={project?.workspaceRoot ?? ""} />
                 </span>
               </div>
               <div className="flex w-28 flex-col items-center gap-0.5 text-muted-foreground text-xs">
+                {/* oxlint-disable-next-line t3code/no-untranslated-copy -- git command name */}
                 <span>git clone</span>
                 <span className="flex w-full items-center">
                   <span className="h-px flex-1 bg-border" />
@@ -292,8 +291,10 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                 </span>
                 <span>
                   {selectedFiles.size === 0
-                    ? t(($) => $.clone.noFiles)
-                    : t(($) => $.clone.addedFiles, { count: selectedFiles.size })}
+                    ? gt("no files")
+                    : gt("{count, plural, one {+ {count} file} other {+ {count} files}}", {
+                        count: selectedFiles.size,
+                      })}
                 </span>
               </div>
               <div className="flex min-w-0 flex-col gap-1">
@@ -305,7 +306,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                     }}
                     items={targets.map((t) => ({ value: t.environmentId, label: t.label }))}
                   >
-                    <SelectTrigger size="sm" aria-label={t(($) => $.clone.targetMachine)}>
+                    <SelectTrigger size="sm" aria-label={gt("Machine to add the project to")}>
                       {target ? (
                         <EnvironmentMachineIcon kind={target.machine} className="size-3.5" />
                       ) : null}
@@ -327,7 +328,7 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                     {target ? (
                       <EnvironmentMachineIcon kind={target.machine} className="size-3.5 shrink-0" />
                     ) : null}
-                    <span className="truncate">{target?.label ?? t(($) => $.clone.noMachine)}</span>
+                    <span className="truncate">{target?.label ?? gt("No machine available")}</span>
                   </span>
                 )}
                 <span className="flex min-w-0 font-mono text-muted-foreground text-xs">
@@ -337,10 +338,12 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label>{t(($) => $.clone.protocol)}</Label>
+              <Label>
+                <T>Clone over</T>
+              </Label>
               {sshUrl && httpsUrl ? (
                 <ToggleGroup
-                  aria-label={t(($) => $.clone.protocolLabel)}
+                  aria-label={gt("Clone protocol")}
                   value={protocol ? [protocol] : []}
                   onValueChange={(next) => {
                     const value = next[0];
@@ -356,9 +359,9 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={`${id}-path`}>
-                {t(($) => $.clone.folderOn, {
-                  machine: target?.label ?? t(($) => $.clone.otherMachine),
-                })}
+                {target
+                  ? gt("Folder on {machine}", { machine: target.label })
+                  : gt("Folder on the other machine")}
               </Label>
               <Input
                 id={`${id}-path`}
@@ -374,23 +377,22 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
             {canListFiles ? (
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
-                  <Label className="flex-1">{t(($) => $.clone.copyIgnored)}</Label>
+                  <Label className="flex-1">
+                    <T>Copy ignored files</T>
+                  </Label>
                   {copyable.length > 0 ? (
                     <>
                       <span className="text-muted-foreground text-xs">
-                        {selectedBytes > 0
-                          ? t(($) => $.clone.selectedSize, {
-                              selected: selectedFiles.size,
-                              total: allIgnoredFiles.data?.files.length ?? 0,
-                              size: formatBytes(selectedBytes),
-                            })
-                          : t(($) => $.clone.selected, {
-                              selected: selectedFiles.size,
-                              total: allIgnoredFiles.data?.files.length ?? 0,
-                            })}
+                        {gt("{selected} of {total}", {
+                          selected: selectedFiles.size,
+                          total: allIgnoredFiles.data?.files.length ?? 0,
+                        })}
+                        {selectedBytes > 0 ? ` · ${formatBytes(selectedBytes)}` : ""}
                       </span>
                       <Button type="button" variant="ghost" size="xs" onClick={toggleShownFiles}>
-                        {allCopyableSelected ? t(($) => $.clone.none) : t(($) => $.clone.all)}
+                        {allCopyableSelected
+                          ? gt("None", { $context: "select no files" })
+                          : gt("All", { $context: "select all files" })}
                       </Button>
                     </>
                   ) : null}
@@ -399,8 +401,8 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                   <Input
                     size="sm"
                     type="search"
-                    aria-label={t(($) => $.clone.searchIgnored)}
-                    placeholder={t(($) => $.clone.searchIgnored)}
+                    aria-label={gt("Search ignored files")}
+                    placeholder={gt("Search ignored files")}
                     value={fileQuery}
                     maxLength={256}
                     onChange={(event) => setFileQuery(event.target.value)}
@@ -417,10 +419,10 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                 ) : files.length === 0 ? (
                   <p className="text-muted-foreground text-xs">
                     {!ignoredFiles.isSuccess
-                      ? t(($) => $.clone.finding)
+                      ? gt("Finding ignored files…")
                       : searching
-                        ? t(($) => $.clone.noIgnoredMatch)
-                        : t(($) => $.clone.noIgnored)}
+                        ? gt("No ignored files match.")
+                        : gt("No ignored files to copy.")}
                   </p>
                 ) : (
                   <div className="max-h-52 overflow-y-auto rounded-md border">
@@ -438,34 +440,39 @@ function AddProjectToMachineDialog({ request }: { request: AddProjectToMachineRe
                 {ignoredFiles.data?.truncated ? (
                   <p className="text-muted-foreground text-xs">
                     {canSearchFiles
-                      ? t(($) => $.clone.truncatedSearchable, { count: files.length })
-                      : t(($) => $.clone.truncated, { count: files.length })}
+                      ? gt(
+                          "{count, plural, one {Showing the first {count} files. Search to find the rest.} other {Showing the first {count} files. Search to find the rest.}}",
+                          {
+                            count: files.length,
+                          },
+                        )
+                      : gt(
+                          "{count, plural, one {Showing the first {count} files.} other {Showing the first {count} files.}}",
+                          { count: files.length },
+                        )}
                   </p>
                 ) : null}
-                <p className="text-muted-foreground text-xs">{t(($) => $.clone.copyDescription)}</p>
+                <p className="text-muted-foreground text-xs">
+                  <T>
+                    Files are copied after the clone finishes. Folders git ignores whole, like
+                    node_modules, are left out.
+                  </T>
+                </p>
               </div>
             ) : null}
 
-            {error ? (
-              <p className="text-destructive-foreground text-sm">
-                {error.kind === "folder"
-                  ? t(($) => $.clone.chooseFolder)
-                  : error.cause instanceof Error
-                    ? error.cause.message
-                    : t(($) => $.clone.startFailed)}
-              </p>
-            ) : null}
+            {error ? <p className="text-destructive-foreground text-sm">{error}</p> : null}
           </DialogPanel>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={close}>
-              {t(($) => $.cancel)}
+              <T>Cancel</T>
             </Button>
             <Button type="submit" disabled={unavailable || submitting}>
               {submitting
-                ? t(($) => $.clone.starting)
-                : t(($) => $.clone.cloneTo, {
-                    machine: target?.label ?? t(($) => $.clone.machine),
-                  })}
+                ? gt("Starting…")
+                : target
+                  ? gt("Clone to {machine}", { machine: target.label })
+                  : gt("Clone to machine")}
             </Button>
           </DialogFooter>
         </form>
@@ -510,7 +517,7 @@ function IgnoredFileRow({
   disabled: boolean;
   onCheckedChange: (checked: boolean) => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const tooLarge = file.byteLength > COPYABLE_FILE_MAX_BYTES;
   return (
     <label className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-sm not-last:border-b has-disabled:cursor-not-allowed has-disabled:opacity-64">
@@ -521,7 +528,7 @@ function IgnoredFileRow({
       />
       <span className="min-w-0 flex-1 truncate font-mono text-xs">{file.path}</span>
       <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
-        {tooLarge ? t(($) => $.clone.tooLarge) : formatBytes(file.byteLength)}
+        {tooLarge ? gt("Over 1 MB") : formatBytes(file.byteLength)}
       </span>
     </label>
   );

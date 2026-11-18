@@ -1,4 +1,3 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import {
   GUEST_ATTACHMENT_ROUTE,
   GUEST_MEDIA_ROUTE,
@@ -15,6 +14,9 @@ import {
   type OrchestrationV2TurnItem,
   type ThreadGuestMessage,
 } from "@t3tools/contracts";
+import { msg } from "gt-react";
+
+import { m, type MessageResolver } from "~/i18n/messages";
 import { applyOrchestrationV2ProjectionEvent } from "@t3tools/client-runtime/state/orchestration-v2-projection";
 import { mergeOlderHistoryIntoProjection } from "@t3tools/client-runtime/state/thread-history-merge";
 import { boundedSnapshotProjection } from "@t3tools/shared/orchestrationV2BoundedSnapshot";
@@ -100,14 +102,19 @@ export function applyGuestStreamEvent(
   event: GuestStreamEvent | GuestHistoryPageLoaded,
 ): GuestStreamState {
   switch (event.type) {
-    case "history-page":
+    case "history-page": {
       // A snapshot since the request replaced the thread and its cursor.
       if (state.projection === null || state.historyCursor !== event.cursor) return state;
       return {
         ...state,
         projection: mergeOlderHistoryIntoProjection(state.projection, event.page.items),
+        awaitingRowIds: withoutPlaced(
+          state.awaitingRowIds,
+          event.page.items.map((row) => row.item),
+        ),
         historyCursor: event.page.hasMoreHistory ? event.page.nextCursor : null,
       };
+    }
     case "view":
       // The page follows the share it names; a view of another one means the link changed.
       if (state.view !== null && state.view.shareId !== event.view.shareId) {
@@ -189,12 +196,16 @@ export function unplacedGuestMessages(
 }
 
 /** "23h left" or "5m left", rounded down, for the guest page header. */
-export function formatGuestExpiry(expiresAt: string, nowMs: number, t: TFunction<"chat">): string {
+export function formatGuestExpiry(
+  expiresAt: string,
+  nowMs: number,
+  resolve: MessageResolver = m,
+): string {
   const minutes = Math.floor((Date.parse(expiresAt) - nowMs) / 60_000);
-  if (minutes <= 0) return t(($) => $.links.guest.expired);
+  if (minutes <= 0) return resolve(msg("Expired"));
   return minutes >= 60
-    ? t(($) => $.links.guest.hoursLeft, { count: Math.floor(minutes / 60) })
-    : t(($) => $.links.guest.minutesLeft, { count: minutes });
+    ? resolve(msg("{hours}h left", { hours: Math.floor(minutes / 60) }))
+    : resolve(msg("{minutes}m left", { minutes }));
 }
 
 /**
@@ -218,18 +229,17 @@ export const guestMediaUrl = (shareId: string, path: string) =>
  * Why these files cannot go with one message, or null. The server checks the same limits; this
  * only says so before the upload.
  */
-export type GuestFilesProblem =
-  | { readonly kind: "files-limit"; readonly limit: number }
-  | { readonly kind: "files-size" | "file-unsupported" };
-
 export function guestFilesProblem(
   files: ReadonlyArray<Pick<File, "type" | "size">>,
-): GuestFilesProblem | null {
+  resolve: MessageResolver = m,
+): string | null {
   if (files.length > GUEST_MESSAGE_MAX_ATTACHMENTS) {
-    return { kind: "files-limit", limit: GUEST_MESSAGE_MAX_ATTACHMENTS };
+    return resolve(
+      msg("Attach up to {count} files to a message.", { count: GUEST_MESSAGE_MAX_ATTACHMENTS }),
+    );
   }
   if (files.reduce((total, file) => total + file.size, 0) > GUEST_MESSAGE_MAX_ATTACHMENT_BYTES) {
-    return { kind: "files-size" };
+    return resolve(msg("Attached files can total up to 10 MB per message."));
   }
   const unsupported = files.some(
     (file) =>
@@ -237,7 +247,9 @@ export function guestFilesProblem(
       (file.type.toLowerCase().startsWith("image/") &&
         !isProviderSendTurnSupportedImageMimeType(file.type)),
   );
-  return unsupported ? { kind: "file-unsupported" } : null;
+  return unsupported
+    ? resolve(msg("This file cannot be attached. Images must be PNG, JPEG, GIF, or WebP."))
+    : null;
 }
 
 /**

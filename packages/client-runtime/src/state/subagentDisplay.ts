@@ -9,27 +9,47 @@ import { formatModelSlugName, resolveSelectableModel } from "@t3tools/shared/mod
 import { fileBasename } from "@t3tools/shared/path";
 import { resolveModelShortName } from "../providerClients.ts";
 import { isTerminalSubagentStatus } from "./subagentRuntime.ts";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { mFallback, msg } from "gt-i18n";
+import type { MFunctionType } from "gt-i18n/types";
 
 export function subagentGroupSummary(
   members: ReadonlyArray<{ readonly status: OrchestrationV2TurnItemStatus }>,
-  t: TFunction<"activity">,
+  resolve: MFunctionType = mFallback,
 ) {
   const active = members.some(
     ({ status }) => status === "pending" || status === "running" || status === "waiting",
   );
   return {
     label: active
-      ? t(($) => $.subagent.kickedOff, { count: members.length })
-      : t(($) => $.subagent.ran, { count: members.length }),
+      ? resolve(
+          msg(
+            "{count, plural, one {Kicked off {count} subagent} other {Kicked off {count} subagents}}",
+            {
+              count: members.length,
+            },
+          ),
+        )
+      : resolve(
+          msg("{count, plural, one {Ran {count} subagent} other {Ran {count} subagents}}", {
+            count: members.length,
+          }),
+        ),
     active,
     failed: members.some(({ status }) => status === "failed"),
   };
 }
 
+const SUBAGENT_STATUS_COUNTS = {
+  working: msg("{count} working"),
+  done: msg("{count} done"),
+  failed: msg("{count} failed"),
+  stopped: msg("{count} stopped"),
+  idle: msg("{count} idle"),
+};
+
 export function summarizeSubagentStatuses(
   statuses: ReadonlyArray<OrchestrationV2TurnItemStatus>,
-  t: TFunction<"activity">,
+  resolve: MFunctionType = mFallback,
 ): string {
   const counts = { working: 0, done: 0, failed: 0, stopped: 0, idle: 0 };
   for (const status of statuses) {
@@ -39,9 +59,9 @@ export function summarizeSubagentStatuses(
     else if (status === "idle") counts.idle += 1;
     else counts.stopped += 1;
   }
-  return (["working", "done", "failed", "stopped", "idle"] as const)
+  return (Object.keys(counts) as Array<keyof typeof counts>)
     .filter((key) => counts[key] > 0)
-    .map((key) => t(($) => $.subagent.counts[key], { count: counts[key] }))
+    .map((key) => resolve(SUBAGENT_STATUS_COUNTS[key], { count: counts[key] }))
     .join(" · ");
 }
 
@@ -73,7 +93,7 @@ export function resolveSubagentMetadata(
       | null
       | undefined;
   },
-  t: TFunction<"activity">,
+  resolve: MFunctionType = mFallback,
 ) {
   const model = input.model?.trim() || input.modelSelection?.model.trim();
   const slug = input.provider
@@ -84,7 +104,7 @@ export function resolveSubagentMetadata(
     ? (resolveModelShortName(catalogModel, input.provider?.driver) ?? catalogModel.name)
     : model
       ? formatModelSlugName(model)
-      : t(($) => $.subagent.notReported);
+      : resolve(msg("Not reported"));
   const qualifier = catalogModel?.subProvider?.trim();
   const modelLabel = qualifier
     ? reportedLabel
@@ -103,21 +123,21 @@ export function resolveSubagentMetadata(
     ...(input.parentThread &&
     input.childProject &&
     input.childProject.id !== input.parentThread.projectId
-      ? [{ kind: "project", label: t(($) => $.subagent.project), value: input.childProject.title }]
+      ? [
+          {
+            label: resolve(msg("Project", { $context: "field label" })),
+            value: input.childProject.title,
+          },
+        ]
       : []),
     ...(parentWorkspace && childWorkspace && parentWorkspace !== childWorkspace
       ? [
           {
-            kind: input.childThread?.branch
-              ? "branch"
-              : input.childThread?.worktreePath
-                ? "worktree"
-                : "workspace",
             label: input.childThread?.branch
-              ? t(($) => $.subagent.branch)
+              ? resolve(msg("Branch", { $context: "field label" }))
               : input.childThread?.worktreePath
-                ? t(($) => $.subagent.worktree)
-                : t(($) => $.subagent.workspace),
+                ? resolve(msg("Worktree", { $context: "field label" }))
+                : resolve(msg("Workspace", { $context: "field label" })),
             value: input.childThread?.branch ?? fileBasename(childWorkspace),
           },
         ]
@@ -158,4 +178,16 @@ export function subagentDetailPreview(input: {
     }
   }
   return compact || null;
+}
+
+export function subagentCardDetail(detail: string | null | undefined): string | null {
+  if (!detail || /^Child task ended with status\b/i.test(detail)) return null;
+  return (
+    detail
+      .replace(/!?\[([^\]]+)\]\((?:\\.|[^\\()]|\((?:\\.|[^\\()])*\))*\)/g, "$1")
+      .replace(/`/g, "")
+      .replace(/^[ \t]*[-*][ \t]+/gm, "")
+      .replace(/\s+/g, " ")
+      .trim() || null
+  );
 }

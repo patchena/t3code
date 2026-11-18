@@ -1,18 +1,19 @@
 import type { OrchestrationV2Run, OrchestrationV2RunStatus, RunId } from "@t3tools/contracts";
 import { latestExecutedRun } from "@t3tools/shared/orchestrationV2ThreadError";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { mFallback, msg } from "gt-i18n";
+import type { MFunctionType } from "gt-i18n/types";
 
 export type ThreadActivityStatus = "working" | "approval" | "input" | "idle";
 
 /** Background threads say these too, so a status sounds the same wherever it's heard. */
-export const threadStatusText = (t: TFunction<"activity">) => ({
-  working: t(($) => $.status.working),
-  approval: t(($) => $.status.needsApproval),
-  input: t(($) => $.status.needsInput),
-  done: t(($) => $.status.done),
-  failed: t(($) => $.status.failed),
-  stopped: t(($) => $.status.stopped),
-});
+export const THREAD_STATUS_TEXT = {
+  working: msg("Working"),
+  approval: msg("Needs approval"),
+  input: msg("Needs your input"),
+  done: msg("Done"),
+  failed: msg("Failed"),
+  stopped: msg("Stopped"),
+} as const;
 
 export interface ThreadActivitySnapshot {
   readonly status: ThreadActivityStatus;
@@ -50,16 +51,16 @@ const STARTING_RUN_STATUSES: ReadonlySet<OrchestrationV2RunStatus | null> = new 
 
 export function runOutcomeText(
   status: OrchestrationV2RunStatus | null,
-  t: TFunction<"activity">,
+  resolve: MFunctionType = mFallback,
 ): string | null {
   switch (status) {
     case "completed":
-      return t(($) => $.status.done);
+      return resolve(THREAD_STATUS_TEXT.done);
     case "failed":
-      return t(($) => $.status.failed);
+      return resolve(THREAD_STATUS_TEXT.failed);
     case "interrupted":
     case "cancelled":
-      return t(($) => $.status.stopped);
+      return resolve(THREAD_STATUS_TEXT.stopped);
     default:
       return null;
   }
@@ -104,7 +105,7 @@ export function announcedRun(
 export function nextThreadAnnouncement(
   previous: ThreadAnnouncementMemory | null,
   next: ThreadActivitySnapshot,
-  t: TFunction<"activity">,
+  resolve: MFunctionType = mFallback,
 ): { readonly memory: ThreadAnnouncementMemory; readonly announcement: string | null } {
   const idle = next.status === "idle";
   // A run still starting up while the thread looks idle (a queued message,
@@ -122,7 +123,7 @@ export function nextThreadAnnouncement(
       memory: {
         snapshot: next,
         turnRunId: idle ? null : (newRunId ?? "unknown"),
-        settledRunId: runOutcomeText(next.runStatus, t) === null ? null : next.runId,
+        settledRunId: runOutcomeText(next.runStatus) === null ? null : next.runId,
         idleRunId,
       },
       announcement: null,
@@ -144,19 +145,19 @@ export function nextThreadAnnouncement(
       next.status === "approval"
         ? previous.snapshot.status === "approval" && previous.snapshot.requestId === next.requestId
           ? null
-          : t(($) => $.status.needsApproval)
+          : resolve(THREAD_STATUS_TEXT.approval)
         : next.status === "input"
           ? previous.snapshot.status === "input" && previous.snapshot.requestId === next.requestId
             ? null
-            : t(($) => $.status.needsInput)
+            : resolve(THREAD_STATUS_TEXT.input)
           : turnStarted
-            ? t(($) => $.status.working)
+            ? resolve(THREAD_STATUS_TEXT.working)
             : null;
     return { memory: { ...memory, turnRunId: nextTurnRunId }, announcement };
   }
 
   // Work can stop a moment before the run settles; the ending waits for the run.
-  const outcome = runOutcomeText(next.runStatus, t);
+  const outcome = runOutcomeText(next.runStatus, resolve);
   if (turnRunId === null) {
     // A run that settled unseen is history too, or the next failed send would claim it.
     const settledRunId = outcome === null ? previous.settledRunId : next.runId;

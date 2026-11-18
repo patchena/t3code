@@ -1,8 +1,8 @@
-import { useTranslation } from "react-i18next";
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { useAtomValue } from "@effect/atom-react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { Atom } from "effect/reactivity";
+import { useGT } from "gt-react";
 import { useEffect, useState } from "react";
 
 import {
@@ -188,20 +188,18 @@ function FirstRunRecovery({
   readonly reason: "settings" | "connection";
   readonly retrying?: boolean;
 }) {
-  const { t } = useTranslation("connect");
   const settingsReadFailed = reason === "settings";
+  const gt = useGT();
   return (
     <main className="flex h-dvh min-h-0 items-center justify-center bg-background px-6 text-foreground">
       <div className="flex max-w-sm flex-col items-center text-center">
         <h1 className="text-lg font-semibold">
-          {settingsReadFailed
-            ? t(($) => $.welcome.readSettingsFailed)
-            : t(($) => $.welcome.stillConnecting)}
+          {settingsReadFailed ? gt("Could not read settings") : gt("Still connecting")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {settingsReadFailed
-            ? t(($) => $.welcome.savedSettingsFailed)
-            : t(($) => $.welcome.workspaceUnconfirmed)}
+            ? gt("Your saved settings could not be loaded.")
+            : gt("T3 Code could not confirm this workspace.")}
         </p>
         <Button
           className="mt-5"
@@ -217,7 +215,7 @@ function FirstRunRecovery({
           }}
         >
           <RefreshIcon refreshing={retrying} />
-          {settingsReadFailed ? t(($) => $.welcome.retry) : t(($) => $.welcome.reload)}
+          {settingsReadFailed ? gt("Retry") : gt("Reload")}
         </Button>
       </div>
     </main>

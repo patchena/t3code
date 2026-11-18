@@ -17,7 +17,8 @@ import type {
   ThreadId,
 } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { mFallback, msg } from "gt-i18n";
+import type { MFunctionType } from "gt-i18n/types";
 
 import { formatSubagentDisplayTitle } from "./subagentDisplay.ts";
 
@@ -78,10 +79,6 @@ export interface EnvironmentThreadStructure {
   readonly projection: ThreadStructure;
 }
 
-export interface ProviderStarting {
-  readonly provider: string | null;
-}
-
 export interface ThreadRunSummary {
   readonly runId: RunId;
   readonly status: OrchestrationV2RunStatus;
@@ -99,7 +96,9 @@ export interface ThreadRunSummary {
    * provider is still launching and nothing is generating. Clients show it
    * instead of "Thinking".
    */
-  readonly providerStarting?: ProviderStarting;
+  readonly providerStartingLabel?: string;
+  /** `providerStartingLabel` as a `msg()` string; display sites resolve this one. */
+  readonly providerStartingLabelMsg?: string;
   readonly sourcePlanRef?: {
     readonly threadId: ThreadId;
     readonly planId: PlanId;
@@ -197,6 +196,8 @@ export interface EnvironmentThreadShell {
   readonly pullRequests: ReadonlyArray<import("@t3tools/contracts").ThreadPullRequestLink>;
   readonly linkedPullRequest?: ThreadLinkedPullRequest | null;
   readonly branchPullRequest?: ThreadLinkedPullRequest | null;
+  /** Absent from rows built before issue linking; the server sends an empty list. */
+  readonly issues?: ReadonlyArray<import("@t3tools/contracts").ThreadIssueLink>;
   /**
    * Server-tracked visited watermark. `undefined` means the environment's
    * server predates visited tracking and clients should fall back to any
@@ -306,6 +307,7 @@ export function presentThreadShell(
     pullRequests: threadPullRequestsOf(thread),
     linkedPullRequest: thread.linkedPullRequest ?? null,
     branchPullRequest: thread.branchPullRequest ?? null,
+    issues: thread.issues ?? [],
     lineage: thread.lineage,
     forkedFrom: thread.forkedFrom,
     linkOrigin: thread.linkOrigin ?? null,
@@ -403,10 +405,15 @@ export function resolveThreadWorkingStartedAt(input: {
   return null;
 }
 
-export function formatWorkingDurationLabel(elapsedMs: number, t: TFunction<"common">): string {
+export function formatWorkingDurationLabel(
+  elapsedMs: number,
+  resolve: MFunctionType = mFallback,
+): string {
   const seconds = Number.isFinite(elapsedMs) ? Math.max(0, Math.floor(elapsedMs / 1000)) : 0;
-  if (seconds < 60) return t(($) => $.time.seconds, { count: seconds });
+  if (seconds < 60) return resolve(msg("{count}s", { count: seconds }));
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return t(($) => $.time.minutes, { count: minutes });
-  return t(($) => $.time.hoursMinutes, { hours: Math.floor(minutes / 60), minutes: minutes % 60 });
+  if (minutes < 60) return resolve(msg("{count}m", { count: minutes }));
+  return resolve(
+    msg("{hours}h {minutes}m", { hours: Math.floor(minutes / 60), minutes: minutes % 60 }),
+  );
 }

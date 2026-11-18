@@ -1,23 +1,23 @@
-import { systemLocale } from "~/timestampFormat";
-import { useTranslation } from "react-i18next";
-import type { PullRequestReplyAvailability } from "~/components/pullRequest/pullRequestDetail.logic";
+import { T, useGT } from "gt-react";
+
+import type { PullRequestReplyAvailability } from "./pullRequestDetail.logic";
 
 export function PullRequestMoreReplies({
   moreReplies,
   hasMoreReplies,
   url,
 }: PullRequestReplyAvailability) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   if (!hasMoreReplies) return null;
   return (
     <div className="flex flex-wrap items-baseline gap-2 py-1 text-xs text-muted-foreground">
       <span>
         {moreReplies > 0
-          ? t(($) => $.git.moreReplies, {
+          ? gt("{count, plural, one {{formatted} more reply} other {{formatted} more replies}}", {
               count: moreReplies,
-              value: moreReplies.toLocaleString(systemLocale),
+              formatted: moreReplies.toLocaleString(),
             })
-          : t(($) => $.git.moreRepliesLabel)}
+          : gt("More replies")}
       </span>
       {url ? (
         <a
@@ -26,7 +26,7 @@ export function PullRequestMoreReplies({
           rel="noopener noreferrer"
           className="hover:text-foreground hover:underline"
         >
-          {t(($) => $.git.viewOnHost)}
+          <T>View on host</T>
         </a>
       ) : null}
     </div>

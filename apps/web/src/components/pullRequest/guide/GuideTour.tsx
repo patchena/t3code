@@ -1,5 +1,5 @@
-import { useTranslation } from "react-i18next";
 import type { EnvironmentId, PullRequestRef, PullRequestReviewGuide } from "@t3tools/contracts";
+import { T, Var } from "gt-react";
 import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 
 import { createPullRequestDiffFileContentsLoader } from "~/lib/diffFileContents";
@@ -9,18 +9,18 @@ import { useAtomCommand } from "~/state/use-atom-command";
 
 import { isCommandPaletteOpen } from "~/commandPaletteBus";
 
-import { GuideRail } from "~/components/pullRequest/guide/GuideRail";
-import { GuideStop } from "~/components/pullRequest/guide/GuideStop";
-import type { ExcerptCommenting } from "~/components/pullRequest/guide/GuideExcerpt";
+import { GuideRail } from "./GuideRail";
+import { GuideStop } from "./GuideStop";
+import type { ExcerptCommenting } from "./GuideExcerpt";
 import {
   guideProgressKey,
   guideRunKey,
   useGuideProgress,
   useGuideRunStore,
   type GuideProgress,
-} from "~/components/pullRequest/guide/guideRunStore";
+} from "./guideRunStore";
 import { stepTourPosition, stopFilePaths } from "@t3tools/client-runtime/review-guide-tour";
-import { useGuideDiffFiles } from "~/components/pullRequest/guide/useGuideDiffFiles";
+import { useGuideDiffFiles } from "./useGuideDiffFiles";
 
 export function GuideTour({
   environmentId,
@@ -43,7 +43,6 @@ export function GuideTour({
   onFinish: (() => void) | null;
   onOpenFile: (path: string) => void;
 }) {
-  const { t } = useTranslation("workspace");
   const key = guideProgressKey(guideRunKey(environmentId, reference), guide.headSha);
   const tour = useGuideProgress(key);
   const update = (change: (current: GuideProgress) => Partial<GuideProgress>) =>
@@ -117,12 +116,15 @@ export function GuideTour({
           {banner}
           {diff.error !== null ? (
             <p className="text-xs text-muted-foreground">
-              {t(($) => $.git.guideDiffFailed)}
-              {diff.error}
+              <T>
+                The diff could not be loaded, so excerpts are missing: <Var>{diff.error}</Var>
+              </T>
             </p>
           ) : null}
           {stop === null ? (
-            <p className="text-sm text-muted-foreground">{t(($) => $.git.noTourFiles)}</p>
+            <p className="text-sm text-muted-foreground">
+              <T>This change has no files to tour.</T>
+            </p>
           ) : (
             <GuideStop
               key={position}

@@ -1,6 +1,5 @@
+import { useLocale, useMessages } from "gt-react";
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
-import { useClientSettings } from "~/hooks/useSettings";
 import {
   computeStableMessagesTimelineRows,
   handoffRunsSignature,
@@ -45,30 +44,25 @@ export function useIncrementalTimelineRows(
   identity: string,
   input: MessagesTimelineRowsInput,
 ): MessagesTimelineRow[] {
-  const { t } = useTranslation("activity");
-  const language = useClientSettings((settings) => settings.interfaceLanguage);
+  // Keyed on the locale: without a GTProvider, useMessages() returns a new function every render.
+  const locale = useLocale();
+  const resolve = useMessages();
   const [state, setState] = useState(() => ({
     identity,
     input,
-    t,
-    language,
-    projection: deriveMessagesTimelineRowsWithState(input, t, language),
+    locale,
+    projection: deriveMessagesTimelineRowsWithState(input, null, resolve),
   }));
-  if (
-    state.identity === identity &&
-    state.t === t &&
-    state.language === language &&
-    sameRowsInput(state.input, input)
-  ) {
+  const reusable = state.identity === identity && state.locale === locale;
+  if (reusable && sameRowsInput(state.input, input)) {
     return state.projection.rows;
   }
   const projection = deriveMessagesTimelineRowsWithState(
     input,
-    t,
-    language,
-    state.identity === identity ? state.projection : null,
+    reusable ? state.projection : null,
+    resolve,
   );
-  setState({ identity, input, t, language, projection });
+  setState({ identity, input, locale, projection });
   return projection.rows;
 }
 

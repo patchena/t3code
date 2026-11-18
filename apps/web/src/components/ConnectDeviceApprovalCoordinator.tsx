@@ -1,3 +1,4 @@
+import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { useNavigate } from "@tanstack/react-router";
 import {
   type AtomCommandResult,
@@ -7,9 +8,9 @@ import {
 import { AuthAccessWriteScope, type EnvironmentId } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import { useEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
-import type { TFunction } from "@t3tools/client-runtime/i18n";
+import { msg } from "gt-react";
 
+import { m } from "../i18n/messages";
 import { authEnvironment } from "../state/auth";
 import { useEnvironments } from "../state/environments";
 import { useEnvironmentQuery } from "../state/query";
@@ -46,7 +47,6 @@ function EnvironmentConnectDeviceRequests(props: {
 async function reportFailure(
   title: string,
   action: () => Promise<AtomCommandResult<unknown, unknown>>,
-  t: TFunction<"common">,
 ): Promise<boolean> {
   const result = await action();
   if (result._tag !== "Failure") return false;
@@ -56,7 +56,7 @@ async function reportFailure(
       stackedThreadToast({
         type: "error",
         title,
-        description: error instanceof Error ? error.message : t(($) => $.operations.error),
+        description: thrownErrorMessage(error, m) ?? m(msg("An error occurred.")),
       }),
     );
   }
@@ -71,8 +71,6 @@ function ConnectDeviceRequestToasts({
   readonly environmentLabel: string;
 }) {
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation("connect");
-  const { t: tCommon } = useTranslation("common");
   const access = useEnvironmentQuery(authEnvironment.accessChanges({ environmentId, input: null }));
   const approve = useAtomCommand(authEnvironment.approveConnectDevice, { reportFailure: false });
   const deny = useAtomCommand(authEnvironment.revokePairingLink, { reportFailure: false });
@@ -110,8 +108,8 @@ function ConnectDeviceRequestToasts({
       toasts.current.delete(id);
     }
     for (const { id, request, remainingMs } of live) {
-      const device = describeConnectDeviceClient(request, t);
-      const renderedKey = `${i18n.language}:${request.verificationCode}:${device}`;
+      const device = describeConnectDeviceClient(request);
+      const renderedKey = `${request.verificationCode}:${device}`;
       const tracked = toasts.current.get(id);
       if (tracked?.renderedKey === renderedKey) continue;
       const close = () => {
@@ -120,22 +118,22 @@ function ConnectDeviceRequestToasts({
       };
       const options = stackedThreadToast({
         type: "info",
-        title: t(($) => $.connectDevices.requestTitle, { environment: environmentLabel }),
-        description: t(($) => $.connectDevices.requestDescription, {
-          device,
-          code: request.verificationCode,
-        }),
+        title: m(msg("A device wants to connect to {environmentLabel}", { environmentLabel })),
+        description: m(
+          msg("{device}. Approve only if it shows code {code}.", {
+            device,
+            code: request.verificationCode,
+          }),
+        ),
         timeout: remainingMs,
         actionProps: {
-          children: t(($) => $.actions.approve),
+          children: m(msg("Approve")),
           onClick: () => {
             close();
             void settle(
               id,
-              reportFailure(
-                t(($) => $.connectDevices.approveFailed),
-                () => approve({ environmentId, input: { pairingLinkId: id } }),
-                tCommon,
+              reportFailure(m(msg("Could not approve the device")), () =>
+                approve({ environmentId, input: { pairingLinkId: id } }),
               ),
             );
           },
@@ -143,15 +141,13 @@ function ConnectDeviceRequestToasts({
         data: {
           hideCopyButton: true,
           secondaryActionProps: {
-            children: t(($) => $.actions.deny),
+            children: m(msg("Deny")),
             onClick: () => {
               close();
               void settle(
                 id,
-                reportFailure(
-                  t(($) => $.connectDevices.denyFailed),
-                  () => deny({ environmentId, input: { id } }),
-                  tCommon,
+                reportFailure(m(msg("Could not deny the device")), () =>
+                  deny({ environmentId, input: { id } }),
                 ),
               );
             },
@@ -160,7 +156,7 @@ function ConnectDeviceRequestToasts({
             {
               id: "review",
               props: {
-                children: t(($) => $.connectDevices.review),
+                children: m(msg("Review", { $context: "verb, opens the device in settings" })),
                 onClick: () =>
                   void navigate({ to: "/settings/access", search: { machine: environmentId } }),
               },

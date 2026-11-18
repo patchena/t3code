@@ -1,10 +1,10 @@
-import { useTranslation } from "react-i18next";
 import type { PullRequestReviewGuideStop } from "@t3tools/contracts";
+import { T, useGT, useMessages } from "gt-react";
 import { CheckIcon } from "lucide-react";
 
 import { cn } from "~/lib/utils";
 
-import { Badge } from "~/components/ui/badge";
+import { Badge } from "../../ui/badge";
 import { stopSubline } from "@t3tools/client-runtime/review-guide-tour";
 
 export function GuideRail({
@@ -18,7 +18,8 @@ export function GuideRail({
   seen: ReadonlySet<number>;
   onSelect: (position: number) => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
+  const messages = useMessages();
   const reviewed = seen.size;
   const renderStop = (stop: PullRequestReviewGuideStop, index: number) => (
     <li key={index}>
@@ -31,10 +32,10 @@ export function GuideRail({
           <>
             {stop.attention !== null ? (
               <Badge size="sm" variant="warning">
-                {t(($) => $.git.lookClosely)}
+                <T>Look closely</T>
               </Badge>
             ) : null}
-            <span>{stopSubline(stop, t)}</span>
+            <span>{stopSubline(stop, messages)}</span>
           </>
         }
       />
@@ -42,9 +43,12 @@ export function GuideRail({
   );
 
   return (
-    <nav aria-label={t(($) => $.git.reviewTour)} className="flex min-h-0 flex-col gap-4">
+    <nav aria-label={gt("Review tour")} className="flex min-h-0 flex-col gap-4">
       <p className="text-xs text-muted-foreground tabular-nums @max-[56rem]/guide:hidden">
-        {t(($) => $.git.stopsRead, { count: reviewed, total: stops.length })}
+        {gt(
+          "{total, plural, one {{reviewed} of {total} read} other {{reviewed} of {total} read}}",
+          { reviewed, total: stops.length },
+        )}
       </p>
       <div className="flex flex-col gap-4">
         <ol className="flex flex-col gap-0.5">{stops.map(renderStop)}</ol>
@@ -90,7 +94,7 @@ function RailRow({
 }
 
 function StopBullet({ number, seen }: { number: number; seen: boolean }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   return (
     <span
       className={cn(
@@ -99,10 +103,7 @@ function StopBullet({ number, seen }: { number: number; seen: boolean }) {
       )}
     >
       {seen ? (
-        <CheckIcon
-          aria-label={t(($) => $.git.stopReadLabel, { number: number })}
-          className="size-3"
-        />
+        <CheckIcon aria-label={gt("Stop {number}, read", { number })} className="size-3" />
       ) : (
         number
       )}

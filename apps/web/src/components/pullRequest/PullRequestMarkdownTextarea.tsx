@@ -15,23 +15,19 @@ import {
   type PullRequestCompletionSupport,
   type PullRequestComposerTrigger,
 } from "@t3tools/shared/pullRequestComposerTrigger";
+import { msg, useMessages } from "gt-react";
 import { CircleCheckIcon, CircleDotIcon } from "lucide-react";
 import { useId, useState, type Ref } from "react";
 import { flushSync } from "react-dom";
-import { useTranslation } from "react-i18next";
 
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import { cn } from "~/lib/utils";
 import { usePullRequestFilterOptions } from "~/state/pullRequests";
 import { useDebouncedValue } from "~/state/queries";
 
-import { Popover, PopoverPopup } from "~/components/ui/popover";
-import { Textarea, type TextareaProps } from "~/components/ui/textarea";
-import { pullRequestStatePresentation } from "~/components/pullRequest/pullRequestIcons";
-import {
-  PullRequestActorAvatar,
-  resolvePullRequestState,
-} from "~/components/pullRequest/pullRequestPresentation";
+import { Popover, PopoverPopup } from "../ui/popover";
+import { Textarea, type TextareaProps } from "../ui/textarea";
+import { PULL_REQUEST_STATE_PRESENTATION } from "./pullRequestIcons";
+import { PullRequestActorAvatar, resolvePullRequestState } from "./pullRequestPresentation";
 
 /** The repository whose users `@` completes and whose issues and change requests `#` does. */
 export interface PullRequestCompletionScope {
@@ -100,20 +96,20 @@ function useCompletions(
 }
 
 function ReferenceStateIcon({ candidate }: { candidate: PullRequestReferenceCandidate }) {
-  const { t } = useTranslation("workspace");
+  const m = useMessages();
   const presentation =
     candidate.kind === "change-request"
-      ? resolvePullRequestState({ state: candidate.state, isDraft: false }, t)
+      ? resolvePullRequestState({ state: candidate.state, isDraft: false }, m)
       : candidate.state === "open"
         ? {
-            label: t(($) => $.git.openIssue),
+            label: m(msg("Open issue")),
             Icon: CircleDotIcon,
-            toneClassName: pullRequestStatePresentation(t).open.toneClassName,
+            toneClassName: PULL_REQUEST_STATE_PRESENTATION.open.toneClassName,
           }
         : {
-            label: t(($) => $.git.closedIssue),
+            label: m(msg("Closed issue")),
             Icon: CircleCheckIcon,
-            toneClassName: pullRequestStatePresentation(t).merged.toneClassName,
+            toneClassName: PULL_REQUEST_STATE_PRESENTATION.merged.toneClassName,
           };
   return (
     <presentation.Icon
@@ -147,22 +143,20 @@ function CompletionRow({ completion }: { completion: PullRequestCompletion }) {
   );
 }
 
-function completionEmptyState(t: TFunction<"workspace">) {
-  return {
-    mention: {
-      label: t(($) => $.git.mentionUser),
-      pending: t(($) => $.git.searchingUsers),
-      failed: t(($) => $.git.searchUsersFailed),
-      none: t(($) => $.git.noMatchingUsers),
-    },
-    reference: {
-      label: t(($) => $.git.referenceIssueOrRequest),
-      pending: t(($) => $.git.searchingReferences),
-      failed: t(($) => $.git.searchHostFailed),
-      none: t(($) => $.git.noMatchingReferences),
-    },
-  };
-}
+const EMPTY_STATE = {
+  mention: {
+    label: msg("Mention a user"),
+    pending: msg("Searching users..."),
+    failed: msg("Couldn't search users on the host"),
+    none: msg("No matching users"),
+  },
+  reference: {
+    label: msg("Reference an issue or change request"),
+    pending: msg("Searching..."),
+    failed: msg("Couldn't search the host"),
+    none: msg("No matching issues or change requests"),
+  },
+} as const;
 
 function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
   if (typeof ref === "function") ref(value);
@@ -185,8 +179,7 @@ export function PullRequestMarkdownTextarea({
   readonly onValueChange: (value: string) => void;
   readonly completionScope: PullRequestCompletionScope | null;
 }) {
-  const { t } = useTranslation("workspace");
-  const emptyState = completionEmptyState(t);
+  const m = useMessages();
   const listId = useId();
   const [element, setElement] = useState<HTMLTextAreaElement | null>(null);
   const [caret, setCaret] = useState<number | null>(null);
@@ -309,7 +302,7 @@ export function PullRequestMarkdownTextarea({
             <div
               id={listId}
               role="listbox"
-              aria-label={emptyState[trigger?.kind ?? "mention"].label}
+              aria-label={m(EMPTY_STATE[trigger?.kind ?? "mention"].label)}
               className="-mx-1.5"
             >
               {candidates.map((completion, index) => (
@@ -335,11 +328,11 @@ export function PullRequestMarkdownTextarea({
             </div>
           ) : (
             <p className="px-1 text-xs text-muted-foreground">
-              {
-                emptyState[trigger?.kind ?? "mention"][
+              {m(
+                EMPTY_STATE[trigger?.kind ?? "mention"][
                   isPending ? "pending" : failed ? "failed" : "none"
-                ]
-              }
+                ],
+              )}
             </p>
           )}
         </PopoverPopup>

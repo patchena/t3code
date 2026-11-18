@@ -1,11 +1,15 @@
-import type { TFunction } from "@t3tools/client-runtime/i18n";
 import type {
   GitRunStackedActionResult,
   GitStackedAction,
+  PullRequestChangeBreakdown,
   ReviewDiffPreviewSource,
   VcsStatusResult,
 } from "@t3tools/contracts";
+import { summarizeChangedFiles } from "@t3tools/shared/changedFileKind";
 import { isTemporaryWorktreeBranch } from "@t3tools/shared/git";
+import { msg } from "gt-react";
+import { m, type MessageResolver } from "../i18n/messages";
+import { changeRequestTermKind } from "./pullRequest/changeRequestTerm";
 import type { ChangeRequestTerminology } from "@t3tools/client-runtime/source-control-clients";
 import {
   changeRequestTerminologyFor,
@@ -13,7 +17,7 @@ import {
   type DefaultBranchConfirmableAction,
   type GitActionIconName,
   type GitDialogAction,
-  type VcsActionState,
+  vcsActionLabelText,
 } from "@t3tools/client-runtime/state/vcs";
 
 export {
@@ -52,57 +56,6 @@ export interface GitActionResultToastTiming {
 
 export const GIT_ACTION_SUCCESS_VISIBLE_MS = 10_000;
 
-export function resolveGitActionResultPresentation(
-  result: GitRunStackedActionResult,
-  terminology: ChangeRequestTerminology,
-  t: TFunction<"workspace">,
-): { title: string; description: string | null } {
-  if (result.pr.status === "created") {
-    return {
-      title: t(($) => $.git.createdRequest, { term: terminology.shortLabel }),
-      description: null,
-    };
-  }
-  const description = result.toast.description ?? null;
-  if (result.pr.status === "opened_existing") {
-    return {
-      title:
-        result.pr.number === undefined
-          ? t(($) => $.git.openedRequest, { term: terminology.shortLabel })
-          : t(($) => $.git.openedRequestNumber, {
-              term: terminology.shortLabel,
-              number: result.pr.number,
-            }),
-      description,
-    };
-  }
-  const sha = result.commit.commitSha?.slice(0, 7);
-  if (result.push.status === "pushed") {
-    const branch = result.push.upstreamBranch ?? result.push.branch;
-    return {
-      title:
-        sha === undefined
-          ? branch === undefined
-            ? t(($) => $.git.pushed)
-            : t(($) => $.git.pushedToBranch, { branch })
-          : branch === undefined
-            ? t(($) => $.git.pushedSha, { sha })
-            : t(($) => $.git.pushedShaToBranch, { sha, branch }),
-      description,
-    };
-  }
-  if (result.commit.status === "created") {
-    return {
-      title:
-        sha === undefined
-          ? t(($) => $.git.committedChanges)
-          : t(($) => $.git.committedSha, { sha }),
-      description,
-    };
-  }
-  return { title: t(($) => $.git.done), description };
-}
-
 export function resolveGitActionResultToastTiming(
   type: "error" | "success",
 ): GitActionResultToastTiming {
@@ -113,18 +66,16 @@ export function resolveGitActionResultToastTiming(
 }
 
 export function resolveGitActionProgressPresentation(
-  input: Pick<
-    VcsActionState,
-    | "isRunning"
-    | "operation"
-    | "currentPhase"
-    | "hookName"
-    | "lastOutputLine"
-    | "phaseStartedAtMs"
-    | "hookStartedAtMs"
-  >,
-  terminology: ChangeRequestTerminology,
-  t: TFunction<"workspace">,
+  input: {
+    readonly isRunning: boolean;
+    readonly operation: string | null;
+    readonly currentLabel: string | null;
+    readonly hookName?: string | null;
+    readonly lastOutputLine: string | null;
+    readonly phaseStartedAtMs: number | null;
+    readonly hookStartedAtMs: number | null;
+  },
+  resolve: MessageResolver = m,
 ): GitActionProgressPresentation | null {
   if (
     !input.isRunning ||
@@ -132,23 +83,18 @@ export function resolveGitActionProgressPresentation(
   ) {
     return null;
   }
+
+  const currentLabel = input.currentLabel?.trim();
   const output = input.lastOutputLine?.trim();
   const isPull = input.operation === "pull";
-  const status = isPull
-    ? t(($) => $.git.pulling)
-    : input.hookName !== null
-      ? t(($) => $.git.runningHook, { hook: input.hookName })
-      : input.currentPhase === "branch"
-        ? t(($) => $.git.preparingFeatureBranch)
-        : input.currentPhase === "commit"
-          ? t(($) => $.git.committing)
-          : input.currentPhase === "push"
-            ? t(($) => $.git.pushing)
-            : input.currentPhase === "pr"
-              ? t(($) => $.git.preparingRequest, { term: terminology.shortLabel })
-              : t(($) => $.git.startingGitAction);
   return {
-    status,
+    status:
+      currentLabel && currentLabel !== "Running source control action"
+        ? (vcsActionLabelText({ currentLabel, hookName: input.hookName ?? null }, resolve) ??
+          currentLabel)
+        : isPull
+          ? resolve(msg("Pulling latest changes..."))
+          : resolve(msg("Starting source control action...")),
     output: !isPull && output ? output : null,
     startedAtMs: isPull
       ? input.phaseStartedAtMs
@@ -156,26 +102,30 @@ export function resolveGitActionProgressPresentation(
   };
 }
 
-export function formatGitActionElapsed(startedAtMs: number | null, nowMs: number): string | null {
+export function formatGitActionElapsed(
+  startedAtMs: number | null,
+  nowMs: number,
+  resolve: MessageResolver = m,
+): string | null {
   if (startedAtMs === null) {
     return null;
   }
 
   const elapsedSeconds = Math.max(0, Math.floor((nowMs - startedAtMs) / 1_000));
   if (elapsedSeconds < 60) {
-    return `${elapsedSeconds}s`;
+    return resolve(msg("{seconds}s", { seconds: elapsedSeconds }));
   }
 
   const minutes = Math.floor(elapsedSeconds / 60);
   const seconds = elapsedSeconds % 60;
-  return `${minutes}m ${seconds}s`;
+  return resolve(msg("{minutes}m {seconds}s", { minutes, seconds }));
 }
 
 export function buildMenuItems(
   gitStatus: VcsStatusResult | null,
   isBusy: boolean,
   hasPrimaryRemote = true,
-  t: TFunction<"workspace">,
+  resolve: MessageResolver = m,
 ): GitActionMenuItem[] {
   if (!gitStatus) return [];
   const terminology = changeRequestTerminologyFor(gitStatus);
@@ -203,7 +153,7 @@ export function buildMenuItems(
 
   const commitItem: GitActionMenuItem = {
     id: "commit",
-    label: t(($) => $.git.commit),
+    label: resolve(msg("Commit", { $context: "verb, git action" })),
     disabled: !canCommit,
     icon: "commit",
     kind: "open_dialog",
@@ -216,7 +166,7 @@ export function buildMenuItems(
 
   const pushItem: GitActionMenuItem = {
     id: "push",
-    label: t(($) => $.git.push),
+    label: resolve(msg("Push", { $context: "verb, git action" })),
     disabled: !canPush,
     icon: "push",
     kind: "open_dialog",
@@ -232,13 +182,104 @@ export function buildMenuItems(
     pushItem,
     {
       id: "pr",
-      label: t(($) => $.git.createRequest, { term: terminology.shortLabel }),
+      label: resolve(
+        msg("Create {term, select, mr {MR} cr {change request} other {PR}}", {
+          term: changeRequestTermKind(terminology),
+        }),
+      ),
       disabled: !canCreatePr,
       icon: "pr",
       kind: "open_dialog",
       dialogAction: "create_pr",
     },
   ];
+}
+
+export function getMenuActionDisabledReason(
+  {
+    item,
+    gitStatus,
+    isBusy,
+    hasPrimaryRemote,
+  }: {
+    item: GitActionMenuItem;
+    gitStatus: VcsStatusResult | null;
+    isBusy: boolean;
+    hasPrimaryRemote: boolean;
+  },
+  resolve: MessageResolver = m,
+): string | null {
+  if (!item.disabled) return null;
+  if (isBusy) return resolve(msg("Git action in progress."));
+  if (!gitStatus) return resolve(msg("Git status is unavailable."));
+
+  const hasBranch = gitStatus.refName !== null;
+  const hasChanges = gitStatus.hasWorkingTreeChanges;
+  const isAhead = gitStatus.aheadCount > 0;
+  const isBehind = gitStatus.behindCount > 0;
+  const terminology = changeRequestTerminologyFor(gitStatus);
+
+  if (item.id === "commit") {
+    if (!hasChanges) {
+      return resolve(msg("Worktree is clean. Make changes before committing."));
+    }
+    return resolve(msg("Commit is currently unavailable."));
+  }
+
+  if (item.id === "push") {
+    if (!hasBranch) {
+      return resolve(msg("Detached HEAD: check out a branch before pushing."));
+    }
+    if (isBehind) {
+      return resolve(msg("Branch is behind upstream. Pull/rebase before pushing."));
+    }
+    if (!gitStatus.hasUpstream && !hasPrimaryRemote) {
+      return resolve(msg('Add an "origin" remote before pushing.'));
+    }
+    if (!isAhead) {
+      return resolve(msg("No local commits to push."));
+    }
+    return resolve(msg("Push is currently unavailable."));
+  }
+
+  if (!hasBranch) {
+    return resolve(
+      msg(
+        "Detached HEAD: check out a branch before creating a {term, select, mr {merge request} cr {change request} other {pull request}}.",
+        { term: changeRequestTermKind(terminology) },
+      ),
+    );
+  }
+  if (!gitStatus.hasUpstream && !hasPrimaryRemote) {
+    return resolve(
+      msg(
+        'Add an "origin" remote before creating a {term, select, mr {merge request} cr {change request} other {pull request}}.',
+        { term: changeRequestTermKind(terminology) },
+      ),
+    );
+  }
+  if ((gitStatus.aheadOfDefaultCount ?? gitStatus.aheadCount) <= 0) {
+    return resolve(
+      msg(
+        "No local commits to include in a {term, select, mr {merge request} cr {change request} other {pull request}}.",
+        { term: changeRequestTermKind(terminology) },
+      ),
+    );
+  }
+  if (isBehind) {
+    return resolve(
+      msg(
+        "Branch is behind upstream. Pull/rebase before creating a {term, select, mr {merge request} cr {change request} other {pull request}}.",
+        { term: changeRequestTermKind(terminology) },
+      ),
+    );
+  }
+  return resolve(
+    msg(
+      "Create {term, select, mr {merge request} cr {change request} other {pull request}} is currently unavailable.",
+      { term: changeRequestTermKind(terminology) },
+    ),
+  );
 }
 
 export function hasUsableGitMenuContent(input: {
@@ -259,23 +300,23 @@ export function resolveQuickAction(
   isBusy: boolean,
   isDefaultRef = false,
   hasPrimaryRemote = true,
-  t: TFunction<"workspace">,
+  resolve: MessageResolver = m,
 ): GitQuickAction {
   if (isBusy) {
     return {
-      label: t(($) => $.git.commit),
+      label: resolve(msg("Commit", { $context: "verb, git action" })),
       disabled: true,
       kind: "show_hint",
-      hint: t(($) => $.git.gitActionInProgress),
+      hint: resolve(msg("Git action in progress.")),
     };
   }
 
   if (!gitStatus) {
     return {
-      label: t(($) => $.git.commit),
+      label: resolve(msg("Commit", { $context: "verb, git action" })),
       disabled: true,
       kind: "show_hint",
-      hint: t(($) => $.git.gitStatusUnavailable),
+      hint: resolve(msg("Git status is unavailable.")),
     };
   }
 
@@ -290,17 +331,22 @@ export function resolveQuickAction(
 
   if (!hasBranch) {
     return {
-      label: t(($) => $.git.commit),
+      label: resolve(msg("Commit", { $context: "verb, git action" })),
       disabled: true,
       kind: "show_hint",
-      hint: t(($) => $.git.refBeforePush, { term: terminology.singular }),
+      hint: resolve(
+        msg(
+          "Create and checkout a ref before pushing or opening a {term, select, mr {merge request} cr {change request} other {pull request}}.",
+          { term: changeRequestTermKind(terminology) },
+        ),
+      ),
     };
   }
 
   if (hasChanges) {
     if (isBehind || (!gitStatus.hasUpstream && !hasPrimaryRemote)) {
       return {
-        label: t(($) => $.git.commit),
+        label: resolve(msg("Commit", { $context: "verb, git action" })),
         disabled: false,
         kind: "run_action",
         action: "commit",
@@ -308,14 +354,18 @@ export function resolveQuickAction(
     }
     if (hasOpenPr || isDefaultRef) {
       return {
-        label: t(($) => $.git.commitPush),
+        label: resolve(msg("Commit & push")),
         disabled: false,
         kind: "run_action",
         action: "commit_push",
       };
     }
     return {
-      label: t(($) => $.git.commitPushRequest, { term: terminology.shortLabel }),
+      label: resolve(
+        msg("Commit, push & {term, select, mr {MR} cr {change request} other {PR}}", {
+          term: changeRequestTermKind(terminology),
+        }),
+      ),
       disabled: false,
       kind: "run_action",
       action: "commit_push_pr",
@@ -325,7 +375,7 @@ export function resolveQuickAction(
   if (!gitStatus.hasUpstream) {
     if (!hasPrimaryRemote) {
       return {
-        label: t(($) => $.git.publishRepository),
+        label: resolve(msg("Publish repository")),
         disabled: false,
         kind: "open_publish",
       };
@@ -333,29 +383,33 @@ export function resolveQuickAction(
     if (!isAhead) {
       if (hasOpenPr) {
         return {
-          label: t(($) => $.git.commit),
+          label: resolve(msg("Commit", { $context: "verb, git action" })),
           disabled: true,
           kind: "show_hint",
-          hint: t(($) => $.git.branchUpToDate),
+          hint: resolve(msg("Branch is up to date. No action needed.")),
         };
       }
       return {
-        label: t(($) => $.git.push),
+        label: resolve(msg("Push", { $context: "verb, git action" })),
         disabled: true,
         kind: "show_hint",
-        hint: t(($) => $.git.noCommitsToPush),
+        hint: resolve(msg("No local commits to push.")),
       };
     }
     if (hasOpenPr || isDefaultRef) {
       return {
-        label: t(($) => $.git.push),
+        label: resolve(msg("Push", { $context: "verb, git action" })),
         disabled: false,
         kind: "run_action",
         action: isDefaultRef ? "commit_push" : "push",
       };
     }
     return {
-      label: t(($) => $.git.pushCreateRequest, { term: terminology.shortLabel }),
+      label: resolve(
+        msg("Push & create {term, select, mr {MR} cr {change request} other {PR}}", {
+          term: changeRequestTermKind(terminology),
+        }),
+      ),
       disabled: false,
       kind: "run_action",
       action: "create_pr",
@@ -364,16 +418,16 @@ export function resolveQuickAction(
 
   if (isDiverged) {
     return {
-      label: t(($) => $.git.syncRef),
+      label: resolve(msg("Sync ref")),
       disabled: true,
       kind: "show_hint",
-      hint: t(($) => $.git.divergedBranches),
+      hint: resolve(msg("Branch has diverged from upstream. Rebase/merge first.")),
     };
   }
 
   if (isBehind) {
     return {
-      label: t(($) => $.git.pull),
+      label: resolve(msg("Pull")),
       disabled: false,
       kind: "run_pull",
     };
@@ -382,14 +436,18 @@ export function resolveQuickAction(
   if (isAhead) {
     if (hasOpenPr || isDefaultRef) {
       return {
-        label: t(($) => $.git.push),
+        label: resolve(msg("Push", { $context: "verb, git action" })),
         disabled: false,
         kind: "run_action",
         action: isDefaultRef ? "commit_push" : "push",
       };
     }
     return {
-      label: t(($) => $.git.pushCreateRequest, { term: terminology.shortLabel }),
+      label: resolve(
+        msg("Push & create {term, select, mr {MR} cr {change request} other {PR}}", {
+          term: changeRequestTermKind(terminology),
+        }),
+      ),
       disabled: false,
       kind: "run_action",
       action: "create_pr",
@@ -398,16 +456,20 @@ export function resolveQuickAction(
 
   if (hasOpenPr && gitStatus.hasUpstream) {
     return {
-      label: t(($) => $.git.commit),
+      label: resolve(msg("Commit", { $context: "verb, git action" })),
       disabled: true,
       kind: "show_hint",
-      hint: t(($) => $.git.branchUpToDate),
+      hint: resolve(msg("Branch is up to date. No action needed.")),
     };
   }
 
   if (hasDefaultBranchDelta && !isDefaultRef) {
     return {
-      label: t(($) => $.git.createRequest, { term: terminology.shortLabel }),
+      label: resolve(
+        msg("Create {term, select, mr {MR} cr {change request} other {PR}}", {
+          term: changeRequestTermKind(terminology),
+        }),
+      ),
       disabled: false,
       kind: "run_action",
       action: "create_pr",
@@ -415,10 +477,10 @@ export function resolveQuickAction(
   }
 
   return {
-    label: t(($) => $.git.commit),
+    label: resolve(msg("Commit", { $context: "verb, git action" })),
     disabled: true,
     kind: "show_hint",
-    hint: t(($) => $.git.branchUpToDate),
+    hint: resolve(msg("Branch is up to date. No action needed.")),
   };
 }
 
@@ -429,56 +491,102 @@ export function resolveDefaultBranchActionDialogCopy(
     includesCommit: boolean;
     terminology: ChangeRequestTerminology;
   },
-  t: TFunction<"workspace">,
+  resolve: MessageResolver = m,
 ): DefaultBranchActionDialogCopy {
-  const branchLabel = input.branchName;
-  const { terminology } = input;
+  const branch = input.branchName;
+  const term = changeRequestTermKind(input.terminology);
 
   if (input.action === "push" || input.action === "commit_push") {
     if (input.includesCommit) {
       return {
-        title: t(($) => $.git.confirmCommitPushDefault),
-        description: t(($) => $.git.commitPushDefaultDescription, { branch: branchLabel }),
-        continueLabel: t(($) => $.git.commitPushToBranch, { branch: branchLabel }),
+        title: resolve(msg("Commit & push to default ref?")),
+        description: resolve(
+          msg(
+            'This action will commit and push changes on "{branch}". You can continue on this ref or create a feature ref and run the same action there.',
+            { branch },
+          ),
+        ),
+        continueLabel: resolve(msg("Commit & push to {branch}", { branch })),
       };
     }
     return {
-      title: t(($) => $.git.confirmPushDefault),
-      description: t(($) => $.git.pushDefaultDescription, { branch: branchLabel }),
-      continueLabel: t(($) => $.git.pushToBranch, { branch: branchLabel }),
+      title: resolve(msg("Push to default ref?")),
+      description: resolve(
+        msg(
+          'This action will push local commits on "{branch}". You can continue on this ref or create a feature ref and run the same action there.',
+          { branch },
+        ),
+      ),
+      continueLabel: resolve(msg("Push to {branch}", { branch })),
     };
   }
 
   if (input.includesCommit) {
     return {
-      title: t(($) => $.git.confirmCommitPushRequest, { term: terminology.shortLabel }),
-      description: t(($) => $.git.commitPushRequestDefaultDescription, {
-        branch: branchLabel,
-        term: terminology.singular,
-      }),
-      continueLabel: t(($) => $.git.commitPushCreateRequest, { term: terminology.shortLabel }),
+      title: resolve(
+        msg(
+          "Commit, push & create {term, select, mr {MR} cr {change request} other {PR}} from default ref?",
+          { term },
+        ),
+      ),
+      description: resolve(
+        msg(
+          'This action will commit, push, and create a {term, select, mr {merge request} cr {change request} other {pull request}} on "{branch}". You can continue on this ref or create a feature ref and run the same action there.',
+          { term, branch },
+        ),
+      ),
+      continueLabel: resolve(
+        msg("Commit, push & create {term, select, mr {MR} cr {change request} other {PR}}", {
+          term,
+        }),
+      ),
     };
   }
   return {
-    title: t(($) => $.git.confirmPushCreateRequest, { term: terminology.shortLabel }),
-    description: t(($) => $.git.pushRequestDefaultDescription, {
-      branch: branchLabel,
-      term: terminology.singular,
-    }),
-    continueLabel: t(($) => $.git.pushCreateRequest, { term: terminology.shortLabel }),
+    title: resolve(
+      msg(
+        "Push & create {term, select, mr {MR} cr {change request} other {PR}} from default ref?",
+        { term },
+      ),
+    ),
+    description: resolve(
+      msg(
+        'This action will push local commits and create a {term, select, mr {merge request} cr {change request} other {pull request}} on "{branch}". You can continue on this ref or create a feature ref and run the same action there.',
+        { term, branch },
+      ),
+    ),
+    continueLabel: resolve(
+      msg("Push & create {term, select, mr {MR} cr {change request} other {PR}}", { term }),
+    ),
   };
 }
 
-/** Clean trees cannot create feature branches because the server derives names from uncommitted changes. */
+/** The server names a feature branch from the commit it makes, so the action must commit changes. */
 export function resolveFeatureBranchUnavailableReason(
   input: {
+    action: DefaultBranchConfirmableAction;
     branchName: string;
     hasWorkingTreeChanges: boolean;
   },
-  t: TFunction<"workspace">,
+  resolve: MessageResolver = m,
 ): string | null {
-  if (input.hasWorkingTreeChanges) return null;
-  return t(($) => $.git.cannotNameFeatureBranch, { branch: input.branchName });
+  if (!input.hasWorkingTreeChanges) {
+    return resolve(
+      msg(
+        "There are no changes to commit, so a feature branch can't be named. Create a branch yourself or continue on {branch}.",
+        { branch: input.branchName },
+      ),
+    );
+  }
+  if (input.action === "push" || input.action === "create_pr") {
+    return resolve(
+      msg(
+        "This action doesn't commit your changes, so a feature branch can't be named. Create a branch yourself or continue on {branch}.",
+        { branch: input.branchName },
+      ),
+    );
+  }
+  return null;
 }
 
 export function resolveThreadBranchUpdate(
@@ -538,6 +646,8 @@ export type ChangesLineTotals = {
   readonly deletions: number;
   /** Ref the counts compare against; `null` means they are uncommitted changes against HEAD. */
   readonly baseRef: string | null;
+  /** `null` when the selected totals carry no per-file stats. */
+  readonly breakdown: PullRequestChangeBreakdown;
 };
 
 // `branchChanges ?? workingTree` treats `{0,0}` as present, so a zero branch total hid a dirty
@@ -555,7 +665,12 @@ export function resolveChangesTotals(
       insertions += file.additions;
       deletions += file.deletions;
     }
-    return { insertions, deletions, baseRef: branchPreview.baseRef };
+    return {
+      insertions,
+      deletions,
+      baseRef: branchPreview.baseRef,
+      breakdown: summarizeChangedFiles(branchPreview.files),
+    };
   }
   if (!status) return null;
   const branch = status.branchChanges;
@@ -570,5 +685,15 @@ export function resolveChangesTotals(
     insertions: selected.insertions,
     deletions: selected.deletions,
     baseRef: selected.baseRef,
+    breakdown:
+      selected === tree
+        ? summarizeChangedFiles(
+            tree.files.map((file) => ({
+              path: file.path,
+              additions: file.insertions,
+              deletions: file.deletions,
+            })),
+          )
+        : null,
   };
 }

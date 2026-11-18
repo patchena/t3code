@@ -1,8 +1,9 @@
-import { useTranslation } from "react-i18next";
-import { useCopyToClipboard } from "~/hooks/useCopyToClipboard";
+import { T, useGT } from "gt-react";
+
+import { type ClipboardTarget, useCopyToClipboard } from "~/hooks/useCopyToClipboard";
 import { cn } from "~/lib/utils";
 
-import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 export function PullRequestCopyableCode({
   value,
@@ -14,14 +15,14 @@ export function PullRequestCopyableCode({
   onError,
 }: {
   readonly value: string;
-  readonly target: string;
+  readonly target: ClipboardTarget;
   readonly copyLabel: string;
   readonly copiedLabel: string;
   readonly className?: string;
   readonly tooltipSide?: "top" | "bottom";
   readonly onError?: (error: Error) => void;
 }) {
-  const { t } = useTranslation("workspace");
+  const gt = useGT();
   const { copyToClipboard, isCopied } = useCopyToClipboard({
     target,
     timeout: 1600,
@@ -57,11 +58,11 @@ export function PullRequestCopyableCode({
             isCopied ? "opacity-100" : "opacity-0",
           )}
         >
-          {t(($) => $.git.copied)}
+          <T>Copied</T>
         </span>
       </TooltipTrigger>
       <TooltipPopup variant="code" side={tooltipSide}>
-        {`${isCopied ? t(($) => $.git.copied) : copyLabel}: ${value}`}
+        {`${isCopied ? gt("Copied") : copyLabel}: ${value}`}
       </TooltipPopup>
     </Tooltip>
   );

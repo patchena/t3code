@@ -1,23 +1,62 @@
-import { createI18n } from "@t3tools/client-runtime/i18n";
 import { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { describe, expect, it } from "vite-plus/test";
+import type { ComposerThreadDraftState } from "../../composerDraftStore";
 import { formatInlineContextReference } from "../../lib/composerContextReferences";
 import { threadContextReference } from "../../lib/composerContextRecords";
 import { threadContextRecord } from "@t3tools/shared/composerContextReferences";
 import {
   approvalRedirectNotice,
+  composerDraftContentChanged,
   loadBalancingSendWarning,
   multipleModelSendBlock,
   referencedThreadContexts,
 } from "./composerSend.logic";
 
-const chatT = createI18n("en").getFixedT(null, "chat");
-
 const local = EnvironmentId.make("local");
 const remote = EnvironmentId.make("remote");
 const localThread = threadContextRecord(scopeThreadRef(local, ThreadId.make("a")), "Local");
 const remoteThread = threadContextRecord(scopeThreadRef(remote, ThreadId.make("b")), "Remote");
+
+it("detects draft edits during upload preparation without treating upload metadata as an edit", () => {
+  const draft: ComposerThreadDraftState = {
+    prompt: "before",
+    images: [],
+    files: [
+      {
+        type: "file",
+        id: "file",
+        name: "a.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 1,
+        file: null,
+      },
+    ],
+    nonPersistedImageIds: [],
+    persistedAttachments: [],
+    terminalContexts: [],
+    previewAnnotations: [],
+    reviewComments: [],
+    threadContexts: [],
+    environmentContexts: [],
+    replyTo: null,
+    modelSelectionByProvider: {},
+    activeProvider: null,
+    runtimeMode: null,
+    interactionMode: null,
+  };
+  expect(
+    composerDraftContentChanged(draft, {
+      ...draft,
+      files: [{ ...draft.files[0]!, uploadedAttachmentId: "upload", uploadEnvironmentId: local }],
+    }),
+  ).toBe(false);
+  expect(composerDraftContentChanged(draft, { ...draft, prompt: "after" })).toBe(true);
+  expect(composerDraftContentChanged(draft, { ...draft, files: [] })).toBe(true);
+  expect(composerDraftContentChanged(draft, { ...draft, threadContexts: [localThread] })).toBe(
+    true,
+  );
+});
 
 describe("referencedThreadContexts", () => {
   it("keeps only the attached threads the prompt still links", () => {
@@ -31,40 +70,31 @@ describe("referencedThreadContexts", () => {
 describe("loadBalancingSendWarning", () => {
   it("asks the user to wait while resource checks run", () => {
     expect(
-      loadBalancingSendWarning(
-        {
-          pending: true,
-          threadContexts: [localThread, remoteThread],
-          candidateEnvironmentIds: [],
-        },
-        chatT,
-      ).title,
+      loadBalancingSendWarning({
+        pending: true,
+        threadContexts: [localThread, remoteThread],
+        candidateEnvironmentIds: [],
+      }).title,
     ).toBe("Checking machine resources");
   });
 
   it("blames the attached threads when no machine can read all of them", () => {
     expect(
-      loadBalancingSendWarning(
-        {
-          pending: false,
-          threadContexts: [localThread, remoteThread],
-          candidateEnvironmentIds: [local, remote],
-        },
-        chatT,
-      ).description,
+      loadBalancingSendWarning({
+        pending: false,
+        threadContexts: [localThread, remoteThread],
+        candidateEnvironmentIds: [local, remote],
+      }).description,
     ).toMatch(/No machine can read every attached thread/);
   });
 
   it("blames resources when one machine can read every attached thread", () => {
     expect(
-      loadBalancingSendWarning(
-        {
-          pending: false,
-          threadContexts: [localThread],
-          candidateEnvironmentIds: [remote, local],
-        },
-        chatT,
-      ).description,
+      loadBalancingSendWarning({
+        pending: false,
+        threadContexts: [localThread],
+        candidateEnvironmentIds: [remote, local],
+      }).description,
     ).toMatch(/No eligible machine has available resources/);
   });
 });
@@ -111,28 +141,28 @@ describe("approvalRedirectNotice", () => {
   };
 
   it("says the decline went through when the draft changed after it", () => {
-    expect(approvalRedirectNotice({ ...settled, draftChanged: true }, chatT)).toBe(
+    expect(approvalRedirectNotice({ ...settled, draftChanged: true })).toBe(
       "Approval declined. Your message changed, so it wasn't sent.",
     );
-    expect(approvalRedirectNotice({ ...settled, draftChanged: true, declined: false }, chatT)).toBe(
+    expect(approvalRedirectNotice({ ...settled, draftChanged: true, declined: false })).toBe(
       "Your message changed, so it wasn't sent.",
     );
   });
 
   it("explains an approval already being answered", () => {
     expect(
-      approvalRedirectNotice({ ...settled, declined: false, approvalResponding: true }, chatT),
+      approvalRedirectNotice({ ...settled, declined: false, approvalResponding: true }),
     ).toMatch(/already being answered/);
   });
 
   it("explains an approval that arrived during the decline", () => {
-    expect(approvalRedirectNotice({ ...settled, approvalArrived: true }, chatT)).toMatch(
+    expect(approvalRedirectNotice({ ...settled, approvalArrived: true })).toMatch(
       /Another approval arrived/,
     );
   });
 
   it("stays quiet when the decline failed or the user left the thread", () => {
-    expect(approvalRedirectNotice({ ...settled, declined: false }, chatT)).toBeNull();
-    expect(approvalRedirectNotice(settled, chatT)).toBeNull();
+    expect(approvalRedirectNotice({ ...settled, declined: false })).toBeNull();
+    expect(approvalRedirectNotice(settled)).toBeNull();
   });
 });
