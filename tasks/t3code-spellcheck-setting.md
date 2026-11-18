@@ -9,7 +9,7 @@ Annahme für die Umsetzung: Der Standardwert bleibt aktiviert. Die Einstellung g
 ## Anforderungen
 
 - Verwende den vorhandenen Client-Einstellungspfad mit einem booleschen Feld `composerSpellCheckEnabled` in `ClientSettingsSchema` und `ClientSettingsPatch`, einschließlich Standardwert.
-- Integriere den Schalter in `ChatSettingsPanel`, die Einstellungssuche, die Anzeige geänderter Einstellungen sowie individuelles und allgemeines Zurücksetzen. Ergänze deutsche und englische Texte im vorhandenen i18n-System.
+- Integriere den Schalter in `ChatSettingsPanel`, die Einstellungssuche, die Anzeige geänderter Einstellungen sowie individuelles und allgemeines Zurücksetzen. Ergänze Texte über die vorhandenen GT-APIs und übersetze neue Katalogeinträge in alle unterstützten Sprachen.
 - Übergib den wirksamen Wert an den gemeinsamen Prompt-Editor und setze `spellcheck` explizit auf dessen bearbeitbarem DOM-Element. Berücksichtige Rich-Text- und Klartextmodus sowie alle produktiven Aufrufstellen einschließlich der Editorvorschau in den Einstellungen.
 - Änderungen wirken auf bereits geöffnete Eingabefelder ohne Neustart, Remount, Verlust des Entwurfs oder Verschieben der Auswahl. Die deaktivierte Prüfung muss auch bereits sichtbare Markierungen entfernen.
 - Verwende die vorhandene Persistenz für Browser und Desktop. Speicherfehler bleiben sichtbar. Ein Wechsel des verbundenen Environments verändert diese lokale Präferenz nicht.
@@ -22,7 +22,7 @@ Annahme für die Umsetzung: Der Standardwert bleibt aktiviert. Die Einstellung g
 - `apps/web/src/hooks/useSettings.ts`: Lesen, Aktualisieren und Persistieren lokaler Einstellungen.
 - `apps/web/src/components/settings/SettingsPanels.tsx`: Chat-Einstellungen, Zurücksetzen und geänderte Einstellungen.
 - `apps/web/src/components/settings/settingsSearch.ts`: Suchindex.
-- `packages/client-runtime/src/i18n/{de,en}/settings.ts`: Übersetzungen.
+- `apps/web/src/i18n/translations/*.json`: GT-Kataloge; mit `vp run i18n:generate` im Web-Paket erzeugen und mit `vp run i18n:check` im Repository-Wurzelverzeichnis prüfen.
 - `apps/web/src/components/chat/ChatComposer.tsx` und `apps/web/src/components/settings/SettingsFontPreviews.tsx`: produktive Editor-Aufrufstellen.
 - `apps/web/src/components/ComposerPromptEditorTiptap.tsx`: `editorAttributes`, `useEditor` und bestehende Aktualisierung über `editor.view.setProps`.
 - `apps/desktop/src/settings/DesktopClientSettings.ts` und `apps/desktop/src/ipc/methods/clientSettings.ts`: Desktop-Persistenz und Schemaübertragung.

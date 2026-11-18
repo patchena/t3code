@@ -12,6 +12,13 @@ becomes an attachment when inserting it would exceed the message limit. On a
 hardware keyboard, use `Cmd+Shift+V` on Apple devices or `Ctrl+Shift+V` elsewhere
 to keep a large paste editable in the composer instead.
 
+## Spell check
+
+On web and desktop, **Settings → Chat → Composer spell check** controls spelling
+underlines in the composer. It starts enabled and applies to rich text and plain
+Markdown. Changes apply to the current draft; the preference is saved separately
+for each browser or desktop client.
+
 ## Formatting
 
 The composer writes Markdown and shows it styled as you type. When your cursor

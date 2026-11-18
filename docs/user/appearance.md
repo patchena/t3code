@@ -21,6 +21,17 @@ Android uses **Material You Layout** by default unless you have turned it off in
 It changes shapes, spacing, and controls independently
 of the selected theme.
 
+## Language
+
+Open **Settings → General → Language** on web, desktop, or mobile to choose the
+interface language. Select **Deutsch** for German or **System default** to follow
+your browser or operating system. The initial language is English; each client
+saves its own choice. Desktop menus follow the same choice.
+
+Missing translations can appear in English. Embedded sign-in and account dialogs
+may remain in English. The interface language does not change messages you send
+to an agent or its responses.
+
 ## Composer context
 
 Git-backed projects show branch and worktree controls below the composer while you create a thread.
