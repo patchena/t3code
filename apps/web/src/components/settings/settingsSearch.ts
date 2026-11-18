@@ -914,7 +914,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "start-fullscreen",
     title: msg("Start in fullscreen"),
     to: "/settings/general",
-    searchTerms: [msg("desktop app window launch maximized full screen startup")],
+    searchTerms: [msg("desktop app window launch full screen startup")],
     desktopOnly: true,
   },
   {

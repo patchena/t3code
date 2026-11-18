@@ -1,7 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
-import { DesktopSnapShotId } from "@t3tools/contracts";
+import { DEFAULT_CLIENT_SETTINGS, DesktopSnapShotId } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
@@ -163,9 +163,15 @@ function makeFakeBrowserWindow() {
   };
 }
 
-const layerDesktopClientSettings = Layer.mock(DesktopClientSettings.DesktopClientSettings)({
-  get: Effect.succeedNone,
-});
+const layerDesktopClientSettingsWith = (startFullscreen: boolean | undefined) =>
+  Layer.mock(DesktopClientSettings.DesktopClientSettings)({
+    get:
+      startFullscreen === undefined
+        ? Effect.succeedNone
+        : Effect.succeedSome({ ...DEFAULT_CLIENT_SETTINGS, startFullscreen }),
+  });
+
+const layerDesktopClientSettings = layerDesktopClientSettingsWith(undefined);
 
 const layerElectronApp = Layer.mock(ElectronApp.ElectronApp)({
   quit: Effect.void,
@@ -245,6 +251,7 @@ function layerTest(input: {
   readonly onPopupTemplate?: (input: ElectronMenu.ElectronMenuTemplateInput) => Effect.Effect<void>;
   readonly previewZoomReapplies?: number[];
   readonly onReveal?: (window: Electron.BrowserWindow) => void;
+  readonly duringReveal?: Effect.Effect<void>;
   readonly focusedWindow?: Electron.BrowserWindow;
   readonly fallbackWindow?: Electron.BrowserWindow;
   readonly platform?: NodeJS.Platform;
@@ -254,6 +261,7 @@ function layerTest(input: {
   }>;
   readonly primaryPasteEnabled?: boolean;
   readonly previewPasskeyBridgeEnabled?: boolean;
+  readonly startFullscreen?: boolean;
 }) {
   let desktopSettings = input.desktopSettings ?? DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS;
   const layerDesktopAppSettings = Layer.succeed(DesktopAppSettings.DesktopAppSettings, {
@@ -310,7 +318,10 @@ function layerTest(input: {
     setMain: (window) => Ref.set(input.mainWindow, Option.some(window)),
     clearMain: () => Ref.set(input.mainWindow, Option.none()),
     prepareReveal: () => Effect.succeed(false),
-    reveal: (window) => Effect.sync(() => input.onReveal?.(window)),
+    reveal: (window) =>
+      Effect.sync(() => input.onReveal?.(window)).pipe(
+        Effect.andThen(input.duringReveal ?? Effect.void),
+      ),
     sendAll: () => Effect.void,
     destroyAll: input.destroyAll ?? Effect.void,
     syncAllAppearance: (sync) =>
@@ -336,7 +347,7 @@ function layerTest(input: {
           ? layerDesktopEnvironment
           : layerDesktopEnvironmentFor(input.platform),
         layerDesktopAppSettings,
-        layerDesktopClientSettings,
+        layerDesktopClientSettingsWith(input.startFullscreen),
         layerDesktopServerExposure,
         DesktopState.layer,
         layerElectronApp,
@@ -675,6 +686,86 @@ describe("DesktopWindow", () => {
           ),
         );
       }),
+  );
+
+  it.effect(
+    "starts only the first main window fullscreen, after reveal and without maximizing",
+    () =>
+      Effect.gen(function* () {
+        const fake = makeFakeBrowserWindow();
+        const createCount = yield* Ref.make(0);
+        const mainWindow = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
+        const fullScreenCallsAtReveal: number[] = [];
+        let painted = Promise.withResolvers<void>();
+        yield* Effect.gen(function* () {
+          const windows = yield* DesktopWindow.DesktopWindow;
+          yield* windows.ensureMain;
+          fake.windowListeners.get("ready-to-show")?.();
+          yield* Effect.promise(() => painted.promise);
+          assert.deepEqual(fullScreenCallsAtReveal, [0]);
+          assert.deepEqual(fake.setFullScreen.mock.calls, [[true]]);
+          assert.equal(fake.maximize.mock.calls.length, 0);
+
+          fake.isDestroyed.mockReturnValue(true);
+          fake.windowListeners.get("closed")?.();
+          fake.isDestroyed.mockReturnValue(false);
+          painted = Promise.withResolvers<void>();
+          yield* windows.activate;
+          assert.equal(yield* Ref.get(createCount), 2);
+          fake.windowListeners.get("ready-to-show")?.();
+          yield* Effect.promise(() => painted.promise);
+          assert.deepEqual(fake.setFullScreen.mock.calls, [[true]]);
+          assert.equal(fake.maximize.mock.calls.length, 1);
+        }).pipe(
+          Effect.provide(
+            layerTest({
+              window: fake.window,
+              createCount,
+              mainWindow,
+              desktopSettings: {
+                ...DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS,
+                mainWindowMaximized: true,
+              },
+              startFullscreen: true,
+              onReveal: () => {
+                fullScreenCallsAtReveal.push(fake.setFullScreen.mock.calls.length);
+                painted.resolve();
+              },
+            }),
+          ),
+        );
+      }),
+  );
+
+  it.effect("does not enter fullscreen when quit starts during the first reveal", () =>
+    Effect.gen(function* () {
+      const fake = makeFakeBrowserWindow();
+      const createCount = yield* Ref.make(0);
+      const mainWindow = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
+      const painted = Promise.withResolvers<void>();
+      let quitting: Ref.Ref<boolean> | undefined;
+      yield* Effect.gen(function* () {
+        const windows = yield* DesktopWindow.DesktopWindow;
+        quitting = (yield* DesktopState.DesktopState).quitting;
+        yield* windows.ensureMain;
+        fake.windowListeners.get("ready-to-show")?.();
+        yield* Effect.promise(() => painted.promise);
+        assert.equal(fake.setFullScreen.mock.calls.length, 0);
+      }).pipe(
+        Effect.provide(
+          layerTest({
+            window: fake.window,
+            createCount,
+            mainWindow,
+            startFullscreen: true,
+            duringReveal: Effect.suspend(() =>
+              quitting === undefined ? Effect.void : Ref.set(quitting, true),
+            ),
+            onReveal: () => painted.resolve(),
+          }),
+        ),
+      );
+    }),
   );
 
   it.effect("leaves Cmd+W to the renderer and blocks repeated presses", () =>
@@ -1047,10 +1138,14 @@ describe("DesktopWindow", () => {
       }),
   );
 
-  it.effect("persists normal bounds and state for a maximized window", () =>
+  it.effect.each([
+    { state: "maximized", fullScreen: false },
+    { state: "fullscreen over a saved maximized", fullScreen: true },
+  ])("persists normal bounds and the maximized flag for a $state window", ({ fullScreen }) =>
     Effect.gen(function* () {
       const fakeWindow = makeFakeBrowserWindow();
-      fakeWindow.isMaximized.mockReturnValue(true);
+      fakeWindow.isMaximized.mockReturnValue(!fullScreen);
+      fakeWindow.isFullScreen.mockReturnValue(fullScreen);
       fakeWindow.getBounds.mockReturnValue({ x: 0, y: 0, width: 1920, height: 1080 });
       fakeWindow.getNormalBounds.mockReturnValue({ x: 220, y: 140, width: 1380, height: 920 });
       const createCount = yield* Ref.make(0);
@@ -1063,6 +1158,10 @@ describe("DesktopWindow", () => {
         mainWindow,
         mainWindowBoundsUpdates,
         mainWindowMaximizedUpdates,
+        desktopSettings: {
+          ...DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS,
+          mainWindowMaximized: true,
+        },
       });
 
       yield* Effect.gen(function* () {

@@ -398,6 +398,7 @@ export const make = Effect.gen(function* () {
   const backendReadyRef = yield* Ref.make(false);
   let backendHasStarted = false;
   let mainClosedDuringStartup = false;
+  let isFirstMainWindow = true;
   const splashWindowRef = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
   const context = yield* Effect.context<DesktopWindowRuntimeServices>();
   const runFork = Effect.runForkWith(context);
@@ -452,6 +453,18 @@ export const make = Effect.gen(function* () {
     const iconOption = getIconOption(iconPaths, environment.platform);
     const shouldUseDarkColors = yield* electronTheme.shouldUseDarkColors;
     const persistedSettings = yield* desktopSettings.get;
+    const startFullscreen = isFirstMainWindow
+      ? yield* clientSettings.get.pipe(
+          Effect.map(
+            Option.match({
+              onNone: () => DEFAULT_CLIENT_SETTINGS.startFullscreen,
+              onSome: (settings) => settings.startFullscreen,
+            }),
+          ),
+          Effect.orElseSucceed(() => DEFAULT_CLIENT_SETTINGS.startFullscreen),
+        )
+      : false;
+    isFirstMainWindow = false;
     const persistedBounds = persistedSettings.mainWindowBounds;
     const displayBoundsResult = yield* Effect.sync(() => {
       try {
@@ -525,9 +538,13 @@ export const make = Effect.gen(function* () {
       if (window.isMinimized()) {
         return lastPersistableState;
       }
-      const isMaximized = window.isMaximized();
+      const isFullScreen = window.isFullScreen();
+      const windowMaximized = window.isMaximized();
+      const isMaximized = isFullScreen
+        ? (lastPersistableState?.isMaximized ?? persistedSettings.mainWindowMaximized)
+        : windowMaximized;
       const bounds =
-        window.isFullScreen() || isMaximized
+        isFullScreen || windowMaximized
           ? normalBoundsOnWindowDisplay(
               window.getNormalBounds(),
               window.getBounds(),
@@ -995,22 +1012,11 @@ export const make = Effect.gen(function* () {
       firstRevealComplete = true;
       pendingMainReveals.delete(window);
       window.webContents.setBackgroundThrottling(true);
-      if (persistedSettings.mainWindowMaximized) window.maximize();
+      if (persistedSettings.mainWindowMaximized && !startFullscreen) window.maximize();
       yield* electronWindow.reveal(window);
-      const startFullscreen = yield* clientSettings.get.pipe(
-        Effect.map(
-          Option.match({
-            onNone: () => DEFAULT_CLIENT_SETTINGS.startFullscreen,
-            onSome: (settings) => settings.startFullscreen,
-          }),
-        ),
-        Effect.catch((error) =>
-          logWindowWarning("failed to read client settings for fullscreen start", {
-            message: error.message,
-          }).pipe(Effect.as(false)),
-        ),
-      );
-      if (startFullscreen && !window.isDestroyed()) window.setFullScreen(true);
+      if (startFullscreen && !window.isDestroyed() && !(yield* Ref.get(desktopState.quitting))) {
+        window.setFullScreen(true);
+      }
       yield* dismissConnectingSplash;
     });
     pendingMainReveals.set(window, revealWhenReady);

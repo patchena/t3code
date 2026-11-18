@@ -1070,29 +1070,6 @@ export function GeneralSettingsPanel() {
         />
         {isElectron ? (
           <SettingsRow
-            {...setting("start-fullscreen")}
-            description={<T>Open the app window in fullscreen on launch.</T>}
-            resetAction={
-              settings.startFullscreen !== DEFAULT_UNIFIED_SETTINGS.startFullscreen ? (
-                <SettingResetButton
-                  ariaLabel={gt("Reset fullscreen start to default")}
-                  onClick={() =>
-                    updateSettings({ startFullscreen: DEFAULT_UNIFIED_SETTINGS.startFullscreen })
-                  }
-                />
-              ) : null
-            }
-            control={
-              <Switch
-                checked={settings.startFullscreen}
-                onCheckedChange={(checked) => updateSettings({ startFullscreen: Boolean(checked) })}
-                aria-label={gt("Start in fullscreen")}
-              />
-            }
-          />
-        ) : null}
-        {isElectron ? (
-          <SettingsRow
             {...setting("quit-confirmation")}
             description={<T>Hold mode also quits on two quick presses.</T>}
             resetAction={
@@ -1226,6 +1203,29 @@ export function GeneralSettingsPanel() {
             </Select>
           }
         />
+        {isElectron ? (
+          <SettingsRow
+            {...setting("start-fullscreen")}
+            description={<T>Open the app window in fullscreen on launch.</T>}
+            resetAction={
+              settings.startFullscreen !== DEFAULT_UNIFIED_SETTINGS.startFullscreen ? (
+                <SettingResetButton
+                  ariaLabel={gt("Reset fullscreen start to default")}
+                  onClick={() =>
+                    updateSettings({ startFullscreen: DEFAULT_UNIFIED_SETTINGS.startFullscreen })
+                  }
+                />
+              ) : null
+            }
+            control={
+              <Switch
+                checked={settings.startFullscreen}
+                onCheckedChange={(checked) => updateSettings({ startFullscreen: Boolean(checked) })}
+                aria-label={gt("Start in fullscreen")}
+              />
+            }
+          />
+        ) : null}
       </SettingsSection>
     </SettingsPageContainer>
   );
