@@ -621,6 +621,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       ? [gt("Delete confirmation")]
       : []),
     ...(settings.confirmQuit !== DEFAULT_UNIFIED_SETTINGS.confirmQuit ? [gt("Quit shortcut")] : []),
+    ...(settings.startFullscreen !== DEFAULT_UNIFIED_SETTINGS.startFullscreen
+      ? [gt("Start in fullscreen")]
+      : []),
     ...(isTextGenerationModelDirty ? [gt("Text generation model")] : []),
     ...(settings.threadTitleInstructions !== DEFAULT_UNIFIED_SETTINGS.threadTitleInstructions
       ? [gt("Thread title instructions")]
@@ -736,6 +739,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
       confirmThreadUnpin: DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin,
       confirmQuit: DEFAULT_UNIFIED_SETTINGS.confirmQuit,
+      startFullscreen: DEFAULT_UNIFIED_SETTINGS.startFullscreen,
       textGenerationModelSelection: DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection,
       threadTitleInstructions: DEFAULT_UNIFIED_SETTINGS.threadTitleInstructions,
       fontFamilySans: DEFAULT_UNIFIED_SETTINGS.fontFamilySans,
@@ -1064,6 +1068,29 @@ export function GeneralSettingsPanel() {
             />
           }
         />
+        {isElectron ? (
+          <SettingsRow
+            {...setting("start-fullscreen")}
+            description={<T>Open the app window in fullscreen on launch.</T>}
+            resetAction={
+              settings.startFullscreen !== DEFAULT_UNIFIED_SETTINGS.startFullscreen ? (
+                <SettingResetButton
+                  ariaLabel={gt("Reset fullscreen start to default")}
+                  onClick={() =>
+                    updateSettings({ startFullscreen: DEFAULT_UNIFIED_SETTINGS.startFullscreen })
+                  }
+                />
+              ) : null
+            }
+            control={
+              <Switch
+                checked={settings.startFullscreen}
+                onCheckedChange={(checked) => updateSettings({ startFullscreen: Boolean(checked) })}
+                aria-label={gt("Start in fullscreen")}
+              />
+            }
+          />
+        ) : null}
         {isElectron ? (
           <SettingsRow
             {...setting("quit-confirmation")}

@@ -911,6 +911,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["ask before delete stop process shell console history"],
   },
   {
+    id: "start-fullscreen",
+    title: msg("Start in fullscreen"),
+    to: "/settings/general",
+    searchTerms: [msg("desktop app window launch maximized full screen startup")],
+    desktopOnly: true,
+  },
+  {
     id: "quit-confirmation",
     title: msg("Quit shortcut"),
     to: "/settings/general",

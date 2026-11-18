@@ -997,6 +997,20 @@ export const make = Effect.gen(function* () {
       window.webContents.setBackgroundThrottling(true);
       if (persistedSettings.mainWindowMaximized) window.maximize();
       yield* electronWindow.reveal(window);
+      const startFullscreen = yield* clientSettings.get.pipe(
+        Effect.map(
+          Option.match({
+            onNone: () => DEFAULT_CLIENT_SETTINGS.startFullscreen,
+            onSome: (settings) => settings.startFullscreen,
+          }),
+        ),
+        Effect.catch((error) =>
+          logWindowWarning("failed to read client settings for fullscreen start", {
+            message: error.message,
+          }).pipe(Effect.as(false)),
+        ),
+      );
+      if (startFullscreen && !window.isDestroyed()) window.setFullScreen(true);
       yield* dismissConnectingSplash;
     });
     pendingMainReveals.set(window, revealWhenReady);
