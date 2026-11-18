@@ -302,6 +302,7 @@ function Sidebar({
   const gt = useGT();
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [peek, setPeek] = React.useState(false);
+  const [overlay, setOverlay] = React.useState(false);
   // Not usePanelAnimationSettings: its navigation suppression would snap the sheet shut mid-exit when an item navigates.
   const panelAnimationDurationMs = useClientSettings(
     (settings) => settings.panelAnimationDurationMs,
@@ -310,6 +311,8 @@ function Sidebar({
   const panelAnimationsActive = panelAnimationDurationMs > 0 && !prefersReducedMotion;
   const offcanvasCollapsed = !isMobile && collapsible === "offcanvas" && state === "collapsed";
   if (peek && !offcanvasCollapsed) setPeek(false);
+  const nextOverlay = offcanvasCollapsed && (overlay || peek);
+  if (nextOverlay !== overlay) setOverlay(nextOverlay);
   const concealed = offcanvasCollapsed && !peek;
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the overlay follows the document pointer, which can pass it without ever entering it
@@ -499,6 +502,7 @@ function Sidebar({
         className="group peer hidden text-sidebar-foreground md:block"
         data-collapsible={state === "collapsed" && !peek ? collapsible : ""}
         data-collapsible-mode={collapsible}
+        data-overlay={overlay}
         data-peek={peek}
         inert={concealed}
         data-side={side}
@@ -520,13 +524,13 @@ function Sidebar({
         />
         <div
           className={cn(
-            "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) md:flex group-data-[peek=true]:z-50 group-data-[peek=true]:shadow-sidebar-peek dark:group-data-[peek=true]:shadow-sidebar-peek-dark",
-            "group-data-[peek=true]:before:absolute group-data-[peek=true]:before:inset-0 group-data-[peek=true]:before:-z-1 group-data-[peek=true]:before:rounded-[inherit] group-data-[peek=true]:before:bg-sidebar/(--glass-opacity) group-data-[peek=true]:before:backdrop-blur-(--glass-blur) group-data-[peek=true]:before:backdrop-saturate-(--glass-saturation)",
-            "group-data-[peek=true]:after:pointer-events-none group-data-[peek=true]:after:absolute group-data-[peek=true]:after:inset-0 group-data-[peek=true]:after:rounded-[inherit] group-data-[peek=true]:after:border-sidebar-border",
-            "[[data-panel-animations=true]_&]:transition-[left,right,width] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
+            "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) md:flex group-data-[collapsible=offcanvas]:invisible group-data-[overlay=true]:z-50 group-data-[overlay=true]:shadow-sidebar-peek dark:group-data-[overlay=true]:shadow-sidebar-peek-dark",
+            "group-data-[overlay=true]:before:absolute group-data-[overlay=true]:before:inset-0 group-data-[overlay=true]:before:-z-1 group-data-[overlay=true]:before:rounded-[inherit] group-data-[overlay=true]:before:bg-sidebar/(--glass-opacity) group-data-[overlay=true]:before:backdrop-blur-(--glass-blur) group-data-[overlay=true]:before:backdrop-saturate-(--glass-saturation)",
+            "group-data-[overlay=true]:after:pointer-events-none group-data-[overlay=true]:after:absolute group-data-[overlay=true]:after:inset-0 group-data-[overlay=true]:after:rounded-[inherit] group-data-[overlay=true]:after:border-sidebar-border",
+            "[[data-panel-animations=true]_&]:transition-[left,right,width,visibility] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
             side === "left"
-              ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] group-data-[peek=true]:rounded-r-xl group-data-[peek=true]:after:-right-px group-data-[peek=true]:has-[[data-slot=sidebar-rail]:hover]:after:border-r-2"
-              : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] group-data-[peek=true]:rounded-l-xl group-data-[peek=true]:after:-left-px group-data-[peek=true]:has-[[data-slot=sidebar-rail]:hover]:after:border-l-2",
+              ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] group-data-[overlay=true]:rounded-r-xl group-data-[overlay=true]:after:-right-px group-data-[overlay=true]:has-[[data-slot=sidebar-rail]:hover]:after:border-r-2"
+              : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] group-data-[overlay=true]:rounded-l-xl group-data-[overlay=true]:after:-left-px group-data-[overlay=true]:has-[[data-slot=sidebar-rail]:hover]:after:border-l-2",
             variant === "floating" || variant === "inset"
               ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
               : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
@@ -537,7 +541,7 @@ function Sidebar({
           {...props}
         >
           <div
-            className="flex h-full w-full flex-col bg-sidebar surface-grain group-data-[peek=true]:overflow-clip group-data-[peek=true]:rounded-[inherit] group-data-[peek=true]:bg-transparent group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
+            className="flex h-full w-full flex-col bg-sidebar surface-grain group-data-[overlay=true]:overflow-clip group-data-[overlay=true]:rounded-[inherit] group-data-[overlay=true]:bg-transparent group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm/5"
             data-sidebar="sidebar"
             data-slot="sidebar-inner"
           >
@@ -710,7 +714,7 @@ function SidebarRail({
               /* A collapsed offcanvas rail overlaps the native scrollbar on Windows and Linux. */
               "-translate-x-1/2 group-data-[side=left]:-right-4 absolute inset-y-0 z-20 hidden w-4 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=right]:left-0 sm:flex [[data-collapsible=offcanvas][data-state=collapsed]_&]:pointer-events-none",
               "[[data-panel-animations=true]_&]:transition-all [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
-              "touch-none group-data-[peek=true]:after:hidden",
+              "touch-none group-data-[overlay=true]:after:hidden",
               canResize
                 ? "cursor-col-resize"
                 : "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize [[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",

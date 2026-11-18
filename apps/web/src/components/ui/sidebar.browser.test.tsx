@@ -138,6 +138,7 @@ describe("Sidebar", () => {
     (screen.getByRole("button", { name: "Filter" }).element() as HTMLElement).focus();
     await move(rail.right + 1);
     expect(sidebar.inert).toBe(true);
+    expect(sidebar.dataset.overlay).toBe("true");
     expect(getComputedStyle(titlebar).getPropertyValue("-webkit-app-region")).toBe("drag");
     // The composer, not the trigger button, so typing still reaches it.
     expect(document.activeElement).toBe(
@@ -169,8 +170,10 @@ describe("Sidebar", () => {
     // The trigger sits under the overlay, so it is clicked directly.
     screen.container.querySelector<HTMLElement>('[data-slot="sidebar-trigger"]')!.click();
     await vi.waitFor(() => expect(sidebar.dataset.state).toBe("expanded"));
+    expect(sidebar.dataset.overlay).toBe("false");
     await collapse(screen);
     expect(sidebar.dataset.peek).toBe("false");
+    expect(sidebar.dataset.overlay).toBe("false");
   });
 
   it("keeps the peek open while editing inside it or while a popup, dialog or context menu is open", async () => {
