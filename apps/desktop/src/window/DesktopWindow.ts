@@ -540,7 +540,6 @@ export const make = Effect.gen(function* () {
       }
       const isFullScreen = window.isFullScreen();
       const windowMaximized = window.isMaximized();
-      if (!isFullScreen && window.isVisible()) maximizedOutsideFullScreen = windowMaximized;
       const isMaximized = isFullScreen ? maximizedOutsideFullScreen : windowMaximized;
       const bounds =
         isFullScreen || windowMaximized
@@ -842,8 +841,13 @@ export const make = Effect.gen(function* () {
     });
     window.on("resize", scheduleBoundsPersist);
     window.on("move", scheduleBoundsPersist);
-    window.on("maximize", scheduleBoundsPersist);
-    window.on("unmaximize", scheduleBoundsPersist);
+    // Linux reports entering fullscreen from maximized as unmaximize.
+    const trackMaximized = (maximized: boolean) => {
+      if (!window.isFullScreen()) maximizedOutsideFullScreen = maximized;
+      scheduleBoundsPersist();
+    };
+    window.on("maximize", () => trackMaximized(true));
+    window.on("unmaximize", () => trackMaximized(false));
     window.on("close", () => {
       runFork(flushBoundsPersist);
     });

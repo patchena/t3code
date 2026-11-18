@@ -1204,12 +1204,45 @@ describe("DesktopWindow", () => {
   );
 
   it.effect.each([
-    { state: "maximized", fullScreen: false, maximized: true },
-    { state: "fullscreen over a saved maximized", fullScreen: true, maximized: true },
-    { state: "fullscreen without a saved maximized", fullScreen: true, maximized: false },
-  ])(
+    { state: "maximized", fullScreen: false, saved: true, before: [], maximized: true },
+    {
+      state: "fullscreen over a saved maximized",
+      fullScreen: true,
+      saved: true,
+      before: [],
+      maximized: true,
+    },
+    {
+      state: "fullscreen without a saved maximized",
+      fullScreen: true,
+      saved: false,
+      before: [],
+      maximized: false,
+    },
+    {
+      state: "fullscreen read unmaximized before entering it",
+      fullScreen: true,
+      saved: true,
+      before: [["move", false]],
+      maximized: true,
+    },
+    {
+      state: "fullscreen entered from maximized",
+      fullScreen: true,
+      saved: true,
+      before: [["unmaximize", true]],
+      maximized: true,
+    },
+    {
+      state: "fullscreen entered after unmaximizing",
+      fullScreen: true,
+      saved: true,
+      before: [["unmaximize", false]],
+      maximized: false,
+    },
+  ] as const)(
     "persists normal bounds and the maximized flag for a $state window",
-    ({ fullScreen, maximized }) =>
+    ({ fullScreen, saved, before, maximized }) =>
       Effect.gen(function* () {
         const fakeWindow = makeFakeBrowserWindow();
         fakeWindow.isMaximized.mockReturnValue(!fullScreen);
@@ -1228,7 +1261,7 @@ describe("DesktopWindow", () => {
           mainWindowMaximizedUpdates,
           desktopSettings: {
             ...DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS,
-            mainWindowMaximized: maximized,
+            mainWindowMaximized: saved,
           },
         });
 
@@ -1236,6 +1269,20 @@ describe("DesktopWindow", () => {
           const desktopWindow = yield* DesktopWindow.DesktopWindow;
           yield* desktopWindow.handleBackendReady(new URL("http://127.0.0.1:3773"));
 
+          for (const [eventName, duringFullScreen] of before) {
+            const listener = fakeWindow.windowListeners.get(eventName);
+            if (!listener) {
+              return yield* Effect.die(`window ${eventName} listener was not registered`);
+            }
+            // Wayland may map the window unmaximized before fullscreen applies; Linux reports
+            // entering fullscreen from maximized as unmaximize.
+            fakeWindow.isFullScreen.mockReturnValue(duringFullScreen);
+            fakeWindow.isMaximized.mockReturnValue(false);
+            listener();
+          }
+          fakeWindow.isFullScreen.mockReturnValue(fullScreen);
+          fakeWindow.isMaximized.mockReturnValue(!fullScreen && maximized);
+          const normalBoundsReads = fakeWindow.getNormalBounds.mock.calls.length;
           const close = fakeWindow.windowListeners.get("close");
           if (!close) {
             return yield* Effect.die("window close listener was not registered");
@@ -1245,7 +1292,7 @@ describe("DesktopWindow", () => {
 
           assert.deepEqual(mainWindowBoundsUpdates, [{ x: 220, y: 140, width: 1380, height: 920 }]);
           assert.deepEqual(mainWindowMaximizedUpdates, [maximized]);
-          assert.equal(fakeWindow.getNormalBounds.mock.calls.length, 1);
+          assert.equal(fakeWindow.getNormalBounds.mock.calls.length, normalBoundsReads + 1);
         }).pipe(Effect.provide(layer));
       }),
   );
