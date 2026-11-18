@@ -841,7 +841,6 @@ export const make = Effect.gen(function* () {
     });
     window.on("resize", scheduleBoundsPersist);
     window.on("move", scheduleBoundsPersist);
-    // Linux reports entering fullscreen from maximized as unmaximize.
     const trackMaximized = (maximized: boolean) => {
       if (!window.isFullScreen()) maximizedOutsideFullScreen = maximized;
       scheduleBoundsPersist();
