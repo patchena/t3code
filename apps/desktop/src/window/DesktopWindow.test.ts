@@ -113,7 +113,6 @@ function makeFakeBrowserWindow() {
     isFullScreen: vi.fn(() => false),
     isMaximized: vi.fn(() => false),
     isMinimized: vi.fn(() => false),
-    isVisible: vi.fn(() => true),
     loadURL: vi.fn(() => Promise.resolve()),
     maximize: vi.fn(),
     on: vi.fn((eventName: string, listener: (...args: readonly unknown[]) => void) => {
@@ -142,7 +141,6 @@ function makeFakeBrowserWindow() {
     isFullScreen: window.isFullScreen,
     isMaximized: window.isMaximized,
     isMinimized: window.isMinimized,
-    isVisible: window.isVisible,
     loadURL: window.loadURL,
     maximize: window.maximize,
     openDevTools: webContents.openDevTools,
@@ -1227,6 +1225,21 @@ describe("DesktopWindow", () => {
       maximized: true,
     },
     {
+      state: "fullscreen entered after a macOS edge resize unzoomed it",
+      fullScreen: true,
+      saved: true,
+      before: [["resize", false]],
+      maximized: false,
+    },
+    {
+      state: "fullscreen entered after a Linux resize read unmaximized",
+      platform: "linux",
+      fullScreen: true,
+      saved: true,
+      before: [["resize", false]],
+      maximized: true,
+    },
+    {
       state: "fullscreen entered from maximized",
       fullScreen: true,
       saved: true,
@@ -1242,7 +1255,7 @@ describe("DesktopWindow", () => {
     },
   ] as const)(
     "persists normal bounds and the maximized flag for a $state window",
-    ({ fullScreen, saved, before, maximized }) =>
+    ({ platform, fullScreen, saved, before, maximized }) =>
       Effect.gen(function* () {
         const fakeWindow = makeFakeBrowserWindow();
         fakeWindow.isMaximized.mockReturnValue(!fullScreen);
@@ -1259,6 +1272,7 @@ describe("DesktopWindow", () => {
           mainWindow,
           mainWindowBoundsUpdates,
           mainWindowMaximizedUpdates,
+          ...(platform === undefined ? {} : { platform }),
           desktopSettings: {
             ...DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS,
             mainWindowMaximized: saved,
@@ -1274,8 +1288,6 @@ describe("DesktopWindow", () => {
             if (!listener) {
               return yield* Effect.die(`window ${eventName} listener was not registered`);
             }
-            // Wayland may map the window unmaximized before fullscreen applies; Linux reports
-            // entering fullscreen from maximized as unmaximize.
             fakeWindow.isFullScreen.mockReturnValue(duringFullScreen);
             fakeWindow.isMaximized.mockReturnValue(false);
             listener();
@@ -1370,7 +1382,6 @@ describe("DesktopWindow", () => {
     ({ fullScreen, maximized }) =>
       Effect.gen(function* () {
         const fakeWindow = makeFakeBrowserWindow();
-        fakeWindow.isVisible.mockReturnValue(false);
         const createCount = yield* Ref.make(0);
         const mainWindow = yield* Ref.make<Option.Option<Electron.BrowserWindow>>(Option.none());
         const mainWindowBoundsUpdates: DesktopAppSettings.DesktopWindowBounds[] = [];
@@ -1403,7 +1414,6 @@ describe("DesktopWindow", () => {
           assert.deepEqual(mainWindowBoundsUpdates, []);
 
           const normalBounds = { x: 80, y: 60, width: 1280, height: 840 };
-          fakeWindow.isVisible.mockReturnValue(true);
           fakeWindow.isFullScreen.mockReturnValue(fullScreen);
           fakeWindow.getBounds.mockReturnValue(
             fullScreen ? { x: 0, y: 0, width: 1920, height: 1080 } : normalBounds,
