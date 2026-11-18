@@ -749,6 +749,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("timestamp clock locale system browser os 12 hour 24 hour")],
   },
   {
+    id: "start-fullscreen",
+    title: msg("Start in fullscreen"),
+    to: "/settings/general",
+    searchTerms: [msg("desktop app window launch full screen startup")],
+    desktopOnly: true,
+  },
+  {
     id: "response-streaming",
     title: msg("Response streaming"),
     to: "/settings/threads",
@@ -909,13 +916,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: msg("Terminal close confirmation"),
     to: "/settings/general",
     searchTerms: ["ask before delete stop process shell console history"],
-  },
-  {
-    id: "start-fullscreen",
-    title: msg("Start in fullscreen"),
-    to: "/settings/general",
-    searchTerms: [msg("desktop app window launch full screen startup")],
-    desktopOnly: true,
   },
   {
     id: "quit-confirmation",

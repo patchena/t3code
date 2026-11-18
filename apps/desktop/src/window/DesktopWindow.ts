@@ -464,7 +464,6 @@ export const make = Effect.gen(function* () {
           Effect.orElseSucceed(() => DEFAULT_CLIENT_SETTINGS.startFullscreen),
         )
       : false;
-    isFirstMainWindow = false;
     const persistedBounds = persistedSettings.mainWindowBounds;
     const displayBoundsResult = yield* Effect.sync(() => {
       try {
@@ -529,6 +528,7 @@ export const make = Effect.gen(function* () {
       readonly bounds: DesktopAppSettings.DesktopWindowBounds;
       readonly isMaximized: boolean;
     } | null = null;
+    let maximizedOutsideFullScreen = persistedSettings.mainWindowMaximized;
     const readPersistableState = () => {
       if (window.isDestroyed()) {
         return null;
@@ -540,9 +540,8 @@ export const make = Effect.gen(function* () {
       }
       const isFullScreen = window.isFullScreen();
       const windowMaximized = window.isMaximized();
-      const isMaximized = isFullScreen
-        ? (lastPersistableState?.isMaximized ?? persistedSettings.mainWindowMaximized)
-        : windowMaximized;
+      if (!isFullScreen && window.isVisible()) maximizedOutsideFullScreen = windowMaximized;
+      const isMaximized = isFullScreen ? maximizedOutsideFullScreen : windowMaximized;
       const bounds =
         isFullScreen || windowMaximized
           ? normalBoundsOnWindowDisplay(
@@ -1012,8 +1011,9 @@ export const make = Effect.gen(function* () {
       firstRevealComplete = true;
       pendingMainReveals.delete(window);
       window.webContents.setBackgroundThrottling(true);
-      if (persistedSettings.mainWindowMaximized && !startFullscreen) window.maximize();
+      if (persistedSettings.mainWindowMaximized) window.maximize();
       yield* electronWindow.reveal(window);
+      isFirstMainWindow = false;
       if (startFullscreen && !window.isDestroyed() && !(yield* Ref.get(desktopState.quitting))) {
         window.setFullScreen(true);
       }
