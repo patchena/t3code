@@ -1397,7 +1397,13 @@ it.each([true, false])(
   "restores the caret after dictation unlocks the editor (rich text: %s)",
   async (richTextEnabled) => {
     const ui = (disabled: boolean) => (
-      <Composer value="Draft" richTextEnabled={richTextEnabled} skills={[]} disabled={disabled} />
+      <Composer
+        value="Draft"
+        richTextEnabled={richTextEnabled}
+        spellCheck
+        skills={[]}
+        disabled={disabled}
+      />
     );
     await using screen = await render(ui(false));
     const editor = editorIn(screen.container);
@@ -1421,7 +1427,7 @@ it.each(["other field", "document body"])(
   async (focusTarget) => {
     const ui = (disabled: boolean) => (
       <>
-        <Composer value="Draft" richTextEnabled skills={[]} disabled={disabled} />
+        <Composer value="Draft" richTextEnabled spellCheck skills={[]} disabled={disabled} />
         <input aria-label="Other field" />
       </>
     );
@@ -1446,6 +1452,7 @@ it("lets a one-line placeholder's button take clicks and passes the rest to the 
     <Composer
       value=""
       richTextEnabled
+      spellCheck
       skills={[]}
       placeholder="Run the tests"
       placeholderSuffix={
