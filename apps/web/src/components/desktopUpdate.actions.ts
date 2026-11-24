@@ -4,6 +4,7 @@ import { msg } from "gt-react";
 
 import {
   getDesktopUpdateActionError,
+  installDesktopUpdate,
   shouldToastDesktopUpdateActionResult,
 } from "~/components/desktopUpdate.logic";
 import { showDesktopUpdateDownloadedToast } from "~/components/desktopUpdate.toast";
@@ -60,7 +61,7 @@ export async function installLocalUpdate(
   expectedVersion?: string,
 ): Promise<boolean> {
   try {
-    const result = await bridge.installUpdate(expectedVersion);
+    const result = await installDesktopUpdate(bridge, expectedVersion);
     if (!result.accepted) {
       showDesktopUpdateDownloadedToast(bridge, result.state);
       return false;

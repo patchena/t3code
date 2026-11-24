@@ -49,9 +49,17 @@ it.each([true, false])(
     });
     const waitReady = vi.fn(() => approval);
     const downloadUpdate = vi.fn(async () => ({ completed: true, state: downloaded }));
-    const installUpdate = vi.fn(async () => ({ accepted: true, state: downloaded }));
+    const installUpdate = vi.fn(async () => ({
+      accepted: true,
+      completed: true,
+      state: downloaded,
+    }));
     using _patcher = stubGlobal("t3codePatcher", { waitReady });
-    using _desktop = stubGlobal("desktopBridge", { downloadUpdate, installUpdate });
+    using _desktop = stubGlobal("desktopBridge", {
+      downloadUpdate,
+      installUpdate,
+      onUpdateState: vi.fn(() => vi.fn()),
+    });
     await using screen = await render(<AboutSettingsPanel />);
 
     await userEvent.click(

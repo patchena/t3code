@@ -63,7 +63,7 @@ export function createLocalApi(): LocalApi {
         try {
           return await (window.desktopBridge
             ? (window.desktopBridge.showContextMenu(items, position, source) as Promise<T | null>)
-            : showContextMenuFallback(items, position));
+            : showContextMenuFallback(items, position, source));
         } finally {
           openContextMenus -= 1;
         }

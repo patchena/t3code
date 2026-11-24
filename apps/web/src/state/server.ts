@@ -25,7 +25,7 @@ import { isConnectedWithConfig } from "../components/settings/scopedSettings";
 import { environmentCatalog } from "../connection/catalog";
 import { connectionAtomRuntime } from "../connection/runtime";
 import { environmentAtomList } from "./environmentAtomList";
-import { primaryEnvironmentIdAtom, themeEnvironmentIdAtom } from "./primaryEnvironment";
+import { localEnvironmentIdAtom, primaryEnvironmentIdAtom } from "./primaryEnvironment";
 import { environmentSession } from "./session";
 import { reuseProvidersIgnoringCheckedAt } from "./serverProviders.logic";
 
@@ -167,9 +167,8 @@ export const primaryServerKeybindingsAtom = createShortcutKeybindingsAtom({
 const EMPTY_ENVIRONMENT_THEMES: ReadonlyArray<EnvironmentTheme> = [];
 
 const themeServerConfigAtom = Atom.make((get): ServerConfig | null => {
-  const environmentId = get(themeEnvironmentIdAtom);
+  const environmentId = get(localEnvironmentIdAtom);
   if (environmentId !== null) return get(serverEnvironment.configValueAtom(environmentId));
-  if (get(primaryEnvironmentIdAtom) !== null) return null;
   for (const candidate of get(environmentCatalog.catalogValueAtom).entries.keys()) {
     const config = get(serverEnvironment.configValueAtom(candidate));
     if (config?.environmentThemes !== undefined && config.environmentThemes.length > 0)

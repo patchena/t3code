@@ -122,9 +122,12 @@ describe("SidebarUpdatePill patcher", () => {
       cancel: async () => {},
       retry: async () => true,
     };
-    const installUpdate = vi.fn(async () => ({ accepted: true, state: update }));
+    const installUpdate = vi.fn(async () => ({ accepted: true, completed: true, state: update }));
     using _patcher = stubGlobal("t3codePatcher", patcher);
-    using _desktop = stubGlobal("desktopBridge", { installUpdate });
+    using _desktop = stubGlobal("desktopBridge", {
+      installUpdate,
+      onUpdateState: vi.fn(() => vi.fn()),
+    });
     await using screen = await render(<SidebarUpdatePill />);
     await using _reset = {
       async [Symbol.asyncDispose]() {
